@@ -1,0 +1,10 @@
+# General
+.env
+bin/
+*.exe
+*.exe~
+*.test
+*.out
+.idea/
+.vscode/
+.vs
