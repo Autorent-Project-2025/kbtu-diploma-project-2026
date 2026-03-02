@@ -9,7 +9,7 @@ namespace BookingService.Domain.Entities
         public int Id { get; set; }
 
         [Column("user_id")]
-        public int UserId { get; set; }
+        public string UserId { get; set; } = string.Empty;
 
         [Column("car_id")]
         public int CarId { get; set; }

@@ -1,0 +1,58 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: identity_service_postgres
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "${POSTGRES_PORT:-5434}:5432"
+    volumes:
+      - identity_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-postgres_db}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+
+  flyway:
+    image: flyway/flyway:12
+    container_name: identity_service_flyway
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: migrate
+    env_file:
+      - .env
+    volumes:
+      - ./src/Migrations:/flyway/sql:ro
+    environment:
+      FLYWAY_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-postgres_db}
+      FLYWAY_USER: ${POSTGRES_USER:-postgres}
+      FLYWAY_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      FLYWAY_CONNECT_RETRIES: 30
+
+  identity-service:
+    build:
+      context: ./src
+      dockerfile: ./IdentityService.Api/Dockerfile
+    container_name: identity_service_api
+    restart: unless-stopped
+    env_file:
+      - .env.example
+      - .env
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__DbConnection: Host=postgres;Port=5432;Database=${POSTGRES_DB:-postgres_db};Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:-postgres}
+    ports:
+      - "${EXTERNAL_PORT:-1244}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      flyway:
+        condition: service_completed_successfully
+
+volumes:
+  identity_pgdata:

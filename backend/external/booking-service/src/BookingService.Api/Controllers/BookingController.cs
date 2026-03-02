@@ -1,3 +1,4 @@
+using BookingService.Application.Constants;
 using BookingService.Application.DTOs.Booking;
 using BookingService.Application.DTOs.Common;
 using BookingService.Application.Interfaces;
@@ -19,18 +20,21 @@ namespace BookingService.Api.Controllers
             _bookingService = bookingService;
         }
 
-        private int GetUserId()
+        private string GetUserId()
         {
-            var claimUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (int.TryParse(claimUserId, out var userIdFromClaim) && userIdFromClaim > 0)
+            var claimUserId = User.FindFirstValue(ClaimTypes.NameIdentifier)
+                ?? User.FindFirstValue("sub");
+
+            if (!string.IsNullOrWhiteSpace(claimUserId))
             {
-                return userIdFromClaim;
+                return claimUserId;
             }
 
             throw new UnauthorizedAccessException("Authenticated user id claim is required.");
         }
 
         [HttpPost]
+        [Authorize(Policy = "bookings:create")]
         public async Task<IActionResult> Create([FromBody] BookingCreateDto dto)
         {
             var booking = await _bookingService.CreateBooking(GetUserId(), dto);

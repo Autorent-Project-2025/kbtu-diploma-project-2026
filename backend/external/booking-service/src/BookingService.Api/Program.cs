@@ -1,4 +1,5 @@
 using BookingService.Api.Middleware;
+using BookingService.Application.Constants;
 using BookingService.Application.Interfaces;
 using BookingService.Infrastructure.Persistence;
 using BookingService.Infrastructure.Utils;
@@ -73,7 +74,11 @@ builder.Services
         };
     });
 
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("bookings:create", policy =>
+        policy.RequireClaim("permissions", PermissionConstants.BookingCreate));
+});
 builder.Services.AddScoped<IBookingService, BookingService.Infrastructure.Services.BookingService>();
 
 var app = builder.Build();

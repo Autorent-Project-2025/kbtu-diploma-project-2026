@@ -35,14 +35,11 @@ namespace BookingService.Infrastructure.Services
             return !await HasOverlappingActiveBookings(carId, start, end);
         }
 
-        public async Task<BookingResponseDto> CreateBooking(int userId, BookingCreateDto dto)
+        public async Task<BookingResponseDto> CreateBooking(string userId, BookingCreateDto dto)
         {
             ArgumentNullException.ThrowIfNull(dto);
 
-            if (userId <= 0)
-            {
-                throw new ArgumentException("User id must be greater than zero.", nameof(userId));
-            }
+            EnsureValidUserId(userId);
 
             if (dto.CarId <= 0)
             {
@@ -90,12 +87,9 @@ namespace BookingService.Infrastructure.Services
             throw new InvalidOperationException("Car is already booked for this time.");
         }
 
-        public async Task<IEnumerable<BookingResponseDto>> GetUserBookings(int userId)
+        public async Task<IEnumerable<BookingResponseDto>> GetUserBookings(string userId)
         {
-            if (userId <= 0)
-            {
-                throw new ArgumentException("User id must be greater than zero.", nameof(userId));
-            }
+            EnsureValidUserId(userId);
 
             return await _db.Bookings
                 .AsNoTracking()
@@ -104,14 +98,11 @@ namespace BookingService.Infrastructure.Services
                 .ToListAsync();
         }
 
-        public async Task<PagedResult<BookingResponseDto>> GetUserBookingsPaginated(int userId, BookingQueryParams queryParams)
+        public async Task<PagedResult<BookingResponseDto>> GetUserBookingsPaginated(string userId, BookingQueryParams queryParams)
         {
             ArgumentNullException.ThrowIfNull(queryParams);
 
-            if (userId <= 0)
-            {
-                throw new ArgumentException("User id must be greater than zero.", nameof(userId));
-            }
+            EnsureValidUserId(userId);
 
             var sortBy = NormalizeSortBy(queryParams.SortBy);
             var isDescending = string.Equals(queryParams.SortOrder, "desc", StringComparison.OrdinalIgnoreCase);
@@ -144,17 +135,14 @@ namespace BookingService.Infrastructure.Services
             };
         }
 
-        public async Task<BookingResponseDto?> GetBooking(int id, int userId)
+        public async Task<BookingResponseDto?> GetBooking(int id, string userId)
         {
             if (id <= 0)
             {
                 throw new ArgumentException("Booking id must be greater than zero.", nameof(id));
             }
 
-            if (userId <= 0)
-            {
-                throw new ArgumentException("User id must be greater than zero.", nameof(userId));
-            }
+            EnsureValidUserId(userId);
 
             return await _db.Bookings
                 .AsNoTracking()
@@ -163,7 +151,7 @@ namespace BookingService.Infrastructure.Services
                 .FirstOrDefaultAsync();
         }
 
-        public async Task<bool> CancelBooking(int id, int userId)
+        public async Task<bool> CancelBooking(int id, string userId)
         {
             var booking = await GetUserBookingEntity(id, userId);
             if (booking == null)
@@ -176,7 +164,7 @@ namespace BookingService.Infrastructure.Services
             return true;
         }
 
-        public async Task<bool> ConfirmBooking(int id, int userId)
+        public async Task<bool> ConfirmBooking(int id, string userId)
         {
             var booking = await GetUserBookingEntity(id, userId);
             if (booking == null)
@@ -189,7 +177,7 @@ namespace BookingService.Infrastructure.Services
             return true;
         }
 
-        public async Task<bool> CompleteBooking(int id, int userId)
+        public async Task<bool> CompleteBooking(int id, string userId)
         {
             var booking = await GetUserBookingEntity(id, userId);
             if (booking == null)
@@ -202,7 +190,7 @@ namespace BookingService.Infrastructure.Services
             return true;
         }
 
-        private async Task<BookingResponseDto> CreateBookingInMemory(int userId, BookingCreateDto dto)
+        private async Task<BookingResponseDto> CreateBookingInMemory(string userId, BookingCreateDto dto)
         {
             await InMemoryCreateLock.WaitAsync();
             try
@@ -216,7 +204,7 @@ namespace BookingService.Infrastructure.Services
             }
         }
 
-        private async Task<Booking> CreateBookingWithOverlapCheck(int userId, BookingCreateDto dto)
+        private async Task<Booking> CreateBookingWithOverlapCheck(string userId, BookingCreateDto dto)
         {
             if (await HasOverlappingActiveBookings(dto.CarId, dto.StartDate, dto.EndDate))
             {
@@ -251,17 +239,14 @@ namespace BookingService.Infrastructure.Services
                     end > b.StartDate);
         }
 
-        private async Task<Booking?> GetUserBookingEntity(int id, int userId)
+        private async Task<Booking?> GetUserBookingEntity(int id, string userId)
         {
             if (id <= 0)
             {
                 throw new ArgumentException("Booking id must be greater than zero.", nameof(id));
             }
 
-            if (userId <= 0)
-            {
-                throw new ArgumentException("User id must be greater than zero.", nameof(userId));
-            }
+            EnsureValidUserId(userId);
 
             return await _db.Bookings
                 .FirstOrDefaultAsync(b => b.Id == id && b.UserId == userId);
@@ -299,6 +284,14 @@ namespace BookingService.Infrastructure.Services
             }
 
             throw new ArgumentException("SortBy must be one of: id, startDate, endDate.", nameof(sortBy));
+        }
+
+        private static void EnsureValidUserId(string userId)
+        {
+            if (string.IsNullOrWhiteSpace(userId))
+            {
+                throw new ArgumentException("User id is required.", nameof(userId));
+            }
         }
 
         private static void ApplyStatusTransition(Booking booking, BookingStatus targetStatus)

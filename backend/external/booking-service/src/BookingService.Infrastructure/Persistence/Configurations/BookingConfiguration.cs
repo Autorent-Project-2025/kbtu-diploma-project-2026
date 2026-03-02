@@ -10,6 +10,9 @@ namespace BookingService.Infrastructure.Persistence.Configurations
         {
             builder.ToTable("bookings");
 
+            builder.Property(b => b.UserId)
+                .HasMaxLength(64);
+
             builder.Property(b => b.Status)
                 .HasConversion<string>();
 
