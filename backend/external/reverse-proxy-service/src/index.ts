@@ -7,11 +7,11 @@ app.use(cors());
 
 type ServiceConfig = {
   route: string;
-  envKey: "USER_SERVICE_URL" | "CAR_SERVICE_URL" | "BOOKING_SERVICE_URL" | "INTERNAL_SERVICE_URL";
+  envKey: "IDENTITY_SERVICE_URL" | "CAR_SERVICE_URL" | "BOOKING_SERVICE_URL" | "INTERNAL_SERVICE_URL";
 };
 
 const services: ServiceConfig[] = [
-  { route: "/users", envKey: "USER_SERVICE_URL" },
+  { route: "/identity", envKey: "IDENTITY_SERVICE_URL" },
   { route: "/cars", envKey: "CAR_SERVICE_URL" },
   { route: "/bookings", envKey: "BOOKING_SERVICE_URL" },
   { route: "/internal", envKey: "INTERNAL_SERVICE_URL"},

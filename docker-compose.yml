@@ -1,5 +1,5 @@
 services:
-  user-db:
+  identity-db:
     image: postgres:16
     restart: unless-stopped
     environment:
@@ -7,9 +7,9 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: postgres_db
     ports:
-      - "${USER_DB_PORT:-5432}:5432"
+      - "${IDENTITY_DB_PORT:-5434}:5432"
     volumes:
-      - user_pgdata:/var/lib/postgresql/data
+      - identity_pgdata:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d postgres_db"]
       interval: 5s
@@ -17,40 +17,40 @@ services:
       retries: 20
       start_period: 5s
 
-  user-flyway:
+  identity-flyway:
     image: flyway/flyway:12
     restart: "no"
     depends_on:
-      user-db:
+      identity-db:
         condition: service_healthy
     command: migrate
     volumes:
-      - ./backend/external/user-service/src/Migrations:/flyway/sql:ro
+      - ./backend/shared/identity-service/src/Migrations:/flyway/sql:ro
     environment:
-      FLYWAY_URL: jdbc:postgresql://user-db:5432/postgres_db
+      FLYWAY_URL: jdbc:postgresql://identity-db:5432/postgres_db
       FLYWAY_USER: postgres
       FLYWAY_PASSWORD: postgres
       FLYWAY_CONNECT_RETRIES: 30
 
-  user-service:
+  identity-service:
     build:
-      context: ./backend/external/user-service/src
-      dockerfile: ./UserService.Api/Dockerfile
+      context: ./backend/shared/identity-service/src
+      dockerfile: ./IdentityService.Api/Dockerfile
     restart: unless-stopped
     env_file:
-      - path: ./backend/external/user-service/.env.example
+      - path: ./backend/shared/identity-service/.env.example
         required: true
-      - path: ./backend/external/user-service/.env
+      - path: ./backend/shared/identity-service/.env
         required: false
     environment:
       ASPNETCORE_ENVIRONMENT: Development
-      ConnectionStrings__DbConnection: Host=user-db;Port=5432;Database=postgres_db;Username=postgres;Password=postgres
+      ConnectionStrings__DbConnection: Host=identity-db;Port=5432;Database=postgres_db;Username=postgres;Password=postgres
     ports:
-      - "${USER_SERVICE_PORT:-1243}:8080"
+      - "${IDENTITY_SERVICE_PORT:-1244}:8080"
     depends_on:
-      user-db:
+      identity-db:
         condition: service_healthy
-      user-flyway:
+      identity-flyway:
         condition: service_completed_successfully
 
   car-db:
@@ -184,7 +184,7 @@ services:
       dockerfile: ./Dockerfile
     restart: unless-stopped
     environment:
-      USER_SERVICE_URL: http://user-service:8080
+      IDENTITY_SERVICE_URL: http://identity-service:8080
       CAR_SERVICE_URL: http://car-service:8080
       BOOKING_SERVICE_URL: http://booking-service:8080
       INTERNAL_SERVICE_URL: http://image-service:8080
@@ -192,7 +192,7 @@ services:
     ports:
       - "${API_GATEWAY_PORT:-9186}:8080"
     depends_on:
-      user-service:
+      identity-service:
         condition: service_started
       car-service:
         condition: service_started
@@ -219,7 +219,7 @@ services:
         condition: service_started
 
 volumes:
-  user_pgdata:
+  identity_pgdata:
   car_pgdata:
   booking_pgdata:
   image_uploads:
