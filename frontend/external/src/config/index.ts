@@ -1,6 +1,9 @@
+const rawApiUrl = import.meta.env.VITE_API_URL || "http://localhost:9186";
+const normalizedApiUrl = rawApiUrl.replace(/\/+$/, "").replace(/\/api$/i, "");
+
 export const config = {
   api: {
-    baseURL: import.meta.env.VITE_API_URL || "http://localhost:2651/api",
+    baseURL: normalizedApiUrl,
   },
   app: {
     name: import.meta.env.VITE_APP_NAME || "AutoRent",
