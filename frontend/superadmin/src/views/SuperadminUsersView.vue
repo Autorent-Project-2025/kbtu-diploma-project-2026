@@ -11,6 +11,45 @@
     <div v-if="errorMessage" class="error" style="margin-bottom: 12px">{{ errorMessage }}</div>
     <div v-if="successMessage" class="success" style="margin-bottom: 12px">{{ successMessage }}</div>
 
+    <section class="card" style="margin-bottom: 16px">
+      <h2 style="margin: 0 0 12px">Создать пользователя</h2>
+
+      <form @submit.prevent="createNewUser" style="display: grid; gap: 12px">
+        <div style="display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr))">
+          <div>
+            <label class="label" for="createUsername">Username</label>
+            <input id="createUsername" v-model="createUsername" class="input" type="text" required />
+          </div>
+          <div>
+            <label class="label" for="createEmail">Email</label>
+            <input id="createEmail" v-model="createEmail" class="input" type="email" required />
+          </div>
+          <div>
+            <label class="label" for="createPassword">Password</label>
+            <input id="createPassword" v-model="createPassword" class="input" type="password" required />
+          </div>
+        </div>
+
+        <div>
+          <label class="label" for="createRoles">Роли (опционально)</label>
+          <select id="createRoles" v-model="createRoleNames" class="select" multiple style="min-height: 120px">
+            <option v-for="role in roles" :key="role.id" :value="role.name">
+              {{ role.name }}
+            </option>
+          </select>
+          <p style="margin: 6px 0 0; color: #6b7280; font-size: 12px">
+            Если роли не выбраны, будет назначена роль по умолчанию.
+          </p>
+        </div>
+
+        <div>
+          <button class="btn btn-primary" type="submit" :disabled="actionLoading || loading">
+            Создать пользователя
+          </button>
+        </div>
+      </form>
+    </section>
+
     <div v-if="loading">Загрузка...</div>
     <div v-else-if="users.length === 0" class="card">Пользователей пока нет.</div>
 
@@ -138,6 +177,7 @@ import { getRoles } from "../api/roles";
 import {
   activateUser,
   assignRole,
+  createUser as createUserApi,
   deactivateUser,
   deleteUser,
   getUserById,
@@ -162,6 +202,10 @@ const editUsername = ref("");
 const editEmail = ref("");
 const roleToAssignId = ref("");
 const searchQuery = ref("");
+const createUsername = ref("");
+const createEmail = ref("");
+const createPassword = ref("");
+const createRoleNames = ref<string[]>([]);
 
 const filteredUsers = computed(() => {
   const query = searchQuery.value.trim().toLowerCase();
@@ -190,6 +234,13 @@ function syncEditableFields() {
 
   editUsername.value = selectedUser.value.username;
   editEmail.value = selectedUser.value.email;
+}
+
+function resetCreateForm() {
+  createUsername.value = "";
+  createEmail.value = "";
+  createPassword.value = "";
+  createRoleNames.value = [];
 }
 
 async function loadData() {
@@ -244,6 +295,48 @@ async function selectUser(userId: string) {
   const user = await getUserById(userId);
   selectedUser.value = user;
   syncEditableFields();
+}
+
+async function createNewUser() {
+  if (actionLoading.value || loading.value) return;
+
+  const username = createUsername.value.trim();
+  const email = createEmail.value.trim();
+  const password = createPassword.value;
+
+  if (!username || !email || !password) {
+    errorMessage.value = "Заполните username, email и password.";
+    return;
+  }
+
+  const uniqueRoles = Array.from(
+    new Set(
+      createRoleNames.value
+        .map((roleName) => roleName.trim())
+        .filter((roleName) => roleName.length > 0)
+    )
+  );
+
+  actionLoading.value = true;
+  errorMessage.value = "";
+  successMessage.value = "";
+
+  try {
+    const created = await createUserApi({
+      username,
+      email,
+      password,
+      roles: uniqueRoles.length > 0 ? uniqueRoles : undefined,
+    });
+
+    resetCreateForm();
+    await reloadUsersAndKeepSelection(created.userId);
+    successMessage.value = `Пользователь ${created.username} создан.`;
+  } catch (e: any) {
+    errorMessage.value = e?.response?.data?.error || "Не удалось создать пользователя.";
+  } finally {
+    actionLoading.value = false;
+  }
 }
 
 function getRoleIdByName(roleName: string): string | null {

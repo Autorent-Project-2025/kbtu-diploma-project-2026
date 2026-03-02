@@ -1,9 +1,28 @@
 import api from "./axios";
 import type { User } from "../types/User";
 
+export interface CreateUserPayload {
+  username: string;
+  email: string;
+  password: string;
+  roles?: string[];
+}
+
+export interface CreateUserResponse {
+  userId: string;
+  username: string;
+  email: string;
+  roles: string[];
+}
+
 export async function getUsers(): Promise<User[]> {
   const res = await api.get("/identity/users");
   return (res.data ?? []) as User[];
+}
+
+export async function createUser(payload: CreateUserPayload): Promise<CreateUserResponse> {
+  const res = await api.post("/identity/users", payload);
+  return res.data as CreateUserResponse;
 }
 
 export async function getUserById(userId: string): Promise<User> {
