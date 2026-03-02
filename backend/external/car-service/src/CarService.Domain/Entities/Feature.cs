@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations.Schema;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace CarService.Domain.Entities
 {
@@ -10,6 +10,9 @@ namespace CarService.Domain.Entities
         [Column("name")]
         public required string Name { get; set; }
 
-        public List<CarFeature> CarFeatures { get; set; } = new();
+        [Column("created_on")]
+        public DateTime CreatedOn { get; set; }
+
+        public List<CarFeature> CarFeatures { get; set; } = [];
     }
 }

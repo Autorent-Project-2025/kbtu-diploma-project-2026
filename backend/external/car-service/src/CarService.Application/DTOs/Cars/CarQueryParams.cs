@@ -1,5 +1,5 @@
-﻿using CarService.Application.DTOs.Common;
-using CarService.Application.Enums;
+using CarService.Application.DTOs.Common;
+using CarService.Domain.Enums;
 
 namespace CarService.Application.DTOs.Cars
 {

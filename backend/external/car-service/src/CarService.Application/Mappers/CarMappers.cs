@@ -82,6 +82,7 @@ namespace CarService.Application.Mappers
                         Content = comment.Content,
                         Rating = comment.Rating,
                         UserId = comment.UserId,
+                        UserName = comment.UserName,
                         Created_On = comment.CreatedOn
                     })
                     .ToList(),

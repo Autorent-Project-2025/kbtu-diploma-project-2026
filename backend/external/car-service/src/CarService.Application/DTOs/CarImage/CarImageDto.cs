@@ -1,11 +1,11 @@
-﻿using CarService.Application.Attributes;
+using CarService.Application.Attributes;
 using CarService.Domain.Enums;
 
 namespace CarService.Application.DTOs.CarImage
 {
     public class CarImageDto
     {
-        public int Id;
+        public int Id { get; set; }
 
         public required string ImageUrl { get; set; }
 

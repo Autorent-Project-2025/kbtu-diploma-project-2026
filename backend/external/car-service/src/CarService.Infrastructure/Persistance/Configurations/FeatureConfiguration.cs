@@ -4,11 +4,11 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace CarService.Infrastructure.Persistence.Configurations
 {
-    public class CarConfiguration : IEntityTypeConfiguration<Car>
+    public class FeatureConfiguration : IEntityTypeConfiguration<Feature>
     {
-        public void Configure(EntityTypeBuilder<Car> builder)
+        public void Configure(EntityTypeBuilder<Feature> builder)
         {
-            builder.ToTable("cars");
+            builder.ToTable("features");
         }
     }
 }

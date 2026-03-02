@@ -1,11 +1,10 @@
-using CarService.Application.DTOs.Cars;
 using CarService.Application.DTOs.Common;
-using CarService.Application.Mappers;
 using CarService.Application.DTOs.Cars;
-using CarService.Application.Entities;
-using CarService.Application.Enums;
 using CarService.Application.Interfaces;
-using CarService.Infrastructure.Persistence;
+using CarService.Application.Mappers;
+using CarService.Domain.Entities;
+using CarService.Domain.Enums;
+using CarService.Infrastructure.Persistance;
 using Microsoft.EntityFrameworkCore;
 
 namespace CarService.Infrastructure.Services
@@ -30,7 +29,6 @@ namespace CarService.Infrastructure.Services
         {
             var query = _db.Cars.AsQueryable();
 
-            // Filtering
             if (!string.IsNullOrWhiteSpace(queryParams.Brand))
             {
                 query = query.Where(c => c.Brand.ToLower().Contains(queryParams.Brand.ToLower()));
@@ -41,7 +39,6 @@ namespace CarService.Infrastructure.Services
                 query = query.Where(c => c.Model.ToLower().Contains(queryParams.Model.ToLower()));
             }
 
-            // Sorting
             var isDescending = queryParams.SortOrder?.ToLower() == "desc";
 
             query = queryParams.SortBy switch
@@ -73,12 +70,11 @@ namespace CarService.Infrastructure.Services
         {
             var car = await _db.Cars
                 .Include(c => c.Comments)
-                    .ThenInclude(cc => cc.User)
                 .Include(c => c.CarFeatures)
                     .ThenInclude(cf => cf.Feature)
                 .FirstOrDefaultAsync(c => c.Id == id);
 
-            return car.ToCarDetailsResponseDto();
+            return car?.ToCarDetailsResponseDto();
         }
 
         public async Task<CarCreateResponseDto> Create(CarCreateRequestDto dto)
@@ -97,7 +93,7 @@ namespace CarService.Infrastructure.Services
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
             var newFeaturesToCreate = inputCarFeatureNames
-                .Where(name => !existingCarFeatureNames.Contains(name.ToLower()))
+                .Where(name => !existingCarFeatureNames.Contains(name))
                 .Select(name => new Feature
                 {
                     Name = name,
@@ -129,7 +125,10 @@ namespace CarService.Infrastructure.Services
         public async Task<CarResponseDto?> Update(int id, CarUpdateDto dto)
         {
             var car = await _db.Cars.FindAsync(id);
-            if (car == null) return null;
+            if (car == null)
+            {
+                return null;
+            }
 
             car.ApplyUpdate(dto);
 
@@ -141,7 +140,10 @@ namespace CarService.Infrastructure.Services
         public async Task<bool> Delete(int id)
         {
             var car = await _db.Cars.FindAsync(id);
-            if (car == null) return false;
+            if (car == null)
+            {
+                return false;
+            }
 
             _db.Cars.Remove(car);
             await _db.SaveChangesAsync();
@@ -154,7 +156,7 @@ namespace CarService.Infrastructure.Services
                 .Include(c => c.Comments)
                 .FirstOrDefaultAsync(c => c.Id == id);
 
-            if (!car.Comments.Any())
+            if (car is null || !car.Comments.Any())
             {
                 return;
             }

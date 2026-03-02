@@ -1,4 +1,4 @@
-﻿using CarService.Domain.Entities;
+using CarService.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -8,7 +8,7 @@ namespace CarService.Infrastructure.Persistence.Configurations
     {
         public void Configure(EntityTypeBuilder<CarComment> builder)
         {
-            builder.ToTable("CarComment");
+            builder.ToTable("car_comments");
 
             builder.HasOne(e => e.Car)
                 .WithMany(e => e.Comments)

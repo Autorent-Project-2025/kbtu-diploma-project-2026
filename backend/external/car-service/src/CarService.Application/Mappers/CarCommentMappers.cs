@@ -14,7 +14,7 @@ namespace CarService.Application.Mappers
             Content = comment.Content,
             Rating = comment.Rating,
             Created_On = comment.CreatedOn,
-            Username = comment.User.Name
+            Username = comment.UserName
         };
 
         public static IQueryable<CarCommentDetailsResponseDto> SelectToCarCommentDetailsResponseDto(this IQueryable<CarComment> query)
@@ -40,6 +40,7 @@ namespace CarService.Application.Mappers
             return new CarComment
             {
                 UserId = userId,
+                UserName = $"user-{userId}",
                 CarId = dto.CarId,
                 Content = dto.Content,
                 Rating = dto.Rating,

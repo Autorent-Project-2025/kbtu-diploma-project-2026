@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations.Schema;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace CarService.Domain.Entities
 {
@@ -9,6 +9,9 @@ namespace CarService.Domain.Entities
 
         [Column("user_id")]
         public int UserId { get; set; }
+
+        [Column("user_name")]
+        public string UserName { get; set; } = string.Empty;
 
         [Column("car_id")]
         public int CarId { get; set; }
