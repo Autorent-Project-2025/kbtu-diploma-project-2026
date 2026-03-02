@@ -1,57 +1,74 @@
-﻿namespace IdentityService.Domain.Entities
+namespace IdentityService.Domain.Entities;
+
+public class User
 {
-    public class User
+    public Guid Id { get; private set; }
+    public string Username { get; private set; } = string.Empty;
+    public string Email { get; private set; } = string.Empty;
+    public string PasswordHash { get; private set; } = string.Empty;
+
+    public ICollection<Role> Roles { get; private set; } = new List<Role>();
+    public ICollection<RefreshToken> RefreshTokens { get; private set; } = new List<RefreshToken>();
+
+    private User() { }
+
+    public User(Guid id, string username, string email, string passwordHash)
     {
-        private readonly List<Role> _roles = new();
+        Id = id == Guid.Empty ? Guid.NewGuid() : id;
+        SetUsername(username);
+        SetEmail(email);
+        SetPasswordHash(passwordHash);
+    }
 
-        public Guid Id { get; private set; }
-        public string Username { get; private set; }
-        public string Email { get; private set; }
-        public string PasswordHash { get; private set; }
-
-        public IReadOnlyCollection<Role> Roles => _roles.AsReadOnly();
-
-        private User() { }
-
-        public User(Guid id, string username, string email, string passwordHash)
+    public void SetPasswordHash(string passwordHash)
+    {
+        if (string.IsNullOrWhiteSpace(passwordHash))
         {
-            Id = id;
-            Username = username ?? throw new ArgumentNullException(nameof(username));
-            Email = email ?? throw new ArgumentNullException(nameof(email));
-            PasswordHash = passwordHash ?? throw new ArgumentNullException(nameof(passwordHash));
+            throw new ArgumentException("Password hash cannot be empty.", nameof(passwordHash));
         }
 
-        public void ChangeEmail(string newEmail)
-        {
-            if (string.IsNullOrWhiteSpace(newEmail))
-                throw new ArgumentException("Email cannot be empty");
+        PasswordHash = passwordHash;
+    }
 
-            Email = newEmail;
+    public void SetEmail(string email)
+    {
+        if (string.IsNullOrWhiteSpace(email))
+        {
+            throw new ArgumentException("Email cannot be empty.", nameof(email));
         }
 
-        public void ChangePassword(string newPasswordHash)
+        Email = email.Trim().ToLowerInvariant();
+    }
+
+    public void SetUsername(string username)
+    {
+        if (string.IsNullOrWhiteSpace(username))
         {
-            PasswordHash = newPasswordHash;
+            throw new ArgumentException("Username cannot be empty.", nameof(username));
         }
 
-        public void AddRole(Role role)
-        {
-            if (_roles.Any(r => r.Id == role.Id))
-                return;
+        Username = username.Trim();
+    }
 
-            _roles.Add(role);
+    public void AssignRole(Role role)
+    {
+        ArgumentNullException.ThrowIfNull(role);
+
+        if (Roles.Any(existingRole => existingRole.Id == role.Id))
+        {
+            return;
         }
 
-        public void RemoveRole(Guid roleId)
+        Roles.Add(role);
+    }
+
+    public bool HasPermission(string permissionName)
+    {
+        if (string.IsNullOrWhiteSpace(permissionName))
         {
-            var role = _roles.FirstOrDefault(r => r.Id == roleId);
-            if (role != null)
-                _roles.Remove(role);
+            return false;
         }
 
-        public bool HasPermission(string permissionName)
-        {
-            return _roles.Any(r => r.HasPermission(permissionName));
-        }
+        return Roles.Any(role => role.HasPermission(permissionName));
     }
 }
