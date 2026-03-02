@@ -18,6 +18,13 @@ public sealed class PermissionRepository : IPermissionRepository
         await _dbContext.Permissions.AddAsync(permission, cancellationToken);
     }
 
+    public async Task<IReadOnlyCollection<Permission>> ListAsync(CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.Permissions
+            .OrderBy(permission => permission.Name)
+            .ToArrayAsync(cancellationToken);
+    }
+
     public Task<Permission?> GetByIdAsync(Guid permissionId, CancellationToken cancellationToken = default)
     {
         return _dbContext.Permissions.SingleOrDefaultAsync(

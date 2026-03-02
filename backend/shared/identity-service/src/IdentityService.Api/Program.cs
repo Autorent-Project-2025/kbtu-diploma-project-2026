@@ -1,11 +1,23 @@
 using IdentityService.Api.Middleware;
+using IdentityService.Application.Constants;
+using IdentityService.Application.Commands.ActivateUser;
+using IdentityService.Application.Commands.ActivateUserByAdmin;
 using IdentityService.Application.Commands.AssignPermissionToRole;
 using IdentityService.Application.Commands.AssignRoleToUser;
 using IdentityService.Application.Commands.CreatePermission;
 using IdentityService.Application.Commands.CreateRole;
+using IdentityService.Application.Commands.CreateUser;
+using IdentityService.Application.Commands.DeactivateUser;
+using IdentityService.Application.Commands.DeleteUser;
 using IdentityService.Application.Commands.LoginUser;
+using IdentityService.Application.Commands.ProvisionUser;
 using IdentityService.Application.Commands.RefreshToken;
-using IdentityService.Application.Commands.RegisterUser;
+using IdentityService.Application.Commands.RemoveRoleFromUser;
+using IdentityService.Application.Commands.UpdateUser;
+using IdentityService.Application.Queries.GetPermissions;
+using IdentityService.Application.Queries.GetRoles;
+using IdentityService.Application.Queries.GetUserById;
+using IdentityService.Application.Queries.GetUsers;
 using IdentityService.Infrastructure;
 using IdentityService.Infrastructure.Security;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -18,13 +30,24 @@ builder.Services.AddEndpointsApiExplorer();
 
 builder.Services.AddInfrastructure(builder.Configuration);
 
-builder.Services.AddScoped<RegisterUserCommandHandler>();
+builder.Services.AddScoped<ActivateUserCommandHandler>();
+builder.Services.AddScoped<ActivateUserByAdminCommandHandler>();
 builder.Services.AddScoped<LoginUserCommandHandler>();
 builder.Services.AddScoped<RefreshTokenCommandHandler>();
+builder.Services.AddScoped<CreateUserCommandHandler>();
+builder.Services.AddScoped<UpdateUserCommandHandler>();
+builder.Services.AddScoped<DeactivateUserCommandHandler>();
+builder.Services.AddScoped<DeleteUserCommandHandler>();
+builder.Services.AddScoped<ProvisionUserCommandHandler>();
 builder.Services.AddScoped<CreateRoleCommandHandler>();
 builder.Services.AddScoped<AssignRoleToUserCommandHandler>();
+builder.Services.AddScoped<RemoveRoleFromUserCommandHandler>();
 builder.Services.AddScoped<CreatePermissionCommandHandler>();
 builder.Services.AddScoped<AssignPermissionToRoleCommandHandler>();
+builder.Services.AddScoped<GetUsersQueryHandler>();
+builder.Services.AddScoped<GetUserByIdQueryHandler>();
+builder.Services.AddScoped<GetRolesQueryHandler>();
+builder.Services.AddScoped<GetPermissionsQueryHandler>();
 
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
 builder.Services.AddCors(options =>
@@ -70,7 +93,47 @@ builder.Services
         };
     });
 
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("roles:create", policy =>
+        policy.RequireClaim("permissions", PermissionConstants.RoleCreate));
+
+    options.AddPolicy("roles:assign-permission", policy =>
+        policy.RequireClaim("permissions", PermissionConstants.RoleAssignPermission));
+
+    options.AddPolicy("roles:view", policy =>
+        policy.RequireClaim("permissions", PermissionConstants.RoleView));
+
+    options.AddPolicy("permissions:create", policy =>
+        policy.RequireClaim("permissions", PermissionConstants.PermissionCreate));
+
+    options.AddPolicy("permissions:view", policy =>
+        policy.RequireClaim("permissions", PermissionConstants.PermissionView));
+
+    options.AddPolicy("users:create", policy =>
+        policy.RequireClaim("permissions", PermissionConstants.UserCreate));
+
+    options.AddPolicy("users:view", policy =>
+        policy.RequireClaim("permissions", PermissionConstants.UserView));
+
+    options.AddPolicy("users:update", policy =>
+        policy.RequireClaim("permissions", PermissionConstants.UserUpdate));
+
+    options.AddPolicy("users:assign-role", policy =>
+        policy.RequireClaim("permissions", PermissionConstants.UserAssignRole));
+
+    options.AddPolicy("users:remove-role", policy =>
+        policy.RequireClaim("permissions", PermissionConstants.UserRemoveRole));
+
+    options.AddPolicy("users:deactivate", policy =>
+        policy.RequireClaim("permissions", PermissionConstants.UserDeactivate));
+
+    options.AddPolicy("users:activate", policy =>
+        policy.RequireClaim("permissions", PermissionConstants.UserActivate));
+
+    options.AddPolicy("users:delete", policy =>
+        policy.RequireClaim("permissions", PermissionConstants.UserDelete));
+});
 
 var app = builder.Build();
 

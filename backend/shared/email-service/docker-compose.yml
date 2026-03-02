@@ -1,0 +1,15 @@
+services:
+  email-service:
+    build:
+      context: ./src
+      dockerfile: ./Dockerfile
+    restart: unless-stopped
+    env_file:
+      - path: ./.env.example
+        required: true
+      - path: ./.env
+        required: false
+    environment:
+      PORT: 8080
+    ports:
+      - "${EXTERNAL_PORT:-9182}:8080"

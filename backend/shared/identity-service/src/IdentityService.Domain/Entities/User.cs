@@ -6,18 +6,20 @@ public class User
     public string Username { get; private set; } = string.Empty;
     public string Email { get; private set; } = string.Empty;
     public string PasswordHash { get; private set; } = string.Empty;
+    public bool IsActive { get; private set; } = true;
 
     public ICollection<Role> Roles { get; private set; } = new List<Role>();
     public ICollection<RefreshToken> RefreshTokens { get; private set; } = new List<RefreshToken>();
 
     private User() { }
 
-    public User(Guid id, string username, string email, string passwordHash)
+    public User(Guid id, string username, string email, string passwordHash, bool isActive = true)
     {
         Id = id == Guid.Empty ? Guid.NewGuid() : id;
         SetUsername(username);
         SetEmail(email);
         SetPasswordHash(passwordHash);
+        IsActive = isActive;
     }
 
     public void SetPasswordHash(string passwordHash)
@@ -60,6 +62,32 @@ public class User
         }
 
         Roles.Add(role);
+    }
+
+    public void RemoveRole(Guid roleId)
+    {
+        if (roleId == Guid.Empty)
+        {
+            return;
+        }
+
+        var role = Roles.FirstOrDefault(existingRole => existingRole.Id == roleId);
+        if (role is null)
+        {
+            return;
+        }
+
+        Roles.Remove(role);
+    }
+
+    public void Deactivate()
+    {
+        IsActive = false;
+    }
+
+    public void Activate()
+    {
+        IsActive = true;
     }
 
     public bool HasPermission(string permissionName)

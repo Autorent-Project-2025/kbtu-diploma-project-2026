@@ -5,9 +5,17 @@ namespace IdentityService.Application.Interfaces;
 public interface IUserRepository
 {
     Task AddAsync(User user, CancellationToken cancellationToken = default);
+    Task<IReadOnlyCollection<User>> ListAsync(
+        bool includeRolesAndPermissions = false,
+        CancellationToken cancellationToken = default);
 
     Task<User?> GetByEmailAsync(
         string email,
+        bool includeRolesAndPermissions = false,
+        CancellationToken cancellationToken = default);
+
+    Task<User?> GetByUsernameAsync(
+        string username,
         bool includeRolesAndPermissions = false,
         CancellationToken cancellationToken = default);
 
@@ -15,6 +23,8 @@ public interface IUserRepository
         Guid userId,
         bool includeRolesAndPermissions = false,
         CancellationToken cancellationToken = default);
+
+    void Delete(User user);
 
     Task<bool> ExistsByEmailAsync(string email, CancellationToken cancellationToken = default);
     Task<bool> ExistsByUsernameAsync(string username, CancellationToken cancellationToken = default);

@@ -45,6 +45,11 @@ public sealed class LoginUserCommandHandler
             throw new UnauthorizedException("Invalid email or password.");
         }
 
+        if (!user.IsActive)
+        {
+            throw new UnauthorizedException("User account is deactivated.");
+        }
+
         var permissions = user.Roles
             .SelectMany(role => role.Permissions)
             .Select(permission => permission.Name)

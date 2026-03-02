@@ -1,7 +1,7 @@
 using IdentityService.Api.Contracts.Auth;
+using IdentityService.Application.Commands.ActivateUser;
 using IdentityService.Application.Commands.LoginUser;
 using IdentityService.Application.Commands.RefreshToken;
-using IdentityService.Application.Commands.RegisterUser;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -11,31 +11,18 @@ namespace IdentityService.Api.Controllers;
 [Route("auth")]
 public sealed class AuthController : ControllerBase
 {
-    private readonly RegisterUserCommandHandler _registerUserCommandHandler;
     private readonly LoginUserCommandHandler _loginUserCommandHandler;
     private readonly RefreshTokenCommandHandler _refreshTokenCommandHandler;
+    private readonly ActivateUserCommandHandler _activateUserCommandHandler;
 
     public AuthController(
-        RegisterUserCommandHandler registerUserCommandHandler,
         LoginUserCommandHandler loginUserCommandHandler,
-        RefreshTokenCommandHandler refreshTokenCommandHandler)
+        RefreshTokenCommandHandler refreshTokenCommandHandler,
+        ActivateUserCommandHandler activateUserCommandHandler)
     {
-        _registerUserCommandHandler = registerUserCommandHandler;
         _loginUserCommandHandler = loginUserCommandHandler;
         _refreshTokenCommandHandler = refreshTokenCommandHandler;
-    }
-
-    [AllowAnonymous]
-    [HttpPost("register")]
-    public async Task<IActionResult> Register(
-        [FromBody] RegisterUserRequest request,
-        CancellationToken cancellationToken)
-    {
-        var result = await _registerUserCommandHandler.Handle(
-            new RegisterUserCommand(request.Username, request.Email, request.Password),
-            cancellationToken);
-
-        return Created($"/users/{result.UserId}", result);
+        _activateUserCommandHandler = activateUserCommandHandler;
     }
 
     [AllowAnonymous]
@@ -59,6 +46,19 @@ public sealed class AuthController : ControllerBase
     {
         var result = await _refreshTokenCommandHandler.Handle(
             new RefreshTokenCommand(request.RefreshToken),
+            cancellationToken);
+
+        return Ok(result);
+    }
+
+    [AllowAnonymous]
+    [HttpPost("activate")]
+    public async Task<IActionResult> Activate(
+        [FromBody] ActivateUserRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await _activateUserCommandHandler.Handle(
+            new ActivateUserCommand(request.ActivationToken, request.Password),
             cancellationToken);
 
         return Ok(result);

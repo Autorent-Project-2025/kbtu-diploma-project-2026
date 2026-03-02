@@ -15,6 +15,7 @@ public class IdentityDbContext : DbContext, IIdentityUnitOfWork
     public DbSet<Role> Roles => Set<Role>();
     public DbSet<Permission> Permissions => Set<Permission>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+    public DbSet<ActivationToken> ActivationTokens => Set<ActivationToken>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

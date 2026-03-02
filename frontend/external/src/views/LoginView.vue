@@ -155,10 +155,10 @@
         <!-- Register Link -->
         <div class="text-center">
           <router-link
-            to="/register"
+            to="/apply"
             class="text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 font-semibold transition-colors inline-flex items-center gap-1 group"
           >
-            <span>Зарегистрироваться</span>
+            <span>Подать заявку</span>
             <svg
               class="w-4 h-4 transform group-hover:translate-x-1 transition-transform"
               fill="none"

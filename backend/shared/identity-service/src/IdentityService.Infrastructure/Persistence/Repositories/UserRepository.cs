@@ -18,6 +18,16 @@ public sealed class UserRepository : IUserRepository
         await _dbContext.Users.AddAsync(user, cancellationToken);
     }
 
+    public async Task<IReadOnlyCollection<User>> ListAsync(
+        bool includeRolesAndPermissions = false,
+        CancellationToken cancellationToken = default)
+    {
+        var query = BuildUserQuery(includeRolesAndPermissions);
+        return await query
+            .OrderBy(user => user.Username)
+            .ToArrayAsync(cancellationToken);
+    }
+
     public Task<User?> GetByEmailAsync(
         string email,
         bool includeRolesAndPermissions = false,
@@ -31,6 +41,16 @@ public sealed class UserRepository : IUserRepository
             cancellationToken);
     }
 
+    public Task<User?> GetByUsernameAsync(
+        string username,
+        bool includeRolesAndPermissions = false,
+        CancellationToken cancellationToken = default)
+    {
+        var normalizedUsername = username.Trim();
+        var query = BuildUserQuery(includeRolesAndPermissions);
+        return query.SingleOrDefaultAsync(user => user.Username == normalizedUsername, cancellationToken);
+    }
+
     public Task<User?> GetByIdAsync(
         Guid userId,
         bool includeRolesAndPermissions = false,
@@ -38,6 +58,11 @@ public sealed class UserRepository : IUserRepository
     {
         var query = BuildUserQuery(includeRolesAndPermissions);
         return query.SingleOrDefaultAsync(user => user.Id == userId, cancellationToken);
+    }
+
+    public void Delete(User user)
+    {
+        _dbContext.Users.Remove(user);
     }
 
     public Task<bool> ExistsByEmailAsync(string email, CancellationToken cancellationToken = default)

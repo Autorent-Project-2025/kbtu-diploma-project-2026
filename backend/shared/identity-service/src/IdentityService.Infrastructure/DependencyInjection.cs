@@ -17,6 +17,7 @@ public static class DependencyInjection
         IConfiguration configuration)
     {
         services.Configure<JwtOptions>(configuration.GetSection(JwtOptions.SectionName));
+        services.Configure<InternalAuthOptions>(configuration.GetSection(InternalAuthOptions.SectionName));
 
         var connectionString = configuration.GetConnectionString("DbConnection");
         if (string.IsNullOrWhiteSpace(connectionString))
@@ -40,6 +41,7 @@ public static class DependencyInjection
         services.AddScoped<IRoleRepository, RoleRepository>();
         services.AddScoped<IPermissionRepository, PermissionRepository>();
         services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
+        services.AddScoped<IActivationTokenRepository, ActivationTokenRepository>();
         services.AddScoped<IPasswordHasher, BCryptPasswordHasher>();
         services.AddSingleton<IJwtProvider, JwtProvider>();
 
