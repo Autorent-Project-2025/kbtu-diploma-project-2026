@@ -9,21 +9,21 @@ export interface GetMyBookingsParams {
 
 /**
  * Получить бронирования текущего пользователя с пагинацией
- * Пытается использовать /api/v2/bookings/my (с пагинацией)
- * Если не работает, fallback на /api/booking/my
+ * Пытается использовать /bookings/my (с пагинацией)
+ * Если не работает, fallback на тот же endpoint
  */
 export async function getMyBookings(
   params?: GetMyBookingsParams
 ): Promise<PaginatedResponse<Booking> | Booking[]> {
   try {
-    // Пробуем использовать v2 endpoint с пагинацией
+    // Основной endpoint с пагинацией
     const queryParams = new URLSearchParams();
 
     if (params?.page) queryParams.append("page", params.page.toString());
     if (params?.pageSize)
       queryParams.append("pageSize", params.pageSize.toString());
 
-    const url = `/v2/bookings/my${
+    const url = `/bookings/my${
       queryParams.toString() ? "?" + queryParams.toString() : ""
     }`;
     const res = await api.get(url);
@@ -54,11 +54,11 @@ export async function getMyBookings(
       totalPages: items.length > 0 ? 1 : 0,
     };
   } catch (error) {
-    // Fallback на старый endpoint
-    console.log("v2 endpoint not available, using fallback /booking/my");
+    // Fallback на тот же endpoint
+    console.log("Primary endpoint not available, using fallback /bookings/my");
 
     try {
-      const res = await api.get("/booking/my");
+      const res = await api.get("/bookings/my");
 
       // Если статус 204 No Content - возвращаем пустой массив
       if (res.status === 204 || !res.data) {
@@ -101,7 +101,7 @@ export async function getMyBookings(
  * Создать новое бронирование
  */
 export async function createBooking(carId: number, start: string, end: string) {
-  const res = await api.post("/booking", {
+  const res = await api.post("/bookings", {
     carId,
     startDate: start,
     endDate: end,
@@ -113,14 +113,43 @@ export async function createBooking(carId: number, start: string, end: string) {
  * Отменить бронирование
  */
 export async function cancelBooking(bookingId: number) {
-  const res = await api.post(`/booking/${bookingId}/cancel`);
+  const res = await api.post(`/bookings/${bookingId}/cancel`);
   return res.data;
 }
 
 /**
  * Получить бронирования для конкретной машины
  */
-export async function getCarBookings(carId: number) {
-  const res = await api.get(`/booking/car/${carId}`);
-  return res.data;
+export async function getCarBookings(carId: number): Promise<Booking[]> {
+  try {
+    const start = new Date();
+    const end = new Date(start.getTime() + 1000);
+    const res = await api.get("/bookings/available", {
+      params: {
+        carId,
+        start: start.toISOString(),
+        end: end.toISOString(),
+      },
+    });
+
+    if (res.data?.available === false) {
+      return [
+        {
+          id: -carId,
+          carId,
+          carBrand: "",
+          carModel: "",
+          startDate: start.toISOString(),
+          endDate: end.toISOString(),
+          price: null,
+          status: "active",
+        },
+      ];
+    }
+
+    return [];
+  } catch (error) {
+    console.error("Failed to fetch car availability:", error);
+    return [];
+  }
 }

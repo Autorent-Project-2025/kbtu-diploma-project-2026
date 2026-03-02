@@ -1,0 +1,2 @@
+ALTER TABLE car_images
+    ADD COLUMN IF NOT EXISTS image_id VARCHAR(40);

@@ -39,7 +39,7 @@ export async function getCars(
   console.log("🔍 getCars called with params:", params);
 
   try {
-    // Пробуем использовать v2 endpoint с пагинацией
+    // Загружаем список машин через gateway
     const queryParams = new URLSearchParams();
 
     if (params?.brand) queryParams.append("brand", params.brand);
@@ -48,7 +48,7 @@ export async function getCars(
     // ✅ ИСПРАВЛЕНО: Отправляем правильные имена полей в API
     if (params?.sortBy) {
       // Преобразуем camelCase → PascalCase для бэкенда
-      let apiSortBy = params.sortBy;
+      let apiSortBy: string = params.sortBy;
       if (params.sortBy === "priceHour") {
         apiSortBy = "PriceHour";
       } else if (params.sortBy === "rating") {
@@ -69,7 +69,7 @@ export async function getCars(
     if (params?.pageSize)
       queryParams.append("pageSize", params.pageSize.toString());
 
-    const url = `/v2/cars${
+    const url = `/cars${
       queryParams.toString() ? "?" + queryParams.toString() : ""
     }`;
 
@@ -100,8 +100,8 @@ export async function getCars(
       totalPages: 1,
     };
   } catch (error) {
-    // Fallback на старый endpoint
-    console.log("⚠️ v2 endpoint not available, using fallback /cars");
+    // Fallback на тот же endpoint, если основной запрос не удался
+    console.log("⚠️ Primary endpoint failed, using fallback /cars");
     const res = await api.get("/cars");
     const items = toCamelCase(res.data);
 
@@ -227,7 +227,7 @@ export async function createCarComment(
   content: string,
   rating: number
 ) {
-  const res = await api.post("/comment", {
+  const res = await api.post("/cars/comment", {
     carId,
     content,
     rating,
@@ -243,7 +243,7 @@ export async function updateCarComment(
   content: string,
   rating: number
 ) {
-  const res = await api.put(`/comment/${commentId}`, {
+  const res = await api.put(`/cars/comment/${commentId}`, {
     content,
     rating,
   });
@@ -254,6 +254,6 @@ export async function updateCarComment(
  * Удалить комментарий
  */
 export async function deleteCarComment(commentId: number) {
-  const res = await api.delete(`/comment/${commentId}`);
+  const res = await api.delete(`/cars/comment/${commentId}`);
   return res.data;
 }

@@ -1,0 +1,56 @@
+services:
+  postgres:
+    image: postgres:18
+    container_name: car_service_postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "${POSTGRES_PORT}:5432"
+    volumes:
+      - rental_pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+    restart: unless-stopped
+
+  flyway:
+    image: flyway/flyway:12
+    container_name: car_service_flyway
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: migrate
+    volumes:
+      - ./src/Migrations:/flyway/sql
+    environment:
+      FLYWAY_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
+      FLYWAY_USER: ${POSTGRES_USER}
+      FLYWAY_PASSWORD: ${POSTGRES_PASSWORD}
+      FLYWAY_CONNECT_RETRIES: 30
+    restart: "no"
+
+  car-service:
+    build:
+      context: ./src
+      dockerfile: ./CarService.Api/Dockerfile
+    ports:
+      - "${EXTERNAL_PORT}:8080"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - Jwt__PublicKey=${Jwt__PublicKey}
+      - ConnectionStrings__DbConnection=Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      flyway:
+        condition: service_completed_successfully
+
+volumes:
+  rental_pgdata:
