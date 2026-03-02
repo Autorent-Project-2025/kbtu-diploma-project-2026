@@ -116,10 +116,3 @@ desktop.ini
 
 # Test Logs
 TestResults/
-
-# Allow Seeders Data
-!Autorent.Infrastructure/
-!Autorent.Infrastructure/Persistence/
-!Autorent.Infrastructure/Persistence/Seeders/
-!Autorent.Infrastructure/Persistence/Seeders/Data/
-!Autorent.Infrastructure/Persistence/Seeders/Data/*
