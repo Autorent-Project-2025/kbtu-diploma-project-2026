@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="IdentityService.Api/IdentityService.Api.csproj" Id="e9e15b33-1c01-4d3b-9d30-42521518cb53" />
+  <Project Path="IdentityService.Application/IdentityService.Application.csproj" Id="9809f5b6-5405-4dfc-bf4f-2a34d4cf27a8" />
+  <Project Path="IdentityService.Domain/IdentityService.Domain.csproj" Id="db85b6c0-f6a0-4160-ab1f-596f81e783dd" />
+  <Project Path="IdentityService.Infrastructure/IdentityService.Infrastructure.csproj" Id="e676289d-b505-4588-b501-dfe5812afcd0" />
+</Solution>
