@@ -1,0 +1,8 @@
+services:
+  internal-frontend:
+    build: .
+    env_file:
+      - .env
+    ports:
+      - "5174:5173"
+    command: npm run dev -- --host

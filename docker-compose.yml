@@ -161,6 +161,81 @@ services:
       booking-flyway:
         condition: service_completed_successfully
 
+  ticket-db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres_db
+    ports:
+      - "${TICKET_DB_PORT:-1290}:5432"
+    volumes:
+      - ticket_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+
+  ticket-flyway:
+    image: flyway/flyway:12
+    restart: "no"
+    depends_on:
+      ticket-db:
+        condition: service_healthy
+    command: migrate
+    volumes:
+      - ./backend/internal/ticket-service/src/Migrations:/flyway/sql:ro
+    environment:
+      FLYWAY_URL: jdbc:postgresql://ticket-db:5432/postgres_db
+      FLYWAY_USER: postgres
+      FLYWAY_PASSWORD: postgres
+      FLYWAY_CONNECT_RETRIES: 30
+
+  email-service:
+    build:
+      context: ./backend/shared/email-service/src
+      dockerfile: ./Dockerfile
+    restart: unless-stopped
+    env_file:
+      - path: ./backend/shared/email-service/.env.example
+        required: true
+      - path: ./backend/shared/email-service/.env
+        required: false
+    environment:
+      PORT: 8080
+    ports:
+      - "${EMAIL_SERVICE_PORT:-9182}:8080"
+
+  ticket-service:
+    build:
+      context: ./backend/internal/ticket-service/src
+      dockerfile: ./TicketService.Api/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - path: ./backend/internal/ticket-service/.env.example
+        required: true
+      - path: ./backend/internal/ticket-service/.env
+        required: false
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__DbConnection: Host=ticket-db;Port=5432;Database=postgres_db;Username=postgres;Password=postgres
+      IdentityService__BaseUrl: http://identity-service:8080
+      EmailService__BaseUrl: http://email-service:8080
+    ports:
+      - "${TICKET_SERVICE_PORT:-1248}:8080"
+    depends_on:
+      ticket-db:
+        condition: service_healthy
+      ticket-flyway:
+        condition: service_completed_successfully
+      identity-service:
+        condition: service_started
+      email-service:
+        condition: service_started
+
   image-service:
     build:
       context: ./backend/shared/image-service/src
@@ -187,6 +262,7 @@ services:
       IDENTITY_SERVICE_URL: http://identity-service:8080
       CAR_SERVICE_URL: http://car-service:8080
       BOOKING_SERVICE_URL: http://booking-service:8080
+      TICKET_SERVICE_URL: http://ticket-service:8080
       INTERNAL_SERVICE_URL: http://image-service:8080
       PORT: 8080
     ports:
@@ -197,6 +273,8 @@ services:
       car-service:
         condition: service_started
       booking-service:
+        condition: service_started
+      ticket-service:
         condition: service_started
       image-service:
         condition: service_started
@@ -218,8 +296,26 @@ services:
       api-gateway:
         condition: service_started
 
+  internal-frontend:
+    build:
+      context: ./frontend/internal
+      dockerfile: ./Dockerfile
+    restart: unless-stopped
+    env_file:
+      - path: ./frontend/internal/.env.example
+        required: true
+      - path: ./frontend/internal/.env
+        required: false
+    command: npm run dev -- --host
+    ports:
+      - "${INTERNAL_FRONTEND_PORT:-5174}:5173"
+    depends_on:
+      api-gateway:
+        condition: service_started
+
 volumes:
   identity_pgdata:
   car_pgdata:
   booking_pgdata:
+  ticket_pgdata:
   image_uploads:

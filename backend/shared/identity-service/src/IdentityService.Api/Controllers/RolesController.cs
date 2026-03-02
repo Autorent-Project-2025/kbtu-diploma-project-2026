@@ -23,6 +23,7 @@ public sealed class RolesController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Policy = "roles:create")]
     public async Task<IActionResult> CreateRole(
         [FromBody] CreateRoleRequest request,
         CancellationToken cancellationToken)
@@ -35,6 +36,7 @@ public sealed class RolesController : ControllerBase
     }
 
     [HttpPost("{id:guid}/permissions")]
+    [Authorize(Policy = "roles:assign-permission")]
     public async Task<IActionResult> AssignPermission(
         [FromRoute] Guid id,
         [FromBody] AddPermissionToRoleRequest request,

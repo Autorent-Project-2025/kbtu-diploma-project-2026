@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from "vue-router";
 import HomeView from "../views/HomeView.vue";
 import LoginView from "../views/LoginView.vue";
 import RegisterView from "../views/RegisterView.vue";
+import ActivateAccountView from "../views/ActivateAccountView.vue";
 import CarsView from "../views/CarsView.vue";
 import MyBookingsView from "../views/MyBookingsView.vue";
 import NotFoundView from "../views/NotFoundView.vue";
@@ -19,8 +20,16 @@ const routes = [
     component: LoginView,
   },
   {
-    path: "/register",
+    path: "/apply",
     component: RegisterView,
+  },
+  {
+    path: "/register",
+    redirect: "/apply",
+  },
+  {
+    path: "/activate",
+    component: ActivateAccountView,
   },
   {
     path: "/cars",

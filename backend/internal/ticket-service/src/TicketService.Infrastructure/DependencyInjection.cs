@@ -1,0 +1,74 @@
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
+using TicketService.Application.Interfaces;
+using TicketService.Infrastructure.Events;
+using TicketService.Infrastructure.Integrations;
+using TicketService.Infrastructure.Options;
+using TicketService.Infrastructure.Persistence;
+using TicketService.Infrastructure.Persistence.Repositories;
+using TicketService.Infrastructure.Utils;
+
+namespace TicketService.Infrastructure;
+
+public static class DependencyInjection
+{
+    public static IServiceCollection AddInfrastructure(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        services.Configure<IdentityServiceOptions>(configuration.GetSection(IdentityServiceOptions.SectionName));
+        services.Configure<EmailServiceOptions>(configuration.GetSection(EmailServiceOptions.SectionName));
+        services.Configure<ActivationOptions>(configuration.GetSection(ActivationOptions.SectionName));
+
+        var connectionString = configuration.GetConnectionString("DbConnection");
+        if (string.IsNullOrWhiteSpace(connectionString))
+        {
+            var herokuDatabaseUrl = Environment.GetEnvironmentVariable("DATABASE_URL");
+            if (!string.IsNullOrWhiteSpace(herokuDatabaseUrl))
+            {
+                connectionString = HerokuHelper.BuildConnectionString(herokuDatabaseUrl);
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(connectionString))
+        {
+            throw new InvalidOperationException("ConnectionStrings:DbConnection is required.");
+        }
+
+        services.AddDbContext<TicketDbContext>(options => options.UseNpgsql(connectionString));
+        services.AddScoped<ITicketUnitOfWork>(serviceProvider => serviceProvider.GetRequiredService<TicketDbContext>());
+        services.AddScoped<ITicketRepository, TicketRepository>();
+        services.AddScoped<ITicketEventPublisher, TicketEventPublisher>();
+
+        services.AddHttpClient<IIdentityProvisioningClient, IdentityProvisioningClient>((serviceProvider, client) =>
+        {
+            var options = serviceProvider.GetRequiredService<IOptions<IdentityServiceOptions>>().Value;
+            if (string.IsNullOrWhiteSpace(options.BaseUrl))
+            {
+                throw new InvalidOperationException("IdentityService:BaseUrl configuration is required.");
+            }
+
+            client.BaseAddress = new Uri(NormalizeBaseUrl(options.BaseUrl));
+        });
+
+        services.AddHttpClient<IEmailNotificationClient, EmailNotificationClient>((serviceProvider, client) =>
+        {
+            var options = serviceProvider.GetRequiredService<IOptions<EmailServiceOptions>>().Value;
+            if (string.IsNullOrWhiteSpace(options.BaseUrl))
+            {
+                throw new InvalidOperationException("EmailService:BaseUrl configuration is required.");
+            }
+
+            client.BaseAddress = new Uri(NormalizeBaseUrl(options.BaseUrl));
+        });
+
+        return services;
+    }
+
+    private static string NormalizeBaseUrl(string url)
+    {
+        return url.Trim().TrimEnd('/');
+    }
+}

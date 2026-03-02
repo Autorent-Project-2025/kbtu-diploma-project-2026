@@ -1,0 +1,65 @@
+using Microsoft.Extensions.Options;
+using TicketService.Application.Events;
+using TicketService.Application.Interfaces;
+using TicketService.Application.Models;
+using TicketService.Infrastructure.Options;
+
+namespace TicketService.Infrastructure.Events;
+
+public sealed class TicketEventPublisher : ITicketEventPublisher
+{
+    private readonly IIdentityProvisioningClient _identityProvisioningClient;
+    private readonly IEmailNotificationClient _emailNotificationClient;
+    private readonly ActivationOptions _activationOptions;
+
+    public TicketEventPublisher(
+        IIdentityProvisioningClient identityProvisioningClient,
+        IEmailNotificationClient emailNotificationClient,
+        IOptions<ActivationOptions> activationOptions)
+    {
+        _identityProvisioningClient = identityProvisioningClient;
+        _emailNotificationClient = emailNotificationClient;
+        _activationOptions = activationOptions.Value;
+    }
+
+    public async Task PublishApprovedAsync(TicketApprovedEvent ticketApprovedEvent, CancellationToken cancellationToken = default)
+    {
+        var provisionResult = await _identityProvisioningClient.ProvisionUserAsync(
+            new ProvisionIdentityUserRequest(
+                ticketApprovedEvent.FullName,
+                ticketApprovedEvent.Email,
+                ticketApprovedEvent.BirthDate),
+            cancellationToken);
+
+        var setPasswordUrl = BuildSetPasswordUrl(provisionResult.ActivationToken);
+        await _emailNotificationClient.SendApprovedAsync(
+            new SendApprovedEmailRequest(
+                ticketApprovedEvent.Email,
+                ticketApprovedEvent.FullName,
+                provisionResult.Email,
+                setPasswordUrl),
+            cancellationToken);
+    }
+
+    public async Task PublishRejectedAsync(TicketRejectedEvent ticketRejectedEvent, CancellationToken cancellationToken = default)
+    {
+        await _emailNotificationClient.SendRejectedAsync(
+            new SendRejectedEmailRequest(
+                ticketRejectedEvent.Email,
+                ticketRejectedEvent.FullName,
+                ticketRejectedEvent.DecisionReason),
+            cancellationToken);
+    }
+
+    private string BuildSetPasswordUrl(string activationToken)
+    {
+        if (string.IsNullOrWhiteSpace(_activationOptions.SetPasswordBaseUrl))
+        {
+            throw new InvalidOperationException("Activation:SetPasswordBaseUrl configuration is required.");
+        }
+
+        var baseUrl = _activationOptions.SetPasswordBaseUrl.Trim();
+        var separator = baseUrl.Contains('?', StringComparison.Ordinal) ? "&" : "?";
+        return $"{baseUrl}{separator}token={Uri.EscapeDataString(activationToken)}";
+    }
+}

@@ -1,11 +1,14 @@
 using IdentityService.Api.Middleware;
+using IdentityService.Application.Constants;
+using IdentityService.Application.Commands.ActivateUser;
 using IdentityService.Application.Commands.AssignPermissionToRole;
 using IdentityService.Application.Commands.AssignRoleToUser;
 using IdentityService.Application.Commands.CreatePermission;
 using IdentityService.Application.Commands.CreateRole;
+using IdentityService.Application.Commands.CreateUser;
 using IdentityService.Application.Commands.LoginUser;
+using IdentityService.Application.Commands.ProvisionUser;
 using IdentityService.Application.Commands.RefreshToken;
-using IdentityService.Application.Commands.RegisterUser;
 using IdentityService.Infrastructure;
 using IdentityService.Infrastructure.Security;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -18,9 +21,11 @@ builder.Services.AddEndpointsApiExplorer();
 
 builder.Services.AddInfrastructure(builder.Configuration);
 
-builder.Services.AddScoped<RegisterUserCommandHandler>();
+builder.Services.AddScoped<ActivateUserCommandHandler>();
 builder.Services.AddScoped<LoginUserCommandHandler>();
 builder.Services.AddScoped<RefreshTokenCommandHandler>();
+builder.Services.AddScoped<CreateUserCommandHandler>();
+builder.Services.AddScoped<ProvisionUserCommandHandler>();
 builder.Services.AddScoped<CreateRoleCommandHandler>();
 builder.Services.AddScoped<AssignRoleToUserCommandHandler>();
 builder.Services.AddScoped<CreatePermissionCommandHandler>();
@@ -70,7 +75,23 @@ builder.Services
         };
     });
 
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("roles:create", policy =>
+        policy.RequireClaim("permissions", PermissionConstants.RoleCreate));
+
+    options.AddPolicy("roles:assign-permission", policy =>
+        policy.RequireClaim("permissions", PermissionConstants.RoleAssignPermission));
+
+    options.AddPolicy("permissions:create", policy =>
+        policy.RequireClaim("permissions", PermissionConstants.PermissionCreate));
+
+    options.AddPolicy("users:create", policy =>
+        policy.RequireClaim("permissions", PermissionConstants.UserCreate));
+
+    options.AddPolicy("users:assign-role", policy =>
+        policy.RequireClaim("permissions", PermissionConstants.UserAssignRole));
+});
 
 var app = builder.Build();
 

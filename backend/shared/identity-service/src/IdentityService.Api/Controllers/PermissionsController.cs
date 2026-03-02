@@ -18,6 +18,7 @@ public sealed class PermissionsController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Policy = "permissions:create")]
     public async Task<IActionResult> CreatePermission(
         [FromBody] CreatePermissionRequest request,
         CancellationToken cancellationToken)
