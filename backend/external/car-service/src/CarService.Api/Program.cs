@@ -1,3 +1,4 @@
+using CarService.Application.Constants;
 using CarService.Application.Interfaces;
 using CarService.Infrastructure.Persistance;
 using CarService.Infrastructure.Services;
@@ -65,7 +66,17 @@ builder.Services
         };
     });
 
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("cars:create", policy =>
+        policy.RequireClaim("permissions", PermissionConstants.CarCreate));
+    options.AddPolicy("cars:update", policy =>
+        policy.RequireClaim("permissions", PermissionConstants.CarUpdate));
+    options.AddPolicy("cars:delete", policy =>
+        policy.RequireClaim("permissions", PermissionConstants.CarDelete));
+    options.AddPolicy("cars:image:create", policy =>
+        policy.RequireClaim("permissions", PermissionConstants.CarImageCreate));
+});
 builder.Services.AddScoped<ICarService, CarService.Infrastructure.Services.CarService>();
 builder.Services.AddScoped<ICarCommentService, CarCommentService>();
 builder.Services.AddScoped<ICarFeatureService, CarFeatureService>();

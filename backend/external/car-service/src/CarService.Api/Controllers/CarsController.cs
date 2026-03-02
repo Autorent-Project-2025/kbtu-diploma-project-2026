@@ -50,7 +50,7 @@ namespace CarService.Api.Controllers.v2
         }
 
         [HttpPost]
-        [Authorize(Roles = RoleConstants.Admin)]
+        [Authorize(Policy = "cars:create")]
         public async Task<IActionResult> Create(CarCreateRequestDto dto)
         {
             try
@@ -64,7 +64,7 @@ namespace CarService.Api.Controllers.v2
         }
 
         [HttpPost("$batch")]
-        [Authorize(Roles = RoleConstants.Admin)]
+        [Authorize(Policy = "cars:create")]
         public async Task<IActionResult> Create(CarCreateRequestDto[] dtos)
         {
             try
@@ -78,7 +78,7 @@ namespace CarService.Api.Controllers.v2
         }
 
         [HttpPut("{id}")]
-        [Authorize(Roles = RoleConstants.Admin)]
+        [Authorize(Policy = "cars:update")]
         public async Task<IActionResult> Update(int id, CarUpdateDto dto)
         {
             try
@@ -93,7 +93,7 @@ namespace CarService.Api.Controllers.v2
         }
 
         [HttpDelete("{id}")]
-        [Authorize(Roles = RoleConstants.Admin)]
+        [Authorize(Policy = "cars:delete")]
         public async Task<IActionResult> Delete(int id)
         {
             try
@@ -120,6 +120,7 @@ namespace CarService.Api.Controllers.v2
         }
 
         [HttpPost("{carId}/images")]
+        [Authorize(Policy = "cars:image:create")]
         public async Task<IActionResult> CreateCarImage([FromRoute] int carId, CarImageCreateRequestDto dto)
         {
             try

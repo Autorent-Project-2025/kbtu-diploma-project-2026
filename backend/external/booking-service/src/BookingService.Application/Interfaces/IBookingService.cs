@@ -6,13 +6,13 @@ namespace BookingService.Application.Interfaces
     public interface IBookingService
     {
         Task<bool> IsCarAvailable(int carId, DateTime start, DateTime end);
-        Task<BookingResponseDto> CreateBooking(int userId, BookingCreateDto dto);
-        Task<IEnumerable<BookingResponseDto>> GetUserBookings(int userId);
-        Task<PagedResult<BookingResponseDto>> GetUserBookingsPaginated(int userId, BookingQueryParams queryParams);
-        Task<BookingResponseDto?> GetBooking(int id, int userId);
+        Task<BookingResponseDto> CreateBooking(string userId, BookingCreateDto dto);
+        Task<IEnumerable<BookingResponseDto>> GetUserBookings(string userId);
+        Task<PagedResult<BookingResponseDto>> GetUserBookingsPaginated(string userId, BookingQueryParams queryParams);
+        Task<BookingResponseDto?> GetBooking(int id, string userId);
 
-        Task<bool> CancelBooking(int id, int userId);
-        Task<bool> ConfirmBooking(int id, int userId);
-        Task<bool> CompleteBooking(int id, int userId);
+        Task<bool> CancelBooking(int id, string userId);
+        Task<bool> ConfirmBooking(int id, string userId);
+        Task<bool> CompleteBooking(int id, string userId);
     }
 }

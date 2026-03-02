@@ -6,7 +6,7 @@ public sealed class JwtOptions
 
     public string PrivateKey { get; init; } = string.Empty;
     public string? PublicKey { get; init; }
-    public string Issuer { get; init; } = "autorent-user-service";
+    public string Issuer { get; init; } = "autorent-identity-service";
     public string Audience { get; init; } = "autorent-service";
     public int AccessTokenLifetimeMinutes { get; init; } = 15;
     public int RefreshTokenLifetimeDays { get; init; } = 30;
