@@ -1,0 +1,8 @@
+services:
+  superadmin-frontend:
+    build: .
+    env_file:
+      - .env
+    ports:
+      - "5175:5173"
+    command: npm run dev -- --host

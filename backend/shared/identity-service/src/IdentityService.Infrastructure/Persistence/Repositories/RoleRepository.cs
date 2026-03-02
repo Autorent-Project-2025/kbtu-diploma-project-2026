@@ -18,6 +18,16 @@ public sealed class RoleRepository : IRoleRepository
         await _dbContext.Roles.AddAsync(role, cancellationToken);
     }
 
+    public async Task<IReadOnlyCollection<Role>> ListAsync(
+        bool includePermissions = false,
+        CancellationToken cancellationToken = default)
+    {
+        var query = BuildRoleQuery(includePermissions);
+        return await query
+            .OrderBy(role => role.Name)
+            .ToArrayAsync(cancellationToken);
+    }
+
     public Task<Role?> GetByIdAsync(
         Guid roleId,
         bool includePermissions = false,

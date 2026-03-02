@@ -49,6 +49,11 @@ public sealed class RefreshTokenCommandHandler
             throw new UnauthorizedException("Refresh token owner was not found.");
         }
 
+        if (!user.IsActive)
+        {
+            throw new UnauthorizedException("User account is deactivated.");
+        }
+
         storedRefreshToken.Revoke(nowUtc);
 
         var permissions = user.Roles

@@ -313,6 +313,23 @@ services:
       api-gateway:
         condition: service_started
 
+  superadmin-frontend:
+    build:
+      context: ./frontend/superadmin
+      dockerfile: ./Dockerfile
+    restart: unless-stopped
+    env_file:
+      - path: ./frontend/superadmin/.env.example
+        required: true
+      - path: ./frontend/superadmin/.env
+        required: false
+    command: npm run dev -- --host
+    ports:
+      - "${SUPERADMIN_FRONTEND_PORT:-5175}:5173"
+    depends_on:
+      api-gateway:
+        condition: service_started
+
 volumes:
   identity_pgdata:
   car_pgdata:

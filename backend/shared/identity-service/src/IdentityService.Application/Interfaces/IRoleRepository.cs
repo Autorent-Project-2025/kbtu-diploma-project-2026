@@ -5,6 +5,9 @@ namespace IdentityService.Application.Interfaces;
 public interface IRoleRepository
 {
     Task AddAsync(Role role, CancellationToken cancellationToken = default);
+    Task<IReadOnlyCollection<Role>> ListAsync(
+        bool includePermissions = false,
+        CancellationToken cancellationToken = default);
 
     Task<Role?> GetByIdAsync(
         Guid roleId,
