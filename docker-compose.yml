@@ -1,0 +1,225 @@
+services:
+  user-db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres_db
+    ports:
+      - "${USER_DB_PORT:-5432}:5432"
+    volumes:
+      - user_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+
+  user-flyway:
+    image: flyway/flyway:12
+    restart: "no"
+    depends_on:
+      user-db:
+        condition: service_healthy
+    command: migrate
+    volumes:
+      - ./backend/external/user-service/src/Migrations:/flyway/sql:ro
+    environment:
+      FLYWAY_URL: jdbc:postgresql://user-db:5432/postgres_db
+      FLYWAY_USER: postgres
+      FLYWAY_PASSWORD: postgres
+      FLYWAY_CONNECT_RETRIES: 30
+
+  user-service:
+    build:
+      context: ./backend/external/user-service/src
+      dockerfile: ./UserService.Api/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - path: ./backend/external/user-service/.env.example
+        required: true
+      - path: ./backend/external/user-service/.env
+        required: false
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__DbConnection: Host=user-db;Port=5432;Database=postgres_db;Username=postgres;Password=postgres
+    ports:
+      - "${USER_SERVICE_PORT:-1243}:8080"
+    depends_on:
+      user-db:
+        condition: service_healthy
+      user-flyway:
+        condition: service_completed_successfully
+
+  car-db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres_db
+    ports:
+      - "${CAR_DB_PORT:-1299}:5432"
+    volumes:
+      - car_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+
+  car-flyway:
+    image: flyway/flyway:12
+    restart: "no"
+    depends_on:
+      car-db:
+        condition: service_healthy
+    command: migrate
+    volumes:
+      - ./backend/external/car-service/src/Migrations:/flyway/sql:ro
+    environment:
+      FLYWAY_URL: jdbc:postgresql://car-db:5432/postgres_db
+      FLYWAY_USER: postgres
+      FLYWAY_PASSWORD: postgres
+      FLYWAY_CONNECT_RETRIES: 30
+
+  car-service:
+    build:
+      context: ./backend/external/car-service/src
+      dockerfile: ./CarService.Api/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - path: ./backend/external/car-service/.env.example
+        required: true
+      - path: ./backend/external/car-service/.env
+        required: false
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__DbConnection: Host=car-db;Port=5432;Database=postgres_db;Username=postgres;Password=postgres
+    ports:
+      - "${CAR_SERVICE_PORT:-1298}:8080"
+    depends_on:
+      car-db:
+        condition: service_healthy
+      car-flyway:
+        condition: service_completed_successfully
+
+  booking-db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres_db
+    ports:
+      - "${BOOKING_DB_PORT:-1292}:5432"
+    volumes:
+      - booking_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+
+  booking-flyway:
+    image: flyway/flyway:12
+    restart: "no"
+    depends_on:
+      booking-db:
+        condition: service_healthy
+    command: migrate
+    volumes:
+      - ./backend/external/booking-service/src/Migrations:/flyway/sql:ro
+    environment:
+      FLYWAY_URL: jdbc:postgresql://booking-db:5432/postgres_db
+      FLYWAY_USER: postgres
+      FLYWAY_PASSWORD: postgres
+      FLYWAY_CONNECT_RETRIES: 30
+
+  booking-service:
+    build:
+      context: ./backend/external/booking-service/src
+      dockerfile: ./BookingService.Api/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - path: ./backend/external/booking-service/.env.example
+        required: true
+      - path: ./backend/external/booking-service/.env
+        required: false
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__DbConnection: Host=booking-db;Port=5432;Database=postgres_db;Username=postgres;Password=postgres
+    ports:
+      - "${BOOKING_SERVICE_PORT:-1821}:8080"
+    depends_on:
+      booking-db:
+        condition: service_healthy
+      booking-flyway:
+        condition: service_completed_successfully
+
+  image-service:
+    build:
+      context: ./backend/shared/image-service/src
+      dockerfile: ./Dockerfile
+    restart: unless-stopped
+    env_file:
+      - path: ./backend/shared/image-service/.env.example
+        required: true
+      - path: ./backend/shared/image-service/.env
+        required: false
+    environment:
+      PORT: 8080
+    ports:
+      - "${IMAGE_SERVICE_PORT:-9181}:8080"
+    volumes:
+      - image_uploads:/app/uploads
+
+  api-gateway:
+    build:
+      context: ./backend/external/reverse-proxy-service/src
+      dockerfile: ./Dockerfile
+    restart: unless-stopped
+    environment:
+      USER_SERVICE_URL: http://user-service:8080
+      CAR_SERVICE_URL: http://car-service:8080
+      BOOKING_SERVICE_URL: http://booking-service:8080
+      INTERNAL_SERVICE_URL: http://image-service:8080
+      PORT: 8080
+    ports:
+      - "${API_GATEWAY_PORT:-9186}:8080"
+    depends_on:
+      user-service:
+        condition: service_started
+      car-service:
+        condition: service_started
+      booking-service:
+        condition: service_started
+      image-service:
+        condition: service_started
+
+  frontend:
+    build:
+      context: ./frontend/external
+      dockerfile: ./Dockerfile
+    restart: unless-stopped
+    env_file:
+      - path: ./frontend/external/.env.example
+        required: true
+      - path: ./frontend/external/.env
+        required: false
+    command: npm run dev -- --host
+    ports:
+      - "${FRONTEND_PORT:-5173}:5173"
+    depends_on:
+      api-gateway:
+        condition: service_started
+
+volumes:
+  user_pgdata:
+  car_pgdata:
+  booking_pgdata:
+  image_uploads:
