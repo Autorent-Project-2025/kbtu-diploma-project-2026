@@ -59,7 +59,7 @@ docker compose up --build
 | Booking Service | `Booking.Create` (для создания), остальные пользовательские операции требуют валидный JWT |
 | Ticket Service | `Ticket.View`, `Ticket.Approve`, `Ticket.Reject` |
 | File Service | `File.Create`, `File.Read`, `File.Delete` |
-| Image Service | Не требуются (в текущей реализации) |
+| Image Service | `Image.Create`, `Image.Delete` |
 | Email Service | Не требуются (в текущей реализации) |
 | API Gateway | Не требуются (в текущей реализации) |
 

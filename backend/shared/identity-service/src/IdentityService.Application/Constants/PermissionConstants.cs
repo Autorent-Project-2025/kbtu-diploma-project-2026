@@ -21,4 +21,6 @@ public static class PermissionConstants
     public const string FileCreate = "File.Create";
     public const string FileRead = "File.Read";
     public const string FileDelete = "File.Delete";
+    public const string ImageCreate = "Image.Create";
+    public const string ImageDelete = "Image.Delete";
 }
