@@ -1,68 +1,81 @@
 # Email Service
 
 ## Назначение
-Сервис отправки email через SMTP:
-- `approved` письма (одобрение заявки);
-- `rejected` письма (отклонение заявки);
-- `custom` письма (произвольная тема/тело).
+Сервис отправки email через SMTP. Поддерживает шаблоны:
+- `approved`;
+- `rejected`;
+- `custom`.
 
-## Быстрый запуск
-1. Скопировать окружение:
-```bash
-cp .env.example .env
-```
-2. Запустить локально:
-```bash
-cd src
-npm ci
-npm run start
-```
-3. Или через Docker Compose:
-```bash
-docker compose up --build
-```
-
-## Переменные окружения
-- `EXTERNAL_PORT` - внешний порт контейнера.
-- `PORT` - внутренний порт HTTP-сервиса (по умолчанию `8080`).
-- `SMTP_VERIFY_ON_STARTUP` - проверять SMTP при старте (`true/false`).
-- `SMTP_HOST` - SMTP хост.
-- `SMTP_PORT` - SMTP порт.
-- `SMTP_SECURE` - `true` для SMTPS (обычно `465`), `false` для STARTTLS (`587`).
-- `SMTP_USER` - SMTP логин.
-- `SMTP_PASS` - SMTP пароль / app password.
-- `SMTP_FROM` - отправитель, пример: `"Autorent <no-reply@autorent.kz>"`.
+## Стек
+- Node.js
+- TypeScript (runtime: `node --experimental-strip-types`)
+- Nodemailer
 
 ## API
-### `GET /health`
-Проверка доступности сервиса.
+Base path: `/`.
 
-### `POST /emails/approved`
+Маршруты:
+- `GET /health`
+- `POST /emails/approved`
+- `POST /emails/rejected`
+- `POST /emails/custom`
+
+Пример `POST /emails/approved`:
+
 ```json
 {
   "to": "user@example.com",
   "fullName": "Arlan",
   "loginEmail": "arlan@example.com",
-  "setPasswordUrl": "https://site/set-password?token=..."
+  "setPasswordUrl": "https://app.example.com/activate?token=..."
 }
 ```
 
-### `POST /emails/rejected`
-```json
-{
-  "to": "user@example.com",
-  "fullName": "Arlan",
-  "reason": "Фото документа не читается"
-}
+## Переменные окружения
+См. `./.env.example`:
+- `EXTERNAL_PORT`
+- `PORT`
+- `SMTP_VERIFY_ON_STARTUP`
+- `SMTP_HOST`
+- `SMTP_PORT`
+- `SMTP_SECURE`
+- `SMTP_USER`
+- `SMTP_PASS`
+- `SMTP_FROM`
+
+## Запуск
+### Локально
+Из `backend/shared/email-service/src`:
+
+```bash
+npm ci
+npm run dev
 ```
 
-### `POST /emails/custom`
-```json
-{
-  "to": "user@example.com",
-  "subject": "Заголовок",
-  "text": "Текст письма",
-  "html": "<p>HTML письмо</p>",
-  "replyTo": "support@example.com"
-}
+### Через compose сервиса
+Из `backend/shared/email-service`:
+
+```bash
+docker compose up --build
 ```
+
+### В составе всего проекта
+Из корня репозитория:
+
+```bash
+docker compose up --build email-service
+```
+
+Сервис будет доступен на порту `EXTERNAL_PORT` (по умолчанию `9182`).
+
+## Необходимые права
+В текущей реализации сервис не требует JWT, API-key или permission claim.
+
+Доступ к маршрутам:
+- `GET /health`
+- `POST /emails/approved`
+- `POST /emails/rejected`
+- `POST /emails/custom`
+
+без проверки ролей/прав.
+
