@@ -1,6 +1,7 @@
 using IdentityService.Application.Exceptions;
 using IdentityService.Application.Interfaces;
 using IdentityService.Application.Models;
+using IdentityService.Application.Utils;
 using IdentityService.Domain.Entities;
 using RefreshTokenEntity = IdentityService.Domain.Entities.RefreshToken;
 
@@ -8,15 +9,18 @@ namespace IdentityService.Application.Commands.RefreshToken;
 
 public sealed class RefreshTokenCommandHandler
 {
+    private readonly IRoleRepository _roleRepository;
     private readonly IRefreshTokenRepository _refreshTokenRepository;
     private readonly IJwtProvider _jwtProvider;
     private readonly IIdentityUnitOfWork _unitOfWork;
 
     public RefreshTokenCommandHandler(
+        IRoleRepository roleRepository,
         IRefreshTokenRepository refreshTokenRepository,
         IJwtProvider jwtProvider,
         IIdentityUnitOfWork unitOfWork)
     {
+        _roleRepository = roleRepository;
         _refreshTokenRepository = refreshTokenRepository;
         _jwtProvider = jwtProvider;
         _unitOfWork = unitOfWork;
@@ -56,11 +60,15 @@ public sealed class RefreshTokenCommandHandler
 
         storedRefreshToken.Revoke(nowUtc);
 
-        var permissions = user.Roles
-            .SelectMany(role => role.Permissions)
-            .Select(permission => permission.Name)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToArray();
+        var roles = await _roleRepository.ListAsync(
+            includePermissions: true,
+            includeParentRoles: true,
+            cancellationToken: cancellationToken);
+
+        var roleGraph = RolePermissionResolver.BuildGraph(roles);
+        var permissions = RolePermissionResolver.ResolveEffectivePermissions(
+            user.Roles.Select(role => role.Id),
+            roleGraph);
 
         var accessToken = _jwtProvider.GenerateAccessToken(user.Id, user.Username, permissions);
         var rotatedRefreshToken = _jwtProvider.GenerateRefreshToken();

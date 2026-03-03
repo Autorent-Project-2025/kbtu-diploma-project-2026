@@ -10,6 +10,11 @@ AutoRent - микросервисная платформа каршеринга.
 
 Диаграмма архитектуры: `docs/project-architecture.puml`.
 
+## Новое в админке
+- Superadmin UI обновлен до формата control center: отдельные секции `Role Management` и `User Management`, метрики и улучшенная адаптивность.
+- Добавлено полноценное управление ролями: создание роли с начальными permissions и parent-ролями.
+- Добавлено наследование ролей (role inheritance): итоговые permissions вычисляются транзитивно и применяются в JWT, API и UI.
+
 ## Быстрый старт
 1. Заполните нужные `.env` файлы по `.env.example`.
 2. Из корня проекта выполните:
@@ -70,7 +75,7 @@ docker compose up --build
 ### Frontend-права
 - External Frontend: просмотр каталога и создание тикета без прав; бронирование требует JWT, создание брони - `Booking.Create`.
 - Internal Frontend: доступ к списку заявок - `Ticket.View`; approve/reject - `Ticket.Approve`/`Ticket.Reject`.
-- Superadmin Frontend: доступ к разделу пользователей - `User.View`; дальнейшее управление зависит от соответствующих `User.*` и `Role.View`.
+- Superadmin Frontend: вход в panel требует `User.View`; role management использует `Role.View`/`Role.Create`/`Role.AssignPermission`, user management использует `User.*`, загрузка справочника прав - `Permission.View`.
 
 ## Документация по сервисам
 Подробная документация находится в `README.md` каждого сервиса.

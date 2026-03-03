@@ -7,6 +7,8 @@ public class Role
 
     public ICollection<User> Users { get; private set; } = new List<User>();
     public ICollection<Permission> Permissions { get; private set; } = new List<Permission>();
+    public ICollection<Role> ParentRoles { get; private set; } = new List<Role>();
+    public ICollection<Role> ChildRoles { get; private set; } = new List<Role>();
 
     private Role() { }
 
@@ -38,6 +40,55 @@ public class Role
         Permissions.Add(permission);
     }
 
+    public void RemovePermission(Guid permissionId)
+    {
+        if (permissionId == Guid.Empty)
+        {
+            return;
+        }
+
+        var permission = Permissions.FirstOrDefault(existingPermission => existingPermission.Id == permissionId);
+        if (permission is null)
+        {
+            return;
+        }
+
+        Permissions.Remove(permission);
+    }
+
+    public void AddParentRole(Role parentRole)
+    {
+        ArgumentNullException.ThrowIfNull(parentRole);
+
+        if (parentRole.Id == Id)
+        {
+            throw new ArgumentException("A role cannot inherit from itself.", nameof(parentRole));
+        }
+
+        if (ParentRoles.Any(existingParent => existingParent.Id == parentRole.Id))
+        {
+            return;
+        }
+
+        ParentRoles.Add(parentRole);
+    }
+
+    public void RemoveParentRole(Guid parentRoleId)
+    {
+        if (parentRoleId == Guid.Empty)
+        {
+            return;
+        }
+
+        var parentRole = ParentRoles.FirstOrDefault(existingParent => existingParent.Id == parentRoleId);
+        if (parentRole is null)
+        {
+            return;
+        }
+
+        ParentRoles.Remove(parentRole);
+    }
+
     public bool HasPermission(string permissionName)
     {
         if (string.IsNullOrWhiteSpace(permissionName))
@@ -45,7 +96,23 @@ public class Role
             return false;
         }
 
-        return Permissions.Any(permission =>
-            permission.Name.Equals(permissionName.Trim(), StringComparison.OrdinalIgnoreCase));
+        var visitedRoleIds = new HashSet<Guid>();
+        return HasPermissionInternal(permissionName.Trim(), visitedRoleIds);
+    }
+
+    private bool HasPermissionInternal(string permissionName, HashSet<Guid> visitedRoleIds)
+    {
+        if (!visitedRoleIds.Add(Id))
+        {
+            return false;
+        }
+
+        if (Permissions.Any(permission =>
+            permission.Name.Equals(permissionName, StringComparison.OrdinalIgnoreCase)))
+        {
+            return true;
+        }
+
+        return ParentRoles.Any(parentRole => parentRole.HasPermissionInternal(permissionName, visitedRoleIds));
     }
 }
