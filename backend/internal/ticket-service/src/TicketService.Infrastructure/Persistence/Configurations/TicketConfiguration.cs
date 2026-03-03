@@ -12,11 +12,12 @@ public sealed class TicketConfiguration : IEntityTypeConfiguration<Ticket>
 
         builder.HasKey(ticket => ticket.Id);
         builder.Property(ticket => ticket.Id).HasColumnName("id");
+        builder.Property(ticket => ticket.TicketType).HasColumnName("ticket_type").HasConversion<int>().IsRequired();
         builder.Property(ticket => ticket.FirstName).HasColumnName("first_name").HasMaxLength(100).IsRequired();
         builder.Property(ticket => ticket.LastName).HasColumnName("last_name").HasMaxLength(100).IsRequired();
         builder.Property(ticket => ticket.FullName).HasColumnName("full_name").HasMaxLength(300).IsRequired();
         builder.Property(ticket => ticket.Email).HasColumnName("email").HasMaxLength(255).IsRequired();
-        builder.Property(ticket => ticket.BirthDate).HasColumnName("birth_date").HasColumnType("date").IsRequired();
+        builder.Property(ticket => ticket.BirthDate).HasColumnName("birth_date").HasColumnType("date");
         builder.Property(ticket => ticket.PhoneNumber).HasColumnName("phone_number").HasMaxLength(32).IsRequired();
         builder.Property(ticket => ticket.IdentityDocumentFileName).HasColumnName("identity_document_file_name").HasMaxLength(255);
         builder.Property(ticket => ticket.DriverLicenseFileName).HasColumnName("driver_license_file_name").HasMaxLength(255);
@@ -28,6 +29,7 @@ public sealed class TicketConfiguration : IEntityTypeConfiguration<Ticket>
         builder.Property(ticket => ticket.ReviewedAt).HasColumnName("reviewed_at");
 
         builder.HasIndex(ticket => ticket.Status);
+        builder.HasIndex(ticket => ticket.TicketType);
         builder.HasIndex(ticket => ticket.Email);
         builder.HasIndex(ticket => ticket.CreatedAt);
     }

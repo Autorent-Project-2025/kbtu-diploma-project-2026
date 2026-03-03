@@ -17,7 +17,7 @@ public class Partner
     public DateTime CreatedOn { get; set; }
 
     [Column("contract_file_name")]
-    public string ContractFileName { get; set; } = string.Empty;
+    public string? ContractFileName { get; set; }
 
     [Column("owner_identity_file_name")]
     public string OwnerIdentityFileName { get; set; } = string.Empty;

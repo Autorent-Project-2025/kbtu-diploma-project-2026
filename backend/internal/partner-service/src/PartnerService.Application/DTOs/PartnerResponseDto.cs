@@ -6,7 +6,7 @@ public sealed class PartnerResponseDto
     public string OwnerFirstName { get; set; } = string.Empty;
     public string OwnerLastName { get; set; } = string.Empty;
     public DateTime CreatedOn { get; set; }
-    public string ContractFileName { get; set; } = string.Empty;
+    public string? ContractFileName { get; set; }
     public string OwnerIdentityFileName { get; set; } = string.Empty;
     public DateOnly RegistrationDate { get; set; }
     public DateOnly PartnershipEndDate { get; set; }

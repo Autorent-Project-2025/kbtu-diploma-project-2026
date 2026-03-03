@@ -2,6 +2,7 @@ using TicketService.Application.Exceptions;
 using TicketService.Application.Interfaces;
 using TicketService.Application.Models;
 using TicketService.Domain.Entities;
+using TicketService.Domain.Enums;
 
 namespace TicketService.Application.Commands.CreateTicket;
 
@@ -31,12 +32,17 @@ public sealed class CreateTicketCommandHandler
             command.IdentityDocumentFile,
             cancellationToken);
 
-        var driverLicenseFileName = await _fileStorageClient.UploadFileAsync(
-            command.DriverLicenseFile,
-            cancellationToken);
+        string? driverLicenseFileName = null;
+        if (command.TicketType == TicketType.Client)
+        {
+            driverLicenseFileName = await _fileStorageClient.UploadFileAsync(
+                command.DriverLicenseFile!,
+                cancellationToken);
+        }
 
         var ticket = new Ticket(
             Guid.NewGuid(),
+            command.TicketType,
             command.FirstName,
             command.LastName,
             command.Email,
@@ -70,23 +76,40 @@ public sealed class CreateTicketCommandHandler
             throw new ValidationException("Email is required.");
         }
 
-        if (command.BirthDate == default)
-        {
-            throw new ValidationException("Birth date is required.");
-        }
-
-        if (command.BirthDate > DateOnly.FromDateTime(DateTime.UtcNow))
-        {
-            throw new ValidationException("Birth date cannot be in the future.");
-        }
-
         if (string.IsNullOrWhiteSpace(command.PhoneNumber))
         {
             throw new ValidationException("Phone number is required.");
         }
 
+        if (command.TicketType is not TicketType.Client and not TicketType.Partner)
+        {
+            throw new ValidationException("Ticket type is invalid.");
+        }
+
+        if (command.TicketType == TicketType.Client)
+        {
+            if (command.BirthDate == default)
+            {
+                throw new ValidationException("Birth date is required.");
+            }
+
+            if (command.BirthDate > DateOnly.FromDateTime(DateTime.UtcNow))
+            {
+                throw new ValidationException("Birth date cannot be in the future.");
+            }
+        }
+
         ValidatePdf(command.IdentityDocumentFile, nameof(command.IdentityDocumentFile));
-        ValidatePdf(command.DriverLicenseFile, nameof(command.DriverLicenseFile));
+
+        if (command.TicketType == TicketType.Client)
+        {
+            if (command.DriverLicenseFile is null)
+            {
+                throw new ValidationException($"{nameof(command.DriverLicenseFile)} is required.");
+            }
+
+            ValidatePdf(command.DriverLicenseFile, nameof(command.DriverLicenseFile));
+        }
     }
 
     private static void ValidatePdf(TicketDocumentFilePayload file, string fieldName)

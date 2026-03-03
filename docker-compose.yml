@@ -334,6 +334,8 @@ services:
       EmailService__BaseUrl: http://email-service:8080
       ClientService__BaseUrl: http://client-service:8080
       ClientService__InternalApiKey: local-internal-api-key
+      PartnerService__BaseUrl: http://partner-service:8080
+      PartnerService__InternalApiKey: local-internal-api-key
       FileService__BaseUrl: http://file-service:8080
       FileService__InternalApiKey: local-internal-api-key
     ports:
@@ -348,6 +350,8 @@ services:
       email-service:
         condition: service_started
       client-service:
+        condition: service_started
+      partner-service:
         condition: service_started
       file-service:
         condition: service_started

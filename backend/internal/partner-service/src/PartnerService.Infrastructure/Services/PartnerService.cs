@@ -174,7 +174,7 @@ public class PartnerService : IPartnerService
         return new NormalizedPartnerData(
             NormalizeRequired(ownerFirstName, nameof(ownerFirstName), 100),
             NormalizeRequired(ownerLastName, nameof(ownerLastName), 100),
-            NormalizeRequired(contractFileName, nameof(contractFileName), 255),
+            NormalizeOptional(contractFileName, nameof(contractFileName), 255),
             NormalizeRequired(ownerIdentityFileName, nameof(ownerIdentityFileName), 255),
             registrationDate,
             partnershipEndDate,
@@ -198,6 +198,22 @@ public class PartnerService : IPartnerService
         return normalized;
     }
 
+    private static string? NormalizeOptional(string? value, string paramName, int maxLength)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        var normalized = value.Trim();
+        if (normalized.Length > maxLength)
+        {
+            throw new ArgumentException($"{paramName} length must not exceed {maxLength}.", paramName);
+        }
+
+        return normalized;
+    }
+
     private static void EnsureValidId(int id)
     {
         if (id <= 0)
@@ -209,7 +225,7 @@ public class PartnerService : IPartnerService
     private sealed record NormalizedPartnerData(
         string OwnerFirstName,
         string OwnerLastName,
-        string ContractFileName,
+        string? ContractFileName,
         string OwnerIdentityFileName,
         DateOnly RegistrationDate,
         DateOnly PartnershipEndDate,

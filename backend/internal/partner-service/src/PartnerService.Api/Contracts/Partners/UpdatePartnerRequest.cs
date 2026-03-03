@@ -12,9 +12,8 @@ public sealed class UpdatePartnerRequest
     [MaxLength(100)]
     public string OwnerLastName { get; set; } = string.Empty;
 
-    [Required]
     [MaxLength(255)]
-    public string ContractFileName { get; set; } = string.Empty;
+    public string? ContractFileName { get; set; }
 
     [Required]
     [MaxLength(255)]

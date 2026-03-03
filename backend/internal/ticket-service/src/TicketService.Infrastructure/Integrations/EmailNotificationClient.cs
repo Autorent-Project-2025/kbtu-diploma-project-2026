@@ -51,6 +51,41 @@ public sealed class EmailNotificationClient : IEmailNotificationClient
         }
     }
 
+    public async Task SendPartnerApprovedAsync(
+        SendPartnerApprovedEmailRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.PostAsJsonAsync("/emails/partners/approved", new
+        {
+            to = request.To,
+            fullName = request.FullName,
+            loginEmail = request.LoginEmail,
+            setPasswordUrl = request.SetPasswordUrl
+        }, cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            await ThrowResponseExceptionAsync(response, cancellationToken);
+        }
+    }
+
+    public async Task SendPartnerRejectedAsync(
+        SendPartnerRejectedEmailRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.PostAsJsonAsync("/emails/partners/rejected", new
+        {
+            to = request.To,
+            fullName = request.FullName,
+            reason = request.Reason
+        }, cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            await ThrowResponseExceptionAsync(response, cancellationToken);
+        }
+    }
+
     private static async Task ThrowResponseExceptionAsync(HttpResponseMessage response, CancellationToken cancellationToken)
     {
         var errorMessage = await TryReadErrorMessageAsync(response, cancellationToken)

@@ -1,10 +1,11 @@
 export interface Ticket {
   id: string;
+  ticketType: number;
   firstName: string;
   lastName: string;
   fullName: string;
   email: string;
-  birthDate: string;
+  birthDate?: string | null;
   phoneNumber: string;
   identityDocumentFileName?: string | null;
   driverLicenseFileName?: string | null;

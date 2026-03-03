@@ -1,4 +1,5 @@
 using PartnerService.Api.Middleware;
+using PartnerService.Api.Options;
 using PartnerService.Application.Constants;
 using PartnerService.Application.Interfaces;
 using PartnerService.Infrastructure.Persistence;
@@ -12,6 +13,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
+builder.Services.Configure<InternalAuthOptions>(builder.Configuration.GetSection(InternalAuthOptions.SectionName));
 
 var connectionString = builder.Configuration.GetConnectionString("DbConnection");
 if (string.IsNullOrWhiteSpace(connectionString))

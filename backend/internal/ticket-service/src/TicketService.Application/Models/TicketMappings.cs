@@ -8,6 +8,7 @@ public static class TicketMappings
     {
         return new TicketDto(
             ticket.Id,
+            ticket.TicketType,
             ticket.FirstName,
             ticket.LastName,
             ticket.FullName,

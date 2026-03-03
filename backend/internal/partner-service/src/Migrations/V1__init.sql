@@ -3,7 +3,7 @@ CREATE TABLE IF NOT EXISTS partners (
     owner_first_name VARCHAR(100) NOT NULL,
     owner_last_name VARCHAR(100) NOT NULL,
     created_on TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    contract_file_name VARCHAR(255) NOT NULL,
+    contract_file_name VARCHAR(255) NULL,
     owner_identity_file_name VARCHAR(255) NOT NULL,
     registration_date DATE NOT NULL,
     partnership_end_date DATE NOT NULL,

@@ -11,4 +11,12 @@ public interface IEmailNotificationClient
     Task SendRejectedAsync(
         SendRejectedEmailRequest request,
         CancellationToken cancellationToken = default);
+
+    Task SendPartnerApprovedAsync(
+        SendPartnerApprovedEmailRequest request,
+        CancellationToken cancellationToken = default);
+
+    Task SendPartnerRejectedAsync(
+        SendPartnerRejectedEmailRequest request,
+        CancellationToken cancellationToken = default);
 }

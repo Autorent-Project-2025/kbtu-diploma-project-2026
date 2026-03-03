@@ -39,7 +39,7 @@ docker compose up --build
 | Identity Service | `backend/shared/identity-service` | Auth, users, roles, permissions, JWKS |
 | Car Service | `backend/external/car-service` | Каталог автомобилей |
 | Booking Service | `backend/external/booking-service` | Бронирования |
-| Ticket Service | `backend/internal/ticket-service` | Заявки на регистрацию/верификацию |
+| Ticket Service | `backend/internal/ticket-service` | Заявки на регистрацию/верификацию клиентов и партнеров |
 | Image Service | `backend/shared/image-service` | Загрузка/удаление изображений |
 | File Service | `backend/internal/file-service` | Хранение приватных файлов и выдача временных ссылок |
 | Email Service | `backend/shared/email-service` | SMTP-уведомления |

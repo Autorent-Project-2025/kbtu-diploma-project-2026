@@ -10,6 +10,7 @@ using TicketService.Application.Interfaces;
 using TicketService.Application.Models;
 using TicketService.Application.Queries.GetPendingTickets;
 using TicketService.Application.Queries.GetTicketById;
+using TicketService.Domain.Enums;
 
 namespace TicketService.Api.Controllers;
 
@@ -46,13 +47,21 @@ public sealed class TicketsController : ControllerBase
         [FromForm] CreateTicketRequest request,
         CancellationToken cancellationToken)
     {
-        if (request.IdentityDocumentFile is null || request.DriverLicenseFile is null)
+        var ticketType = ResolveTicketType(request.TicketType);
+
+        if (request.IdentityDocumentFile is null)
         {
-            throw new ValidationException("Both PDF documents are required.");
+            throw new ValidationException("Identity document PDF is required.");
+        }
+
+        if (ticketType == TicketType.Client && request.DriverLicenseFile is null)
+        {
+            throw new ValidationException("Driver license PDF is required for client tickets.");
         }
 
         var result = await _createTicketCommandHandler.Handle(
             new CreateTicketCommand(
+                ticketType,
                 request.FirstName,
                 request.LastName,
                 request.Email,
@@ -60,7 +69,7 @@ public sealed class TicketsController : ControllerBase
                 request.PhoneNumber,
                 request.AvatarUrl,
                 await MapToFilePayloadAsync(request.IdentityDocumentFile, cancellationToken),
-                await MapToFilePayloadAsync(request.DriverLicenseFile, cancellationToken)),
+                await MapToOptionalFilePayloadAsync(request.DriverLicenseFile, cancellationToken)),
             cancellationToken);
 
         return Created($"/{result.Ticket.Id}", result.Ticket);
@@ -151,6 +160,33 @@ public sealed class TicketsController : ControllerBase
             file.FileName,
             file.ContentType,
             memoryStream.ToArray());
+    }
+
+    private static async Task<TicketDocumentFilePayload?> MapToOptionalFilePayloadAsync(
+        IFormFile? file,
+        CancellationToken cancellationToken)
+    {
+        if (file is null)
+        {
+            return null;
+        }
+
+        return await MapToFilePayloadAsync(file, cancellationToken);
+    }
+
+    private static TicketType ResolveTicketType(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return TicketType.Client;
+        }
+
+        return value.Trim().ToLowerInvariant() switch
+        {
+            "client" => TicketType.Client,
+            "partner" => TicketType.Partner,
+            _ => throw new ValidationException("ticketType must be 'Client' or 'Partner'.")
+        };
     }
 
     private static string? ResolveDocumentFileName(TicketDto ticket, string documentType)

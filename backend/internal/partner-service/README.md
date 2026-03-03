@@ -29,6 +29,7 @@
 - `PUT /{id:int}` (policy `partners:update`)
 - `DELETE /{id:int}` (policy `partners:delete`)
 - `GET /me` (требует валидный JWT, без отдельной policy)
+- `POST /internal/partners/provision` (внутренний endpoint, header `X-Internal-Api-Key`)
 
 Пример создания партнера:
 
@@ -49,6 +50,7 @@
 См. `./.env.example`:
 - `Jwt__PublicKey`
 - `Cors__AllowedOrigins__0`
+- `InternalAuth__ApiKey`
 - `EXTERNAL_PORT`
 - `POSTGRES_USER`
 - `POSTGRES_PASSWORD`
@@ -83,3 +85,5 @@ docker compose -f docker-compose.yaml up --build
 - `Partner.Delete` - удаление партнера (`DELETE /{id}`)
 
 Маршрут `GET /me` требует валидный JWT и возвращает карточку партнера, связанную с `relatedUserId` текущего пользователя.
+
+Внутренний маршрут `POST /internal/partners/provision` не требует JWT, но требует валидный `X-Internal-Api-Key`.

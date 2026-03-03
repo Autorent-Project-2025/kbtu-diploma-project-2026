@@ -2,6 +2,38 @@
   <div
     class="relative min-h-screen overflow-hidden bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-950"
   >
+    <div
+      v-if="showRoleChoiceModal"
+      class="fixed inset-0 z-[60] flex items-center justify-center bg-black/55 px-4"
+    >
+      <div class="w-full max-w-xl rounded-3xl border border-gray-200 bg-white p-8 shadow-2xl dark:border-gray-800 dark:bg-gray-900">
+        <h2 class="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white">
+          Добро пожаловать в AutoRent
+        </h2>
+        <p class="mt-3 text-gray-600 dark:text-gray-300">
+          Выберите вариант продолжения:
+        </p>
+
+        <div class="mt-8 grid gap-4 sm:grid-cols-2">
+          <button
+            class="rounded-2xl border border-gray-300 px-5 py-4 text-left text-gray-800 transition hover:border-primary-500 hover:bg-primary-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
+            @click="continueAsClient"
+          >
+            <div class="text-lg font-bold">Я клиент</div>
+            <div class="mt-1 text-sm text-gray-500 dark:text-gray-400">Открыть сайт как обычно</div>
+          </button>
+
+          <button
+            class="rounded-2xl bg-primary-600 px-5 py-4 text-left text-white transition hover:bg-primary-700"
+            @click="continueAsPartner"
+          >
+            <div class="text-lg font-bold">Я партнер</div>
+            <div class="mt-1 text-sm text-primary-100">Перейти к форме партнерской заявки</div>
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- Hero Section -->
     <section
       class="relative min-h-screen flex items-center justify-center px-4 sm:px-6 lg:px-8"
@@ -320,5 +352,32 @@
 </template>
 
 <script setup lang="ts">
-// Hero section component
+import { computed, onMounted, ref } from "vue";
+import { useRouter } from "vue-router";
+import { auth } from "../store/auth";
+
+const router = useRouter();
+const showRoleChoiceModal = ref(false);
+const roleModalSessionKey = "external-role-choice-shown";
+
+const isAuthenticated = computed(() => {
+  if (!auth.token) return false;
+  return auth.checkTokenValidity();
+});
+
+function continueAsClient() {
+  sessionStorage.setItem(roleModalSessionKey, "1");
+  showRoleChoiceModal.value = false;
+}
+
+function continueAsPartner() {
+  sessionStorage.setItem(roleModalSessionKey, "1");
+  showRoleChoiceModal.value = false;
+  router.push("/partner/apply");
+}
+
+onMounted(() => {
+  const modalAlreadyShown = sessionStorage.getItem(roleModalSessionKey) === "1";
+  showRoleChoiceModal.value = !isAuthenticated.value && !modalAlreadyShown;
+});
 </script>

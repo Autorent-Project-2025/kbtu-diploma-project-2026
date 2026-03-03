@@ -1,6 +1,11 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { createMailer } from "./mailer/mailer.ts";
-import { approvedTemplate, rejectedTemplate } from "./mailer/templates.ts";
+import {
+  approvedTemplate,
+  partnerApprovedTemplate,
+  partnerRejectedTemplate,
+  rejectedTemplate,
+} from "./mailer/templates.ts";
 
 type JsonBody = Record<string, unknown>;
 
@@ -124,6 +129,43 @@ async function main() {
         const reason = optionalString(body.reason, "reason");
 
         const template = rejectedTemplate({ fullName, reason });
+        const result = await mailer.sendMail({
+          to,
+          subject: template.subject,
+          text: template.text,
+          html: template.html,
+        });
+
+        sendJson(res, 200, { message: "Email sent", ...result });
+        return;
+      }
+
+      if (req.method === "POST" && url.pathname === "/emails/partners/approved") {
+        const body = await readJsonBody(req);
+        const to = requiredString(body.to, "to");
+        const fullName = requiredString(body.fullName, "fullName");
+        const loginEmail = requiredString(body.loginEmail, "loginEmail");
+        const setPasswordUrl = requiredString(body.setPasswordUrl, "setPasswordUrl");
+
+        const template = partnerApprovedTemplate({ fullName, loginEmail, setPasswordUrl });
+        const result = await mailer.sendMail({
+          to,
+          subject: template.subject,
+          text: template.text,
+          html: template.html,
+        });
+
+        sendJson(res, 200, { message: "Email sent", ...result });
+        return;
+      }
+
+      if (req.method === "POST" && url.pathname === "/emails/partners/rejected") {
+        const body = await readJsonBody(req);
+        const to = requiredString(body.to, "to");
+        const fullName = requiredString(body.fullName, "fullName");
+        const reason = optionalString(body.reason, "reason");
+
+        const template = partnerRejectedTemplate({ fullName, reason });
         const result = await mailer.sendMail({
           to,
           subject: template.subject,
