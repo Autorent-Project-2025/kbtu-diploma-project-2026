@@ -12,6 +12,7 @@ type ServiceConfig = {
     | "CAR_SERVICE_URL"
     | "BOOKING_SERVICE_URL"
     | "CLIENT_SERVICE_URL"
+    | "PARTNER_SERVICE_URL"
     | "INTERNAL_SERVICE_URL"
     | "TICKET_SERVICE_URL"
     | "FILE_SERVICE_URL";
@@ -22,9 +23,10 @@ const services: ServiceConfig[] = [
   { route: "/cars", envKey: "CAR_SERVICE_URL" },
   { route: "/bookings", envKey: "BOOKING_SERVICE_URL" },
   { route: "/clients", envKey: "CLIENT_SERVICE_URL" },
+  { route: "/partners", envKey: "PARTNER_SERVICE_URL" },
   { route: "/tickets", envKey: "TICKET_SERVICE_URL" },
   { route: "/files", envKey: "FILE_SERVICE_URL" },
-  { route: "/internal", envKey: "INTERNAL_SERVICE_URL"},
+  { route: "/internal", envKey: "INTERNAL_SERVICE_URL" },
 ];
 
 for (const service of services) {
@@ -40,8 +42,8 @@ for (const service of services) {
       target,
       changeOrigin: true,
       pathRewrite: {
-        [`^${service.route}`]: ""
-      }
+        [`^${service.route}`]: "",
+      },
     })
   );
 }

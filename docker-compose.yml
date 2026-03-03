@@ -215,6 +215,60 @@ services:
       client-flyway:
         condition: service_completed_successfully
 
+  partner-db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres_db
+    ports:
+      - "${PARTNER_DB_PORT:-1289}:5432"
+    volumes:
+      - partner_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+
+  partner-flyway:
+    image: flyway/flyway:12
+    restart: "no"
+    depends_on:
+      partner-db:
+        condition: service_healthy
+    command: migrate
+    volumes:
+      - ./backend/internal/partner-service/src/Migrations:/flyway/sql:ro
+    environment:
+      FLYWAY_URL: jdbc:postgresql://partner-db:5432/postgres_db
+      FLYWAY_USER: postgres
+      FLYWAY_PASSWORD: postgres
+      FLYWAY_CONNECT_RETRIES: 30
+
+  partner-service:
+    build:
+      context: ./backend/internal/partner-service/src
+      dockerfile: ./PartnerService.Api/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - path: ./backend/internal/partner-service/.env.example
+        required: true
+      - path: ./backend/internal/partner-service/.env
+        required: false
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__DbConnection: Host=partner-db;Port=5432;Database=postgres_db;Username=postgres;Password=postgres
+    ports:
+      - "${PARTNER_SERVICE_PORT:-1832}:8080"
+    depends_on:
+      partner-db:
+        condition: service_healthy
+      partner-flyway:
+        condition: service_completed_successfully
+
   ticket-db:
     image: postgres:16
     restart: unless-stopped
@@ -343,6 +397,7 @@ services:
       CAR_SERVICE_URL: http://car-service:8080
       BOOKING_SERVICE_URL: http://booking-service:8080
       CLIENT_SERVICE_URL: http://client-service:8080
+      PARTNER_SERVICE_URL: http://partner-service:8080
       TICKET_SERVICE_URL: http://ticket-service:8080
       FILE_SERVICE_URL: http://file-service:8080
       INTERNAL_SERVICE_URL: http://image-service:8080
@@ -357,6 +412,8 @@ services:
       booking-service:
         condition: service_started
       client-service:
+        condition: service_started
+      partner-service:
         condition: service_started
       ticket-service:
         condition: service_started
@@ -421,6 +478,7 @@ volumes:
   car_pgdata:
   booking_pgdata:
   client_pgdata:
+  partner_pgdata:
   ticket_pgdata:
   image_uploads:
   file_uploads:

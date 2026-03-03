@@ -27,4 +27,8 @@ public static class PermissionConstants
     public const string ClientCreate = "Client.Create";
     public const string ClientUpdate = "Client.Update";
     public const string ClientDelete = "Client.Delete";
+    public const string PartnerView = "Partner.View";
+    public const string PartnerCreate = "Partner.Create";
+    public const string PartnerUpdate = "Partner.Update";
+    public const string PartnerDelete = "Partner.Delete";
 }

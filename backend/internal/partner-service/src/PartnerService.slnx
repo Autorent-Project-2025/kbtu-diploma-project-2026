@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="PartnerService.Api/PartnerService.Api.csproj" />
+  <Project Path="PartnerService.Application/PartnerService.Application.csproj" />
+  <Project Path="PartnerService.Domain/PartnerService.Domain.csproj" />
+  <Project Path="PartnerService.Infrastructure/PartnerService.Infrastructure.csproj" />
+</Solution>
