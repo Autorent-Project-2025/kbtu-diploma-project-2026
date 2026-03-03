@@ -60,19 +60,6 @@
           </div>
 
           <div class="space-y-2">
-            <label for="avatarUrl" class="block text-sm font-semibold text-gray-700 dark:text-gray-300">
-              Ссылка на аватар (опционально)
-            </label>
-            <input
-              id="avatarUrl"
-              v-model="avatarUrl"
-              type="url"
-              placeholder="https://..."
-              class="w-full px-4 py-3.5 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:border-primary-500 dark:focus:border-primary-400 focus:ring-4 focus:ring-primary-500/10 transition-all duration-200"
-            />
-          </div>
-
-          <div class="space-y-2">
             <label for="identityDocumentFile" class="block text-sm font-semibold text-gray-700 dark:text-gray-300">
               Удостоверение личности (PDF)
             </label>
@@ -171,7 +158,6 @@ const lastName = ref("");
 const email = ref("");
 const birthDate = ref("");
 const phoneNumber = ref("");
-const avatarUrl = ref("");
 const identityDocumentFile = ref<File | null>(null);
 const driverLicenseFile = ref<File | null>(null);
 const loading = ref(false);
@@ -226,7 +212,6 @@ async function onSubmit() {
       email: email.value.trim(),
       birthDate: birthDate.value,
       phoneNumber: phoneNumber.value.trim(),
-      avatarUrl: avatarUrl.value.trim(),
       identityDocumentFile: identityDocumentFile.value,
       driverLicenseFile: driverLicenseFile.value
     });

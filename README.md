@@ -4,7 +4,7 @@
 AutoRent - микросервисная платформа каршеринга.
 
 В репозитории находятся:
-- 10 backend-сервисов (external/internal/shared);
+- 11 backend-сервисов (external/internal/shared);
 - 3 frontend-приложения (external/internal/superadmin);
 - общая оркестрация через `docker-compose.yml` в корне.
 
@@ -27,6 +27,7 @@ docker compose up --build
 - Car Service: `1298`
 - Booking Service: `1821`
 - Client Service: `1831`
+- Partner Service: `1832`
 - Ticket Service: `1248`
 - Image Service: `9181`
 - Email Service: `9182`
@@ -38,13 +39,13 @@ docker compose up --build
 | Identity Service | `backend/shared/identity-service` | Auth, users, roles, permissions, JWKS |
 | Car Service | `backend/external/car-service` | Каталог автомобилей |
 | Booking Service | `backend/external/booking-service` | Бронирования |
-| Ticket Service | `backend/internal/ticket-service` | Заявки на регистрацию/верификацию |
+| Ticket Service | `backend/internal/ticket-service` | Заявки на регистрацию/верификацию клиентов и партнеров |
 | Image Service | `backend/shared/image-service` | Загрузка/удаление изображений |
 | File Service | `backend/internal/file-service` | Хранение приватных файлов и выдача временных ссылок |
 | Email Service | `backend/shared/email-service` | SMTP-уведомления |
-| API Gateway | `backend/external/reverse-proxy-service` | Проксирование `/identity`, `/cars`, `/bookings`, `/clients`, `/tickets`, `/files`, `/internal` |
+| API Gateway | `backend/external/reverse-proxy-service` | Проксирование `/identity`, `/cars`, `/bookings`, `/clients`, `/partners`, `/tickets`, `/files`, `/internal` |
 | Client Service | `backend/external/client-service` | Профили клиентов (CRUD + `/me`) |
-| Partner Service | `backend/internal/partner-service` | Не реализован (заготовка) |
+| Partner Service | `backend/internal/partner-service` | Профили партнеров (CRUD + `/me`) |
 | External Frontend | `frontend/external` | Пользовательский UI |
 | Internal Frontend | `frontend/internal` | UI менеджера |
 | Superadmin Frontend | `frontend/superadmin` | UI супер-админа |
@@ -59,6 +60,7 @@ docker compose up --build
 | Car Service | `Car.Create`, `Car.Update`, `Car.Delete`, `Car.Image.Create` |
 | Booking Service | `Booking.Create` (для создания), остальные пользовательские операции требуют валидный JWT |
 | Client Service | `Client.View`, `Client.Create`, `Client.Update`, `Client.Delete` |
+| Partner Service | `Partner.View`, `Partner.Create`, `Partner.Update`, `Partner.Delete` |
 | Ticket Service | `Ticket.View`, `Ticket.Approve`, `Ticket.Reject` |
 | File Service | `File.Create`, `File.Read`, `File.Delete` |
 | Image Service | `Image.Create`, `Image.Delete` |

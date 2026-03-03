@@ -25,6 +25,9 @@
             >
               <div style="font-weight: 600">{{ ticket.fullName }}</div>
               <div style="font-size: 13px; color: #6b7280">{{ ticket.email }}</div>
+              <div style="font-size: 12px; color: #4b5563; margin-top: 2px">
+                {{ ticketTypeLabel(ticket.ticketType) }}
+              </div>
             </button>
           </li>
         </ul>
@@ -33,12 +36,19 @@
       <section class="card" v-if="selectedTicket">
         <div style="display: grid; gap: 10px; margin-bottom: 12px">
           <div><strong>Ticket ID:</strong> {{ selectedTicket.id }}</div>
+          <div><strong>Тип заявки:</strong> {{ ticketTypeLabel(selectedTicket.ticketType) }}</div>
           <div><strong>ФИО:</strong> {{ selectedTicket.fullName }}</div>
           <div><strong>Email:</strong> {{ selectedTicket.email }}</div>
-          <div><strong>Дата рождения:</strong> {{ selectedTicket.birthDate }}</div>
+          <div v-if="isClientTicket(selectedTicket)"><strong>Дата рождения:</strong> {{ selectedTicket.birthDate }}</div>
           <div><strong>Телефон:</strong> {{ selectedTicket.phoneNumber }}</div>
-          <div><strong>Документ личности:</strong> {{ selectedTicket.identityDocumentFileName ? "Загружен" : "Нет" }}</div>
-          <div><strong>Водительские права:</strong> {{ selectedTicket.driverLicenseFileName ? "Загружены" : "Нет" }}</div>
+          <div>
+            <strong>{{ isPartnerTicket(selectedTicket) ? "Удостоверение владельца:" : "Документ личности:" }}</strong>
+            {{ selectedTicket.identityDocumentFileName ? "Загружен" : "Нет" }}
+          </div>
+          <div v-if="isClientTicket(selectedTicket)">
+            <strong>Водительские права:</strong>
+            {{ selectedTicket.driverLicenseFileName ? "Загружены" : "Нет" }}
+          </div>
           <div><strong>Статус:</strong> {{ statusLabel(selectedTicket.status) }}</div>
         </div>
 
@@ -48,9 +58,10 @@
             @click="openDocument('identity')"
             :disabled="actionLoading || !selectedTicket.identityDocumentFileName"
           >
-            Глянуть удостоверение
+            {{ isPartnerTicket(selectedTicket) ? "Глянуть удостоверение владельца" : "Глянуть удостоверение" }}
           </button>
           <button
+            v-if="isClientTicket(selectedTicket)"
             class="btn btn-outline"
             @click="openDocument('license')"
             :disabled="actionLoading || !selectedTicket.driverLicenseFileName"
@@ -107,6 +118,19 @@ function statusLabel(status: number) {
   if (status === 2) return "Approved";
   if (status === 3) return "Rejected";
   return "Unknown";
+}
+
+function ticketTypeLabel(ticketType: number) {
+  if (ticketType === 2) return "Партнерская заявка";
+  return "Клиентская заявка";
+}
+
+function isClientTicket(ticket: Ticket) {
+  return ticket.ticketType !== 2;
+}
+
+function isPartnerTicket(ticket: Ticket) {
+  return ticket.ticketType === 2;
 }
 
 async function loadPending() {

@@ -5,11 +5,12 @@ namespace TicketService.Domain.Entities;
 public sealed class Ticket
 {
     public Guid Id { get; private set; }
+    public TicketType TicketType { get; private set; }
     public string FirstName { get; private set; } = string.Empty;
     public string LastName { get; private set; } = string.Empty;
     public string FullName { get; private set; } = string.Empty;
     public string Email { get; private set; } = string.Empty;
-    public DateOnly BirthDate { get; private set; }
+    public DateOnly? BirthDate { get; private set; }
     public string PhoneNumber { get; private set; } = string.Empty;
     public string? IdentityDocumentFileName { get; private set; }
     public string? DriverLicenseFileName { get; private set; }
@@ -24,10 +25,11 @@ public sealed class Ticket
 
     public Ticket(
         Guid id,
+        TicketType ticketType,
         string firstName,
         string lastName,
         string email,
-        DateOnly birthDate,
+        DateOnly? birthDate,
         string phoneNumber,
         string? identityDocumentFileName,
         string? driverLicenseFileName,
@@ -35,12 +37,15 @@ public sealed class Ticket
         DateTime createdAt)
     {
         Id = id == Guid.Empty ? Guid.NewGuid() : id;
+        TicketType = ticketType;
         SetName(firstName, lastName);
         SetEmail(email);
-        SetBirthDate(birthDate);
+        SetBirthDate(ticketType, birthDate);
         SetPhoneNumber(phoneNumber);
         IdentityDocumentFileName = NormalizeOptional(identityDocumentFileName, nameof(identityDocumentFileName), 255);
-        DriverLicenseFileName = NormalizeOptional(driverLicenseFileName, nameof(driverLicenseFileName), 255);
+        DriverLicenseFileName = ticketType == TicketType.Client
+            ? NormalizeOptional(driverLicenseFileName, nameof(driverLicenseFileName), 255)
+            : null;
         SetAvatarUrl(avatarUrl);
         Status = TicketStatus.Pending;
         CreatedAt = createdAt;
@@ -110,9 +115,15 @@ public sealed class Ticket
         Email = email.Trim().ToLowerInvariant();
     }
 
-    private void SetBirthDate(DateOnly birthDate)
+    private void SetBirthDate(TicketType ticketType, DateOnly? birthDate)
     {
-        if (birthDate == default)
+        if (ticketType == TicketType.Partner)
+        {
+            BirthDate = birthDate;
+            return;
+        }
+
+        if (birthDate is null || birthDate == default)
         {
             throw new ArgumentException("Birth date is required.", nameof(birthDate));
         }

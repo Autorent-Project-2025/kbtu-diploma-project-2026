@@ -41,12 +41,14 @@ public sealed class ApproveTicketCommandHandler
             throw new NotFoundException($"Ticket '{command.TicketId}' was not found.");
         }
 
-        ticket.Approve(command.ManagerId, DateTime.UtcNow);
+        var reviewedAtUtc = DateTime.UtcNow;
+        ticket.Approve(command.ManagerId, reviewedAtUtc);
         await _ticketUnitOfWork.SaveChangesAsync(cancellationToken);
 
         await _ticketEventPublisher.PublishApprovedAsync(
             new TicketApprovedEvent(
                 ticket.Id,
+                ticket.TicketType,
                 ticket.FirstName,
                 ticket.LastName,
                 ticket.FullName,
@@ -56,7 +58,8 @@ public sealed class ApproveTicketCommandHandler
                 ticket.IdentityDocumentFileName,
                 ticket.DriverLicenseFileName,
                 ticket.AvatarUrl,
-                command.ManagerId),
+                command.ManagerId,
+                reviewedAtUtc),
             cancellationToken);
 
         return new ApproveTicketResult(ticket.ToDto());

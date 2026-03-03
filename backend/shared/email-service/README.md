@@ -18,6 +18,8 @@ Base path: `/`.
 - `GET /health`
 - `POST /emails/approved`
 - `POST /emails/rejected`
+- `POST /emails/partners/approved`
+- `POST /emails/partners/rejected`
 - `POST /emails/custom`
 
 Пример `POST /emails/approved`:
@@ -75,6 +77,8 @@ docker compose up --build email-service
 - `GET /health`
 - `POST /emails/approved`
 - `POST /emails/rejected`
+- `POST /emails/partners/approved`
+- `POST /emails/partners/rejected`
 - `POST /emails/custom`
 
 без проверки ролей/прав.

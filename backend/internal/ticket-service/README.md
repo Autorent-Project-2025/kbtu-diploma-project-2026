@@ -1,12 +1,13 @@
 # Ticket Service
 
 ## Назначение
-Сервис заявок на регистрацию/верификацию клиента. Отвечает за:
+Сервис заявок на регистрацию/верификацию клиента и партнера. Отвечает за:
 - создание заявки пользователем;
 - просмотр pending-заявок менеджером;
 - approve/reject заявки;
 - интеграцию с `identity-service` (provision пользователя);
-- интеграцию с `client-service` (создание клиентского профиля при approve);
+- интеграцию с `client-service` (создание клиентского профиля при approve client-ticket);
+- интеграцию с `partner-service` (создание профиля партнера при approve partner-ticket);
 - интеграцию с `email-service` (approved/rejected уведомления).
 
 ## Стек
@@ -31,14 +32,15 @@
 Пример создания заявки:
 
 `POST /` принимает `multipart/form-data`:
+- `ticketType` (`Client` | `Partner`, optional, default `Client`)
 - `firstName` (string)
 - `lastName` (string)
 - `email` (string)
-- `birthDate` (YYYY-MM-DD)
+- `birthDate` (YYYY-MM-DD, required for `Client`)
 - `phoneNumber` (string)
-- `avatarUrl` (string, optional)
+- `avatarUrl` (string, optional, for `Client`)
 - `identityDocumentFile` (PDF file, required)
-- `driverLicenseFile` (PDF file, required)
+- `driverLicenseFile` (PDF file, required for `Client`)
 
 Пример reject:
 
@@ -57,6 +59,8 @@
 - `EmailService__BaseUrl`
 - `ClientService__BaseUrl`
 - `ClientService__InternalApiKey`
+- `PartnerService__BaseUrl`
+- `PartnerService__InternalApiKey`
 - `FileService__BaseUrl`
 - `FileService__InternalApiKey`
 - `Activation__SetPasswordBaseUrl`
@@ -69,10 +73,13 @@
 ## Интеграции
 - `POST {IdentityService__BaseUrl}/internal/users/provision` + header `X-Internal-Api-Key`.
 - `POST {ClientService__BaseUrl}/internal/clients/provision` + header `X-Internal-Api-Key`.
+- `POST {PartnerService__BaseUrl}/internal/partners/provision` + header `X-Internal-Api-Key`.
 - `POST {FileService__BaseUrl}/api/internal/files/upload` + header `X-Internal-Api-Key`.
 - `POST {FileService__BaseUrl}/api/internal/files/temporary-link` + header `X-Internal-Api-Key`.
 - `POST {EmailService__BaseUrl}/emails/approved`.
 - `POST {EmailService__BaseUrl}/emails/rejected`.
+- `POST {EmailService__BaseUrl}/emails/partners/approved`.
+- `POST {EmailService__BaseUrl}/emails/partners/rejected`.
 
 ## Запуск
 В папке сервиса отдельного `docker-compose` нет. Рекомендуемый запуск - из корня репозитория:

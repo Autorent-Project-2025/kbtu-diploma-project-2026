@@ -52,6 +52,7 @@ public sealed class RejectTicketCommandHandler
         await _ticketEventPublisher.PublishRejectedAsync(
             new TicketRejectedEvent(
                 ticket.Id,
+                ticket.TicketType,
                 ticket.FullName,
                 ticket.Email,
                 command.DecisionReason.Trim(),
