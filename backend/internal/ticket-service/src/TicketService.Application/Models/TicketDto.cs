@@ -4,6 +4,8 @@ namespace TicketService.Application.Models;
 
 public sealed record TicketDto(
     Guid Id,
+    string FirstName,
+    string LastName,
     string FullName,
     string Email,
     DateOnly BirthDate,

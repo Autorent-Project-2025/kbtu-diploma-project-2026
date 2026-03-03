@@ -1,5 +1,7 @@
 export interface Ticket {
   id: string;
+  firstName: string;
+  lastName: string;
   fullName: string;
   email: string;
   birthDate: string;

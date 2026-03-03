@@ -47,6 +47,8 @@ public sealed class ApproveTicketCommandHandler
         await _ticketEventPublisher.PublishApprovedAsync(
             new TicketApprovedEvent(
                 ticket.Id,
+                ticket.FirstName,
+                ticket.LastName,
                 ticket.FullName,
                 ticket.Email,
                 ticket.BirthDate,

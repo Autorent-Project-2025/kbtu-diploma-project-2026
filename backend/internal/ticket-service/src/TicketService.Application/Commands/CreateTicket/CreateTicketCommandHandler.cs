@@ -9,13 +9,16 @@ public sealed class CreateTicketCommandHandler
 {
     private readonly ITicketRepository _ticketRepository;
     private readonly ITicketUnitOfWork _ticketUnitOfWork;
+    private readonly IFileStorageClient _fileStorageClient;
 
     public CreateTicketCommandHandler(
         ITicketRepository ticketRepository,
-        ITicketUnitOfWork ticketUnitOfWork)
+        ITicketUnitOfWork ticketUnitOfWork,
+        IFileStorageClient fileStorageClient)
     {
         _ticketRepository = ticketRepository;
         _ticketUnitOfWork = ticketUnitOfWork;
+        _fileStorageClient = fileStorageClient;
     }
 
     public async Task<CreateTicketResult> Handle(
@@ -24,14 +27,23 @@ public sealed class CreateTicketCommandHandler
     {
         Validate(command);
 
+        var identityDocumentFileName = await _fileStorageClient.UploadFileAsync(
+            command.IdentityDocumentFile,
+            cancellationToken);
+
+        var driverLicenseFileName = await _fileStorageClient.UploadFileAsync(
+            command.DriverLicenseFile,
+            cancellationToken);
+
         var ticket = new Ticket(
             Guid.NewGuid(),
-            command.FullName,
+            command.FirstName,
+            command.LastName,
             command.Email,
             command.BirthDate,
             command.PhoneNumber,
-            command.IdentityDocumentFileName,
-            command.DriverLicenseFileName,
+            identityDocumentFileName,
+            driverLicenseFileName,
             command.AvatarUrl,
             DateTime.UtcNow);
 
@@ -43,9 +55,14 @@ public sealed class CreateTicketCommandHandler
 
     private static void Validate(CreateTicketCommand command)
     {
-        if (string.IsNullOrWhiteSpace(command.FullName))
+        if (string.IsNullOrWhiteSpace(command.FirstName))
         {
-            throw new ValidationException("Full name is required.");
+            throw new ValidationException("First name is required.");
+        }
+
+        if (string.IsNullOrWhiteSpace(command.LastName))
+        {
+            throw new ValidationException("Last name is required.");
         }
 
         if (string.IsNullOrWhiteSpace(command.Email))
@@ -66,6 +83,30 @@ public sealed class CreateTicketCommandHandler
         if (string.IsNullOrWhiteSpace(command.PhoneNumber))
         {
             throw new ValidationException("Phone number is required.");
+        }
+
+        ValidatePdf(command.IdentityDocumentFile, nameof(command.IdentityDocumentFile));
+        ValidatePdf(command.DriverLicenseFile, nameof(command.DriverLicenseFile));
+    }
+
+    private static void ValidatePdf(TicketDocumentFilePayload file, string fieldName)
+    {
+        if (file.Content.Length == 0)
+        {
+            throw new ValidationException($"{fieldName} is required.");
+        }
+
+        var fileName = file.FileName?.Trim() ?? string.Empty;
+        if (!fileName.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new ValidationException($"{fieldName} must be a PDF file.");
+        }
+
+        var contentType = file.ContentType?.Trim() ?? string.Empty;
+        if (!string.Equals(contentType, "application/pdf", StringComparison.OrdinalIgnoreCase) &&
+            !string.Equals(contentType, "application/octet-stream", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new ValidationException($"{fieldName} content type must be application/pdf.");
         }
     }
 }

@@ -5,6 +5,8 @@ namespace TicketService.Domain.Entities;
 public sealed class Ticket
 {
     public Guid Id { get; private set; }
+    public string FirstName { get; private set; } = string.Empty;
+    public string LastName { get; private set; } = string.Empty;
     public string FullName { get; private set; } = string.Empty;
     public string Email { get; private set; } = string.Empty;
     public DateOnly BirthDate { get; private set; }
@@ -22,7 +24,8 @@ public sealed class Ticket
 
     public Ticket(
         Guid id,
-        string fullName,
+        string firstName,
+        string lastName,
         string email,
         DateOnly birthDate,
         string phoneNumber,
@@ -32,7 +35,7 @@ public sealed class Ticket
         DateTime createdAt)
     {
         Id = id == Guid.Empty ? Guid.NewGuid() : id;
-        SetFullName(fullName);
+        SetName(firstName, lastName);
         SetEmail(email);
         SetBirthDate(birthDate);
         SetPhoneNumber(phoneNumber);
@@ -70,14 +73,31 @@ public sealed class Ticket
         ReviewedAt = reviewedAt;
     }
 
-    private void SetFullName(string fullName)
+    private void SetName(string firstName, string lastName)
     {
-        if (string.IsNullOrWhiteSpace(fullName))
+        if (string.IsNullOrWhiteSpace(firstName))
         {
-            throw new ArgumentException("Full name is required.", nameof(fullName));
+            throw new ArgumentException("First name is required.", nameof(firstName));
         }
 
-        FullName = fullName.Trim();
+        if (string.IsNullOrWhiteSpace(lastName))
+        {
+            throw new ArgumentException("Last name is required.", nameof(lastName));
+        }
+
+        FirstName = firstName.Trim();
+        LastName = lastName.Trim();
+        if (FirstName.Length > 100)
+        {
+            throw new ArgumentException("First name length must not exceed 100.", nameof(firstName));
+        }
+
+        if (LastName.Length > 100)
+        {
+            throw new ArgumentException("Last name length must not exceed 100.", nameof(lastName));
+        }
+
+        FullName = $"{FirstName} {LastName}".Trim();
     }
 
     private void SetEmail(string email)

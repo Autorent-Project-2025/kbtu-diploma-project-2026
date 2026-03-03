@@ -34,11 +34,10 @@ public sealed class TicketEventPublisher : ITicketEventPublisher
                 ticketApprovedEvent.BirthDate),
             cancellationToken);
 
-        var (firstName, lastName) = SplitFullName(ticketApprovedEvent.FullName);
         await _clientProvisioningClient.ProvisionClientAsync(
             new ProvisionClientProfileRequest(
-                firstName,
-                lastName,
+                ticketApprovedEvent.FirstName,
+                ticketApprovedEvent.LastName,
                 ticketApprovedEvent.BirthDate,
                 ticketApprovedEvent.IdentityDocumentFileName,
                 ticketApprovedEvent.DriverLicenseFileName,
@@ -77,28 +76,5 @@ public sealed class TicketEventPublisher : ITicketEventPublisher
         var baseUrl = _activationOptions.SetPasswordBaseUrl.Trim();
         var separator = baseUrl.Contains('?', StringComparison.Ordinal) ? "&" : "?";
         return $"{baseUrl}{separator}token={Uri.EscapeDataString(activationToken)}";
-    }
-
-    private static (string FirstName, string LastName) SplitFullName(string fullName)
-    {
-        if (string.IsNullOrWhiteSpace(fullName))
-        {
-            return ("Unknown", "Unknown");
-        }
-
-        var parts = fullName
-            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-
-        if (parts.Length == 0)
-        {
-            return ("Unknown", "Unknown");
-        }
-
-        if (parts.Length == 1)
-        {
-            return (parts[0], parts[0]);
-        }
-
-        return (parts[0], string.Join(' ', parts.Skip(1)));
     }
 }

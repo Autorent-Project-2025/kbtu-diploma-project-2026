@@ -2,6 +2,7 @@ import { RequestHandler, Router } from "express";
 
 import FilesController from "../controllers/filesController";
 import { createFilesRouter } from "./filesRouter";
+import { createInternalFilesRouter } from "./internalFilesRouter";
 import { createStorageRouter } from "./storageRouter";
 
 interface CreateApiRouterArgs {
@@ -13,6 +14,7 @@ export const createApiRouter = ({ filesController, rawFileBodyParser }: CreateAp
   const apiRouter = Router();
 
   apiRouter.use("/files", createFilesRouter(filesController, rawFileBodyParser));
+  apiRouter.use("/internal/files", createInternalFilesRouter(filesController, rawFileBodyParser));
 
   return apiRouter;
 };

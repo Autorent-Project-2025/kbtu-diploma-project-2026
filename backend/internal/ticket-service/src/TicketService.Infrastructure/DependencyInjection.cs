@@ -21,6 +21,7 @@ public static class DependencyInjection
         services.Configure<IdentityServiceOptions>(configuration.GetSection(IdentityServiceOptions.SectionName));
         services.Configure<EmailServiceOptions>(configuration.GetSection(EmailServiceOptions.SectionName));
         services.Configure<ClientServiceOptions>(configuration.GetSection(ClientServiceOptions.SectionName));
+        services.Configure<FileServiceOptions>(configuration.GetSection(FileServiceOptions.SectionName));
         services.Configure<ActivationOptions>(configuration.GetSection(ActivationOptions.SectionName));
 
         var connectionString = configuration.GetConnectionString("DbConnection");
@@ -71,6 +72,17 @@ public static class DependencyInjection
             if (string.IsNullOrWhiteSpace(options.BaseUrl))
             {
                 throw new InvalidOperationException("ClientService:BaseUrl configuration is required.");
+            }
+
+            client.BaseAddress = new Uri(NormalizeBaseUrl(options.BaseUrl));
+        });
+
+        services.AddHttpClient<IFileStorageClient, FileStorageClient>((serviceProvider, client) =>
+        {
+            var options = serviceProvider.GetRequiredService<IOptions<FileServiceOptions>>().Value;
+            if (string.IsNullOrWhiteSpace(options.BaseUrl))
+            {
+                throw new InvalidOperationException("FileService:BaseUrl configuration is required.");
             }
 
             client.BaseAddress = new Uri(NormalizeBaseUrl(options.BaseUrl));
