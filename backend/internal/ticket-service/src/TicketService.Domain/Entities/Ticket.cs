@@ -8,6 +8,10 @@ public sealed class Ticket
     public string FullName { get; private set; } = string.Empty;
     public string Email { get; private set; } = string.Empty;
     public DateOnly BirthDate { get; private set; }
+    public string PhoneNumber { get; private set; } = string.Empty;
+    public string? IdentityDocumentFileName { get; private set; }
+    public string? DriverLicenseFileName { get; private set; }
+    public string? AvatarUrl { get; private set; }
     public TicketStatus Status { get; private set; }
     public string? DecisionReason { get; private set; }
     public DateTime CreatedAt { get; private set; }
@@ -21,12 +25,20 @@ public sealed class Ticket
         string fullName,
         string email,
         DateOnly birthDate,
+        string phoneNumber,
+        string? identityDocumentFileName,
+        string? driverLicenseFileName,
+        string? avatarUrl,
         DateTime createdAt)
     {
         Id = id == Guid.Empty ? Guid.NewGuid() : id;
         SetFullName(fullName);
         SetEmail(email);
-        BirthDate = birthDate;
+        SetBirthDate(birthDate);
+        SetPhoneNumber(phoneNumber);
+        IdentityDocumentFileName = NormalizeOptional(identityDocumentFileName, nameof(identityDocumentFileName), 255);
+        DriverLicenseFileName = NormalizeOptional(driverLicenseFileName, nameof(driverLicenseFileName), 255);
+        SetAvatarUrl(avatarUrl);
         Status = TicketStatus.Pending;
         CreatedAt = createdAt;
     }
@@ -76,6 +88,64 @@ public sealed class Ticket
         }
 
         Email = email.Trim().ToLowerInvariant();
+    }
+
+    private void SetBirthDate(DateOnly birthDate)
+    {
+        if (birthDate == default)
+        {
+            throw new ArgumentException("Birth date is required.", nameof(birthDate));
+        }
+
+        if (birthDate > DateOnly.FromDateTime(DateTime.UtcNow))
+        {
+            throw new ArgumentException("Birth date cannot be in the future.", nameof(birthDate));
+        }
+
+        BirthDate = birthDate;
+    }
+
+    private void SetPhoneNumber(string phoneNumber)
+    {
+        if (string.IsNullOrWhiteSpace(phoneNumber))
+        {
+            throw new ArgumentException("Phone number is required.", nameof(phoneNumber));
+        }
+
+        var normalized = phoneNumber.Trim();
+        if (normalized.Length > 32)
+        {
+            throw new ArgumentException("Phone number length must not exceed 32.", nameof(phoneNumber));
+        }
+
+        PhoneNumber = normalized;
+    }
+
+    private void SetAvatarUrl(string? avatarUrl)
+    {
+        var normalized = NormalizeOptional(avatarUrl, nameof(avatarUrl), 1024);
+        if (normalized is not null && !Uri.TryCreate(normalized, UriKind.Absolute, out _))
+        {
+            throw new ArgumentException("Avatar url must be a valid absolute URL.", nameof(avatarUrl));
+        }
+
+        AvatarUrl = normalized;
+    }
+
+    private static string? NormalizeOptional(string? value, string paramName, int maxLength)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        var normalized = value.Trim();
+        if (normalized.Length > maxLength)
+        {
+            throw new ArgumentException($"{paramName} length must not exceed {maxLength}.", paramName);
+        }
+
+        return normalized;
     }
 
     private void EnsurePendingStatus()

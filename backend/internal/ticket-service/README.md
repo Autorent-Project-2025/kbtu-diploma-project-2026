@@ -6,6 +6,7 @@
 - просмотр pending-заявок менеджером;
 - approve/reject заявки;
 - интеграцию с `identity-service` (provision пользователя);
+- интеграцию с `client-service` (создание клиентского профиля при approve);
 - интеграцию с `email-service` (approved/rejected уведомления).
 
 ## Стек
@@ -32,7 +33,11 @@
 {
   "fullName": "Arlan User",
   "email": "arlan@example.com",
-  "birthDate": "2000-01-15"
+  "birthDate": "2000-01-15",
+  "phoneNumber": "+77011234567",
+  "identityDocumentFileName": "id_arl_001.pdf",
+  "driverLicenseFileName": "license_arl_001.pdf",
+  "avatarUrl": "https://storage.example.com/avatars/arlan.png"
 }
 ```
 
@@ -51,6 +56,8 @@
 - `IdentityService__BaseUrl`
 - `IdentityService__InternalApiKey`
 - `EmailService__BaseUrl`
+- `ClientService__BaseUrl`
+- `ClientService__InternalApiKey`
 - `Activation__SetPasswordBaseUrl`
 - `EXTERNAL_PORT`
 - `POSTGRES_USER`
@@ -60,6 +67,7 @@
 
 ## Интеграции
 - `POST {IdentityService__BaseUrl}/internal/users/provision` + header `X-Internal-Api-Key`.
+- `POST {ClientService__BaseUrl}/internal/clients/provision` + header `X-Internal-Api-Key`.
 - `POST {EmailService__BaseUrl}/emails/approved`.
 - `POST {EmailService__BaseUrl}/emails/rejected`.
 

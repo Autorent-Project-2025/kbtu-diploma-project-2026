@@ -59,6 +59,20 @@
             />
           </div>
 
+          <div class="space-y-2">
+            <label for="phoneNumber" class="block text-sm font-semibold text-gray-700 dark:text-gray-300">
+              Номер телефона
+            </label>
+            <input
+              id="phoneNumber"
+              v-model="phoneNumber"
+              type="tel"
+              required
+              placeholder="+77011234567"
+              class="w-full px-4 py-3.5 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:border-primary-500 dark:focus:border-primary-400 focus:ring-4 focus:ring-primary-500/10 transition-all duration-200"
+            />
+          </div>
+
           <button
             type="submit"
             :disabled="loading"
@@ -101,6 +115,7 @@ import { useToast } from "../composables/useToast";
 const fullName = ref("");
 const email = ref("");
 const birthDate = ref("");
+const phoneNumber = ref("");
 const loading = ref(false);
 const submitted = ref(false);
 const { error } = useToast();
@@ -110,7 +125,7 @@ async function onSubmit() {
 
   loading.value = true;
   try {
-    await createTicket(fullName.value, email.value, birthDate.value);
+    await createTicket(fullName.value, email.value, birthDate.value, phoneNumber.value);
     submitted.value = true;
   } catch (e: any) {
     const errorMsg =

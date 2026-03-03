@@ -29,6 +29,10 @@ public sealed class CreateTicketCommandHandler
             command.FullName,
             command.Email,
             command.BirthDate,
+            command.PhoneNumber,
+            command.IdentityDocumentFileName,
+            command.DriverLicenseFileName,
+            command.AvatarUrl,
             DateTime.UtcNow);
 
         await _ticketRepository.AddAsync(ticket, cancellationToken);
@@ -52,6 +56,16 @@ public sealed class CreateTicketCommandHandler
         if (command.BirthDate == default)
         {
             throw new ValidationException("Birth date is required.");
+        }
+
+        if (command.BirthDate > DateOnly.FromDateTime(DateTime.UtcNow))
+        {
+            throw new ValidationException("Birth date cannot be in the future.");
+        }
+
+        if (string.IsNullOrWhiteSpace(command.PhoneNumber))
+        {
+            throw new ValidationException("Phone number is required.");
         }
     }
 }

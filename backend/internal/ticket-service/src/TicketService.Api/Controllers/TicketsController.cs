@@ -42,7 +42,14 @@ public sealed class TicketsController : ControllerBase
         CancellationToken cancellationToken)
     {
         var result = await _createTicketCommandHandler.Handle(
-            new CreateTicketCommand(request.FullName, request.Email, request.BirthDate),
+            new CreateTicketCommand(
+                request.FullName,
+                request.Email,
+                request.BirthDate,
+                request.PhoneNumber,
+                request.IdentityDocumentFileName,
+                request.DriverLicenseFileName,
+                request.AvatarUrl),
             cancellationToken);
 
         return Created($"/{result.Ticket.Id}", result.Ticket);

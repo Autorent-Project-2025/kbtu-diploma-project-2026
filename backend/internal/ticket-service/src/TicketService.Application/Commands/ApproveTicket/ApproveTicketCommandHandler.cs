@@ -50,6 +50,10 @@ public sealed class ApproveTicketCommandHandler
                 ticket.FullName,
                 ticket.Email,
                 ticket.BirthDate,
+                ticket.PhoneNumber,
+                ticket.IdentityDocumentFileName,
+                ticket.DriverLicenseFileName,
+                ticket.AvatarUrl,
                 command.ManagerId),
             cancellationToken);
 

@@ -36,6 +36,7 @@
           <div><strong>ФИО:</strong> {{ selectedTicket.fullName }}</div>
           <div><strong>Email:</strong> {{ selectedTicket.email }}</div>
           <div><strong>Дата рождения:</strong> {{ selectedTicket.birthDate }}</div>
+          <div><strong>Телефон:</strong> {{ selectedTicket.phoneNumber }}</div>
           <div><strong>Статус:</strong> {{ statusLabel(selectedTicket.status) }}</div>
         </div>
 

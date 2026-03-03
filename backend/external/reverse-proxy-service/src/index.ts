@@ -11,6 +11,7 @@ type ServiceConfig = {
     | "IDENTITY_SERVICE_URL"
     | "CAR_SERVICE_URL"
     | "BOOKING_SERVICE_URL"
+    | "CLIENT_SERVICE_URL"
     | "INTERNAL_SERVICE_URL"
     | "TICKET_SERVICE_URL"
     | "FILE_SERVICE_URL";
@@ -20,6 +21,7 @@ const services: ServiceConfig[] = [
   { route: "/identity", envKey: "IDENTITY_SERVICE_URL" },
   { route: "/cars", envKey: "CAR_SERVICE_URL" },
   { route: "/bookings", envKey: "BOOKING_SERVICE_URL" },
+  { route: "/clients", envKey: "CLIENT_SERVICE_URL" },
   { route: "/tickets", envKey: "TICKET_SERVICE_URL" },
   { route: "/files", envKey: "FILE_SERVICE_URL" },
   { route: "/internal", envKey: "INTERNAL_SERVICE_URL"},

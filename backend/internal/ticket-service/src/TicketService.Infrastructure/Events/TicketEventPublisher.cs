@@ -9,15 +9,18 @@ namespace TicketService.Infrastructure.Events;
 public sealed class TicketEventPublisher : ITicketEventPublisher
 {
     private readonly IIdentityProvisioningClient _identityProvisioningClient;
+    private readonly IClientProvisioningClient _clientProvisioningClient;
     private readonly IEmailNotificationClient _emailNotificationClient;
     private readonly ActivationOptions _activationOptions;
 
     public TicketEventPublisher(
         IIdentityProvisioningClient identityProvisioningClient,
+        IClientProvisioningClient clientProvisioningClient,
         IEmailNotificationClient emailNotificationClient,
         IOptions<ActivationOptions> activationOptions)
     {
         _identityProvisioningClient = identityProvisioningClient;
+        _clientProvisioningClient = clientProvisioningClient;
         _emailNotificationClient = emailNotificationClient;
         _activationOptions = activationOptions.Value;
     }
@@ -29,6 +32,19 @@ public sealed class TicketEventPublisher : ITicketEventPublisher
                 ticketApprovedEvent.FullName,
                 ticketApprovedEvent.Email,
                 ticketApprovedEvent.BirthDate),
+            cancellationToken);
+
+        var (firstName, lastName) = SplitFullName(ticketApprovedEvent.FullName);
+        await _clientProvisioningClient.ProvisionClientAsync(
+            new ProvisionClientProfileRequest(
+                firstName,
+                lastName,
+                ticketApprovedEvent.BirthDate,
+                ticketApprovedEvent.IdentityDocumentFileName,
+                ticketApprovedEvent.DriverLicenseFileName,
+                provisionResult.UserId,
+                ticketApprovedEvent.PhoneNumber,
+                ticketApprovedEvent.AvatarUrl),
             cancellationToken);
 
         var setPasswordUrl = BuildSetPasswordUrl(provisionResult.ActivationToken);
@@ -61,5 +77,28 @@ public sealed class TicketEventPublisher : ITicketEventPublisher
         var baseUrl = _activationOptions.SetPasswordBaseUrl.Trim();
         var separator = baseUrl.Contains('?', StringComparison.Ordinal) ? "&" : "?";
         return $"{baseUrl}{separator}token={Uri.EscapeDataString(activationToken)}";
+    }
+
+    private static (string FirstName, string LastName) SplitFullName(string fullName)
+    {
+        if (string.IsNullOrWhiteSpace(fullName))
+        {
+            return ("Unknown", "Unknown");
+        }
+
+        var parts = fullName
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        if (parts.Length == 0)
+        {
+            return ("Unknown", "Unknown");
+        }
+
+        if (parts.Length == 1)
+        {
+            return (parts[0], parts[0]);
+        }
+
+        return (parts[0], string.Join(' ', parts.Skip(1)));
     }
 }

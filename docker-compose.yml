@@ -161,6 +161,60 @@ services:
       booking-flyway:
         condition: service_completed_successfully
 
+  client-db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres_db
+    ports:
+      - "${CLIENT_DB_PORT:-1291}:5432"
+    volumes:
+      - client_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+
+  client-flyway:
+    image: flyway/flyway:12
+    restart: "no"
+    depends_on:
+      client-db:
+        condition: service_healthy
+    command: migrate
+    volumes:
+      - ./backend/external/client-service/src/Migrations:/flyway/sql:ro
+    environment:
+      FLYWAY_URL: jdbc:postgresql://client-db:5432/postgres_db
+      FLYWAY_USER: postgres
+      FLYWAY_PASSWORD: postgres
+      FLYWAY_CONNECT_RETRIES: 30
+
+  client-service:
+    build:
+      context: ./backend/external/client-service/src
+      dockerfile: ./ClientService.Api/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - path: ./backend/external/client-service/.env.example
+        required: true
+      - path: ./backend/external/client-service/.env
+        required: false
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__DbConnection: Host=client-db;Port=5432;Database=postgres_db;Username=postgres;Password=postgres
+    ports:
+      - "${CLIENT_SERVICE_PORT:-1831}:8080"
+    depends_on:
+      client-db:
+        condition: service_healthy
+      client-flyway:
+        condition: service_completed_successfully
+
   ticket-db:
     image: postgres:16
     restart: unless-stopped
@@ -224,6 +278,8 @@ services:
       ConnectionStrings__DbConnection: Host=ticket-db;Port=5432;Database=postgres_db;Username=postgres;Password=postgres
       IdentityService__BaseUrl: http://identity-service:8080
       EmailService__BaseUrl: http://email-service:8080
+      ClientService__BaseUrl: http://client-service:8080
+      ClientService__InternalApiKey: local-internal-api-key
     ports:
       - "${TICKET_SERVICE_PORT:-1248}:8080"
     depends_on:
@@ -234,6 +290,8 @@ services:
       identity-service:
         condition: service_started
       email-service:
+        condition: service_started
+      client-service:
         condition: service_started
 
   image-service:
@@ -279,6 +337,7 @@ services:
       IDENTITY_SERVICE_URL: http://identity-service:8080
       CAR_SERVICE_URL: http://car-service:8080
       BOOKING_SERVICE_URL: http://booking-service:8080
+      CLIENT_SERVICE_URL: http://client-service:8080
       TICKET_SERVICE_URL: http://ticket-service:8080
       FILE_SERVICE_URL: http://file-service:8080
       INTERNAL_SERVICE_URL: http://image-service:8080
@@ -291,6 +350,8 @@ services:
       car-service:
         condition: service_started
       booking-service:
+        condition: service_started
+      client-service:
         condition: service_started
       ticket-service:
         condition: service_started
@@ -354,6 +415,7 @@ volumes:
   identity_pgdata:
   car_pgdata:
   booking_pgdata:
+  client_pgdata:
   ticket_pgdata:
   image_uploads:
   file_uploads:
