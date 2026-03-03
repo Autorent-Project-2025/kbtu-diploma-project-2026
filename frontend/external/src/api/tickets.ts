@@ -7,7 +7,6 @@ export interface CreateTicketPayload {
   email: string;
   birthDate: string;
   phoneNumber: string;
-  avatarUrl?: string;
   identityDocumentFile: File;
   driverLicenseFile: File;
 }
@@ -22,10 +21,6 @@ export async function createTicket(
   formData.append("email", payload.email);
   formData.append("birthDate", payload.birthDate);
   formData.append("phoneNumber", payload.phoneNumber);
-
-  if (payload.avatarUrl?.trim()) {
-    formData.append("avatarUrl", payload.avatarUrl.trim());
-  }
 
   formData.append("identityDocumentFile", payload.identityDocumentFile);
   formData.append("driverLicenseFile", payload.driverLicenseFile);
