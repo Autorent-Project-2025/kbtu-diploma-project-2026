@@ -1,15 +1,21 @@
 <template>
-  <div>
-    <header class="card" style="border-radius: 0; border-left: 0; border-right: 0">
-      <div
-        class="container"
-        style="padding-top: 4px; padding-bottom: 4px; display: flex; align-items: center; justify-content: space-between"
-      >
-        <strong>AutoRent Internal</strong>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="container topbar-inner">
+        <div class="brand">
+          <span class="brand-mark">AR</span>
+          <div class="brand-copy">
+            <strong>AutoRent Internal</strong>
+            <small>Manager workspace</small>
+          </div>
+        </div>
         <button v-if="isAuthenticated" class="btn btn-outline" @click="logout">Выйти</button>
       </div>
     </header>
-    <router-view />
+
+    <main class="app-main">
+      <router-view />
+    </main>
   </div>
 </template>
 

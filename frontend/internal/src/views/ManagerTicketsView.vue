@@ -1,93 +1,128 @@
 <template>
-  <div class="container">
-    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px">
+  <div class="container manager-page">
+    <section class="card manager-hero">
       <div>
-        <h1 style="margin: 0">Manager Panel</h1>
-        <p style="margin: 4px 0 0; color: #6b7280">Pending registration tickets</p>
+        <p class="manager-hero__eyebrow">Manager Panel</p>
+        <h1>Заявки на регистрацию</h1>
+        <p class="manager-hero__subtitle">Проверяйте документы и принимайте решение по каждой новой заявке.</p>
       </div>
-      <button class="btn btn-outline" @click="loadPending" :disabled="loading">Обновить</button>
-    </div>
+      <div class="manager-hero__actions">
+        <span class="hero-stat">Pending: {{ tickets.length }}</span>
+        <button class="btn btn-outline" @click="loadPending" :disabled="loading">Обновить</button>
+      </div>
+    </section>
 
-    <div v-if="errorMessage" class="error" style="margin-bottom: 12px">{{ errorMessage }}</div>
-    <div v-if="successMessage" class="success" style="margin-bottom: 12px">{{ successMessage }}</div>
+    <div v-if="errorMessage" class="error">{{ errorMessage }}</div>
+    <div v-if="successMessage" class="success">{{ successMessage }}</div>
 
-    <div v-if="loading">Загрузка...</div>
-    <div v-else-if="tickets.length === 0" class="card">Pending заявок нет.</div>
+    <div v-if="loading" class="card state-card">Загрузка заявок...</div>
+    <div v-else-if="tickets.length === 0" class="card state-card">Сейчас нет заявок в статусе Pending.</div>
 
-    <div v-else style="display: grid; gap: 16px; grid-template-columns: 320px 1fr">
-      <aside class="card">
-        <ul style="list-style: none; margin: 0; padding: 0; display: grid; gap: 8px">
+    <div v-else class="tickets-layout">
+      <aside class="card ticket-list-card">
+        <div class="ticket-list-head">
+          <h2>Очередь заявок</h2>
+          <span>{{ tickets.length }} шт.</span>
+        </div>
+
+        <ul class="ticket-list">
           <li v-for="ticket in tickets" :key="ticket.id">
             <button
-              class="btn btn-outline"
-              style="width: 100%; text-align: left; padding: 12px"
+              class="ticket-item"
+              :class="{ 'ticket-item--active': selectedTicketId === ticket.id }"
               @click="selectTicket(ticket.id)"
             >
-              <div style="font-weight: 600">{{ ticket.fullName }}</div>
-              <div style="font-size: 13px; color: #6b7280">{{ ticket.email }}</div>
-              <div style="font-size: 12px; color: #4b5563; margin-top: 2px">
-                {{ ticketTypeLabel(ticket.ticketType) }}
+              <div class="ticket-item__top">
+                <strong>{{ ticket.fullName }}</strong>
+                <span class="type-pill" :class="ticketTypeClass(ticket.ticketType)">
+                  {{ ticketTypeLabel(ticket.ticketType) }}
+                </span>
+              </div>
+              <p>{{ ticket.email }}</p>
+              <div class="ticket-item__meta">
+                <span>{{ formatDate(ticket.createdAt) }}</span>
+                <span class="status-pill" :class="statusClass(ticket.status)">
+                  {{ statusLabel(ticket.status) }}
+                </span>
               </div>
             </button>
           </li>
         </ul>
       </aside>
 
-      <section class="card" v-if="selectedTicket">
-        <div style="display: grid; gap: 10px; margin-bottom: 12px">
-          <div><strong>Ticket ID:</strong> {{ selectedTicket.id }}</div>
-          <div><strong>Тип заявки:</strong> {{ ticketTypeLabel(selectedTicket.ticketType) }}</div>
-          <div><strong>ФИО:</strong> {{ selectedTicket.fullName }}</div>
-          <div><strong>Email:</strong> {{ selectedTicket.email }}</div>
-          <div v-if="isClientTicket(selectedTicket)"><strong>Дата рождения:</strong> {{ selectedTicket.birthDate }}</div>
-          <div><strong>Телефон:</strong> {{ selectedTicket.phoneNumber }}</div>
+      <section class="card ticket-details" v-if="selectedTicket">
+        <header class="ticket-details__header">
           <div>
-            <strong>{{ isPartnerTicket(selectedTicket) ? "Удостоверение владельца:" : "Документ личности:" }}</strong>
-            {{ selectedTicket.identityDocumentFileName ? "Загружен" : "Нет" }}
+            <h2>{{ selectedTicket.fullName }}</h2>
+            <p>{{ selectedTicket.email }}</p>
           </div>
-          <div v-if="isClientTicket(selectedTicket)">
-            <strong>Водительские права:</strong>
-            {{ selectedTicket.driverLicenseFileName ? "Загружены" : "Нет" }}
-          </div>
-          <div><strong>Статус:</strong> {{ statusLabel(selectedTicket.status) }}</div>
+          <span class="status-pill" :class="statusClass(selectedTicket.status)">
+            {{ statusLabel(selectedTicket.status) }}
+          </span>
+        </header>
+
+        <div class="details-grid">
+          <article class="detail-item">
+            <span class="detail-label">Ticket ID</span>
+            <span class="detail-value detail-value--mono">{{ selectedTicket.id }}</span>
+          </article>
+          <article class="detail-item">
+            <span class="detail-label">Тип заявки</span>
+            <span class="detail-value">{{ ticketTypeLabel(selectedTicket.ticketType) }}</span>
+          </article>
+          <article class="detail-item">
+            <span class="detail-label">Телефон</span>
+            <span class="detail-value">{{ selectedTicket.phoneNumber }}</span>
+          </article>
+          <article class="detail-item" v-if="isClientTicket(selectedTicket)">
+            <span class="detail-label">Дата рождения</span>
+            <span class="detail-value">{{ selectedTicket.birthDate || "Не указана" }}</span>
+          </article>
+          <article class="detail-item">
+            <span class="detail-label">Создана</span>
+            <span class="detail-value">{{ formatDate(selectedTicket.createdAt) }}</span>
+          </article>
         </div>
 
-        <div style="display: flex; gap: 8px; margin-bottom: 12px">
-          <button
-            class="btn btn-outline"
-            @click="openDocument('identity')"
-            :disabled="actionLoading || !selectedTicket.identityDocumentFileName"
-          >
-            {{ isPartnerTicket(selectedTicket) ? "Глянуть удостоверение владельца" : "Глянуть удостоверение" }}
-          </button>
-          <button
-            v-if="isClientTicket(selectedTicket)"
-            class="btn btn-outline"
-            @click="openDocument('license')"
-            :disabled="actionLoading || !selectedTicket.driverLicenseFileName"
-          >
-            Глянуть права
-          </button>
-        </div>
+        <section class="docs-block">
+          <h3>Проверка документов</h3>
+          <div class="doc-actions">
+            <button
+              class="btn btn-outline"
+              @click="openDocument('identity')"
+              :disabled="actionLoading || !selectedTicket.identityDocumentFileName"
+            >
+              {{ isPartnerTicket(selectedTicket) ? "Открыть удостоверение владельца" : "Открыть документ личности" }}
+            </button>
+            <button
+              v-if="isClientTicket(selectedTicket)"
+              class="btn btn-outline"
+              @click="openDocument('license')"
+              :disabled="actionLoading || !selectedTicket.driverLicenseFileName"
+            >
+              Открыть водительские права
+            </button>
+          </div>
+        </section>
 
-        <div style="margin-bottom: 12px">
+        <section class="decision-block">
           <label class="label" for="rejectReason">Причина отказа</label>
           <textarea
             id="rejectReason"
             class="textarea"
             v-model="rejectReason"
-            placeholder="Укажите причину, если отклоняете заявку"
+            placeholder="Укажите причину, если заявка отклоняется"
           />
-        </div>
 
-        <div style="display: flex; gap: 8px">
-          <button class="btn btn-primary" @click="approveSelected" :disabled="actionLoading">
-            Approve
-          </button>
-          <button class="btn btn-danger" @click="rejectSelected" :disabled="actionLoading">
-            Reject
-          </button>
-        </div>
+          <div class="decision-actions">
+            <button class="btn btn-primary" @click="approveSelected" :disabled="actionLoading">
+              {{ actionLoading ? "Обработка..." : "Одобрить" }}
+            </button>
+            <button class="btn btn-danger" @click="rejectSelected" :disabled="actionLoading">
+              {{ actionLoading ? "Обработка..." : "Отклонить" }}
+            </button>
+          </div>
+        </section>
       </section>
     </div>
   </div>
@@ -120,9 +155,20 @@ function statusLabel(status: number) {
   return "Unknown";
 }
 
+function statusClass(status: number) {
+  if (status === 1) return "status-pill--pending";
+  if (status === 2) return "status-pill--approved";
+  if (status === 3) return "status-pill--rejected";
+  return "";
+}
+
 function ticketTypeLabel(ticketType: number) {
-  if (ticketType === 2) return "Партнерская заявка";
-  return "Клиентская заявка";
+  if (ticketType === 2) return "Партнер";
+  return "Клиент";
+}
+
+function ticketTypeClass(ticketType: number) {
+  return ticketType === 2 ? "type-pill--partner" : "type-pill--client";
 }
 
 function isClientTicket(ticket: Ticket) {
@@ -131,6 +177,19 @@ function isClientTicket(ticket: Ticket) {
 
 function isPartnerTicket(ticket: Ticket) {
   return ticket.ticketType === 2;
+}
+
+function formatDate(value: string) {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat("ru-RU", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(date);
 }
 
 async function loadPending() {
