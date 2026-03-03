@@ -9,15 +9,18 @@ namespace TicketService.Infrastructure.Events;
 public sealed class TicketEventPublisher : ITicketEventPublisher
 {
     private readonly IIdentityProvisioningClient _identityProvisioningClient;
+    private readonly IClientProvisioningClient _clientProvisioningClient;
     private readonly IEmailNotificationClient _emailNotificationClient;
     private readonly ActivationOptions _activationOptions;
 
     public TicketEventPublisher(
         IIdentityProvisioningClient identityProvisioningClient,
+        IClientProvisioningClient clientProvisioningClient,
         IEmailNotificationClient emailNotificationClient,
         IOptions<ActivationOptions> activationOptions)
     {
         _identityProvisioningClient = identityProvisioningClient;
+        _clientProvisioningClient = clientProvisioningClient;
         _emailNotificationClient = emailNotificationClient;
         _activationOptions = activationOptions.Value;
     }
@@ -29,6 +32,18 @@ public sealed class TicketEventPublisher : ITicketEventPublisher
                 ticketApprovedEvent.FullName,
                 ticketApprovedEvent.Email,
                 ticketApprovedEvent.BirthDate),
+            cancellationToken);
+
+        await _clientProvisioningClient.ProvisionClientAsync(
+            new ProvisionClientProfileRequest(
+                ticketApprovedEvent.FirstName,
+                ticketApprovedEvent.LastName,
+                ticketApprovedEvent.BirthDate,
+                ticketApprovedEvent.IdentityDocumentFileName,
+                ticketApprovedEvent.DriverLicenseFileName,
+                provisionResult.UserId,
+                ticketApprovedEvent.PhoneNumber,
+                ticketApprovedEvent.AvatarUrl),
             cancellationToken);
 
         var setPasswordUrl = BuildSetPasswordUrl(provisionResult.ActivationToken);

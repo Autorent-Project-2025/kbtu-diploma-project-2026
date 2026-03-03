@@ -6,6 +6,7 @@
 - просмотр pending-заявок менеджером;
 - approve/reject заявки;
 - интеграцию с `identity-service` (provision пользователя);
+- интеграцию с `client-service` (создание клиентского профиля при approve);
 - интеграцию с `email-service` (approved/rejected уведомления).
 
 ## Стек
@@ -22,19 +23,22 @@
 - `POST /` (`AllowAnonymous`) - создание заявки
 - `GET /pending` (policy `tickets:view`)
 - `GET /{id:guid}` (policy `tickets:view`)
+- `GET /{id:guid}/documents/{identity|license}/temporary-link` (policy `tickets:view`)
 - `POST /{id:guid}/approve` (policy `tickets:approve`)
 - `POST /{id:guid}/reject` (policy `tickets:reject`)
 - `GET /healthz`
 
 Пример создания заявки:
 
-```json
-{
-  "fullName": "Arlan User",
-  "email": "arlan@example.com",
-  "birthDate": "2000-01-15"
-}
-```
+`POST /` принимает `multipart/form-data`:
+- `firstName` (string)
+- `lastName` (string)
+- `email` (string)
+- `birthDate` (YYYY-MM-DD)
+- `phoneNumber` (string)
+- `avatarUrl` (string, optional)
+- `identityDocumentFile` (PDF file, required)
+- `driverLicenseFile` (PDF file, required)
 
 Пример reject:
 
@@ -51,6 +55,10 @@
 - `IdentityService__BaseUrl`
 - `IdentityService__InternalApiKey`
 - `EmailService__BaseUrl`
+- `ClientService__BaseUrl`
+- `ClientService__InternalApiKey`
+- `FileService__BaseUrl`
+- `FileService__InternalApiKey`
 - `Activation__SetPasswordBaseUrl`
 - `EXTERNAL_PORT`
 - `POSTGRES_USER`
@@ -60,6 +68,9 @@
 
 ## Интеграции
 - `POST {IdentityService__BaseUrl}/internal/users/provision` + header `X-Internal-Api-Key`.
+- `POST {ClientService__BaseUrl}/internal/clients/provision` + header `X-Internal-Api-Key`.
+- `POST {FileService__BaseUrl}/api/internal/files/upload` + header `X-Internal-Api-Key`.
+- `POST {FileService__BaseUrl}/api/internal/files/temporary-link` + header `X-Internal-Api-Key`.
 - `POST {EmailService__BaseUrl}/emails/approved`.
 - `POST {EmailService__BaseUrl}/emails/rejected`.
 

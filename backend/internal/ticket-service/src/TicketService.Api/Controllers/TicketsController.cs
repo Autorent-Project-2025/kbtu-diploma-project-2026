@@ -6,6 +6,8 @@ using TicketService.Application.Commands.ApproveTicket;
 using TicketService.Application.Commands.CreateTicket;
 using TicketService.Application.Commands.RejectTicket;
 using TicketService.Application.Exceptions;
+using TicketService.Application.Interfaces;
+using TicketService.Application.Models;
 using TicketService.Application.Queries.GetPendingTickets;
 using TicketService.Application.Queries.GetTicketById;
 
@@ -20,29 +22,45 @@ public sealed class TicketsController : ControllerBase
     private readonly GetTicketByIdQueryHandler _getTicketByIdQueryHandler;
     private readonly ApproveTicketCommandHandler _approveTicketCommandHandler;
     private readonly RejectTicketCommandHandler _rejectTicketCommandHandler;
+    private readonly IFileStorageClient _fileStorageClient;
 
     public TicketsController(
         CreateTicketCommandHandler createTicketCommandHandler,
         GetPendingTicketsQueryHandler getPendingTicketsQueryHandler,
         GetTicketByIdQueryHandler getTicketByIdQueryHandler,
         ApproveTicketCommandHandler approveTicketCommandHandler,
-        RejectTicketCommandHandler rejectTicketCommandHandler)
+        RejectTicketCommandHandler rejectTicketCommandHandler,
+        IFileStorageClient fileStorageClient)
     {
         _createTicketCommandHandler = createTicketCommandHandler;
         _getPendingTicketsQueryHandler = getPendingTicketsQueryHandler;
         _getTicketByIdQueryHandler = getTicketByIdQueryHandler;
         _approveTicketCommandHandler = approveTicketCommandHandler;
         _rejectTicketCommandHandler = rejectTicketCommandHandler;
+        _fileStorageClient = fileStorageClient;
     }
 
     [AllowAnonymous]
     [HttpPost]
     public async Task<IActionResult> Create(
-        [FromBody] CreateTicketRequest request,
+        [FromForm] CreateTicketRequest request,
         CancellationToken cancellationToken)
     {
+        if (request.IdentityDocumentFile is null || request.DriverLicenseFile is null)
+        {
+            throw new ValidationException("Both PDF documents are required.");
+        }
+
         var result = await _createTicketCommandHandler.Handle(
-            new CreateTicketCommand(request.FullName, request.Email, request.BirthDate),
+            new CreateTicketCommand(
+                request.FirstName,
+                request.LastName,
+                request.Email,
+                request.BirthDate,
+                request.PhoneNumber,
+                request.AvatarUrl,
+                await MapToFilePayloadAsync(request.IdentityDocumentFile, cancellationToken),
+                await MapToFilePayloadAsync(request.DriverLicenseFile, cancellationToken)),
             cancellationToken);
 
         return Created($"/{result.Ticket.Id}", result.Ticket);
@@ -62,6 +80,25 @@ public sealed class TicketsController : ControllerBase
     {
         var result = await _getTicketByIdQueryHandler.Handle(new GetTicketByIdQuery(id), cancellationToken);
         return Ok(result.Ticket);
+    }
+
+    [Authorize(Policy = "tickets:view")]
+    [HttpGet("{id:guid}/documents/{documentType}/temporary-link")]
+    public async Task<IActionResult> GetDocumentTemporaryLink(
+        [FromRoute] Guid id,
+        [FromRoute] string documentType,
+        CancellationToken cancellationToken)
+    {
+        var result = await _getTicketByIdQueryHandler.Handle(new GetTicketByIdQuery(id), cancellationToken);
+
+        var fileName = ResolveDocumentFileName(result.Ticket, documentType);
+        if (string.IsNullOrWhiteSpace(fileName))
+        {
+            throw new NotFoundException("Document file was not found for this ticket.");
+        }
+
+        var temporaryLink = await _fileStorageClient.GetTemporaryLinkAsync(fileName, cancellationToken: cancellationToken);
+        return Ok(temporaryLink);
     }
 
     [Authorize(Policy = "tickets:approve")]
@@ -100,5 +137,30 @@ public sealed class TicketsController : ControllerBase
         }
 
         return managerId;
+    }
+
+    private static async Task<TicketDocumentFilePayload> MapToFilePayloadAsync(
+        IFormFile file,
+        CancellationToken cancellationToken)
+    {
+        await using var stream = file.OpenReadStream();
+        using var memoryStream = new MemoryStream();
+        await stream.CopyToAsync(memoryStream, cancellationToken);
+
+        return new TicketDocumentFilePayload(
+            file.FileName,
+            file.ContentType,
+            memoryStream.ToArray());
+    }
+
+    private static string? ResolveDocumentFileName(TicketDto ticket, string documentType)
+    {
+        var normalized = documentType?.Trim().ToLowerInvariant();
+        return normalized switch
+        {
+            "identity" or "identity-document" or "id" => ticket.IdentityDocumentFileName,
+            "license" or "driver-license" => ticket.DriverLicenseFileName,
+            _ => throw new ValidationException("documentType must be 'identity' or 'license'.")
+        };
     }
 }

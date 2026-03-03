@@ -23,4 +23,8 @@ public static class PermissionConstants
     public const string FileDelete = "File.Delete";
     public const string ImageCreate = "Image.Create";
     public const string ImageDelete = "Image.Delete";
+    public const string ClientView = "Client.View";
+    public const string ClientCreate = "Client.Create";
+    public const string ClientUpdate = "Client.Update";
+    public const string ClientDelete = "Client.Delete";
 }

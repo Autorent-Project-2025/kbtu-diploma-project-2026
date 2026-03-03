@@ -25,6 +25,8 @@ Base path: `/api`.
 - `POST /api/files` - загрузка файла (raw body), возвращает `fileName`
 - `POST /api/files/temporary-link` - выдача временной ссылки по `fileName`
 - `DELETE /api/files/{fileName}` - удаление файла
+- `POST /api/internal/files/upload` - внутренняя загрузка по `X-Internal-Api-Key`
+- `POST /api/internal/files/temporary-link` - внутренняя выдача ссылки по `X-Internal-Api-Key`
 
 ### Upload запрос
 `POST /api/files` принимает:
@@ -70,6 +72,7 @@ Base path: `/api`.
 - `JWT_PUBLIC_KEY` (или `Jwt__PublicKey`)
 - `JWT_ISSUER` (опционально)
 - `JWT_AUDIENCE` (опционально)
+- `INTERNAL_API_KEY` (для внутренних S2S вызовов)
 - `GCLOUD_CLIENT_EMAIL`
 - `GCLOUD_PRIVATE_KEY`
 - `GCLOUD_PROJECT_ID`
@@ -105,3 +108,5 @@ docker compose up --build file-service
 - `File.Create` - загрузка файла (`POST /api/files`)
 - `File.Read` - получение временной ссылки (`POST /api/files/temporary-link`)
 - `File.Delete` - удаление файла (`DELETE /api/files/{fileName}`)
+
+Внутренние маршруты `/api/internal/files/*` не требуют JWT, но требуют заголовок `X-Internal-Api-Key`.

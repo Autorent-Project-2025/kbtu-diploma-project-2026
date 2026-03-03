@@ -20,3 +20,17 @@ export async function rejectTicket(ticketId: string, decisionReason: string): Pr
   const res = await api.post(`/tickets/${ticketId}/reject`, { decisionReason });
   return res.data as Ticket;
 }
+
+export interface TicketDocumentTemporaryLink {
+  fileName: string;
+  url: string;
+  expiresAtUtc: string;
+}
+
+export async function getTicketDocumentTemporaryLink(
+  ticketId: string,
+  documentType: "identity" | "license"
+): Promise<TicketDocumentTemporaryLink> {
+  const res = await api.get(`/tickets/${ticketId}/documents/${documentType}/temporary-link`);
+  return res.data as TicketDocumentTemporaryLink;
+}

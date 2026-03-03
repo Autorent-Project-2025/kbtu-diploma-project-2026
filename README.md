@@ -26,6 +26,7 @@ docker compose up --build
 - Identity Service: `1244`
 - Car Service: `1298`
 - Booking Service: `1821`
+- Client Service: `1831`
 - Ticket Service: `1248`
 - Image Service: `9181`
 - Email Service: `9182`
@@ -41,8 +42,8 @@ docker compose up --build
 | Image Service | `backend/shared/image-service` | Загрузка/удаление изображений |
 | File Service | `backend/internal/file-service` | Хранение приватных файлов и выдача временных ссылок |
 | Email Service | `backend/shared/email-service` | SMTP-уведомления |
-| API Gateway | `backend/external/reverse-proxy-service` | Проксирование `/identity`, `/cars`, `/bookings`, `/tickets`, `/files`, `/internal` |
-| Client Service | `backend/external/client-service` | Не реализован (заготовка) |
+| API Gateway | `backend/external/reverse-proxy-service` | Проксирование `/identity`, `/cars`, `/bookings`, `/clients`, `/tickets`, `/files`, `/internal` |
+| Client Service | `backend/external/client-service` | Профили клиентов (CRUD + `/me`) |
 | Partner Service | `backend/internal/partner-service` | Не реализован (заготовка) |
 | External Frontend | `frontend/external` | Пользовательский UI |
 | Internal Frontend | `frontend/internal` | UI менеджера |
@@ -57,6 +58,7 @@ docker compose up --build
 | Identity Service | `User.View`, `User.Create`, `User.Update`, `User.AssignRole`, `User.RemoveRole`, `User.Activate`, `User.Deactivate`, `User.Delete`, `Role.View`, `Role.Create`, `Role.AssignPermission`, `Permission.View`, `Permission.Create` |
 | Car Service | `Car.Create`, `Car.Update`, `Car.Delete`, `Car.Image.Create` |
 | Booking Service | `Booking.Create` (для создания), остальные пользовательские операции требуют валидный JWT |
+| Client Service | `Client.View`, `Client.Create`, `Client.Update`, `Client.Delete` |
 | Ticket Service | `Ticket.View`, `Ticket.Approve`, `Ticket.Reject` |
 | File Service | `File.Create`, `File.Read`, `File.Delete` |
 | Image Service | `Image.Create`, `Image.Delete` |

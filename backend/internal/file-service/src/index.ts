@@ -15,7 +15,9 @@ const maxFileSizeBytes = Math.floor(maxFileSizeMb * 1024 * 1024);
 
 const app = express();
 const rawFileBodyParser = express.raw({
-  type: "application/octet-stream",
+  // Upload endpoints accept arbitrary binary content types (pdf/image/etc.).
+  // Restricting only to application/octet-stream leaves req.body empty for application/pdf.
+  type: () => true,
   limit: maxFileSizeBytes
 });
 

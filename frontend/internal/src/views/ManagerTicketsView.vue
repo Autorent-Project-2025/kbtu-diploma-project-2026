@@ -36,7 +36,27 @@
           <div><strong>ФИО:</strong> {{ selectedTicket.fullName }}</div>
           <div><strong>Email:</strong> {{ selectedTicket.email }}</div>
           <div><strong>Дата рождения:</strong> {{ selectedTicket.birthDate }}</div>
+          <div><strong>Телефон:</strong> {{ selectedTicket.phoneNumber }}</div>
+          <div><strong>Документ личности:</strong> {{ selectedTicket.identityDocumentFileName ? "Загружен" : "Нет" }}</div>
+          <div><strong>Водительские права:</strong> {{ selectedTicket.driverLicenseFileName ? "Загружены" : "Нет" }}</div>
           <div><strong>Статус:</strong> {{ statusLabel(selectedTicket.status) }}</div>
+        </div>
+
+        <div style="display: flex; gap: 8px; margin-bottom: 12px">
+          <button
+            class="btn btn-outline"
+            @click="openDocument('identity')"
+            :disabled="actionLoading || !selectedTicket.identityDocumentFileName"
+          >
+            Глянуть удостоверение
+          </button>
+          <button
+            class="btn btn-outline"
+            @click="openDocument('license')"
+            :disabled="actionLoading || !selectedTicket.driverLicenseFileName"
+          >
+            Глянуть права
+          </button>
         </div>
 
         <div style="margin-bottom: 12px">
@@ -64,7 +84,13 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
-import { approveTicket, getPendingTickets, getTicketById, rejectTicket } from "../api/tickets";
+import {
+  approveTicket,
+  getPendingTickets,
+  getTicketById,
+  getTicketDocumentTemporaryLink,
+  rejectTicket
+} from "../api/tickets";
 import type { Ticket } from "../types/Ticket";
 
 const tickets = ref<Ticket[]>([]);
@@ -143,6 +169,23 @@ async function approveSelected() {
     await loadPending();
   } catch (e: any) {
     errorMessage.value = e?.response?.data?.error || "Не удалось одобрить заявку.";
+  } finally {
+    actionLoading.value = false;
+  }
+}
+
+async function openDocument(documentType: "identity" | "license") {
+  if (!selectedTicket.value || actionLoading.value) return;
+
+  actionLoading.value = true;
+  errorMessage.value = "";
+  successMessage.value = "";
+
+  try {
+    const link = await getTicketDocumentTemporaryLink(selectedTicket.value.id, documentType);
+    window.open(link.url, "_blank", "noopener,noreferrer");
+  } catch (e: any) {
+    errorMessage.value = e?.response?.data?.error || "Не удалось получить временную ссылку на документ.";
   } finally {
     actionLoading.value = false;
   }

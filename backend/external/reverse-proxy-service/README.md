@@ -14,6 +14,7 @@ Edge-сервис, который проксирует запросы фронт
 - `/identity/*` -> `IDENTITY_SERVICE_URL`
 - `/cars/*` -> `CAR_SERVICE_URL`
 - `/bookings/*` -> `BOOKING_SERVICE_URL`
+- `/clients/*` -> `CLIENT_SERVICE_URL`
 - `/tickets/*` -> `TICKET_SERVICE_URL`
 - `/files/*` -> `FILE_SERVICE_URL`
 - `/internal/*` -> `INTERNAL_SERVICE_URL`
@@ -26,14 +27,15 @@ Gateway удаляет префикс перед проксированием.
 - `IDENTITY_SERVICE_URL`
 - `CAR_SERVICE_URL`
 - `BOOKING_SERVICE_URL`
+- `CLIENT_SERVICE_URL`
 - `TICKET_SERVICE_URL`
 - `FILE_SERVICE_URL`
 - `INTERNAL_SERVICE_URL`
 - `PORT`
 - `EXTERNAL_PORT`
 
-Важно: в `src/index.ts` переменная `TICKET_SERVICE_URL` обязательна.
-Если ее нет в вашем `.env`, добавьте вручную.
+Важно: в `src/index.ts` все `*_SERVICE_URL` обязательны.
+Если переменных нет в вашем `.env`, добавьте вручную.
 
 ## Запуск
 ### Локально

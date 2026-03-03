@@ -8,9 +8,15 @@ public static class TicketMappings
     {
         return new TicketDto(
             ticket.Id,
+            ticket.FirstName,
+            ticket.LastName,
             ticket.FullName,
             ticket.Email,
             ticket.BirthDate,
+            ticket.PhoneNumber,
+            ticket.IdentityDocumentFileName,
+            ticket.DriverLicenseFileName,
+            ticket.AvatarUrl,
             ticket.Status,
             ticket.DecisionReason,
             ticket.CreatedAt,
