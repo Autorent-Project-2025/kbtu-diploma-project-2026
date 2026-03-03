@@ -35,6 +35,9 @@
 - `GET /roles` (policy `roles:view`)
 - `POST /roles` (policy `roles:create`)
 - `POST /roles/{id:guid}/permissions` (policy `roles:assign-permission`)
+- `DELETE /roles/{id:guid}/permissions/{permissionId:guid}` (policy `roles:assign-permission`)
+- `POST /roles/{id:guid}/parents` (policy `roles:assign-permission`)
+- `DELETE /roles/{id:guid}/parents/{parentRoleId:guid}` (policy `roles:assign-permission`)
 - `GET /permissions` (policy `permissions:view`)
 - `POST /permissions` (policy `permissions:create`)
 - `POST /internal/users/provision` (внутренний endpoint, header `X-Internal-Api-Key`)
@@ -48,6 +51,15 @@
   "password": "strong-password"
 }
 ```
+
+## Роли и inheritance
+- Роль может наследовать одну или несколько parent-ролей (`role_inheritance`).
+- Итоговые permissions вычисляются транзитивно по графу наследования.
+- Эффективные permissions используются в:
+  - выдаче JWT (`/auth/login`, `/auth/refresh`);
+  - ответах `/users` и `/users/{id}`;
+  - ответе `/roles` (возвращаются прямые и эффективные permissions).
+- Кольцевое наследование ролей запрещено.
 
 ## Переменные окружения
 См. `./.env.example`:
@@ -97,7 +109,7 @@ docker compose -f docker-compose.yaml up --build
 - `User.Delete` - удаление пользователя (`DELETE /users/{id}`)
 - `Role.View` - просмотр ролей (`GET /roles`)
 - `Role.Create` - создание роли (`POST /roles`)
-- `Role.AssignPermission` - назначение permission роли (`POST /roles/{id}/permissions`)
+- `Role.AssignPermission` - управление role access (`POST/DELETE /roles/{id}/permissions`, `POST/DELETE /roles/{id}/parents`)
 - `Permission.View` - просмотр permissions (`GET /permissions`)
 - `Permission.Create` - создание permission (`POST /permissions`)
 

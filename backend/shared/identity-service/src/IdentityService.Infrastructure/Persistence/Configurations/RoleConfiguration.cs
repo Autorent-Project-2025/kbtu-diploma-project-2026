@@ -35,5 +35,25 @@ public sealed class RoleConfiguration : IEntityTypeConfiguration<Role>
                     joinBuilder.ToTable("role_permissions");
                     joinBuilder.HasKey("role_id", "permission_id");
                 });
+
+        builder.HasMany(role => role.ParentRoles)
+            .WithMany(role => role.ChildRoles)
+            .UsingEntity<Dictionary<string, object>>(
+                "role_inheritance",
+                joinParentRole => joinParentRole
+                    .HasOne<Role>()
+                    .WithMany()
+                    .HasForeignKey("parent_role_id")
+                    .OnDelete(DeleteBehavior.Cascade),
+                joinChildRole => joinChildRole
+                    .HasOne<Role>()
+                    .WithMany()
+                    .HasForeignKey("child_role_id")
+                    .OnDelete(DeleteBehavior.Cascade),
+                joinBuilder =>
+                {
+                    joinBuilder.ToTable("role_inheritance");
+                    joinBuilder.HasKey("child_role_id", "parent_role_id");
+                });
     }
 }

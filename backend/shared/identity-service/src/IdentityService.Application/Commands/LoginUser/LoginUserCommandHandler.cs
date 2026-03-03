@@ -1,6 +1,7 @@
 using IdentityService.Application.Exceptions;
 using IdentityService.Application.Interfaces;
 using IdentityService.Application.Models;
+using IdentityService.Application.Utils;
 using IdentityService.Domain.Entities;
 using RefreshTokenEntity = IdentityService.Domain.Entities.RefreshToken;
 
@@ -9,6 +10,7 @@ namespace IdentityService.Application.Commands.LoginUser;
 public sealed class LoginUserCommandHandler
 {
     private readonly IUserRepository _userRepository;
+    private readonly IRoleRepository _roleRepository;
     private readonly IRefreshTokenRepository _refreshTokenRepository;
     private readonly IPasswordHasher _passwordHasher;
     private readonly IJwtProvider _jwtProvider;
@@ -16,12 +18,14 @@ public sealed class LoginUserCommandHandler
 
     public LoginUserCommandHandler(
         IUserRepository userRepository,
+        IRoleRepository roleRepository,
         IRefreshTokenRepository refreshTokenRepository,
         IPasswordHasher passwordHasher,
         IJwtProvider jwtProvider,
         IIdentityUnitOfWork unitOfWork)
     {
         _userRepository = userRepository;
+        _roleRepository = roleRepository;
         _refreshTokenRepository = refreshTokenRepository;
         _passwordHasher = passwordHasher;
         _jwtProvider = jwtProvider;
@@ -50,11 +54,15 @@ public sealed class LoginUserCommandHandler
             throw new UnauthorizedException("User account is deactivated.");
         }
 
-        var permissions = user.Roles
-            .SelectMany(role => role.Permissions)
-            .Select(permission => permission.Name)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToArray();
+        var roles = await _roleRepository.ListAsync(
+            includePermissions: true,
+            includeParentRoles: true,
+            cancellationToken: cancellationToken);
+
+        var roleGraph = RolePermissionResolver.BuildGraph(roles);
+        var permissions = RolePermissionResolver.ResolveEffectivePermissions(
+            user.Roles.Select(role => role.Id),
+            roleGraph);
 
         var accessToken = _jwtProvider.GenerateAccessToken(user.Id, user.Username, permissions);
         var refreshToken = _jwtProvider.GenerateRefreshToken();

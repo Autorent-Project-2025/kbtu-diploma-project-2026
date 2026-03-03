@@ -1,5 +1,6 @@
 using IdentityService.Application.Interfaces;
 using IdentityService.Application.Models;
+using IdentityService.Application.Utils;
 
 namespace IdentityService.Application.Queries.GetRoles;
 
@@ -18,18 +19,35 @@ public sealed class GetRolesQueryHandler
     {
         var roles = await _roleRepository.ListAsync(
             includePermissions: true,
+            includeParentRoles: true,
             cancellationToken: cancellationToken);
+
+        var roleGraph = RolePermissionResolver.BuildGraph(roles);
 
         var roleDtos = roles
             .Select(role =>
             {
-                var permissions = role.Permissions
+                var directPermissions = role.Permissions
                     .Select(permission => permission.Name)
                     .Distinct(StringComparer.OrdinalIgnoreCase)
                     .Order(StringComparer.OrdinalIgnoreCase)
                     .ToArray();
 
-                return new RoleDetailsDto(role.Id, role.Name, permissions);
+                var effectivePermissions = RolePermissionResolver.ResolveEffectivePermissionsForRole(
+                    role.Id,
+                    roleGraph);
+
+                var parentRoles = role.ParentRoles
+                    .Select(parentRole => new RoleReferenceDto(parentRole.Id, parentRole.Name))
+                    .OrderBy(parentRole => parentRole.Name, StringComparer.OrdinalIgnoreCase)
+                    .ToArray();
+
+                return new RoleDetailsDto(
+                    role.Id,
+                    role.Name,
+                    effectivePermissions,
+                    directPermissions,
+                    parentRoles);
             })
             .ToArray();
 
