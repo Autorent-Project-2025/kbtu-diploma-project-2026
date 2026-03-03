@@ -1,27 +1,37 @@
 <template>
-  <div class="container">
-    <div class="card" style="max-width: 420px; margin: 72px auto 0">
-      <h1 style="margin-top: 0">Вход менеджера</h1>
-      <p style="color: #6b7280; margin-top: -6px">Доступ только для ролей с правом Ticket.View</p>
+  <div class="container auth-page">
+    <section class="auth-card">
+      <div class="auth-card__header">
+        <span class="auth-eyebrow">Manager Access</span>
+        <h1>Вход менеджера</h1>
+        <p>Панель управления заявками на регистрацию в AutoRent.</p>
+      </div>
 
-      <div v-if="errorMessage" class="error" style="margin-bottom: 12px">{{ errorMessage }}</div>
+      <div v-if="errorMessage" class="error auth-alert">{{ errorMessage }}</div>
 
-      <form @submit.prevent="onSubmit">
-        <div style="margin-bottom: 12px">
+      <form class="auth-form" @submit.prevent="onSubmit">
+        <div>
           <label class="label" for="email">Email</label>
-          <input id="email" v-model="email" class="input" type="email" required />
+          <input id="email" v-model="email" class="input" type="email" required autocomplete="username" />
         </div>
 
-        <div style="margin-bottom: 16px">
+        <div>
           <label class="label" for="password">Пароль</label>
-          <input id="password" v-model="password" class="input" type="password" required />
+          <input
+            id="password"
+            v-model="password"
+            class="input"
+            type="password"
+            required
+            autocomplete="current-password"
+          />
         </div>
 
-        <button class="btn btn-primary" style="width: 100%" :disabled="loading">
+        <button class="btn btn-primary auth-submit" :disabled="loading">
           {{ loading ? "Вход..." : "Войти" }}
         </button>
       </form>
-    </div>
+    </section>
   </div>
 </template>
 
