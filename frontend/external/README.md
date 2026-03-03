@@ -72,3 +72,12 @@ docker compose up --build frontend
 ```
 
 Порт по умолчанию: `5173`.
+
+## Необходимые права
+UI не проверяет permissions явно для большинства страниц, но backend проверяет их на API-уровне.
+
+Фактические требования:
+- без прав: `/`, `/cars`, `/cars/:id`, `/apply`, `/activate`, создание тикета `POST /tickets`
+- валидный JWT: раздел `/bookings`, `GET /bookings/my`, операции со своими бронями
+- `Booking.Create`: создание брони (`POST /bookings`)
+

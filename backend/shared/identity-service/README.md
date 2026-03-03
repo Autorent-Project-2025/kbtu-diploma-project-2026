@@ -82,3 +82,27 @@ docker compose -f docker-compose.yaml up --build
 ```
 
 Сервис будет доступен на порту `EXTERNAL_PORT` (по умолчанию `1244`).
+
+## Необходимые права
+Права проверяются по claim `permissions` в JWT.
+
+Требуются следующие permissions:
+- `User.View` - просмотр пользователей (`GET /users`, `GET /users/{id}`)
+- `User.Create` - создание пользователя (`POST /users`)
+- `User.Update` - редактирование пользователя (`PUT /users/{id}`)
+- `User.AssignRole` - назначение роли (`POST /users/{id}/roles`)
+- `User.RemoveRole` - снятие роли (`DELETE /users/{id}/roles/{roleId}`)
+- `User.Activate` - активация пользователя (`PATCH /users/{id}/activate`)
+- `User.Deactivate` - деактивация пользователя (`PATCH /users/{id}/deactivate`)
+- `User.Delete` - удаление пользователя (`DELETE /users/{id}`)
+- `Role.View` - просмотр ролей (`GET /roles`)
+- `Role.Create` - создание роли (`POST /roles`)
+- `Role.AssignPermission` - назначение permission роли (`POST /roles/{id}/permissions`)
+- `Permission.View` - просмотр permissions (`GET /permissions`)
+- `Permission.Create` - создание permission (`POST /permissions`)
+
+Публичные/внутренние маршруты без permission-проверки:
+- `POST /auth/login`, `POST /auth/refresh`, `POST /auth/activate`
+- `GET /.well-known/jwks.json`
+- `POST /internal/users/provision` (защищается `X-Internal-Api-Key`)
+

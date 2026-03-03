@@ -69,3 +69,14 @@ docker compose up --build image-service
 ```
 
 Сервис будет доступен на порту `EXTERNAL_PORT` (по умолчанию `9181`).
+
+## Необходимые права
+В текущей реализации сервис не требует JWT, API-key или permission claim.
+
+Доступ к маршрутам:
+- `POST /api/images`
+- `DELETE /api/images/{imageId}`
+- `GET /public/{fileName}`
+
+без проверки ролей/прав.
+

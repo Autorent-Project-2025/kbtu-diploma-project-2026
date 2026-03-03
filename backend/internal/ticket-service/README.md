@@ -71,3 +71,15 @@ docker compose up --build ticket-db ticket-flyway ticket-service
 ```
 
 Сервис будет доступен на порту `TICKET_SERVICE_PORT` (по умолчанию `1248`).
+
+## Необходимые права
+Права проверяются по claim `permissions` в JWT.
+
+Требуются permissions:
+- `Ticket.View` - просмотр pending-списка и карточки (`GET /pending`, `GET /{id}`)
+- `Ticket.Approve` - approve заявки (`POST /{id}/approve`)
+- `Ticket.Reject` - reject заявки (`POST /{id}/reject`)
+
+Публичный маршрут без JWT:
+- `POST /` (создание заявки)
+

@@ -67,3 +67,15 @@ docker compose up --build email-service
 ```
 
 Сервис будет доступен на порту `EXTERNAL_PORT` (по умолчанию `9182`).
+
+## Необходимые права
+В текущей реализации сервис не требует JWT, API-key или permission claim.
+
+Доступ к маршрутам:
+- `GET /health`
+- `POST /emails/approved`
+- `POST /emails/rejected`
+- `POST /emails/custom`
+
+без проверки ролей/прав.
+

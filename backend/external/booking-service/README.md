@@ -63,3 +63,13 @@ docker compose -f docker-compose.yaml up --build
 ```
 
 Сервис будет доступен на порту `EXTERNAL_PORT` (по умолчанию `1821`).
+
+## Необходимые права
+Сервис использует JWT-аутентификацию на уровне контроллера.
+
+Требуются:
+- валидный JWT для всех маршрутов, кроме `GET /available`
+- `Booking.Create` для `POST /`
+
+Маршруты `GET /my`, `GET /{id}`, `POST /{id}/cancel`, `POST /{id}/confirm`, `POST /{id}/complete` требуют авторизованного пользователя, но не имеют отдельной policy сверх аутентификации.
+

@@ -57,3 +57,10 @@ docker compose up --build internal-frontend
 ```
 
 Порт по умолчанию: `5174`.
+
+## Необходимые права
+Требования для работы интерфейса менеджера:
+- `Ticket.View` - вход в раздел `/tickets` и загрузка pending-заявок
+- `Ticket.Approve` - подтверждение заявки (`POST /tickets/{id}/approve`)
+- `Ticket.Reject` - отклонение заявки (`POST /tickets/{id}/reject`)
+

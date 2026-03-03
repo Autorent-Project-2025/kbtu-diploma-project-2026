@@ -71,3 +71,19 @@ docker compose -f docker-compose.yaml up --build
 ```
 
 Сервис будет доступен на порту `EXTERNAL_PORT` (по умолчанию `1298`).
+
+## Необходимые права
+Права проверяются по claim `permissions` в JWT.
+
+Требуются permissions:
+- `Car.Create` - создание автомобиля (`POST /`, `POST /$batch`)
+- `Car.Update` - обновление автомобиля (`PUT /{id}`)
+- `Car.Delete` - удаление автомобиля (`DELETE /{id}`)
+- `Car.Image.Create` - добавление изображения автомобиля (`POST /{carId}/images`)
+
+Публичные маршруты без permission-проверки:
+- `GET /`
+- `GET /{id}`
+- `GET /features`
+- `GET /{carId}/images`
+
