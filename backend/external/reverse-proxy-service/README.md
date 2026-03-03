@@ -15,6 +15,7 @@ Edge-сервис, который проксирует запросы фронт
 - `/cars/*` -> `CAR_SERVICE_URL`
 - `/bookings/*` -> `BOOKING_SERVICE_URL`
 - `/tickets/*` -> `TICKET_SERVICE_URL`
+- `/files/*` -> `FILE_SERVICE_URL`
 - `/internal/*` -> `INTERNAL_SERVICE_URL`
 
 Gateway удаляет префикс перед проксированием.
@@ -26,6 +27,7 @@ Gateway удаляет префикс перед проксированием.
 - `CAR_SERVICE_URL`
 - `BOOKING_SERVICE_URL`
 - `TICKET_SERVICE_URL`
+- `FILE_SERVICE_URL`
 - `INTERNAL_SERVICE_URL`
 - `PORT`
 - `EXTERNAL_PORT`

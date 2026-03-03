@@ -1,0 +1,26 @@
+services:
+  file-service:
+    build:
+      context: ./src
+      dockerfile: ./Dockerfile
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "${EXTERNAL_PORT:-9183}:8080"
+    environment:
+      - PORT=8080
+      - USE_WEB_STORAGE=${USE_WEB_STORAGE}
+      - MAX_FILE_SIZE_MB=${MAX_FILE_SIZE_MB}
+      - SIGNED_URL_TTL_SECONDS=${SIGNED_URL_TTL_SECONDS}
+      - JWT_PUBLIC_KEY=${JWT_PUBLIC_KEY}
+      - JWT_ISSUER=${JWT_ISSUER}
+      - JWT_AUDIENCE=${JWT_AUDIENCE}
+      - GCLOUD_CLIENT_EMAIL=${GCLOUD_CLIENT_EMAIL}
+      - GCLOUD_PRIVATE_KEY=${GCLOUD_PRIVATE_KEY}
+      - GCLOUD_PROJECT_ID=${GCLOUD_PROJECT_ID}
+      - GCLOUD_BUCKET=${GCLOUD_BUCKET}
+    volumes:
+      - file_uploads:/app/uploads
+
+volumes:
+  file_uploads:

@@ -253,6 +253,23 @@ services:
     volumes:
       - image_uploads:/app/uploads
 
+  file-service:
+    build:
+      context: ./backend/internal/file-service/src
+      dockerfile: ./Dockerfile
+    restart: unless-stopped
+    env_file:
+      - path: ./backend/internal/file-service/.env.example
+        required: true
+      - path: ./backend/internal/file-service/.env
+        required: false
+    environment:
+      PORT: 8080
+    ports:
+      - "${FILE_SERVICE_PORT:-9183}:8080"
+    volumes:
+      - file_uploads:/app/uploads
+
   api-gateway:
     build:
       context: ./backend/external/reverse-proxy-service/src
@@ -263,6 +280,7 @@ services:
       CAR_SERVICE_URL: http://car-service:8080
       BOOKING_SERVICE_URL: http://booking-service:8080
       TICKET_SERVICE_URL: http://ticket-service:8080
+      FILE_SERVICE_URL: http://file-service:8080
       INTERNAL_SERVICE_URL: http://image-service:8080
       PORT: 8080
     ports:
@@ -275,6 +293,8 @@ services:
       booking-service:
         condition: service_started
       ticket-service:
+        condition: service_started
+      file-service:
         condition: service_started
       image-service:
         condition: service_started
@@ -336,3 +356,4 @@ volumes:
   booking_pgdata:
   ticket_pgdata:
   image_uploads:
+  file_uploads:

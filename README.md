@@ -4,7 +4,7 @@
 AutoRent - микросервисная платформа каршеринга.
 
 В репозитории находятся:
-- 9 backend-сервисов (external/internal/shared);
+- 10 backend-сервисов (external/internal/shared);
 - 3 frontend-приложения (external/internal/superadmin);
 - общая оркестрация через `docker-compose.yml` в корне.
 
@@ -29,6 +29,7 @@ docker compose up --build
 - Ticket Service: `1248`
 - Image Service: `9181`
 - Email Service: `9182`
+- File Service: `9183`
 
 ## Сервисы
 | Сервис | Путь | Назначение |
@@ -38,8 +39,9 @@ docker compose up --build
 | Booking Service | `backend/external/booking-service` | Бронирования |
 | Ticket Service | `backend/internal/ticket-service` | Заявки на регистрацию/верификацию |
 | Image Service | `backend/shared/image-service` | Загрузка/удаление изображений |
+| File Service | `backend/internal/file-service` | Хранение приватных файлов и выдача временных ссылок |
 | Email Service | `backend/shared/email-service` | SMTP-уведомления |
-| API Gateway | `backend/external/reverse-proxy-service` | Проксирование `/identity`, `/cars`, `/bookings`, `/tickets`, `/internal` |
+| API Gateway | `backend/external/reverse-proxy-service` | Проксирование `/identity`, `/cars`, `/bookings`, `/tickets`, `/files`, `/internal` |
 | Client Service | `backend/external/client-service` | Не реализован (заготовка) |
 | Partner Service | `backend/internal/partner-service` | Не реализован (заготовка) |
 | External Frontend | `frontend/external` | Пользовательский UI |
@@ -56,6 +58,7 @@ docker compose up --build
 | Car Service | `Car.Create`, `Car.Update`, `Car.Delete`, `Car.Image.Create` |
 | Booking Service | `Booking.Create` (для создания), остальные пользовательские операции требуют валидный JWT |
 | Ticket Service | `Ticket.View`, `Ticket.Approve`, `Ticket.Reject` |
+| File Service | `File.Create`, `File.Read`, `File.Delete` |
 | Image Service | Не требуются (в текущей реализации) |
 | Email Service | Не требуются (в текущей реализации) |
 | API Gateway | Не требуются (в текущей реализации) |

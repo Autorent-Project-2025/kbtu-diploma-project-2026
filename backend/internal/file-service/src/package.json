@@ -1,8 +1,7 @@
 {
-  "name": "autoezy-image-service",
+  "name": "autorent-file-service",
   "version": "1.0.0",
-  "description": "The service responsible for working with images ",
-  "author": "Autoezy",
+  "description": "Service that responsible for working with private files",
   "type": "commonjs",
   "main": "index.js",
   "scripts": {
@@ -12,13 +11,9 @@
   },
   "dependencies": {
     "@google-cloud/storage": "^7.19.0",
+    "@types/express": "^5.0.6",
     "cors": "^2.8.6",
     "express": "^5.2.1",
-    "http-proxy-middleware": "^3.0.5",
-    "sharp": "^0.34.5",
     "typescript": "^5.9.3"
-  },
-  "devDependencies": {
-    "@types/express": "^5.0.6"
   }
 }
