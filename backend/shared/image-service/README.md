@@ -71,12 +71,12 @@ docker compose up --build image-service
 Сервис будет доступен на порту `EXTERNAL_PORT` (по умолчанию `9181`).
 
 ## Необходимые права
-В текущей реализации сервис не требует JWT, API-key или permission claim.
+Права проверяются по claim `permissions` в JWT.
 
 Доступ к маршрутам:
-- `POST /api/images`
-- `DELETE /api/images/{imageId}`
-- `GET /public/{fileName}`
+- `POST /api/images` - требует `Image.Create`
+- `DELETE /api/images/{imageId}` - требует `Image.Delete`
+- `GET /public/{fileName}` - без проверки прав (локальное хранение)
 
-без проверки ролей/прав.
+Маршруты `POST` и `DELETE` без валидного JWT и соответствующего permission возвращают `401/403`.
 
