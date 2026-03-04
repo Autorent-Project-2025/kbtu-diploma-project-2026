@@ -10,6 +10,7 @@ namespace CarService.Application.DTOs.PartnerCars
         public int Id { get; set; }
         public Guid PartnerId { get; set; }
         public string LicensePlate { get; set; } = string.Empty;
+        public string? OwnershipFileName { get; set; }
         public string? Color { get; set; }
         public decimal? PriceHour { get; set; }
         public decimal? PriceDay { get; set; }

@@ -12,6 +12,7 @@ public sealed class TicketEventPublisher : ITicketEventPublisher
     private readonly IIdentityProvisioningClient _identityProvisioningClient;
     private readonly IClientProvisioningClient _clientProvisioningClient;
     private readonly IPartnerProvisioningClient _partnerProvisioningClient;
+    private readonly IPartnerCarProvisioningClient _partnerCarProvisioningClient;
     private readonly IEmailNotificationClient _emailNotificationClient;
     private readonly ActivationOptions _activationOptions;
 
@@ -19,18 +20,61 @@ public sealed class TicketEventPublisher : ITicketEventPublisher
         IIdentityProvisioningClient identityProvisioningClient,
         IClientProvisioningClient clientProvisioningClient,
         IPartnerProvisioningClient partnerProvisioningClient,
+        IPartnerCarProvisioningClient partnerCarProvisioningClient,
         IEmailNotificationClient emailNotificationClient,
         IOptions<ActivationOptions> activationOptions)
     {
         _identityProvisioningClient = identityProvisioningClient;
         _clientProvisioningClient = clientProvisioningClient;
         _partnerProvisioningClient = partnerProvisioningClient;
+        _partnerCarProvisioningClient = partnerCarProvisioningClient;
         _emailNotificationClient = emailNotificationClient;
         _activationOptions = activationOptions.Value;
     }
 
     public async Task PublishApprovedAsync(TicketApprovedEvent ticketApprovedEvent, CancellationToken cancellationToken = default)
     {
+        if (ticketApprovedEvent.TicketType == TicketType.PartnerCar)
+        {
+            if (!ticketApprovedEvent.RelatedPartnerUserId.HasValue || ticketApprovedEvent.RelatedPartnerUserId == Guid.Empty)
+            {
+                throw new InvalidOperationException("Related partner user id is required for approved partner car ticket.");
+            }
+
+            var carBrand = RequireField(ticketApprovedEvent.CarBrand, nameof(ticketApprovedEvent.CarBrand));
+            var carModel = RequireField(ticketApprovedEvent.CarModel, nameof(ticketApprovedEvent.CarModel));
+            var licensePlate = RequireField(ticketApprovedEvent.LicensePlate, nameof(ticketApprovedEvent.LicensePlate));
+            var ownershipDocument = RequireField(ticketApprovedEvent.OwnershipDocumentFileName, nameof(ticketApprovedEvent.OwnershipDocumentFileName));
+
+            if (ticketApprovedEvent.CarImages.Count == 0)
+            {
+                throw new InvalidOperationException("At least one car image is required for approved partner car ticket.");
+            }
+
+            await _partnerCarProvisioningClient.ProvisionPartnerCarAsync(
+                new ProvisionPartnerCarRequest(
+                    ticketApprovedEvent.RelatedPartnerUserId.Value,
+                    carBrand,
+                    carModel,
+                    licensePlate,
+                    ownershipDocument,
+                    ticketApprovedEvent.CarImages
+                        .Select(image => new ProvisionPartnerCarImageRequest(image.ImageId, image.ImageUrl))
+                        .ToArray()),
+                cancellationToken);
+
+            await _emailNotificationClient.SendPartnerCarApprovedAsync(
+                new SendPartnerCarApprovedEmailRequest(
+                    ticketApprovedEvent.Email,
+                    ticketApprovedEvent.FullName,
+                    carBrand,
+                    carModel,
+                    licensePlate),
+                cancellationToken);
+
+            return;
+        }
+
         var provisionResult = await _identityProvisioningClient.ProvisionUserAsync(
             new ProvisionIdentityUserRequest(
                 ticketApprovedEvent.FullName,
@@ -115,6 +159,18 @@ public sealed class TicketEventPublisher : ITicketEventPublisher
                     ticketRejectedEvent.DecisionReason),
                 cancellationToken);
         }
+        else if (ticketRejectedEvent.TicketType == TicketType.PartnerCar)
+        {
+            await _emailNotificationClient.SendPartnerCarRejectedAsync(
+                new SendPartnerCarRejectedEmailRequest(
+                    ticketRejectedEvent.Email,
+                    ticketRejectedEvent.FullName,
+                    RequireField(ticketRejectedEvent.CarBrand, nameof(ticketRejectedEvent.CarBrand)),
+                    RequireField(ticketRejectedEvent.CarModel, nameof(ticketRejectedEvent.CarModel)),
+                    RequireField(ticketRejectedEvent.LicensePlate, nameof(ticketRejectedEvent.LicensePlate)),
+                    ticketRejectedEvent.DecisionReason),
+                cancellationToken);
+        }
         else
         {
             await _emailNotificationClient.SendPartnerRejectedAsync(
@@ -136,5 +192,15 @@ public sealed class TicketEventPublisher : ITicketEventPublisher
         var baseUrl = _activationOptions.SetPasswordBaseUrl.Trim();
         var separator = baseUrl.Contains('?', StringComparison.Ordinal) ? "&" : "?";
         return $"{baseUrl}{separator}token={Uri.EscapeDataString(activationToken)}";
+    }
+
+    private static string RequireField(string? value, string fieldName)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            throw new InvalidOperationException($"{fieldName} is required.");
+        }
+
+        return value;
     }
 }

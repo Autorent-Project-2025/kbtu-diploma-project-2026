@@ -32,6 +32,15 @@
         v-else-if="partner"
         class="glass p-8 rounded-3xl border border-gray-200 dark:border-gray-800 shadow-xl space-y-6"
       >
+        <div class="flex justify-end">
+          <router-link
+            to="/partner/cars"
+            class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-primary-600 hover:bg-primary-700 text-white font-semibold transition-colors"
+          >
+            Мои машины
+          </router-link>
+        </div>
+
         <div class="grid sm:grid-cols-2 gap-6">
           <div>
             <p class="text-sm text-gray-500 dark:text-gray-400">Имя владельца</p>

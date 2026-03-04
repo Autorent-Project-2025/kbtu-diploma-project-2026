@@ -277,6 +277,11 @@ p {
   color: #9a5009;
 }
 
+.type-pill--partner-car {
+  background: #ede9ff;
+  color: #4f46b8;
+}
+
 .status-pill--pending {
   background: #fff4df;
   color: #8d5710;

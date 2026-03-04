@@ -108,6 +108,65 @@ export function partnerRejectedTemplate(params: { fullName: string; reason?: str
   return { subject, text, html };
 }
 
+export function partnerCarApprovedTemplate(params: {
+  fullName: string;
+  carBrand: string;
+  carModel: string;
+  licensePlate: string;
+}) {
+  const subject = "Заявка на добавление машины одобрена";
+  const text =
+    `Здравствуйте, ${params.fullName}!\n\n` +
+    `Ваша заявка на добавление машины одобрена.\n` +
+    `Машина: ${params.carBrand} ${params.carModel}\n` +
+    `Гос номер: ${params.licensePlate}\n\n` +
+    `Автомобиль уже добавлен в ваш партнерский кабинет.`;
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; line-height: 1.5">
+      <h2>Заявка на машину одобрена</h2>
+      <p>Здравствуйте, <b>${escapeHtml(params.fullName)}</b>!</p>
+      <p>Ваша заявка на добавление машины одобрена.</p>
+      <p><b>Машина:</b> ${escapeHtml(params.carBrand)} ${escapeHtml(params.carModel)}</p>
+      <p><b>Гос номер:</b> ${escapeHtml(params.licensePlate)}</p>
+      <p>Автомобиль уже добавлен в ваш партнерский кабинет.</p>
+    </div>
+  `;
+
+  return { subject, text, html };
+}
+
+export function partnerCarRejectedTemplate(params: {
+  fullName: string;
+  carBrand: string;
+  carModel: string;
+  licensePlate: string;
+  reason?: string;
+}) {
+  const subject = "Заявка на добавление машины отклонена";
+  const text =
+    `Здравствуйте, ${params.fullName}!\n\n` +
+    `К сожалению, заявка на добавление машины отклонена.\n` +
+    `Машина: ${params.carBrand} ${params.carModel}\n` +
+    `Гос номер: ${params.licensePlate}\n` +
+    (params.reason ? `Причина: ${params.reason}\n` : "") +
+    `\nВы можете отправить заявку повторно.`;
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; line-height: 1.5">
+      <h2>Заявка на машину отклонена</h2>
+      <p>Здравствуйте, <b>${escapeHtml(params.fullName)}</b>!</p>
+      <p>К сожалению, заявка на добавление машины отклонена.</p>
+      <p><b>Машина:</b> ${escapeHtml(params.carBrand)} ${escapeHtml(params.carModel)}</p>
+      <p><b>Гос номер:</b> ${escapeHtml(params.licensePlate)}</p>
+      ${params.reason ? `<p><b>Причина:</b> ${escapeHtml(params.reason)}</p>` : ""}
+      <p>Вы можете отправить заявку повторно.</p>
+    </div>
+  `;
+
+  return { subject, text, html };
+}
+
 // минимальная защита от инъекций в HTML
 function escapeHtml(s: string) {
   return s

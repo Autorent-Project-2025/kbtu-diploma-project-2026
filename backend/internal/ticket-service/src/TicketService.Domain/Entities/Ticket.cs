@@ -21,6 +21,14 @@ public sealed class Ticket
     public string? AvatarUrl => Data is ClientTicketData clientData ? clientData.AvatarUrl : null;
     public string? CompanyName => Data is PartnerTicketData partnerData ? partnerData.CompanyName : null;
     public string? ContactEmail => Data is PartnerTicketData partnerData ? partnerData.ContactEmail : null;
+    public Guid? RelatedPartnerUserId => Data is PartnerCarTicketData partnerCarData ? partnerCarData.RelatedPartnerUserId : null;
+    public string? CarBrand => Data is PartnerCarTicketData partnerCarData ? partnerCarData.CarBrand : null;
+    public string? CarModel => Data is PartnerCarTicketData partnerCarData ? partnerCarData.CarModel : null;
+    public string? LicensePlate => Data is PartnerCarTicketData partnerCarData ? partnerCarData.LicensePlate : null;
+    public string? OwnershipDocumentFileName => Data is PartnerCarTicketData partnerCarData ? partnerCarData.OwnershipDocumentFileName : null;
+    public IReadOnlyCollection<PartnerCarTicketImageData> CarImages => Data is PartnerCarTicketData partnerCarData
+        ? partnerCarData.CarImages
+        : [];
     public string? DecisionReason => Data.DecisionReason;
     public Guid? ReviewedByManagerId => Data.ReviewedByManagerId;
     public DateTime? ReviewedAt => Data.ReviewedAt;
@@ -40,6 +48,12 @@ public sealed class Ticket
         string? avatarUrl,
         string? companyName,
         string? contactEmail,
+        Guid? relatedPartnerUserId,
+        string? carBrand,
+        string? carModel,
+        string? licensePlate,
+        string? ownershipDocumentFileName,
+        IReadOnlyCollection<PartnerCarTicketImageData>? carImages,
         DateTime createdAt)
     {
         ValidateTicketType(ticketType);
@@ -58,9 +72,45 @@ public sealed class Ticket
             avatarUrl,
             companyName,
             contactEmail,
+            relatedPartnerUserId,
+            carBrand,
+            carModel,
+            licensePlate,
+            ownershipDocumentFileName,
+            carImages,
             Email);
         Status = TicketStatus.Pending;
         CreatedAt = createdAt;
+    }
+
+    public void UpdatePartnerCarDetailsForReview(
+        string? carBrand,
+        string? carModel,
+        string? licensePlate,
+        string? email)
+    {
+        EnsurePendingStatus();
+
+        if (TicketType != TicketType.PartnerCar || Data is not PartnerCarTicketData partnerCarData)
+        {
+            throw new InvalidOperationException("Partner car review fields can be updated only for partner car tickets.");
+        }
+
+        var shouldUpdateData = carBrand is not null || carModel is not null || licensePlate is not null;
+        if (shouldUpdateData)
+        {
+            Data = partnerCarData with
+            {
+                CarBrand = carBrand is null ? partnerCarData.CarBrand : NormalizeCarBrand(carBrand),
+                CarModel = carModel is null ? partnerCarData.CarModel : NormalizeCarModel(carModel),
+                LicensePlate = licensePlate is null ? partnerCarData.LicensePlate : NormalizeLicensePlate(licensePlate)
+            };
+        }
+
+        if (email is not null)
+        {
+            SetEmail(email);
+        }
     }
 
     public void Approve(Guid managerId, DateTime reviewedAt)
@@ -129,6 +179,12 @@ public sealed class Ticket
         string? avatarUrl,
         string? companyName,
         string? contactEmail,
+        Guid? relatedPartnerUserId,
+        string? carBrand,
+        string? carModel,
+        string? licensePlate,
+        string? ownershipDocumentFileName,
+        IReadOnlyCollection<PartnerCarTicketImageData>? carImages,
         string normalizedEmail)
     {
         var normalizedName = NormalizeName(firstName, lastName);
@@ -153,15 +209,41 @@ public sealed class Ticket
             };
         }
 
-        return new PartnerTicketData
+        if (ticketType == TicketType.Partner)
+        {
+            return new PartnerTicketData
+            {
+                FirstName = normalizedName.FirstName,
+                LastName = normalizedName.LastName,
+                FullName = normalizedName.FullName,
+                PhoneNumber = normalizedPhoneNumber,
+                IdentityDocumentFileName = normalizedIdentityDocumentFileName,
+                CompanyName = NormalizeCompanyName(companyName, normalizedName.FullName),
+                ContactEmail = NormalizeContactEmail(contactEmail, normalizedEmail),
+                DecisionReason = null,
+                ReviewedByManagerId = null,
+                ReviewedAt = null
+            };
+        }
+
+        if (ticketType != TicketType.PartnerCar)
+        {
+            throw new ArgumentException("Ticket type is invalid.", nameof(ticketType));
+        }
+
+        return new PartnerCarTicketData
         {
             FirstName = normalizedName.FirstName,
             LastName = normalizedName.LastName,
             FullName = normalizedName.FullName,
             PhoneNumber = normalizedPhoneNumber,
-            IdentityDocumentFileName = normalizedIdentityDocumentFileName,
-            CompanyName = NormalizeCompanyName(companyName, normalizedName.FullName),
-            ContactEmail = NormalizeContactEmail(contactEmail, normalizedEmail),
+            IdentityDocumentFileName = null,
+            RelatedPartnerUserId = NormalizePartnerUserId(relatedPartnerUserId),
+            CarBrand = NormalizeCarBrand(carBrand),
+            CarModel = NormalizeCarModel(carModel),
+            LicensePlate = NormalizeLicensePlate(licensePlate),
+            OwnershipDocumentFileName = NormalizeOwnershipDocumentFileName(ownershipDocumentFileName),
+            CarImages = NormalizePartnerCarImages(carImages),
             DecisionReason = null,
             ReviewedByManagerId = null,
             ReviewedAt = null
@@ -264,12 +346,91 @@ public sealed class Ticket
         return candidate;
     }
 
+    private static Guid NormalizePartnerUserId(Guid? relatedPartnerUserId)
+    {
+        if (relatedPartnerUserId is null || relatedPartnerUserId == Guid.Empty)
+        {
+            throw new ArgumentException("Related partner user id is required for partner car tickets.", nameof(relatedPartnerUserId));
+        }
+
+        return relatedPartnerUserId.Value;
+    }
+
+    private static string NormalizeCarBrand(string? carBrand)
+    {
+        return NormalizeRequired(carBrand, nameof(carBrand), 100);
+    }
+
+    private static string NormalizeCarModel(string? carModel)
+    {
+        return NormalizeRequired(carModel, nameof(carModel), 100);
+    }
+
+    private static string NormalizeLicensePlate(string? licensePlate)
+    {
+        return NormalizeRequired(licensePlate, nameof(licensePlate), 20).ToUpperInvariant();
+    }
+
+    private static string NormalizeOwnershipDocumentFileName(string? ownershipDocumentFileName)
+    {
+        return NormalizeRequired(ownershipDocumentFileName, nameof(ownershipDocumentFileName), 255);
+    }
+
+    private static IReadOnlyCollection<PartnerCarTicketImageData> NormalizePartnerCarImages(
+        IReadOnlyCollection<PartnerCarTicketImageData>? carImages)
+    {
+        if (carImages is null || carImages.Count == 0)
+        {
+            throw new ArgumentException("At least one partner car image is required.", nameof(carImages));
+        }
+
+        if (carImages.Count > 12)
+        {
+            throw new ArgumentException("No more than 12 partner car images are allowed.", nameof(carImages));
+        }
+
+        return carImages
+            .Select(image => new PartnerCarTicketImageData
+            {
+                ImageId = NormalizeRequired(image.ImageId, nameof(image.ImageId), 255),
+                ImageUrl = NormalizeImageUrl(image.ImageUrl, nameof(image.ImageUrl))
+            })
+            .ToArray();
+    }
+
+    private static string NormalizeImageUrl(string? value, string paramName)
+    {
+        var normalized = NormalizeRequired(value, paramName, 2048);
+        if (!Uri.TryCreate(normalized, UriKind.Absolute, out _))
+        {
+            throw new ArgumentException($"{paramName} must be a valid absolute URL.", paramName);
+        }
+
+        return normalized;
+    }
+
     private static string? NormalizeAvatarUrl(string? avatarUrl)
     {
         var normalized = NormalizeOptional(avatarUrl, nameof(avatarUrl), 1024);
         if (normalized is not null && !Uri.TryCreate(normalized, UriKind.Absolute, out _))
         {
             throw new ArgumentException("Avatar url must be a valid absolute URL.", nameof(avatarUrl));
+        }
+
+        return normalized;
+    }
+
+    private static string NormalizeRequired(string? value, string paramName, int maxLength)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            throw new ArgumentException($"{paramName} is required.", paramName);
+        }
+
+        var normalized = value.Trim();
+        if (normalized.Length > maxLength)
+        {
+            throw new ArgumentException($"{paramName} length must not exceed {maxLength}.", paramName);
         }
 
         return normalized;

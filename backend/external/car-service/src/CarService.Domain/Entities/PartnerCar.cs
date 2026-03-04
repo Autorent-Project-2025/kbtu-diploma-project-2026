@@ -17,6 +17,9 @@ namespace CarService.Domain.Entities
         [Column("license_plate")]
         public string LicensePlate { get; set; } = string.Empty;
 
+        [Column("ownership_file_name")]
+        public string? OwnershipFileName { get; set; }
+
         [Column("color")]
         public string? Color { get; set; }
 

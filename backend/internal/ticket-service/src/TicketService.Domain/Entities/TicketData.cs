@@ -5,6 +5,7 @@ namespace TicketService.Domain.Entities;
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "$type")]
 [JsonDerivedType(typeof(ClientTicketData), typeDiscriminator: "client")]
 [JsonDerivedType(typeof(PartnerTicketData), typeDiscriminator: "partner")]
+[JsonDerivedType(typeof(PartnerCarTicketData), typeDiscriminator: "partner-car")]
 public abstract record TicketData
 {
     public string FirstName { get; init; } = string.Empty;
@@ -28,4 +29,20 @@ public sealed record PartnerTicketData : TicketData
 {
     public string CompanyName { get; init; } = string.Empty;
     public string ContactEmail { get; init; } = string.Empty;
+}
+
+public sealed record PartnerCarTicketData : TicketData
+{
+    public Guid RelatedPartnerUserId { get; init; }
+    public string CarBrand { get; init; } = string.Empty;
+    public string CarModel { get; init; } = string.Empty;
+    public string LicensePlate { get; init; } = string.Empty;
+    public string OwnershipDocumentFileName { get; init; } = string.Empty;
+    public IReadOnlyCollection<PartnerCarTicketImageData> CarImages { get; init; } = [];
+}
+
+public sealed record PartnerCarTicketImageData
+{
+    public string ImageId { get; init; } = string.Empty;
+    public string ImageUrl { get; init; } = string.Empty;
 }

@@ -51,6 +51,14 @@ public sealed class TicketConfiguration : IEntityTypeConfiguration<Ticket>
         builder.Ignore(ticket => ticket.IdentityDocumentFileName);
         builder.Ignore(ticket => ticket.DriverLicenseFileName);
         builder.Ignore(ticket => ticket.AvatarUrl);
+        builder.Ignore(ticket => ticket.CompanyName);
+        builder.Ignore(ticket => ticket.ContactEmail);
+        builder.Ignore(ticket => ticket.RelatedPartnerUserId);
+        builder.Ignore(ticket => ticket.CarBrand);
+        builder.Ignore(ticket => ticket.CarModel);
+        builder.Ignore(ticket => ticket.LicensePlate);
+        builder.Ignore(ticket => ticket.OwnershipDocumentFileName);
+        builder.Ignore(ticket => ticket.CarImages);
         builder.Ignore(ticket => ticket.DecisionReason);
         builder.Ignore(ticket => ticket.ReviewedByManagerId);
         builder.Ignore(ticket => ticket.ReviewedAt);
@@ -119,6 +127,36 @@ public sealed class TicketConfiguration : IEntityTypeConfiguration<Ticket>
             };
         }
 
+        var relatedPartnerUserId = GetOptionalGuid(root, "relatedPartnerUserId");
+        var ownershipDocumentFileName = GetOptionalString(root, "ownershipDocumentFileName");
+        var carBrand = GetOptionalString(root, "carBrand");
+        var carModel = GetOptionalString(root, "carModel");
+        var licensePlate = GetOptionalString(root, "licensePlate");
+        if (relatedPartnerUserId.HasValue ||
+            !string.IsNullOrWhiteSpace(ownershipDocumentFileName) ||
+            !string.IsNullOrWhiteSpace(carBrand) ||
+            !string.IsNullOrWhiteSpace(carModel) ||
+            !string.IsNullOrWhiteSpace(licensePlate))
+        {
+            return new PartnerCarTicketData
+            {
+                FirstName = firstName,
+                LastName = lastName,
+                FullName = fullName,
+                PhoneNumber = phoneNumber,
+                IdentityDocumentFileName = identityDocumentFileName,
+                RelatedPartnerUserId = relatedPartnerUserId ?? Guid.Empty,
+                CarBrand = carBrand ?? string.Empty,
+                CarModel = carModel ?? string.Empty,
+                LicensePlate = licensePlate ?? string.Empty,
+                OwnershipDocumentFileName = ownershipDocumentFileName ?? string.Empty,
+                CarImages = GetPartnerCarImages(root),
+                DecisionReason = decisionReason,
+                ReviewedByManagerId = reviewedByManagerId,
+                ReviewedAt = reviewedAt
+            };
+        }
+
         return new PartnerTicketData
         {
             FirstName = firstName,
@@ -154,6 +192,31 @@ public sealed class TicketConfiguration : IEntityTypeConfiguration<Ticket>
         }
 
         return null;
+    }
+
+    private static IReadOnlyCollection<PartnerCarTicketImageData> GetPartnerCarImages(JsonElement root)
+    {
+        if (!root.TryGetProperty("carImages", out var value) || value.ValueKind != JsonValueKind.Array)
+        {
+            return [];
+        }
+
+        var images = new List<PartnerCarTicketImageData>();
+        foreach (var item in value.EnumerateArray())
+        {
+            if (item.ValueKind != JsonValueKind.Object)
+            {
+                continue;
+            }
+
+            images.Add(new PartnerCarTicketImageData
+            {
+                ImageId = GetString(item, "imageId"),
+                ImageUrl = GetString(item, "imageUrl")
+            });
+        }
+
+        return images;
     }
 
     private static Guid? GetOptionalGuid(JsonElement root, string propertyName)

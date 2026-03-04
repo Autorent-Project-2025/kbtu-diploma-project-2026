@@ -6,6 +6,7 @@ using CarService.Application.DTOs.PartnerCars;
 using CarService.Application.Interfaces;
 using CarService.Application.Interfaces.Integrations;
 using CarService.Domain.Entities;
+using CarService.Domain.Enums;
 using CarService.Infrastructure.Persistance;
 using Microsoft.EntityFrameworkCore;
 
@@ -90,6 +91,7 @@ namespace CarService.Infrastructure.Services
                 PartnerId = entity.PartnerId,
                 CarModelId = entity.CarModelId,
                 LicensePlate = entity.LicensePlate,
+                OwnershipFileName = entity.OwnershipFileName,
                 Color = entity.Color,
                 PriceHour = entity.PriceHour,
                 PriceDay = entity.PriceDay,
@@ -129,6 +131,7 @@ namespace CarService.Infrastructure.Services
                 PartnerId = currentUserId,
                 CarModelId = dto.CarModelId,
                 LicensePlate = NormalizeRequired(dto.LicensePlate, nameof(dto.LicensePlate), 20),
+                OwnershipFileName = null,
                 Color = NormalizeOptional(dto.Color, 50),
                 PriceHour = dto.PriceHour,
                 PriceDay = dto.PriceDay,
@@ -142,6 +145,78 @@ namespace CarService.Infrastructure.Services
 
             await _db.Entry(entity).Reference(partnerCar => partnerCar.CarModel).LoadAsync(cancellationToken);
 
+            return MapToResponse(entity);
+        }
+
+        public async Task<PartnerCarResponseDto> ProvisionAsync(
+            PartnerCarProvisionDto dto,
+            CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(dto);
+
+            if (dto.RelatedUserId == Guid.Empty)
+            {
+                throw new ArgumentException($"{nameof(dto.RelatedUserId)} is required.", nameof(dto.RelatedUserId));
+            }
+
+            var normalizedBrand = NormalizeRequired(dto.CarBrand, nameof(dto.CarBrand), 100);
+            var normalizedModel = NormalizeRequired(dto.CarModel, nameof(dto.CarModel), 100);
+            var normalizedLicensePlate = NormalizeRequired(dto.LicensePlate, nameof(dto.LicensePlate), 20).ToUpperInvariant();
+            var normalizedOwnershipFileName = NormalizeRequired(dto.OwnershipFileName, nameof(dto.OwnershipFileName), 255);
+
+            var model = await _db.CarModels
+                .AsNoTracking()
+                .Where(carModel =>
+                    carModel.Brand.ToLower() == normalizedBrand.ToLower() &&
+                    carModel.Model.ToLower() == normalizedModel.ToLower())
+                .OrderByDescending(carModel => carModel.Year)
+                .ThenByDescending(carModel => carModel.Id)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (model is null)
+            {
+                throw new KeyNotFoundException(
+                    $"Car model '{normalizedBrand} {normalizedModel}' was not found.");
+            }
+
+            var images = (dto.Images ?? [])
+                .Select((image, index) => new PartnerCarImage
+                {
+                    ImageId = NormalizeRequired(image.ImageId, nameof(image.ImageId), 255),
+                    ImageUrl = NormalizeImageUrl(image.ImageUrl, nameof(image.ImageUrl)),
+                    ImageType = CarImageType.General,
+                    DisplayOrder = index + 1
+                })
+                .ToList();
+
+            if (images.Count == 0)
+            {
+                throw new ArgumentException("At least one image is required.", nameof(dto.Images));
+            }
+
+            var entity = new PartnerCar
+            {
+                PartnerId = dto.RelatedUserId,
+                CarModelId = model.Id,
+                LicensePlate = normalizedLicensePlate,
+                OwnershipFileName = normalizedOwnershipFileName,
+                Status = PartnerCarStatus.Available,
+                CreatedAt = DateTimeOffset.UtcNow,
+                RatingsCount = 0
+            };
+
+            _db.PartnerCars.Add(entity);
+            await _db.SaveChangesAsync(cancellationToken);
+
+            foreach (var image in images)
+            {
+                image.CarId = entity.Id;
+            }
+
+            _db.PartnerCarImages.AddRange(images);
+            await _db.SaveChangesAsync(cancellationToken);
+
+            entity.CarModel = await _db.CarModels.FirstAsync(carModel => carModel.Id == entity.CarModelId, cancellationToken);
             return MapToResponse(entity);
         }
 
@@ -217,6 +292,7 @@ namespace CarService.Infrastructure.Services
                     Rating = car.Rating,
                     BookingCount = countsMap.GetValueOrDefault(car.Id, 0),
                     LicensePlate = car.LicensePlate,
+                    OwnershipFileName = car.OwnershipFileName,
                     PriceHour = car.PriceHour,
                     PriceDay = car.PriceDay,
                     Color = car.Color
@@ -248,6 +324,7 @@ namespace CarService.Infrastructure.Services
                 Id = entity.Id,
                 PartnerId = entity.PartnerId,
                 LicensePlate = entity.LicensePlate,
+                OwnershipFileName = entity.OwnershipFileName,
                 Color = entity.Color,
                 PriceHour = entity.PriceHour,
                 PriceDay = entity.PriceDay,
@@ -310,6 +387,7 @@ namespace CarService.Infrastructure.Services
                 PartnerId = entity.PartnerId,
                 CarModelId = entity.CarModelId,
                 LicensePlate = entity.LicensePlate,
+                OwnershipFileName = entity.OwnershipFileName,
                 Color = entity.Color,
                 PriceHour = entity.PriceHour,
                 PriceDay = entity.PriceDay,
@@ -377,6 +455,17 @@ namespace CarService.Infrastructure.Services
             if (normalized.Length > maxLength)
             {
                 throw new ArgumentException($"Value length must not exceed {maxLength}.");
+            }
+
+            return normalized;
+        }
+
+        private static string NormalizeImageUrl(string? value, string paramName)
+        {
+            var normalized = NormalizeRequired(value, paramName, 2048);
+            if (!Uri.TryCreate(normalized, UriKind.Absolute, out _))
+            {
+                throw new ArgumentException($"{paramName} must be a valid absolute URL.", paramName);
             }
 
             return normalized;

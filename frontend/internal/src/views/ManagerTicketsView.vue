@@ -3,8 +3,8 @@
     <section class="card manager-hero">
       <div>
         <p class="manager-hero__eyebrow">Manager Panel</p>
-        <h1>Заявки на регистрацию</h1>
-        <p class="manager-hero__subtitle">Проверяйте документы и принимайте решение по каждой новой заявке.</p>
+        <h1>Заявки на согласование</h1>
+        <p class="manager-hero__subtitle">Проверяйте данные и принимайте решение по каждой заявке.</p>
       </div>
       <div class="manager-hero__actions">
         <span class="hero-stat">Pending: {{ tickets.length }}</span>
@@ -84,13 +84,36 @@
           </article>
         </div>
 
+        <section class="docs-block" v-if="isPartnerCarTicket(selectedTicket)">
+          <h3>Данные машины (редактируются перед решением)</h3>
+          <div class="details-grid">
+            <article class="detail-item">
+              <label class="label" for="carBrand">Марка</label>
+              <input id="carBrand" class="input" v-model="partnerCarForm.carBrand" />
+            </article>
+            <article class="detail-item">
+              <label class="label" for="carModel">Модель</label>
+              <input id="carModel" class="input" v-model="partnerCarForm.carModel" />
+            </article>
+            <article class="detail-item">
+              <label class="label" for="licensePlate">Гос номер</label>
+              <input id="licensePlate" class="input" v-model="partnerCarForm.licensePlate" />
+            </article>
+            <article class="detail-item">
+              <label class="label" for="contactEmail">Email партнера</label>
+              <input id="contactEmail" class="input" type="email" v-model="partnerCarForm.email" />
+            </article>
+          </div>
+        </section>
+
         <section class="docs-block">
           <h3>Проверка документов</h3>
           <div class="doc-actions">
             <button
+              v-if="selectedTicket.identityDocumentFileName"
               class="btn btn-outline"
               @click="openDocument('identity')"
-              :disabled="actionLoading || !selectedTicket.identityDocumentFileName"
+              :disabled="actionLoading"
             >
               {{ isPartnerTicket(selectedTicket) ? "Открыть удостоверение владельца" : "Открыть документ личности" }}
             </button>
@@ -101,6 +124,25 @@
               :disabled="actionLoading || !selectedTicket.driverLicenseFileName"
             >
               Открыть водительские права
+            </button>
+            <button
+              v-if="isPartnerCarTicket(selectedTicket)"
+              class="btn btn-outline"
+              @click="openDocument('ownership')"
+              :disabled="actionLoading || !selectedTicket.ownershipDocumentFileName"
+            >
+              Открыть файл собственности
+            </button>
+          </div>
+
+          <div v-if="isPartnerCarTicket(selectedTicket) && partnerCarImages.length > 0" class="doc-actions">
+            <button
+              v-for="(image, index) in partnerCarImages"
+              :key="`${image.imageId}-${index}`"
+              class="btn btn-outline"
+              @click="openImage(image.imageUrl)"
+            >
+              Фото машины #{{ index + 1 }}
             </button>
           </div>
         </section>
@@ -129,15 +171,16 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { computed, onMounted, reactive, ref } from "vue";
 import {
   approveTicket,
   getPendingTickets,
   getTicketById,
   getTicketDocumentTemporaryLink,
-  rejectTicket
+  rejectTicket,
+  type PartnerCarReviewPayload,
 } from "../api/tickets";
-import type { Ticket } from "../types/Ticket";
+import type { PartnerCarTicketData, PartnerCarTicketImageData, Ticket } from "../types/Ticket";
 
 const tickets = ref<Ticket[]>([]);
 const selectedTicket = ref<Ticket | null>(null);
@@ -147,6 +190,30 @@ const loading = ref(false);
 const actionLoading = ref(false);
 const errorMessage = ref("");
 const successMessage = ref("");
+
+const partnerCarForm = reactive({
+  carBrand: "",
+  carModel: "",
+  licensePlate: "",
+  email: "",
+});
+
+const partnerCarImages = computed<PartnerCarTicketImageData[]>(() => {
+  if (!selectedTicket.value || !isPartnerCarTicket(selectedTicket.value)) {
+    return [];
+  }
+
+  if (Array.isArray(selectedTicket.value.carImages) && selectedTicket.value.carImages.length > 0) {
+    return selectedTicket.value.carImages;
+  }
+
+  const data = selectedTicket.value.data;
+  if (data && (data as PartnerCarTicketData).$type === "partner-car") {
+    return (data as PartnerCarTicketData).carImages ?? [];
+  }
+
+  return [];
+});
 
 function statusLabel(status: number) {
   if (status === 1) return "Pending";
@@ -164,19 +231,26 @@ function statusClass(status: number) {
 
 function ticketTypeLabel(ticketType: number) {
   if (ticketType === 2) return "Партнер";
+  if (ticketType === 3) return "Машина партнера";
   return "Клиент";
 }
 
 function ticketTypeClass(ticketType: number) {
-  return ticketType === 2 ? "type-pill--partner" : "type-pill--client";
+  if (ticketType === 2) return "type-pill--partner";
+  if (ticketType === 3) return "type-pill--partner-car";
+  return "type-pill--client";
 }
 
 function isClientTicket(ticket: Ticket) {
-  return ticket.ticketType !== 2;
+  return ticket.ticketType === 1;
 }
 
 function isPartnerTicket(ticket: Ticket) {
   return ticket.ticketType === 2;
+}
+
+function isPartnerCarTicket(ticket: Ticket) {
+  return ticket.ticketType === 3;
 }
 
 function formatDate(value: string) {
@@ -192,6 +266,45 @@ function formatDate(value: string) {
   }).format(date);
 }
 
+function syncPartnerCarForm(ticket: Ticket | null) {
+  if (!ticket || !isPartnerCarTicket(ticket)) {
+    partnerCarForm.carBrand = "";
+    partnerCarForm.carModel = "";
+    partnerCarForm.licensePlate = "";
+    partnerCarForm.email = "";
+    return;
+  }
+
+  const data = (ticket.data as PartnerCarTicketData | undefined) ?? undefined;
+  partnerCarForm.carBrand = (ticket.carBrand ?? data?.carBrand ?? "").trim();
+  partnerCarForm.carModel = (ticket.carModel ?? data?.carModel ?? "").trim();
+  partnerCarForm.licensePlate = (ticket.licensePlate ?? data?.licensePlate ?? "").trim();
+  partnerCarForm.email = (ticket.email ?? "").trim();
+}
+
+function buildPartnerCarPayload(): PartnerCarReviewPayload | null | undefined {
+  if (!selectedTicket.value || !isPartnerCarTicket(selectedTicket.value)) {
+    return undefined;
+  }
+
+  const carBrand = partnerCarForm.carBrand.trim();
+  const carModel = partnerCarForm.carModel.trim();
+  const licensePlate = partnerCarForm.licensePlate.trim();
+  const email = partnerCarForm.email.trim();
+
+  if (!carBrand || !carModel || !licensePlate || !email) {
+    errorMessage.value = "Для заявки на машину партнера заполните марку, модель, гос номер и email.";
+    return null;
+  }
+
+  return {
+    carBrand,
+    carModel,
+    licensePlate,
+    email,
+  };
+}
+
 async function loadPending() {
   loading.value = true;
   errorMessage.value = "";
@@ -204,6 +317,7 @@ async function loadPending() {
     if (data.length === 0) {
       selectedTicket.value = null;
       selectedTicketId.value = "";
+      syncPartnerCarForm(null);
       return;
     }
 
@@ -211,6 +325,7 @@ async function loadPending() {
     if (!fallbackTicket) {
       selectedTicket.value = null;
       selectedTicketId.value = "";
+      syncPartnerCarForm(null);
       return;
     }
 
@@ -234,6 +349,7 @@ async function selectTicket(ticketId: string) {
 
   try {
     selectedTicket.value = await getTicketById(ticketId);
+    syncPartnerCarForm(selectedTicket.value);
   } catch (e: any) {
     errorMessage.value = e?.response?.data?.error || "Не удалось загрузить заявку.";
   }
@@ -247,7 +363,12 @@ async function approveSelected() {
   successMessage.value = "";
 
   try {
-    await approveTicket(selectedTicket.value.id);
+    const partnerCarPayload = buildPartnerCarPayload();
+    if (partnerCarPayload === null) {
+      return;
+    }
+
+    await approveTicket(selectedTicket.value.id, partnerCarPayload);
     successMessage.value = "Заявка одобрена.";
     await loadPending();
   } catch (e: any) {
@@ -257,7 +378,12 @@ async function approveSelected() {
   }
 }
 
-async function openDocument(documentType: "identity" | "license") {
+function openImage(url: string) {
+  if (!url) return;
+  window.open(url, "_blank", "noopener,noreferrer");
+}
+
+async function openDocument(documentType: "identity" | "license" | "ownership") {
   if (!selectedTicket.value || actionLoading.value) return;
 
   actionLoading.value = true;
@@ -286,7 +412,12 @@ async function rejectSelected() {
   successMessage.value = "";
 
   try {
-    await rejectTicket(selectedTicket.value.id, rejectReason.value.trim());
+    const partnerCarPayload = buildPartnerCarPayload();
+    if (partnerCarPayload === null) {
+      return;
+    }
+
+    await rejectTicket(selectedTicket.value.id, rejectReason.value.trim(), partnerCarPayload);
     successMessage.value = "Заявка отклонена.";
     await loadPending();
   } catch (e: any) {

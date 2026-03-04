@@ -9,6 +9,8 @@ import MyBookingsView from "../views/MyBookingsView.vue";
 import NotFoundView from "../views/NotFoundView.vue";
 import CarDetailView from "@/views/CarDetailView.vue";
 import PartnerProfileView from "../views/PartnerProfileView.vue";
+import PartnerCarsView from "../views/PartnerCarsView.vue";
+import PartnerCarDetailView from "../views/PartnerCarDetailView.vue";
 import { auth } from "../store/auth";
 
 const routes = [
@@ -50,6 +52,16 @@ const routes = [
   {
     path: "/partner/me",
     component: PartnerProfileView,
+    meta: { requiresAuth: true },
+  },
+  {
+    path: "/partner/cars",
+    component: PartnerCarsView,
+    meta: { requiresAuth: true },
+  },
+  {
+    path: "/partner/cars/:id",
+    component: PartnerCarDetailView,
     meta: { requiresAuth: true },
   },
   {

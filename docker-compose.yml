@@ -103,6 +103,7 @@ services:
       BookingService__BaseUrl: http://booking-service:8080
       BookingService__InternalApiKey: local-internal-api-key
       ImageService__BaseUrl: http://image-service:8080
+      InternalAuth__ApiKey: local-internal-api-key
     ports:
       - "${CAR_SERVICE_PORT:-1298}:8080"
     depends_on:
@@ -343,6 +344,9 @@ services:
       PartnerService__InternalApiKey: local-internal-api-key
       FileService__BaseUrl: http://file-service:8080
       FileService__InternalApiKey: local-internal-api-key
+      ImageService__BaseUrl: http://image-service:8080
+      CarService__BaseUrl: http://car-service:8080
+      CarService__InternalApiKey: local-internal-api-key
     ports:
       - "${TICKET_SERVICE_PORT:-1248}:8080"
     depends_on:
@@ -359,6 +363,10 @@ services:
       partner-service:
         condition: service_started
       file-service:
+        condition: service_started
+      image-service:
+        condition: service_started
+      car-service:
         condition: service_started
 
   image-service:

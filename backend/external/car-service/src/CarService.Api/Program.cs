@@ -1,4 +1,5 @@
 using CarService.Application.Constants;
+using CarService.Api.Options;
 using CarService.Api.Middleware;
 using CarService.Application.Interfaces;
 using CarService.Application.Interfaces.Integrations;
@@ -20,6 +21,7 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.Configure<PartnerServiceOptions>(builder.Configuration.GetSection(PartnerServiceOptions.SectionName));
 builder.Services.Configure<BookingServiceOptions>(builder.Configuration.GetSection(BookingServiceOptions.SectionName));
 builder.Services.Configure<ImageServiceOptions>(builder.Configuration.GetSection(ImageServiceOptions.SectionName));
+builder.Services.Configure<InternalAuthOptions>(builder.Configuration.GetSection(InternalAuthOptions.SectionName));
 
 var connectionString = builder.Configuration.GetConnectionString("DbConnection");
 

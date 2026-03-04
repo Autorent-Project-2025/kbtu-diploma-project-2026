@@ -86,6 +86,45 @@ public sealed class EmailNotificationClient : IEmailNotificationClient
         }
     }
 
+    public async Task SendPartnerCarApprovedAsync(
+        SendPartnerCarApprovedEmailRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.PostAsJsonAsync("/emails/partners/cars/approved", new
+        {
+            to = request.To,
+            fullName = request.FullName,
+            carBrand = request.CarBrand,
+            carModel = request.CarModel,
+            licensePlate = request.LicensePlate
+        }, cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            await ThrowResponseExceptionAsync(response, cancellationToken);
+        }
+    }
+
+    public async Task SendPartnerCarRejectedAsync(
+        SendPartnerCarRejectedEmailRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.PostAsJsonAsync("/emails/partners/cars/rejected", new
+        {
+            to = request.To,
+            fullName = request.FullName,
+            carBrand = request.CarBrand,
+            carModel = request.CarModel,
+            licensePlate = request.LicensePlate,
+            reason = request.Reason
+        }, cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            await ThrowResponseExceptionAsync(response, cancellationToken);
+        }
+    }
+
     private static async Task ThrowResponseExceptionAsync(HttpResponseMessage response, CancellationToken cancellationToken)
     {
         var errorMessage = await TryReadErrorMessageAsync(response, cancellationToken)
