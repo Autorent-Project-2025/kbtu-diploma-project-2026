@@ -26,33 +26,41 @@ public sealed class InternalBookingsController : ControllerBase
     }
 
     [AllowAnonymous]
-    [HttpGet("by-car/{carId:int}")]
-    public async Task<IActionResult> GetByCarId(int carId, CancellationToken cancellationToken)
+    [HttpGet("by-partner-car/{partnerCarId:int}")]
+    [HttpGet("by-car/{partnerCarId:int}")]
+    public async Task<IActionResult> GetByPartnerCarId(int partnerCarId, CancellationToken cancellationToken)
     {
         if (!IsAuthorizedInternalRequest())
         {
             return Unauthorized(new { error = "Internal API key is invalid." });
         }
 
-        var bookings = await _bookingService.GetBookingsByCarId(carId, cancellationToken);
+        var bookings = await _bookingService.GetBookingsByPartnerCarId(partnerCarId, cancellationToken);
         return Ok(bookings);
     }
 
     [AllowAnonymous]
     [HttpGet("counts")]
-    public async Task<IActionResult> GetCounts([FromQuery] string? carIds, CancellationToken cancellationToken)
+    public async Task<IActionResult> GetCounts(
+        [FromQuery] string? partnerCarIds,
+        [FromQuery] string? carIds,
+        CancellationToken cancellationToken)
     {
         if (!IsAuthorizedInternalRequest())
         {
             return Unauthorized(new { error = "Internal API key is invalid." });
         }
 
-        var parsedIds = ParseCarIds(carIds);
-        var counts = await _bookingService.GetBookingCountsByCarIds(parsedIds, cancellationToken);
+        var rawIds = !string.IsNullOrWhiteSpace(partnerCarIds)
+            ? partnerCarIds
+            : carIds;
+
+        var parsedIds = ParseIds(rawIds);
+        var counts = await _bookingService.GetBookingCountsByPartnerCarIds(parsedIds, cancellationToken);
         return Ok(counts);
     }
 
-    private static IReadOnlyCollection<int> ParseCarIds(string? raw)
+    private static IReadOnlyCollection<int> ParseIds(string? raw)
     {
         if (string.IsNullOrWhiteSpace(raw))
         {

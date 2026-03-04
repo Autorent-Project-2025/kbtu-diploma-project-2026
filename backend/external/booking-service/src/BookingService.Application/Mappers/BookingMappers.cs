@@ -10,13 +10,16 @@ namespace BookingService.Application.Mappers
         {
             Id = booking.Id,
             UserId = booking.UserId,
-            CarId = booking.CarId,
+            PartnerCarId = booking.PartnerCarId,
+            PartnerId = booking.PartnerId,
             CarBrand = string.Empty,
             CarModel = string.Empty,
-            StartDate = booking.StartDate,
-            EndDate = booking.EndDate,
-            Price = booking.Price,
-            Status = booking.Status.ToString()
+            StartTime = booking.StartTime,
+            EndTime = booking.EndTime,
+            PriceHour = booking.PriceHour,
+            TotalPrice = booking.TotalPrice,
+            CreatedAt = booking.CreatedAt,
+            Status = booking.Status.ToString().ToLowerInvariant()
         };
 
         public static IQueryable<BookingResponseDto> SelectToBookingResponseDto(this IQueryable<Booking> query)
@@ -30,13 +33,16 @@ namespace BookingService.Application.Mappers
             {
                 Id = booking.Id,
                 UserId = booking.UserId,
-                CarId = booking.CarId,
+                PartnerCarId = booking.PartnerCarId,
+                PartnerId = booking.PartnerId,
                 CarBrand = string.Empty,
                 CarModel = string.Empty,
-                StartDate = booking.StartDate,
-                EndDate = booking.EndDate,
-                Price = booking.Price,
-                Status = booking.Status.ToString()
+                StartTime = booking.StartTime,
+                EndTime = booking.EndTime,
+                PriceHour = booking.PriceHour,
+                TotalPrice = booking.TotalPrice,
+                CreatedAt = booking.CreatedAt,
+                Status = booking.Status.ToString().ToLowerInvariant()
             };
         }
     }
