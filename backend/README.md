@@ -43,7 +43,7 @@
 
 ### 2) Получение ссылки на документ тикета
 Путь:
-1. Менеджер вызывает `GET /tickets/{id}/documents/{identity|license}/temporary-link`.
+1. Менеджер вызывает `GET /tickets/{id}/documents/{identity|license|ownership}/temporary-link`.
 2. `ticket-service` запрашивает у `file-service`: `POST /api/internal/files/temporary-link` с `X-Internal-Api-Key`.
 3. `file-service` генерирует временную ссылку.
 4. Возвращается временная ссылка на документ.
@@ -68,6 +68,31 @@
 2. `ticket-service` отправляет email:
 3. для client: `POST /emails/rejected`
 4. для partner: `POST /emails/partners/rejected`
+5. для partner-car: `POST /emails/partners/cars/rejected`
+
+### 6) Approve тикета типа PartnerCar
+Путь:
+1. Партнер создает тикет `PartnerCar` через `POST /tickets`.
+2. `ticket-service`:
+   - получает контекст текущего партнера через `partner-service /me`;
+   - загружает ownership PDF в `file-service`;
+   - загружает фото машины в `image-service` (`POST /api/images`).
+3. Менеджер вызывает `POST /tickets/{id}/approve`.
+4. `ticket-service` -> `car-service`: `POST /internal/partner-cars/provision` (`X-Internal-Api-Key`).
+5. `ticket-service` -> `email-service`: `POST /emails/partners/cars/approved`.
+
+### 7) Автоподбор машины по модели
+Путь:
+1. Клиентский frontend вызывает `POST /cars/match` через gateway.
+2. `car-service` выбирает кандидатов `partner_cars` по `modelId` и `status=Available`.
+3. `car-service` -> `booking-service`: `POST /internal/bookings/check-availability` (`X-Internal-Api-Key`).
+4. Из кандидатов исключаются занятые машины.
+5. `car-service` ранжирует доступные машины по метрикам:
+   - загрузка партнера;
+   - рейтинг;
+   - количество бронирований;
+   - цена.
+6. Возвращается `partnerCarId` либо ближайшие `suggestedStartTimesUtc`.
 
 ## Авторизация между сервисами
 Используются два механизма.
@@ -84,6 +109,8 @@
 - `client-service`: `/internal/clients/provision`
 - `partner-service`: `/internal/partners/provision`
 - `file-service`: `/api/internal/files/*`
+- `booking-service`: `/internal/bookings/*`
+- `car-service`: `/internal/partner-cars/provision`
 
 В локальной конфигурации общего compose сейчас используется одинаковое значение:
 - `local-internal-api-key`
@@ -101,10 +128,13 @@
 
 Каждый сервис владеет своей БД и не пишет напрямую в БД другого сервиса.
 
-## Что не является прямой S2S интеграцией
-- `car-service`, `booking-service`, `client-service`, `partner-service` не выполняют явных HTTP-вызовов друг к другу.
-- Эти сервисы в основном обслуживают запросы через gateway и работают со своей БД.
-- `client-service` хранит `avatarUrl`, а `client-service` и `partner-service` хранят имена файлов из `file-service`, но не запрашивают эти сервисы напрямую.
+## Прямые S2S интеграции вне ticket-service
+- `car-service` <-> `booking-service`:
+  - чтение связанных бронирований (`/internal/bookings/by-partner-car/{id}`);
+  - агрегаты количества бронирований (`/internal/bookings/counts`);
+  - массовая проверка доступности (`/internal/bookings/check-availability`) для `/cars/match`.
+
+Остальные external/internal сервисы преимущественно обслуживают запросы через gateway и работают со своей БД.
 
 ## Где смотреть детали
 - Общая оркестрация: `../docker-compose.yml`

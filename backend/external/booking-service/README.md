@@ -6,7 +6,8 @@
 - получение бронирований текущего пользователя;
 - смену статуса (confirm, complete, cancel);
 - проверку доступности машины по временному интервалу;
-- внутренние read-эндпоинты для `car-service`.
+- внутренние read-эндпоинты для `car-service`;
+- массовую проверку доступности по списку машин (`check-availability`).
 
 ## Стек
 - ASP.NET Core (`net10.0`)
@@ -41,7 +42,10 @@
 Требуется заголовок `X-Internal-Api-Key`.
 
 - `GET /internal/bookings/by-partner-car/{partnerCarId}`
+- `GET /internal/bookings/by-car/{partnerCarId}` (alias для обратной совместимости)
 - `GET /internal/bookings/counts?partnerCarIds=1,2,3`
+- `GET /internal/bookings/counts?carIds=1,2,3` (alias для обратной совместимости)
+- `POST /internal/bookings/check-availability`
 
 ## Контракты
 ### Создание брони (`POST /`)
@@ -62,6 +66,35 @@
 - `Active`
 - `Completed`
 - `Canceled`
+
+### Массовая проверка доступности (`POST /internal/bookings/check-availability`)
+
+Запрос:
+
+```json
+{
+  "carIds": [1, 2, 3, 4],
+  "startTime": "2026-03-10T10:00:00Z",
+  "endTime": "2026-03-10T14:00:00Z"
+}
+```
+
+Ответ:
+
+```json
+[
+  {
+    "partnerCarId": 1,
+    "isAvailable": false,
+    "nextAvailableFrom": "2026-03-10T15:30:00Z"
+  },
+  {
+    "partnerCarId": 2,
+    "isAvailable": true,
+    "nextAvailableFrom": "2026-03-10T10:00:00Z"
+  }
+]
+```
 
 ## Переменные окружения
 См. `./.env.example`:

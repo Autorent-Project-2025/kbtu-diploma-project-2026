@@ -6,7 +6,9 @@
 - CRUD партнерских машин (`partner_cars`);
 - CRUD комментариев к партнерским машинам;
 - CRUD изображений моделей и партнерских машин через `image-service`;
-- партнерский кабинет `/my` (сводка, детали, отзывы, связанные бронирования).
+- партнерский кабинет `/my` (сводка, детали, отзывы, связанные бронирования);
+- автоподбор машины по модели и временному интервалу;
+- внутренний provisioning партнерской машины (после approve `PartnerCar` тикета).
 
 ## Стек
 - ASP.NET Core (`net10.0`)
@@ -65,6 +67,28 @@
 
 Для `/my` дополнительно выполняется проверка текущего пользователя через `partner-service`.
 
+### Автоподбор и доступные модели
+- `GET /available-models` (`AllowAnonymous`)
+  - список моделей, по которым есть машины в статусе `Available`
+  - содержит `availableCarsCount`, ценовой диапазон и средний рейтинг
+- `POST /match` (`AllowAnonymous`)
+  - подбирает лучшую машину партнера по `modelId + startTime + endTime`
+  - сначала берутся кандидаты `status=Available`
+  - затем через `booking-service` исключаются занятые машины
+  - ранжирование выполняется по:
+    - загрузке партнера;
+    - среднему рейтингу;
+    - количеству бронирований машины;
+    - цене (`priceHour`)
+  - если доступной машины нет, возвращаются `suggestedStartTimesUtc`
+
+### Internal API (`/internal/partner-cars`)
+Требуется заголовок `X-Internal-Api-Key`.
+
+- `POST /internal/partner-cars/provision`
+  - используется `ticket-service` после approve тикета типа `PartnerCar`
+  - создает `partner_car` + изображения + ownership-файл
+
 ## Примеры payload
 ### Создание модели (`POST /models`)
 
@@ -105,6 +129,47 @@
 }
 ```
 
+### Автоподбор (`POST /match`)
+
+Запрос:
+
+```json
+{
+  "modelId": 12,
+  "startTime": "2026-03-10T10:00:00Z",
+  "endTime": "2026-03-10T14:00:00Z"
+}
+```
+
+Успешный подбор:
+
+```json
+{
+  "isAvailable": true,
+  "partnerCarId": 101,
+  "partnerId": "2c51e4d3-250d-4f6b-9f4c-1c8c7e62e35a",
+  "priceHour": 3500,
+  "modelBrand": "Toyota",
+  "modelName": "Camry",
+  "modelYear": 2024,
+  "suggestedStartTimesUtc": []
+}
+```
+
+Нет доступной машины:
+
+```json
+{
+  "isAvailable": false,
+  "partnerCarId": null,
+  "partnerId": null,
+  "suggestedStartTimesUtc": [
+    "2026-03-11T08:00:00Z",
+    "2026-03-11T12:00:00Z"
+  ]
+}
+```
+
 ### Создание изображения (`POST /images/partner-cars/{partnerCarId}`)
 
 ```json
@@ -118,7 +183,9 @@
 ## Интеграции
 Сервис использует:
 - `partner-service` для проверки, что текущий пользователь действительно партнер;
-- `booking-service` для связанных бронирований и агрегатов по машинам в `/my`;
+- `booking-service` для:
+  - связанных бронирований и агрегатов по машинам в `/my`;
+  - проверки доступности кандидатов в `/match` (`/internal/bookings/check-availability`);
 - `image-service` для хранения бинарных изображений (upload/delete/update).
 
 ## Переменные окружения
@@ -129,6 +196,7 @@
 - `BookingService__BaseUrl`
 - `BookingService__InternalApiKey`
 - `ImageService__BaseUrl`
+- `InternalAuth__ApiKey`
 - `EXTERNAL_PORT`
 - `POSTGRES_USER`
 - `POSTGRES_PASSWORD`
@@ -169,3 +237,9 @@ docker compose -f docker-compose.yaml up --build
 - `CarImage.Create` -> `POST /images/partner-cars/...`
 - `CarImage.Update` -> `PUT /images/partner-cars/...`
 - `CarImage.Delete` -> `DELETE /images/partner-cars/...`
+
+Маршруты без permission-проверок:
+- `GET /models`, `GET /models/{id}`
+- `GET /partner-cars`, `GET /partner-cars/{id}`
+- `GET /available-models`
+- `POST /match`

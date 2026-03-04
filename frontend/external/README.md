@@ -3,10 +3,12 @@
 ## Назначение
 Публичный клиентский интерфейс AutoRent (пользовательская часть):
 - просмотр машин;
+- автоподбор машины по модели и интервалу дат;
 - регистрация/активация;
 - авторизация;
 - создание и просмотр своих бронирований;
-- создание тикета на регистрацию.
+- создание тикета на регистрацию;
+- партнерский раздел с машинами и тикетом на добавление новой машины.
 
 ## Стек
 - Vue 3 + TypeScript
@@ -23,6 +25,9 @@
 - `/cars`
 - `/cars/:id`
 - `/bookings`
+- `/partner/me`
+- `/partner/cars`
+- `/partner/cars/:id`
 
 ## Интеграция с API Gateway
 Приложение использует `VITE_API_URL` (обычно `http://localhost:9186`).
@@ -32,13 +37,18 @@
 - `POST /identity/auth/activate`
 - `GET /cars`
 - `GET /cars/{id}`
+- `GET /cars/available-models`
+- `POST /cars/match`
 - `POST /bookings`
 - `GET /bookings/my`
 - `POST /bookings/{id}/cancel`
 - `GET /bookings/available`
 - `POST /tickets`
+- `GET /cars/my`
+- `GET /cars/my/{id}`
 
-Примечание: в коде есть клиентские методы для `/cars/comment*`, но текущий `car-service` таких маршрутов не публикует.
+Дополнительно для партнерского flow:
+- `POST /tickets` с `ticketType=PartnerCar` (multipart, ownership + фото машины).
 
 ## Переменные окружения
 См. `./.env.example`:
@@ -78,6 +88,6 @@ UI не проверяет permissions явно для большинства с
 
 Фактические требования:
 - без прав: `/`, `/cars`, `/cars/:id`, `/apply`, `/activate`, создание тикета `POST /tickets`
-- валидный JWT: раздел `/bookings`, `GET /bookings/my`, операции со своими бронями
+- валидный JWT: раздел `/bookings`, автоподбор/бронирование, партнерский кабинет (`/partner/*`)
 - `Booking.Create`: создание брони (`POST /bookings`)
 
