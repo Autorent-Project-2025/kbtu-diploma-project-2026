@@ -10,6 +10,16 @@ namespace CarService.Infrastructure.Persistence.Configurations
         {
             builder.ToTable("car_models");
 
+            builder.HasOne(model => model.Brand)
+                .WithMany(brand => brand.CarModels)
+                .HasForeignKey(model => model.BrandId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            builder.HasOne(model => model.ModelLookup)
+                .WithMany(modelLookup => modelLookup.CarModels)
+                .HasForeignKey(model => model.ModelId)
+                .OnDelete(DeleteBehavior.Restrict);
+
             builder.HasMany(model => model.PartnerCars)
                 .WithOne(partnerCar => partnerCar.CarModel)
                 .HasForeignKey(partnerCar => partnerCar.CarModelId)

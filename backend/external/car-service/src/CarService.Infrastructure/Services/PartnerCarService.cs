@@ -17,13 +17,16 @@ namespace CarService.Infrastructure.Services
     {
         private readonly ApplicationDbContext _db;
         private readonly IBookingReadClient _bookingReadClient;
+        private readonly CarCatalogResolver _catalogResolver;
 
         public PartnerCarService(
             ApplicationDbContext db,
-            IBookingReadClient bookingReadClient)
+            IBookingReadClient bookingReadClient,
+            CarCatalogResolver catalogResolver)
         {
             _db = db;
             _bookingReadClient = bookingReadClient;
+            _catalogResolver = catalogResolver;
         }
 
         public async Task<PagedResult<PartnerCarResponseDto>> GetAllAsync(
@@ -32,7 +35,7 @@ namespace CarService.Infrastructure.Services
         {
             IQueryable<PartnerCar> query = _db.PartnerCars
                 .AsNoTracking()
-                .Include(partnerCar => partnerCar.CarModel);
+                .IncludeModelCatalog();
 
             if (queryParams.CarModelId.HasValue)
             {
@@ -55,11 +58,14 @@ namespace CarService.Infrastructure.Services
 
             var totalCount = await query.CountAsync(cancellationToken);
 
-            var items = await query
+            var entities = await query
                 .Skip((queryParams.Page - 1) * queryParams.PageSize)
                 .Take(queryParams.PageSize)
-                .Select(partnerCar => MapToResponse(partnerCar))
                 .ToListAsync(cancellationToken);
+
+            var items = entities
+                .Select(MapToResponse)
+                .ToList();
 
             return new PagedResult<PartnerCarResponseDto>
             {
@@ -74,7 +80,7 @@ namespace CarService.Infrastructure.Services
         {
             var entity = await _db.PartnerCars
                 .AsNoTracking()
-                .Include(partnerCar => partnerCar.CarModel)
+                .IncludeModelCatalog()
                 .Include(partnerCar => partnerCar.Images)
                 .Include(partnerCar => partnerCar.Comments)
                 .FirstOrDefaultAsync(partnerCar => partnerCar.Id == id, cancellationToken);
@@ -100,8 +106,8 @@ namespace CarService.Infrastructure.Services
                 CreatedAt = entity.CreatedAt,
                 Rating = entity.Rating,
                 RatingsCount = entity.RatingsCount,
-                ModelBrand = entity.CarModel.Brand,
-                ModelName = entity.CarModel.Model,
+                ModelBrand = entity.CarModel.Brand.Name,
+                ModelName = entity.CarModel.ModelLookup.Name,
                 ModelYear = entity.CarModel.Year,
                 Images = entity.Images
                     .OrderBy(image => image.DisplayOrder)
@@ -144,9 +150,12 @@ namespace CarService.Infrastructure.Services
             _db.PartnerCars.Add(entity);
             await _db.SaveChangesAsync(cancellationToken);
 
-            await _db.Entry(entity).Reference(partnerCar => partnerCar.CarModel).LoadAsync(cancellationToken);
+            var persistedEntity = await _db.PartnerCars
+                .AsNoTracking()
+                .IncludeModelCatalog()
+                .FirstAsync(partnerCar => partnerCar.Id == entity.Id, cancellationToken);
 
-            return MapToResponse(entity);
+            return MapToResponse(persistedEntity);
         }
 
         public async Task<PartnerCarResponseDto> ProvisionAsync(
@@ -160,25 +169,23 @@ namespace CarService.Infrastructure.Services
                 throw new ArgumentException($"{nameof(dto.RelatedUserId)} is required.", nameof(dto.RelatedUserId));
             }
 
-            var normalizedBrand = NormalizeRequired(dto.CarBrand, nameof(dto.CarBrand), 100);
-            var normalizedModel = NormalizeRequired(dto.CarModel, nameof(dto.CarModel), 100);
+            var normalizedBrand = NormalizeRequired(dto.CarBrand, nameof(dto.CarBrand), 255);
+            var normalizedModel = NormalizeRequired(dto.CarModel, nameof(dto.CarModel), 255);
             var normalizedLicensePlate = NormalizeRequired(dto.LicensePlate, nameof(dto.LicensePlate), 20).ToUpperInvariant();
             var normalizedOwnershipFileName = NormalizeRequired(dto.OwnershipFileName, nameof(dto.OwnershipFileName), 255);
+            var (brand, modelLookup) = await _catalogResolver.ResolveAsync(
+                normalizedBrand,
+                normalizedModel,
+                cancellationToken);
 
             var model = await _db.CarModels
                 .AsNoTracking()
                 .Where(carModel =>
-                    carModel.Brand.ToLower() == normalizedBrand.ToLower() &&
-                    carModel.Model.ToLower() == normalizedModel.ToLower())
+                    carModel.BrandId == brand.Id &&
+                    carModel.ModelId == modelLookup.Id)
                 .OrderByDescending(carModel => carModel.Year)
                 .ThenByDescending(carModel => carModel.Id)
                 .FirstOrDefaultAsync(cancellationToken);
-
-            if (model is null)
-            {
-                throw new KeyNotFoundException(
-                    $"Car model '{normalizedBrand} {normalizedModel}' was not found.");
-            }
 
             var images = (dto.Images ?? [])
                 .Select((image, index) => new PartnerCarImage
@@ -193,6 +200,32 @@ namespace CarService.Infrastructure.Services
             if (images.Count == 0)
             {
                 throw new ArgumentException("At least one image is required.", nameof(dto.Images));
+            }
+
+            if (model is null)
+            {
+                var createdModel = new Car
+                {
+                    BrandId = brand.Id,
+                    ModelId = modelLookup.Id,
+                    Year = DateTime.UtcNow.Year,
+                    RatingsCount = 0
+                };
+
+                _db.CarModels.Add(createdModel);
+                await _db.SaveChangesAsync(cancellationToken);
+
+                _db.CarModelImages.AddRange(images.Select(image => new CarModelImage
+                {
+                    ModelId = createdModel.Id,
+                    ImageId = image.ImageId,
+                    ImageUrl = image.ImageUrl,
+                    ImageType = image.ImageType,
+                    DisplayOrder = image.DisplayOrder
+                }));
+
+                await _db.SaveChangesAsync(cancellationToken);
+                model = createdModel;
             }
 
             var entity = new PartnerCar
@@ -217,8 +250,12 @@ namespace CarService.Infrastructure.Services
             _db.PartnerCarImages.AddRange(images);
             await _db.SaveChangesAsync(cancellationToken);
 
-            entity.CarModel = await _db.CarModels.FirstAsync(carModel => carModel.Id == entity.CarModelId, cancellationToken);
-            return MapToResponse(entity);
+            var persistedEntity = await _db.PartnerCars
+                .AsNoTracking()
+                .IncludeModelCatalog()
+                .FirstAsync(partnerCar => partnerCar.Id == entity.Id, cancellationToken);
+
+            return MapToResponse(persistedEntity);
         }
 
         public async Task<PartnerCarResponseDto?> UpdateAsync(
@@ -228,7 +265,7 @@ namespace CarService.Infrastructure.Services
             CancellationToken cancellationToken = default)
         {
             var entity = await _db.PartnerCars
-                .Include(partnerCar => partnerCar.CarModel)
+                .IncludeModelCatalog()
                 .FirstOrDefaultAsync(partnerCar => partnerCar.Id == id, cancellationToken);
 
             if (entity is null)
@@ -276,7 +313,7 @@ namespace CarService.Infrastructure.Services
         {
             var cars = await _db.PartnerCars
                 .AsNoTracking()
-                .Include(partnerCar => partnerCar.CarModel)
+                .IncludeModelCatalog()
                 .Where(partnerCar => partnerCar.PartnerId == currentUserId)
                 .OrderByDescending(partnerCar => partnerCar.CreatedAt)
                 .ThenByDescending(partnerCar => partnerCar.Id)
@@ -289,7 +326,7 @@ namespace CarService.Infrastructure.Services
             return cars.Select(car => new MyPartnerCarSummaryDto
                 {
                     Id = car.Id,
-                    ModelDisplayName = $"{car.CarModel.Brand} {car.CarModel.Model} {car.CarModel.Year}",
+                    ModelDisplayName = $"{car.CarModel.Brand.Name} {car.CarModel.ModelLookup.Name} {car.CarModel.Year}",
                     Rating = car.Rating,
                     BookingCount = countsMap.GetValueOrDefault(car.Id, 0),
                     LicensePlate = car.LicensePlate,
@@ -308,7 +345,7 @@ namespace CarService.Infrastructure.Services
         {
             var entity = await _db.PartnerCars
                 .AsNoTracking()
-                .Include(partnerCar => partnerCar.CarModel)
+                .IncludeModelCatalog()
                 .Include(partnerCar => partnerCar.Images)
                 .Include(partnerCar => partnerCar.Comments)
                 .FirstOrDefaultAsync(partnerCar => partnerCar.Id == carId && partnerCar.PartnerId == currentUserId, cancellationToken);
@@ -334,8 +371,8 @@ namespace CarService.Infrastructure.Services
                 Rating = entity.Rating,
                 RatingsCount = entity.RatingsCount,
                 ModelId = entity.CarModel.Id,
-                Brand = entity.CarModel.Brand,
-                Model = entity.CarModel.Model,
+                Brand = entity.CarModel.Brand.Name,
+                Model = entity.CarModel.ModelLookup.Name,
                 Year = entity.CarModel.Year,
                 Engine = entity.CarModel.Engine,
                 Transmission = entity.CarModel.Transmission,
@@ -363,15 +400,15 @@ namespace CarService.Infrastructure.Services
         {
             var availableCars = await _db.PartnerCars
                 .AsNoTracking()
-                .Include(partnerCar => partnerCar.CarModel)
+                .IncludeModelCatalog()
                 .Where(partnerCar => partnerCar.Status == PartnerCarStatus.Available)
                 .Select(partnerCar => new
                 {
                     partnerCar.CarModelId,
                     partnerCar.PriceHour,
                     partnerCar.Rating,
-                    Brand = partnerCar.CarModel.Brand,
-                    Model = partnerCar.CarModel.Model,
+                    Brand = partnerCar.CarModel.Brand.Name,
+                    Model = partnerCar.CarModel.ModelLookup.Name,
                     Year = partnerCar.CarModel.Year
                 })
                 .ToListAsync(cancellationToken);
@@ -428,7 +465,7 @@ namespace CarService.Infrastructure.Services
 
             var candidates = await _db.PartnerCars
                 .AsNoTracking()
-                .Include(partnerCar => partnerCar.CarModel)
+                .IncludeModelCatalog()
                 .Where(partnerCar =>
                     partnerCar.CarModelId == dto.ModelId &&
                     partnerCar.Status == PartnerCarStatus.Available)
@@ -538,8 +575,8 @@ namespace CarService.Infrastructure.Services
                 PartnerCarId = selected.Id,
                 PartnerId = selected.PartnerId,
                 PriceHour = selected.PriceHour,
-                ModelBrand = selected.CarModel.Brand,
-                ModelName = selected.CarModel.Model,
+                ModelBrand = selected.CarModel.Brand.Name,
+                ModelName = selected.CarModel.ModelLookup.Name,
                 ModelYear = selected.CarModel.Year
             };
         }
@@ -581,8 +618,8 @@ namespace CarService.Infrastructure.Services
                 CreatedAt = entity.CreatedAt,
                 Rating = entity.Rating,
                 RatingsCount = entity.RatingsCount,
-                ModelBrand = entity.CarModel.Brand,
-                ModelName = entity.CarModel.Model,
+                ModelBrand = entity.CarModel.Brand.Name,
+                ModelName = entity.CarModel.ModelLookup.Name,
                 ModelYear = entity.CarModel.Year
             };
         }

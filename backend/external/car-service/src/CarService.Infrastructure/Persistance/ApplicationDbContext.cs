@@ -8,6 +8,8 @@ namespace CarService.Infrastructure.Persistance
         public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
             : base(options) { }
 
+        public DbSet<CarBrand> CarBrands => Set<CarBrand>();
+        public DbSet<CarModelLookup> CarModelLookups => Set<CarModelLookup>();
         public DbSet<Car> CarModels => Set<Car>();
         public DbSet<PartnerCar> PartnerCars => Set<PartnerCar>();
         public DbSet<CarComment> CarComments => Set<CarComment>();

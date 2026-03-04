@@ -7,11 +7,11 @@ namespace CarService.Domain.Entities
         [Column("id")]
         public int Id { get; set; }
 
-        [Column("brand")]
-        public string Brand { get; set; } = null!;
+        [Column("brand_id")]
+        public int BrandId { get; set; }
 
-        [Column("model")]
-        public string Model { get; set; } = null!;
+        [Column("model_id")]
+        public int ModelId { get; set; }
 
         [Column("year")]
         public int Year { get; set; }
@@ -40,6 +40,8 @@ namespace CarService.Domain.Entities
         [Column("ratings_count")]
         public int RatingsCount { get; set; }
 
+        public CarBrand Brand { get; set; } = null!;
+        public CarModelLookup ModelLookup { get; set; } = null!;
         public List<CarFeature> CarFeatures { get; set; } = [];
         public List<PartnerCar> PartnerCars { get; set; } = [];
         public List<CarModelImage> ModelImages { get; set; } = [];

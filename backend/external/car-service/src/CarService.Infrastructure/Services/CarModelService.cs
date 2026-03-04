@@ -12,28 +12,34 @@ namespace CarService.Infrastructure.Services
     public sealed class CarModelService : ICarModelService
     {
         private readonly ApplicationDbContext _db;
+        private readonly CarCatalogResolver _catalogResolver;
 
-        public CarModelService(ApplicationDbContext db)
+        public CarModelService(
+            ApplicationDbContext db,
+            CarCatalogResolver catalogResolver)
         {
             _db = db;
+            _catalogResolver = catalogResolver;
         }
 
         public async Task<PagedResult<CarModelResponseDto>> GetAllAsync(
             CarModelQueryParams queryParams,
             CancellationToken cancellationToken = default)
         {
-            IQueryable<Car> query = _db.CarModels.AsNoTracking();
+            IQueryable<Car> query = _db.CarModels
+                .AsNoTracking()
+                .IncludeCatalog();
 
             if (!string.IsNullOrWhiteSpace(queryParams.Brand))
             {
                 var brand = queryParams.Brand.Trim().ToLowerInvariant();
-                query = query.Where(model => model.Brand.ToLower().Contains(brand));
+                query = query.Where(entity => entity.Brand.Name.ToLower().Contains(brand));
             }
 
             if (!string.IsNullOrWhiteSpace(queryParams.Model))
             {
                 var model = queryParams.Model.Trim().ToLowerInvariant();
-                query = query.Where(entity => entity.Model.ToLower().Contains(model));
+                query = query.Where(entity => entity.ModelLookup.Name.ToLower().Contains(model));
             }
 
             if (queryParams.Year.HasValue)
@@ -42,18 +48,21 @@ namespace CarService.Infrastructure.Services
             }
 
             query = query
-                .OrderBy(entity => entity.Brand)
-                .ThenBy(entity => entity.Model)
+                .OrderBy(entity => entity.Brand.Name)
+                .ThenBy(entity => entity.ModelLookup.Name)
                 .ThenByDescending(entity => entity.Year)
                 .ThenBy(entity => entity.Id);
 
             var totalCount = await query.CountAsync(cancellationToken);
 
-            var items = await query
+            var entities = await query
                 .Skip((queryParams.Page - 1) * queryParams.PageSize)
                 .Take(queryParams.PageSize)
-                .Select(entity => MapToResponse(entity))
                 .ToListAsync(cancellationToken);
+
+            var items = entities
+                .Select(MapToResponse)
+                .ToList();
 
             return new PagedResult<CarModelResponseDto>
             {
@@ -68,6 +77,7 @@ namespace CarService.Infrastructure.Services
         {
             var model = await _db.CarModels
                 .AsNoTracking()
+                .IncludeCatalog()
                 .Include(entity => entity.CarFeatures)
                     .ThenInclude(carFeature => carFeature.Feature)
                 .Include(entity => entity.ModelImages)
@@ -78,10 +88,12 @@ namespace CarService.Infrastructure.Services
 
         public async Task<CarModelResponseDto> CreateAsync(CarModelCreateDto dto, CancellationToken cancellationToken = default)
         {
+            var (brand, model) = await _catalogResolver.ResolveAsync(dto.Brand, dto.Model, cancellationToken);
+
             var entity = new Car
             {
-                Brand = NormalizeRequired(dto.Brand, nameof(dto.Brand), 255),
-                Model = NormalizeRequired(dto.Model, nameof(dto.Model), 255),
+                BrandId = brand.Id,
+                ModelId = model.Id,
                 Year = dto.Year,
                 Engine = NormalizeOptional(dto.Engine, 100),
                 Transmission = NormalizeOptional(dto.Transmission, 100),
@@ -95,6 +107,8 @@ namespace CarService.Infrastructure.Services
             _db.CarModels.Add(entity);
             await _db.SaveChangesAsync(cancellationToken);
 
+            entity.Brand = brand;
+            entity.ModelLookup = model;
             return MapToResponse(entity);
         }
 
@@ -109,8 +123,10 @@ namespace CarService.Infrastructure.Services
                 return null;
             }
 
-            entity.Brand = NormalizeRequired(dto.Brand, nameof(dto.Brand), 255);
-            entity.Model = NormalizeRequired(dto.Model, nameof(dto.Model), 255);
+            var (brand, model) = await _catalogResolver.ResolveAsync(dto.Brand, dto.Model, cancellationToken);
+
+            entity.BrandId = brand.Id;
+            entity.ModelId = model.Id;
             entity.Year = dto.Year;
             entity.Engine = NormalizeOptional(dto.Engine, 100);
             entity.Transmission = NormalizeOptional(dto.Transmission, 100);
@@ -121,6 +137,8 @@ namespace CarService.Infrastructure.Services
 
             await _db.SaveChangesAsync(cancellationToken);
 
+            entity.Brand = brand;
+            entity.ModelLookup = model;
             return MapToResponse(entity);
         }
 
@@ -163,8 +181,8 @@ namespace CarService.Infrastructure.Services
             return new CarModelResponseDto
             {
                 Id = entity.Id,
-                Brand = entity.Brand,
-                Model = entity.Model,
+                Brand = entity.Brand.Name,
+                Model = entity.ModelLookup.Name,
                 Year = entity.Year,
                 Engine = entity.Engine,
                 Transmission = entity.Transmission,
@@ -182,8 +200,8 @@ namespace CarService.Infrastructure.Services
             return new CarModelDetailsDto
             {
                 Id = entity.Id,
-                Brand = entity.Brand,
-                Model = entity.Model,
+                Brand = entity.Brand.Name,
+                Model = entity.ModelLookup.Name,
                 Year = entity.Year,
                 Engine = entity.Engine,
                 Transmission = entity.Transmission,
@@ -213,22 +231,6 @@ namespace CarService.Infrastructure.Services
                     })
                     .ToList()
             };
-        }
-
-        private static string NormalizeRequired(string? value, string paramName, int maxLength)
-        {
-            if (string.IsNullOrWhiteSpace(value))
-            {
-                throw new ArgumentException($"{paramName} is required.", paramName);
-            }
-
-            var normalized = value.Trim();
-            if (normalized.Length > maxLength)
-            {
-                throw new ArgumentException($"{paramName} length must not exceed {maxLength}.", paramName);
-            }
-
-            return normalized;
         }
 
         private static string? NormalizeOptional(string? value, int maxLength)

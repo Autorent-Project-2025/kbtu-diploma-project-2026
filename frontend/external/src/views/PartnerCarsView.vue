@@ -30,19 +30,34 @@
             />
           </div>
 
-          <div class="space-y-2 md:col-span-2">
-            <label for="carModel" class="block text-sm font-semibold text-gray-700 dark:text-gray-300">Марка и модель</label>
-            <select
-              id="carModel"
-              v-model.number="form.modelId"
+          <div class="space-y-2">
+            <label for="carBrand" class="block text-sm font-semibold text-gray-700 dark:text-gray-300">Марка</label>
+            <input
+              id="carBrand"
+              v-model="form.carBrand"
+              list="carBrandSuggestions"
+              type="text"
               required
               class="w-full px-4 py-3 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white"
-            >
-              <option :value="0" disabled>Выберите модель</option>
-              <option v-for="model in carModels" :key="model.id" :value="model.id">
-                {{ model.brand }} {{ model.model }} {{ model.year }}
-              </option>
-            </select>
+            />
+            <datalist id="carBrandSuggestions">
+              <option v-for="brand in brandSuggestions" :key="brand" :value="brand" />
+            </datalist>
+          </div>
+
+          <div class="space-y-2">
+            <label for="carModel" class="block text-sm font-semibold text-gray-700 dark:text-gray-300">Модель</label>
+            <input
+              id="carModel"
+              v-model="form.carModel"
+              list="carModelSuggestions"
+              type="text"
+              required
+              class="w-full px-4 py-3 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white"
+            />
+            <datalist id="carModelSuggestions">
+              <option v-for="model in modelSuggestions" :key="model" :value="model" />
+            </datalist>
           </div>
 
           <div class="space-y-2">
@@ -139,7 +154,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from "vue";
+import { computed, onMounted, reactive, ref } from "vue";
 import { createPartnerCarTicket } from "../api/tickets";
 import {
   getCarModels,
@@ -159,10 +174,36 @@ const submitted = ref(false);
 
 const form = reactive({
   email: "",
-  modelId: 0,
+  carBrand: "",
+  carModel: "",
   licensePlate: "",
   ownershipDocumentFile: null as File | null,
   carImageFiles: [] as File[],
+});
+
+const brandSuggestions = computed(() => {
+  return Array.from(
+    new Set(
+      carModels.value
+        .map((model) => model.brand.trim())
+        .filter((brand) => brand.length > 0)
+    )
+  ).sort((left, right) => left.localeCompare(right));
+});
+
+const modelSuggestions = computed(() => {
+  const selectedBrand = form.carBrand.trim().toLowerCase();
+  const candidates = selectedBrand.length === 0
+    ? carModels.value
+    : carModels.value.filter((item) => item.brand.trim().toLowerCase() === selectedBrand);
+
+  return Array.from(
+    new Set(
+      candidates
+        .map((item) => item.model.trim())
+        .filter((model) => model.length > 0)
+    )
+  ).sort((left, right) => left.localeCompare(right));
 });
 
 function isPdf(file: File): boolean {
@@ -229,7 +270,8 @@ async function loadModels() {
 }
 
 function resetForm() {
-  form.modelId = 0;
+  form.carBrand = "";
+  form.carModel = "";
   form.licensePlate = "";
   form.ownershipDocumentFile = null;
   form.carImageFiles = [];
@@ -242,9 +284,10 @@ async function submitTicket() {
     return;
   }
 
-  const selectedModel = carModels.value.find((model) => model.id === form.modelId);
-  if (!selectedModel) {
-    error("Выберите марку и модель машины.");
+  const carBrand = form.carBrand.trim();
+  const carModel = form.carModel.trim();
+  if (!carBrand || !carModel) {
+    error("Укажите марку и модель машины.");
     return;
   }
 
@@ -267,8 +310,8 @@ async function submitTicket() {
   try {
     await createPartnerCarTicket({
       email: form.email.trim(),
-      carBrand: selectedModel.brand,
-      carModel: selectedModel.model,
+      carBrand,
+      carModel,
       licensePlate: form.licensePlate.trim(),
       ownershipDocumentFile: form.ownershipDocumentFile,
       carImageFiles: form.carImageFiles,
