@@ -99,6 +99,10 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ConnectionStrings__DbConnection: Host=car-db;Port=5432;Database=postgres_db;Username=postgres;Password=postgres
+      PartnerService__BaseUrl: http://partner-service:8080
+      BookingService__BaseUrl: http://booking-service:8080
+      BookingService__InternalApiKey: local-internal-api-key
+      ImageService__BaseUrl: http://image-service:8080
     ports:
       - "${CAR_SERVICE_PORT:-1298}:8080"
     depends_on:
@@ -153,6 +157,7 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ConnectionStrings__DbConnection: Host=booking-db;Port=5432;Database=postgres_db;Username=postgres;Password=postgres
+      InternalAuth__ApiKey: local-internal-api-key
     ports:
       - "${BOOKING_SERVICE_PORT:-1821}:8080"
     depends_on:

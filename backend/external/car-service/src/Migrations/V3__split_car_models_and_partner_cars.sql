@@ -154,6 +154,7 @@ CREATE TABLE IF NOT EXISTS public.car_model_images (
     id SERIAL PRIMARY KEY,
     model_id INT NOT NULL,
     image_url TEXT NOT NULL,
+    image_id VARCHAR(255),
     image_type INT NOT NULL,
     display_order INT NOT NULL,
     CONSTRAINT fk_car_model_images_model
@@ -164,6 +165,7 @@ CREATE TABLE IF NOT EXISTS public.partner_car_images (
     id SERIAL PRIMARY KEY,
     car_id INT NOT NULL,
     image_url TEXT NOT NULL,
+    image_id VARCHAR(255),
     image_type INT NOT NULL,
     display_order INT NOT NULL,
     CONSTRAINT fk_partner_car_images_car
@@ -176,12 +178,13 @@ CREATE INDEX IF NOT EXISTS idx_car_model_images_model
 CREATE INDEX IF NOT EXISTS idx_partner_car_images_car
     ON public.partner_car_images (car_id);
 
-INSERT INTO public.car_model_images (model_id, image_url, image_type, display_order)
-SELECT ci.car_id, ci.image_url, ci.image_type, ci.display_order
+INSERT INTO public.car_model_images (model_id, image_url, image_id, image_type, display_order)
+SELECT ci.car_id, ci.image_url, ci.image_id, ci.image_type, ci.display_order
 FROM public.car_images ci
 LEFT JOIN public.car_model_images cmi
   ON cmi.model_id = ci.car_id
  AND cmi.image_url = ci.image_url
+ AND cmi.image_id IS NOT DISTINCT FROM ci.image_id
  AND cmi.image_type = ci.image_type
  AND cmi.display_order = ci.display_order
 WHERE cmi.id IS NULL;

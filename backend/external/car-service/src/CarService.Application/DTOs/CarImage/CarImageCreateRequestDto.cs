@@ -1,15 +1,15 @@
-﻿using CarService.Application.Attributes;
+using CarService.Application.Attributes;
 using CarService.Domain.Enums;
 
 namespace CarService.Application.DTOs.CarImage
 {
     public class CarImageCreateRequestDto
     {
-        public required string ImageUrl { get; set; }
+        public string Base64Content { get; set; } = string.Empty;
 
         [EnumName(typeof(CarImageType))]
-        public required CarImageType ImageType { get; set; }
+        public CarImageType ImageType { get; set; }
 
-        public required int DisplayOrder { get; set; }
+        public int DisplayOrder { get; set; }
     }
 }

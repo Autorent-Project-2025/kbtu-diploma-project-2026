@@ -46,6 +46,10 @@ services:
       - ASPNETCORE_ENVIRONMENT=Development
       - Jwt__PublicKey=${Jwt__PublicKey}
       - ConnectionStrings__DbConnection=Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
+      - PartnerService__BaseUrl=${PartnerService__BaseUrl}
+      - BookingService__BaseUrl=${BookingService__BaseUrl}
+      - BookingService__InternalApiKey=${BookingService__InternalApiKey}
+      - ImageService__BaseUrl=${ImageService__BaseUrl}
     depends_on:
       postgres:
         condition: service_healthy

@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations.Schema;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace CarService.Domain.Entities
 {
@@ -16,21 +16,6 @@ namespace CarService.Domain.Entities
         [Column("year")]
         public int Year { get; set; }
 
-        [Column("image_url")]
-        public string? ImageUrl { get; set; }
-
-        [Column("price_hour")]
-        public decimal? PriceHour { get; set; }
-
-        [Column("price_day")]
-        public decimal? PriceDay { get; set; }
-
-        [Column("rating")]
-        public decimal? Rating { get; set; }
-
-        [Column("description")]
-        public string? Description { get; set; }
-
         [Column("engine")]
         public string? Engine { get; set; }
 
@@ -43,14 +28,21 @@ namespace CarService.Domain.Entities
         [Column("fuel_type")]
         public string? FuelType { get; set; }
 
-        [Column("color")]
-        public string? Color { get; set; }
-
         [Column("doors")]
         public int? Doors { get; set; }
 
-        public List<CarComment> Comments { get; set; } = new();
-        public List<CarImage> CarImages { get; set; } = new();
-        public List<CarFeature> CarFeatures { get; set; } = new();
+        [Column("description")]
+        public string? Description { get; set; }
+
+        [Column("rating")]
+        public decimal? Rating { get; set; }
+
+        [Column("ratings_count")]
+        public int RatingsCount { get; set; }
+
+        public List<CarFeature> CarFeatures { get; set; } = [];
+        public List<PartnerCar> PartnerCars { get; set; } = [];
+        public List<CarModelImage> ModelImages { get; set; } = [];
+        public List<CarComment> Comments { get; set; } = [];
     }
 }

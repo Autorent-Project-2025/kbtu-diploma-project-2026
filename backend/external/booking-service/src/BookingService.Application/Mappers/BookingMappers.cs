@@ -9,6 +9,7 @@ namespace BookingService.Application.Mappers
         private static readonly Expression<Func<Booking, BookingResponseDto>> BookingResponseProjection = booking => new BookingResponseDto
         {
             Id = booking.Id,
+            UserId = booking.UserId,
             CarId = booking.CarId,
             CarBrand = string.Empty,
             CarModel = string.Empty,
@@ -28,6 +29,7 @@ namespace BookingService.Application.Mappers
             return new BookingResponseDto
             {
                 Id = booking.Id,
+                UserId = booking.UserId,
                 CarId = booking.CarId,
                 CarBrand = string.Empty,
                 CarModel = string.Empty,

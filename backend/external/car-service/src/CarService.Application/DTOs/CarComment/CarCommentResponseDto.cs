@@ -1,12 +1,14 @@
-﻿namespace CarService.Application.DTOs.CarComment
+namespace CarService.Application.DTOs.CarComment
 {
     public class CarCommentResponseDto
     {
         public int Id { get; set; }
-        public int UserId { get; set; }
+        public string UserId { get; set; } = string.Empty;
+        public string UserName { get; set; } = string.Empty;
         public int CarId { get; set; }
-        public required string Content { get; set; }
-        public required int Rating { get; set; }
-        public DateTime Created_On { get; set; }
+        public int? PartnerCarId { get; set; }
+        public string Content { get; set; } = string.Empty;
+        public int Rating { get; set; }
+        public DateTime CreatedOn { get; set; }
     }
 }

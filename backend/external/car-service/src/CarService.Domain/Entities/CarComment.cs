@@ -8,13 +8,16 @@ namespace CarService.Domain.Entities
         public int Id { get; set; }
 
         [Column("user_id")]
-        public int UserId { get; set; }
+        public string UserId { get; set; } = string.Empty;
 
         [Column("user_name")]
         public string UserName { get; set; } = string.Empty;
 
         [Column("car_id")]
         public int CarId { get; set; }
+
+        [Column("partner_car_id")]
+        public int? PartnerCarId { get; set; }
 
         [Column("content")]
         public string Content { get; set; } = string.Empty;
@@ -26,5 +29,6 @@ namespace CarService.Domain.Entities
         public DateTime CreatedOn { get; set; }
 
         public Car Car { get; set; } = null!;
+        public PartnerCar? PartnerCar { get; set; }
     }
 }

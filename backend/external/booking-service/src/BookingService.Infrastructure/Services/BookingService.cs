@@ -151,6 +151,46 @@ namespace BookingService.Infrastructure.Services
                 .FirstOrDefaultAsync();
         }
 
+        public async Task<IReadOnlyCollection<BookingResponseDto>> GetBookingsByCarId(int carId, CancellationToken cancellationToken = default)
+        {
+            if (carId <= 0)
+            {
+                throw new ArgumentException("CarId must be greater than zero.", nameof(carId));
+            }
+
+            return await _db.Bookings
+                .AsNoTracking()
+                .Where(booking => booking.CarId == carId)
+                .OrderByDescending(booking => booking.StartDate)
+                .ThenByDescending(booking => booking.Id)
+                .SelectToBookingResponseDto()
+                .ToListAsync(cancellationToken);
+        }
+
+        public async Task<IReadOnlyCollection<CarBookingCountDto>> GetBookingCountsByCarIds(IReadOnlyCollection<int> carIds, CancellationToken cancellationToken = default)
+        {
+            var normalizedIds = carIds
+                .Where(id => id > 0)
+                .Distinct()
+                .ToArray();
+
+            if (normalizedIds.Length == 0)
+            {
+                return [];
+            }
+
+            return await _db.Bookings
+                .AsNoTracking()
+                .Where(booking => normalizedIds.Contains(booking.CarId))
+                .GroupBy(booking => booking.CarId)
+                .Select(group => new CarBookingCountDto
+                {
+                    CarId = group.Key,
+                    Count = group.Count()
+                })
+                .ToListAsync(cancellationToken);
+        }
+
         public async Task<bool> CancelBooking(int id, string userId)
         {
             var booking = await GetUserBookingEntity(id, userId);

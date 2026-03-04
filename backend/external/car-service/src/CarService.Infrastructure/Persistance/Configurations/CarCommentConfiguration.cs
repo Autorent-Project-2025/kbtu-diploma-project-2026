@@ -10,9 +10,17 @@ namespace CarService.Infrastructure.Persistence.Configurations
         {
             builder.ToTable("car_comments");
 
-            builder.HasOne(e => e.Car)
-                .WithMany(e => e.Comments)
-                .HasForeignKey(e => e.CarId)
+            builder.Property(comment => comment.UserId)
+                .HasMaxLength(64);
+
+            builder.HasOne(comment => comment.Car)
+                .WithMany(model => model.Comments)
+                .HasForeignKey(comment => comment.CarId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.HasOne(comment => comment.PartnerCar)
+                .WithMany(partnerCar => partnerCar.Comments)
+                .HasForeignKey(comment => comment.PartnerCarId)
                 .OnDelete(DeleteBehavior.Cascade);
         }
     }
