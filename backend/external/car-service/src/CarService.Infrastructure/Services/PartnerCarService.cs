@@ -2,6 +2,7 @@ using CarService.Application.DTOs.Bookings;
 using CarService.Application.DTOs.CarComment;
 using CarService.Application.DTOs.CarImage;
 using CarService.Application.DTOs.Common;
+using CarService.Application.DTOs.Matching;
 using CarService.Application.DTOs.PartnerCars;
 using CarService.Application.Interfaces;
 using CarService.Application.Interfaces.Integrations;
@@ -358,6 +359,191 @@ namespace CarService.Infrastructure.Services
             };
         }
 
+        public async Task<IReadOnlyCollection<AvailableCarModelDto>> GetAvailableModelsAsync(CancellationToken cancellationToken = default)
+        {
+            var availableCars = await _db.PartnerCars
+                .AsNoTracking()
+                .Include(partnerCar => partnerCar.CarModel)
+                .Where(partnerCar => partnerCar.Status == PartnerCarStatus.Available)
+                .Select(partnerCar => new
+                {
+                    partnerCar.CarModelId,
+                    partnerCar.PriceHour,
+                    partnerCar.Rating,
+                    Brand = partnerCar.CarModel.Brand,
+                    Model = partnerCar.CarModel.Model,
+                    Year = partnerCar.CarModel.Year
+                })
+                .ToListAsync(cancellationToken);
+
+            return availableCars
+                .GroupBy(item => new { item.CarModelId, item.Brand, item.Model, item.Year })
+                .OrderBy(group => group.Key.Brand)
+                .ThenBy(group => group.Key.Model)
+                .ThenByDescending(group => group.Key.Year)
+                .Select(group =>
+                {
+                    var ratings = group
+                        .Where(item => item.Rating.HasValue)
+                        .Select(item => item.Rating!.Value)
+                        .ToList();
+
+                    var prices = group
+                        .Where(item => item.PriceHour.HasValue)
+                        .Select(item => item.PriceHour!.Value)
+                        .ToList();
+
+                    return new AvailableCarModelDto
+                    {
+                        ModelId = group.Key.CarModelId,
+                        Brand = group.Key.Brand,
+                        Model = group.Key.Model,
+                        Year = group.Key.Year,
+                        AvailableCarsCount = group.Count(),
+                        MinPriceHour = prices.Count == 0 ? null : prices.Min(),
+                        MaxPriceHour = prices.Count == 0 ? null : prices.Max(),
+                        AverageRating = ratings.Count == 0
+                            ? null
+                            : Math.Round(ratings.Average(), 1, MidpointRounding.AwayFromZero)
+                    };
+                })
+                .ToList();
+        }
+
+        public async Task<MatchPartnerCarResponseDto> MatchPartnerCarAsync(
+            MatchPartnerCarRequestDto dto,
+            CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(dto);
+
+            if (dto.ModelId <= 0)
+            {
+                throw new ArgumentException($"{nameof(dto.ModelId)} is required.", nameof(dto.ModelId));
+            }
+
+            if (dto.EndTime <= dto.StartTime)
+            {
+                throw new ArgumentException($"{nameof(dto.EndTime)} must be greater than {nameof(dto.StartTime)}.");
+            }
+
+            var candidates = await _db.PartnerCars
+                .AsNoTracking()
+                .Include(partnerCar => partnerCar.CarModel)
+                .Where(partnerCar =>
+                    partnerCar.CarModelId == dto.ModelId &&
+                    partnerCar.Status == PartnerCarStatus.Available)
+                .ToListAsync(cancellationToken);
+
+            if (candidates.Count == 0)
+            {
+                return new MatchPartnerCarResponseDto
+                {
+                    IsAvailable = false
+                };
+            }
+
+            var candidateIds = candidates.Select(candidate => candidate.Id).ToArray();
+            var bookingCounts = await _bookingReadClient.GetBookingCountsByCarIdsAsync(candidateIds, cancellationToken);
+            var bookingCountMap = bookingCounts.ToDictionary(item => item.CarId, item => item.Count);
+
+            var availability = await _bookingReadClient.CheckAvailabilityByCarIdsAsync(
+                candidateIds,
+                dto.StartTime,
+                dto.EndTime,
+                cancellationToken);
+
+            var availabilityMap = availability.ToDictionary(item => item.CarId);
+            var availableCandidates = candidates
+                .Where(candidate =>
+                    availabilityMap.TryGetValue(candidate.Id, out var state) &&
+                    state.IsAvailable)
+                .ToList();
+
+            if (availableCandidates.Count == 0)
+            {
+                var suggestedDates = availability
+                    .Select(item => item.NextAvailableFrom)
+                    .OrderBy(item => item)
+                    .Distinct()
+                    .Take(5)
+                    .ToList();
+
+                return new MatchPartnerCarResponseDto
+                {
+                    IsAvailable = false,
+                    SuggestedStartTimesUtc = suggestedDates
+                };
+            }
+
+            var partnerLoadMap = candidates
+                .GroupBy(candidate => candidate.PartnerId)
+                .ToDictionary(
+                    group => group.Key,
+                    group => group.Sum(candidate => bookingCountMap.GetValueOrDefault(candidate.Id, 0)));
+
+            var minPartnerLoad = availableCandidates.Min(candidate => partnerLoadMap.GetValueOrDefault(candidate.PartnerId, 0));
+            var maxPartnerLoad = availableCandidates.Max(candidate => partnerLoadMap.GetValueOrDefault(candidate.PartnerId, 0));
+            var minBookingCount = availableCandidates.Min(candidate => bookingCountMap.GetValueOrDefault(candidate.Id, 0));
+            var maxBookingCount = availableCandidates.Max(candidate => bookingCountMap.GetValueOrDefault(candidate.Id, 0));
+
+            var priceValues = availableCandidates
+                .Where(candidate => candidate.PriceHour.HasValue)
+                .Select(candidate => (double)candidate.PriceHour!.Value)
+                .ToList();
+
+            var minPrice = priceValues.Count == 0 ? 0d : priceValues.Min();
+            var maxPrice = priceValues.Count == 0 ? 0d : priceValues.Max();
+
+            const double partnerLoadWeight = 0.35;
+            const double ratingWeight = 0.30;
+            const double bookingCountWeight = 0.20;
+            const double priceWeight = 0.15;
+
+            var rankedCandidates = availableCandidates
+                .Select(candidate =>
+                {
+                    var partnerLoad = partnerLoadMap.GetValueOrDefault(candidate.PartnerId, 0);
+                    var bookingCount = bookingCountMap.GetValueOrDefault(candidate.Id, 0);
+                    var rating = candidate.Rating.HasValue ? Clamp01((double)candidate.Rating.Value / 5d) : 0d;
+
+                    var partnerLoadScore = 1d - Normalize(partnerLoad, minPartnerLoad, maxPartnerLoad);
+                    var bookingCountScore = Normalize(bookingCount, minBookingCount, maxBookingCount);
+                    var priceScore = candidate.PriceHour.HasValue
+                        ? 1d - Normalize((double)candidate.PriceHour.Value, minPrice, maxPrice)
+                        : 0d;
+
+                    var totalScore =
+                        partnerLoadScore * partnerLoadWeight +
+                        rating * ratingWeight +
+                        bookingCountScore * bookingCountWeight +
+                        priceScore * priceWeight;
+
+                    return new
+                    {
+                        Candidate = candidate,
+                        Score = totalScore
+                    };
+                })
+                .OrderByDescending(item => item.Score)
+                .ThenByDescending(item => item.Candidate.Rating ?? 0m)
+                .ThenBy(item => item.Candidate.PriceHour ?? decimal.MaxValue)
+                .ThenBy(item => item.Candidate.Id)
+                .ToList();
+
+            var selected = rankedCandidates[0].Candidate;
+
+            return new MatchPartnerCarResponseDto
+            {
+                IsAvailable = true,
+                PartnerCarId = selected.Id,
+                PartnerId = selected.PartnerId,
+                PriceHour = selected.PriceHour,
+                ModelBrand = selected.CarModel.Brand,
+                ModelName = selected.CarModel.Model,
+                ModelYear = selected.CarModel.Year
+            };
+        }
+
         public async Task RecalculateRatingAsync(int partnerCarId, CancellationToken cancellationToken = default)
         {
             var entity = await _db.PartnerCars.FirstOrDefaultAsync(car => car.Id == partnerCarId, cancellationToken);
@@ -469,6 +655,41 @@ namespace CarService.Infrastructure.Services
             }
 
             return normalized;
+        }
+
+        private static double Normalize(double value, double min, double max)
+        {
+            if (max <= min)
+            {
+                return 1d;
+            }
+
+            return Clamp01((value - min) / (max - min));
+        }
+
+        private static double Normalize(int value, int min, int max)
+        {
+            if (max <= min)
+            {
+                return 1d;
+            }
+
+            return Clamp01((double)(value - min) / (max - min));
+        }
+
+        private static double Clamp01(double value)
+        {
+            if (value < 0d)
+            {
+                return 0d;
+            }
+
+            if (value > 1d)
+            {
+                return 1d;
+            }
+
+            return value;
         }
     }
 }

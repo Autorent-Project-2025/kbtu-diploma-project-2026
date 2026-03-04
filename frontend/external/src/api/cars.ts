@@ -30,6 +30,34 @@ export interface GetCarCommentsParams {
   pageSize?: number;
 }
 
+export interface AvailableCarModel {
+  modelId: number;
+  brand: string;
+  model: string;
+  year: number;
+  availableCarsCount: number;
+  minPriceHour?: number | null;
+  maxPriceHour?: number | null;
+  averageRating?: number | null;
+}
+
+export interface MatchCarByModelPayload {
+  modelId: number;
+  startTime: string;
+  endTime: string;
+}
+
+export interface MatchCarByModelResult {
+  isAvailable: boolean;
+  partnerCarId?: number | null;
+  partnerId?: string | null;
+  priceHour?: number | null;
+  modelBrand?: string | null;
+  modelName?: string | null;
+  modelYear?: number | null;
+  suggestedStartTimesUtc?: string[];
+}
+
 /**
  * Получить список всех автомобилей с пагинацией
  */
@@ -177,6 +205,19 @@ export async function getCarDetails(id: number): Promise<CarDetails> {
   const transformed = toCamelCase(res.data);
   console.log("Transformed to camelCase:", transformed);
   return transformed;
+}
+
+export async function getAvailableCarModels(): Promise<AvailableCarModel[]> {
+  const response = await api.get("/cars/available-models");
+  const payload = toCamelCase(response.data);
+  return (payload ?? []) as AvailableCarModel[];
+}
+
+export async function matchCarByModel(
+  payload: MatchCarByModelPayload
+): Promise<MatchCarByModelResult> {
+  const response = await api.post("/cars/match", payload);
+  return toCamelCase(response.data) as MatchCarByModelResult;
 }
 
 /**

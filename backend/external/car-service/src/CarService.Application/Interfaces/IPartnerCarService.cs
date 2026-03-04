@@ -1,4 +1,5 @@
 using CarService.Application.DTOs.Common;
+using CarService.Application.DTOs.Matching;
 using CarService.Application.DTOs.PartnerCars;
 
 namespace CarService.Application.Interfaces
@@ -13,6 +14,8 @@ namespace CarService.Application.Interfaces
         Task<bool> DeleteAsync(Guid currentUserId, int id, CancellationToken cancellationToken = default);
         Task<IReadOnlyCollection<MyPartnerCarSummaryDto>> GetMyCarsAsync(Guid currentUserId, CancellationToken cancellationToken = default);
         Task<MyPartnerCarDetailsDto?> GetMyCarDetailsAsync(Guid currentUserId, int carId, CancellationToken cancellationToken = default);
+        Task<IReadOnlyCollection<AvailableCarModelDto>> GetAvailableModelsAsync(CancellationToken cancellationToken = default);
+        Task<MatchPartnerCarResponseDto> MatchPartnerCarAsync(MatchPartnerCarRequestDto dto, CancellationToken cancellationToken = default);
         Task RecalculateRatingAsync(int partnerCarId, CancellationToken cancellationToken = default);
     }
 }

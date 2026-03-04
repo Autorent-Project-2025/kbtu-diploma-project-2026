@@ -210,6 +210,63 @@ namespace BookingService.Infrastructure.Services
                 .ToListAsync(cancellationToken);
         }
 
+        public async Task<IReadOnlyCollection<CarAvailabilityResultDto>> CheckAvailabilityByPartnerCarIds(
+            IReadOnlyCollection<int> partnerCarIds,
+            DateTimeOffset startTime,
+            DateTimeOffset endTime,
+            CancellationToken cancellationToken = default)
+        {
+            EnsureValidDateRange(startTime, endTime);
+
+            var normalizedIds = partnerCarIds
+                .Where(id => id > 0)
+                .Distinct()
+                .ToArray();
+
+            if (normalizedIds.Length == 0)
+            {
+                return [];
+            }
+
+            var requestedDuration = endTime - startTime;
+
+            var activeBookings = await _db.Bookings
+                .AsNoTracking()
+                .Where(booking =>
+                    normalizedIds.Contains(booking.PartnerCarId) &&
+                    (booking.Status == BookingStatus.Pending ||
+                     booking.Status == BookingStatus.Confirmed ||
+                     booking.Status == BookingStatus.Active) &&
+                    booking.EndTime > startTime)
+                .OrderBy(booking => booking.PartnerCarId)
+                .ThenBy(booking => booking.StartTime)
+                .ToListAsync(cancellationToken);
+
+            var bookingsByCarId = activeBookings
+                .GroupBy(booking => booking.PartnerCarId)
+                .ToDictionary(group => group.Key, group => group.ToList());
+
+            var results = new List<CarAvailabilityResultDto>(normalizedIds.Length);
+            foreach (var partnerCarId in normalizedIds)
+            {
+                var bookings = bookingsByCarId.GetValueOrDefault(partnerCarId, []);
+                var hasOverlap = bookings.Any(booking =>
+                    startTime < booking.EndTime &&
+                    endTime > booking.StartTime);
+
+                var nextAvailableFrom = FindEarliestAvailableStart(bookings, startTime, requestedDuration);
+
+                results.Add(new CarAvailabilityResultDto
+                {
+                    PartnerCarId = partnerCarId,
+                    IsAvailable = !hasOverlap,
+                    NextAvailableFrom = nextAvailableFrom
+                });
+            }
+
+            return results;
+        }
+
         public async Task<bool> CancelBooking(int id, Guid userId)
         {
             var booking = await GetUserBookingEntity(id, userId);
@@ -346,6 +403,28 @@ namespace BookingService.Infrastructure.Services
             {
                 throw new ArgumentException("EndTime must be greater than StartTime.", nameof(endTime));
             }
+        }
+
+        private static DateTimeOffset FindEarliestAvailableStart(
+            IReadOnlyCollection<Booking> bookings,
+            DateTimeOffset requestedStartTime,
+            TimeSpan requestedDuration)
+        {
+            var cursor = requestedStartTime;
+            foreach (var booking in bookings.OrderBy(item => item.StartTime))
+            {
+                if (cursor + requestedDuration <= booking.StartTime)
+                {
+                    return cursor;
+                }
+
+                if (booking.EndTime > cursor)
+                {
+                    cursor = booking.EndTime;
+                }
+            }
+
+            return cursor;
         }
 
         private static string NormalizeSortBy(string? sortBy)

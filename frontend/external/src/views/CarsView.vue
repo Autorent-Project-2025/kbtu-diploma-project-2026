@@ -16,6 +16,96 @@
         </p>
       </div>
 
+      <section
+        class="mb-8 p-6 bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 space-y-4"
+      >
+        <div class="space-y-1">
+          <h2 class="text-2xl font-bold text-gray-900 dark:text-white">
+            Автоподбор и бронирование
+          </h2>
+          <p class="text-sm text-gray-600 dark:text-gray-400">
+            Выберите модель и период. Система автоматически подберет лучшую машину партнера.
+          </p>
+        </div>
+
+        <div class="grid gap-4 md:grid-cols-4">
+          <div class="md:col-span-2">
+            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+              Модель
+            </label>
+            <select
+              v-model.number="selectedModelId"
+              class="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white"
+            >
+              <option :value="0" disabled>Выберите модель</option>
+              <option v-for="model in availableModels" :key="model.modelId" :value="model.modelId">
+                {{ model.brand }} {{ model.model }} {{ model.year }} · {{ model.availableCarsCount }} авто
+              </option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+              Начало
+            </label>
+            <input
+              v-model="matchStartTime"
+              type="datetime-local"
+              :min="minDateTime"
+              class="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white"
+            />
+          </div>
+
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+              Конец
+            </label>
+            <input
+              v-model="matchEndTime"
+              type="datetime-local"
+              :min="matchStartTime || minDateTime"
+              class="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white"
+            />
+          </div>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-3">
+          <button
+            @click="bookByModel"
+            :disabled="matching"
+            class="px-6 py-3 rounded-xl bg-primary-600 hover:bg-primary-700 text-white font-bold transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
+          >
+            {{ matching ? "Подбор..." : "Подобрать и забронировать" }}
+          </button>
+          <button
+            @click="loadAvailableModels"
+            :disabled="matching"
+            class="px-4 py-3 rounded-xl border-2 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 font-semibold hover:border-primary-500"
+          >
+            Обновить модели
+          </button>
+        </div>
+
+        <div
+          v-if="matchSuggestions.length > 0"
+          class="rounded-xl border border-amber-300/70 bg-amber-50 dark:border-amber-500/30 dark:bg-amber-900/20 p-4 space-y-3"
+        >
+          <p class="text-amber-800 dark:text-amber-200 font-semibold">
+            На выбранный период все машины этой модели заняты. Ближайшие доступные даты:
+          </p>
+          <div class="flex flex-wrap gap-2">
+            <button
+              v-for="date in matchSuggestions"
+              :key="date"
+              @click="applySuggestedDate(date)"
+              class="px-3 py-2 text-sm rounded-lg bg-white dark:bg-gray-900 border border-amber-300/70 dark:border-amber-500/40 text-amber-800 dark:text-amber-200"
+            >
+              {{ formatSuggestionDate(date) }}
+            </button>
+          </div>
+        </div>
+      </section>
+
       <!-- Filters and Sorting -->
       <div
         class="mb-8 p-6 bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800"
@@ -313,7 +403,13 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, watch, nextTick } from "vue";
 import { useRouter } from "vue-router";
-import { getCars, type GetCarsParams } from "../api/cars";
+import {
+  getAvailableCarModels,
+  getCars,
+  matchCarByModel,
+  type AvailableCarModel,
+  type GetCarsParams,
+} from "../api/cars";
 import { createBooking, getCarBookings } from "../api/booking";
 import type { Car } from "../types/Car";
 import type { Booking } from "../types/Booking";
@@ -338,6 +434,12 @@ const selectedCar = ref<Car | null>(null);
 const isModalOpen = ref(false);
 const showLoginModal = ref(false);
 const loading = ref(true);
+const matching = ref(false);
+const availableModels = ref<AvailableCarModel[]>([]);
+const selectedModelId = ref(0);
+const matchStartTime = ref("");
+const matchEndTime = ref("");
+const matchSuggestions = ref<string[]>([]);
 
 // ✅ ДОБАВЛЕН: gridKey для force re-render
 const gridKey = ref(0);
@@ -355,6 +457,12 @@ const sortType = ref<
 
 const { success, error } = useToast();
 const { isAuthenticated } = useAuth();
+
+const minDateTime = computed(() => {
+  const now = new Date();
+  now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+  return now.toISOString().slice(0, 16);
+});
 
 // Вычисляем машины со статусом доступности
 const carsWithStatus = computed<CarWithStatus[]>(() => {
@@ -377,7 +485,8 @@ const carsWithStatus = computed<CarWithStatus[]>(() => {
 });
 
 onMounted(async () => {
-  await loadCars();
+  initializeMatchRange();
+  await Promise.all([loadCars(), loadAvailableModels()]);
 });
 
 // ✅ ИСПРАВЛЕНО: watch с force re-render
@@ -457,6 +566,27 @@ async function loadCars() {
     error("Не удалось загрузить список автомобилей");
   } finally {
     loading.value = false;
+  }
+}
+
+function initializeMatchRange() {
+  const start = new Date();
+  start.setMinutes(start.getMinutes() - start.getTimezoneOffset());
+
+  const end = new Date(start.getTime() + 3 * 60 * 60 * 1000);
+  matchStartTime.value = start.toISOString().slice(0, 16);
+  matchEndTime.value = end.toISOString().slice(0, 16);
+}
+
+async function loadAvailableModels() {
+  try {
+    availableModels.value = await getAvailableCarModels();
+    if (availableModels.value.length > 0 && selectedModelId.value === 0) {
+      selectedModelId.value = availableModels.value[0]?.modelId ?? 0;
+    }
+  } catch (e) {
+    console.error("Ошибка загрузки доступных моделей:", e);
+    error("Не удалось загрузить доступные модели.");
   }
 }
 
@@ -541,6 +671,95 @@ async function handleBookingConfirm(startDate: string, endDate: string) {
   } catch (e) {
     console.error("Ошибка бронирования:", e);
     error("Ошибка бронирования. Попробуйте снова.");
+  }
+}
+
+function formatSuggestionDate(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+
+  return new Intl.DateTimeFormat("ru-RU", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(date);
+}
+
+function applySuggestedDate(value: string) {
+  const start = new Date(value);
+  if (Number.isNaN(start.getTime())) return;
+
+  const end = new Date(start.getTime() + 3 * 60 * 60 * 1000);
+
+  const localStart = new Date(start.getTime() - start.getTimezoneOffset() * 60000);
+  const localEnd = new Date(end.getTime() - end.getTimezoneOffset() * 60000);
+  matchStartTime.value = localStart.toISOString().slice(0, 16);
+  matchEndTime.value = localEnd.toISOString().slice(0, 16);
+}
+
+async function bookByModel() {
+  if (!isAuthenticated.value) {
+    showLoginModal.value = true;
+    return;
+  }
+
+  if (selectedModelId.value <= 0) {
+    error("Выберите модель машины.");
+    return;
+  }
+
+  if (!matchStartTime.value || !matchEndTime.value) {
+    error("Выберите дату начала и окончания.");
+    return;
+  }
+
+  const startDate = new Date(matchStartTime.value);
+  const endDate = new Date(matchEndTime.value);
+  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+    error("Некорректный формат даты.");
+    return;
+  }
+
+  if (endDate <= startDate) {
+    error("Дата окончания должна быть позже даты начала.");
+    return;
+  }
+
+  matching.value = true;
+  try {
+    const startUtc = startDate.toISOString();
+    const endUtc = endDate.toISOString();
+
+    const matchResult = await matchCarByModel({
+      modelId: selectedModelId.value,
+      startTime: startUtc,
+      endTime: endUtc,
+    });
+
+    if (!matchResult.isAvailable || !matchResult.partnerCarId) {
+      matchSuggestions.value = (matchResult.suggestedStartTimesUtc ?? []).slice(0, 5);
+      error("На выбранный период все машины заняты.");
+      return;
+    }
+
+    await createBooking(matchResult.partnerCarId, startUtc, endUtc, {
+      partnerId: matchResult.partnerId ?? undefined,
+      priceHour: matchResult.priceHour ?? null,
+    });
+
+    matchSuggestions.value = [];
+
+    const selectedModel = availableModels.value.find((model) => model.modelId === selectedModelId.value);
+    const modelLabel = selectedModel
+      ? `${selectedModel.brand} ${selectedModel.model} ${selectedModel.year}`
+      : "Выбранная модель";
+
+    success(`${modelLabel} успешно забронирована.`);
+    await loadAllCarBookings();
+  } catch (e) {
+    console.error("Ошибка автоподбора и бронирования:", e);
+    error("Не удалось подобрать и забронировать машину.");
+  } finally {
+    matching.value = false;
   }
 }
 </script>

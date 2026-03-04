@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using BookingService.Application.DTOs.Booking;
 using BookingService.Api.Options;
 using BookingService.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
@@ -27,6 +28,7 @@ public sealed class InternalBookingsController : ControllerBase
 
     [AllowAnonymous]
     [HttpGet("by-partner-car/{partnerCarId:int}")]
+    [HttpGet("by-car/{partnerCarId:int}")]
     public async Task<IActionResult> GetByPartnerCarId(int partnerCarId, CancellationToken cancellationToken)
     {
         if (!IsAuthorizedInternalRequest())
@@ -42,6 +44,7 @@ public sealed class InternalBookingsController : ControllerBase
     [HttpGet("counts")]
     public async Task<IActionResult> GetCounts(
         [FromQuery] string? partnerCarIds,
+        [FromQuery] string? carIds,
         CancellationToken cancellationToken)
     {
         if (!IsAuthorizedInternalRequest())
@@ -49,9 +52,39 @@ public sealed class InternalBookingsController : ControllerBase
             return Unauthorized(new { error = "Internal API key is invalid." });
         }
 
-        var parsedIds = ParseIds(partnerCarIds);
+        var parsedIds = ParseIds(!string.IsNullOrWhiteSpace(partnerCarIds) ? partnerCarIds : carIds);
         var counts = await _bookingService.GetBookingCountsByPartnerCarIds(parsedIds, cancellationToken);
         return Ok(counts);
+    }
+
+    [AllowAnonymous]
+    [HttpPost("check-availability")]
+    public async Task<IActionResult> CheckAvailability(
+        [FromBody] CarAvailabilityCheckRequestDto request,
+        CancellationToken cancellationToken)
+    {
+        if (!IsAuthorizedInternalRequest())
+        {
+            return Unauthorized(new { error = "Internal API key is invalid." });
+        }
+
+        var partnerCarIds = request.CarIds
+            .Where(id => id > 0)
+            .Distinct()
+            .ToArray();
+
+        if (partnerCarIds.Length == 0)
+        {
+            return Ok(Array.Empty<CarAvailabilityResultDto>());
+        }
+
+        var payload = await _bookingService.CheckAvailabilityByPartnerCarIds(
+            partnerCarIds,
+            request.StartTime,
+            request.EndTime,
+            cancellationToken);
+
+        return Ok(payload);
     }
 
     private static IReadOnlyCollection<int> ParseIds(string? raw)

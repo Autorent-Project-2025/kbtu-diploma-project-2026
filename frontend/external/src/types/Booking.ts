@@ -1,11 +1,13 @@
 export interface Booking {
   id: number;
   carId: number;
+  partnerId?: string;
   carBrand: string;
   carModel: string;
   startDate: string;
   endDate: string;
   price: number | null;
+  priceHour?: number | null;
   status: BookingStatus;
 }
 
@@ -14,7 +16,7 @@ export type BookingStatus =
   | "confirmed" //
   | "active" //
   | "completed" //
-  | "Canceled"; //
+  | "canceled"; //
 
 export interface BookingWithCarStatus extends Booking {
   computedStatus: ComputedBookingStatus;

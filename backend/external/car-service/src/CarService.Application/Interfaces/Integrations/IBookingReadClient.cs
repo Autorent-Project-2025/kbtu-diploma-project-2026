@@ -11,5 +11,11 @@ namespace CarService.Application.Interfaces.Integrations
         Task<IReadOnlyCollection<LinkedBookingDto>> GetBookingsByCarIdAsync(
             int carId,
             CancellationToken cancellationToken = default);
+
+        Task<IReadOnlyCollection<CarAvailabilityDto>> CheckAvailabilityByCarIdsAsync(
+            IReadOnlyCollection<int> carIds,
+            DateTimeOffset startTime,
+            DateTimeOffset endTime,
+            CancellationToken cancellationToken = default);
     }
 }
