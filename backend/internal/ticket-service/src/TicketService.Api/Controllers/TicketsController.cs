@@ -64,6 +64,8 @@ public sealed class TicketsController : ControllerBase
                 ticketType,
                 request.FirstName,
                 request.LastName,
+                request.CompanyName,
+                request.ContactEmail,
                 request.Email,
                 request.BirthDate,
                 request.PhoneNumber,

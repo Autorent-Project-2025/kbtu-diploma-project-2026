@@ -1,10 +1,12 @@
 using TicketService.Domain.Enums;
+using TicketService.Domain.Entities;
 
 namespace TicketService.Application.Models;
 
 public sealed record TicketDto(
     Guid Id,
     TicketType TicketType,
+    TicketData Data,
     string FirstName,
     string LastName,
     string FullName,

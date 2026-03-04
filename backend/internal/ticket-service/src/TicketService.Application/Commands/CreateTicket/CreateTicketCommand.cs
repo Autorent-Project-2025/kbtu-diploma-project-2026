@@ -7,6 +7,8 @@ public sealed record CreateTicketCommand(
     TicketType TicketType,
     string FirstName,
     string LastName,
+    string? CompanyName,
+    string? ContactEmail,
     string Email,
     DateOnly? BirthDate,
     string PhoneNumber,
