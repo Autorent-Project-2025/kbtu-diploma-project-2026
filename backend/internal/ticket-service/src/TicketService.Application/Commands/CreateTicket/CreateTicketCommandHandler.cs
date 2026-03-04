@@ -51,6 +51,8 @@ public sealed class CreateTicketCommandHandler
             identityDocumentFileName,
             driverLicenseFileName,
             command.AvatarUrl,
+            command.CompanyName,
+            command.ContactEmail,
             DateTime.UtcNow);
 
         await _ticketRepository.AddAsync(ticket, cancellationToken);
@@ -79,6 +81,16 @@ public sealed class CreateTicketCommandHandler
         if (string.IsNullOrWhiteSpace(command.PhoneNumber))
         {
             throw new ValidationException("Phone number is required.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(command.CompanyName) && command.CompanyName.Trim().Length > 300)
+        {
+            throw new ValidationException("Company name length must not exceed 300.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(command.ContactEmail) && command.ContactEmail.Trim().Length > 255)
+        {
+            throw new ValidationException("Contact email length must not exceed 255.");
         }
 
         if (command.TicketType is not TicketType.Client and not TicketType.Partner)

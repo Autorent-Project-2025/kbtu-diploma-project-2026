@@ -7,6 +7,8 @@ public sealed class CreateTicketRequest
     public string? TicketType { get; init; }
     public string FirstName { get; init; } = string.Empty;
     public string LastName { get; init; } = string.Empty;
+    public string? CompanyName { get; init; }
+    public string? ContactEmail { get; init; }
     public string Email { get; init; } = string.Empty;
     public DateOnly? BirthDate { get; init; }
     public string PhoneNumber { get; init; } = string.Empty;

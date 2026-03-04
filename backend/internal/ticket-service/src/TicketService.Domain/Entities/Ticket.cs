@@ -6,20 +6,24 @@ public sealed class Ticket
 {
     public Guid Id { get; private set; }
     public TicketType TicketType { get; private set; }
-    public string FirstName { get; private set; } = string.Empty;
-    public string LastName { get; private set; } = string.Empty;
-    public string FullName { get; private set; } = string.Empty;
-    public string Email { get; private set; } = string.Empty;
-    public DateOnly? BirthDate { get; private set; }
-    public string PhoneNumber { get; private set; } = string.Empty;
-    public string? IdentityDocumentFileName { get; private set; }
-    public string? DriverLicenseFileName { get; private set; }
-    public string? AvatarUrl { get; private set; }
     public TicketStatus Status { get; private set; }
-    public string? DecisionReason { get; private set; }
+    public string Email { get; private set; } = string.Empty;
     public DateTime CreatedAt { get; private set; }
-    public Guid? ReviewedByManagerId { get; private set; }
-    public DateTime? ReviewedAt { get; private set; }
+    public TicketData Data { get; private set; } = new ClientTicketData();
+
+    public string FirstName => Data.FirstName;
+    public string LastName => Data.LastName;
+    public string FullName => Data.FullName;
+    public DateOnly? BirthDate => Data is ClientTicketData clientData ? clientData.BirthDate : null;
+    public string PhoneNumber => Data.PhoneNumber;
+    public string? IdentityDocumentFileName => Data.IdentityDocumentFileName;
+    public string? DriverLicenseFileName => Data is ClientTicketData clientData ? clientData.DriverLicenseFileName : null;
+    public string? AvatarUrl => Data is ClientTicketData clientData ? clientData.AvatarUrl : null;
+    public string? CompanyName => Data is PartnerTicketData partnerData ? partnerData.CompanyName : null;
+    public string? ContactEmail => Data is PartnerTicketData partnerData ? partnerData.ContactEmail : null;
+    public string? DecisionReason => Data.DecisionReason;
+    public Guid? ReviewedByManagerId => Data.ReviewedByManagerId;
+    public DateTime? ReviewedAt => Data.ReviewedAt;
 
     private Ticket() { }
 
@@ -34,19 +38,27 @@ public sealed class Ticket
         string? identityDocumentFileName,
         string? driverLicenseFileName,
         string? avatarUrl,
+        string? companyName,
+        string? contactEmail,
         DateTime createdAt)
     {
+        ValidateTicketType(ticketType);
+
         Id = id == Guid.Empty ? Guid.NewGuid() : id;
         TicketType = ticketType;
-        SetName(firstName, lastName);
         SetEmail(email);
-        SetBirthDate(ticketType, birthDate);
-        SetPhoneNumber(phoneNumber);
-        IdentityDocumentFileName = NormalizeOptional(identityDocumentFileName, nameof(identityDocumentFileName), 255);
-        DriverLicenseFileName = ticketType == TicketType.Client
-            ? NormalizeOptional(driverLicenseFileName, nameof(driverLicenseFileName), 255)
-            : null;
-        SetAvatarUrl(avatarUrl);
+        Data = BuildData(
+            ticketType,
+            firstName,
+            lastName,
+            birthDate,
+            phoneNumber,
+            identityDocumentFileName,
+            driverLicenseFileName,
+            avatarUrl,
+            companyName,
+            contactEmail,
+            Email);
         Status = TicketStatus.Pending;
         CreatedAt = createdAt;
     }
@@ -57,9 +69,12 @@ public sealed class Ticket
         EnsureManagerId(managerId);
 
         Status = TicketStatus.Approved;
-        DecisionReason = null;
-        ReviewedByManagerId = managerId;
-        ReviewedAt = reviewedAt;
+        Data = Data with
+        {
+            DecisionReason = null,
+            ReviewedByManagerId = managerId,
+            ReviewedAt = reviewedAt
+        };
     }
 
     public void Reject(Guid managerId, string reason, DateTime reviewedAt)
@@ -72,13 +87,88 @@ public sealed class Ticket
             throw new ArgumentException("Rejection reason is required.", nameof(reason));
         }
 
+        var normalizedReason = reason.Trim();
+        if (normalizedReason.Length > 1000)
+        {
+            throw new ArgumentException("Rejection reason length must not exceed 1000.", nameof(reason));
+        }
+
         Status = TicketStatus.Rejected;
-        DecisionReason = reason.Trim();
-        ReviewedByManagerId = managerId;
-        ReviewedAt = reviewedAt;
+        Data = Data with
+        {
+            DecisionReason = normalizedReason,
+            ReviewedByManagerId = managerId,
+            ReviewedAt = reviewedAt
+        };
     }
 
-    private void SetName(string firstName, string lastName)
+    private void SetEmail(string email)
+    {
+        if (string.IsNullOrWhiteSpace(email))
+        {
+            throw new ArgumentException("Email is required.", nameof(email));
+        }
+
+        var normalized = email.Trim().ToLowerInvariant();
+        if (normalized.Length > 255)
+        {
+            throw new ArgumentException("Email length must not exceed 255.", nameof(email));
+        }
+
+        Email = normalized;
+    }
+
+    private static TicketData BuildData(
+        TicketType ticketType,
+        string firstName,
+        string lastName,
+        DateOnly? birthDate,
+        string phoneNumber,
+        string? identityDocumentFileName,
+        string? driverLicenseFileName,
+        string? avatarUrl,
+        string? companyName,
+        string? contactEmail,
+        string normalizedEmail)
+    {
+        var normalizedName = NormalizeName(firstName, lastName);
+        var normalizedPhoneNumber = NormalizePhoneNumber(phoneNumber);
+        var normalizedIdentityDocumentFileName = NormalizeOptional(identityDocumentFileName, nameof(identityDocumentFileName), 255);
+
+        if (ticketType == TicketType.Client)
+        {
+            return new ClientTicketData
+            {
+                FirstName = normalizedName.FirstName,
+                LastName = normalizedName.LastName,
+                FullName = normalizedName.FullName,
+                BirthDate = NormalizeClientBirthDate(birthDate),
+                PhoneNumber = normalizedPhoneNumber,
+                IdentityDocumentFileName = normalizedIdentityDocumentFileName,
+                DriverLicenseFileName = NormalizeOptional(driverLicenseFileName, nameof(driverLicenseFileName), 255),
+                AvatarUrl = NormalizeAvatarUrl(avatarUrl),
+                DecisionReason = null,
+                ReviewedByManagerId = null,
+                ReviewedAt = null
+            };
+        }
+
+        return new PartnerTicketData
+        {
+            FirstName = normalizedName.FirstName,
+            LastName = normalizedName.LastName,
+            FullName = normalizedName.FullName,
+            PhoneNumber = normalizedPhoneNumber,
+            IdentityDocumentFileName = normalizedIdentityDocumentFileName,
+            CompanyName = NormalizeCompanyName(companyName, normalizedName.FullName),
+            ContactEmail = NormalizeContactEmail(contactEmail, normalizedEmail),
+            DecisionReason = null,
+            ReviewedByManagerId = null,
+            ReviewedAt = null
+        };
+    }
+
+    private static (string FirstName, string LastName, string FullName) NormalizeName(string firstName, string lastName)
     {
         if (string.IsNullOrWhiteSpace(firstName))
         {
@@ -90,39 +180,29 @@ public sealed class Ticket
             throw new ArgumentException("Last name is required.", nameof(lastName));
         }
 
-        FirstName = firstName.Trim();
-        LastName = lastName.Trim();
-        if (FirstName.Length > 100)
+        var normalizedFirstName = firstName.Trim();
+        var normalizedLastName = lastName.Trim();
+        if (normalizedFirstName.Length > 100)
         {
             throw new ArgumentException("First name length must not exceed 100.", nameof(firstName));
         }
 
-        if (LastName.Length > 100)
+        if (normalizedLastName.Length > 100)
         {
             throw new ArgumentException("Last name length must not exceed 100.", nameof(lastName));
         }
 
-        FullName = $"{FirstName} {LastName}".Trim();
-    }
-
-    private void SetEmail(string email)
-    {
-        if (string.IsNullOrWhiteSpace(email))
+        var fullName = $"{normalizedFirstName} {normalizedLastName}".Trim();
+        if (fullName.Length > 300)
         {
-            throw new ArgumentException("Email is required.", nameof(email));
+            throw new ArgumentException("Full name length must not exceed 300.", nameof(lastName));
         }
 
-        Email = email.Trim().ToLowerInvariant();
+        return (normalizedFirstName, normalizedLastName, fullName);
     }
 
-    private void SetBirthDate(TicketType ticketType, DateOnly? birthDate)
+    private static DateOnly NormalizeClientBirthDate(DateOnly? birthDate)
     {
-        if (ticketType == TicketType.Partner)
-        {
-            BirthDate = birthDate;
-            return;
-        }
-
         if (birthDate is null || birthDate == default)
         {
             throw new ArgumentException("Birth date is required.", nameof(birthDate));
@@ -133,10 +213,10 @@ public sealed class Ticket
             throw new ArgumentException("Birth date cannot be in the future.", nameof(birthDate));
         }
 
-        BirthDate = birthDate;
+        return birthDate.Value;
     }
 
-    private void SetPhoneNumber(string phoneNumber)
+    private static string NormalizePhoneNumber(string phoneNumber)
     {
         if (string.IsNullOrWhiteSpace(phoneNumber))
         {
@@ -149,10 +229,42 @@ public sealed class Ticket
             throw new ArgumentException("Phone number length must not exceed 32.", nameof(phoneNumber));
         }
 
-        PhoneNumber = normalized;
+        return normalized;
     }
 
-    private void SetAvatarUrl(string? avatarUrl)
+    private static string NormalizeCompanyName(string? companyName, string fallbackFullName)
+    {
+        var candidate = string.IsNullOrWhiteSpace(companyName) ? fallbackFullName : companyName.Trim();
+        if (string.IsNullOrWhiteSpace(candidate))
+        {
+            throw new ArgumentException("Company name is required for partner tickets.", nameof(companyName));
+        }
+
+        if (candidate.Length > 300)
+        {
+            throw new ArgumentException("Company name length must not exceed 300.", nameof(companyName));
+        }
+
+        return candidate;
+    }
+
+    private static string NormalizeContactEmail(string? contactEmail, string fallbackEmail)
+    {
+        var candidate = string.IsNullOrWhiteSpace(contactEmail) ? fallbackEmail : contactEmail.Trim().ToLowerInvariant();
+        if (string.IsNullOrWhiteSpace(candidate))
+        {
+            throw new ArgumentException("Contact email is required for partner tickets.", nameof(contactEmail));
+        }
+
+        if (candidate.Length > 255)
+        {
+            throw new ArgumentException("Contact email length must not exceed 255.", nameof(contactEmail));
+        }
+
+        return candidate;
+    }
+
+    private static string? NormalizeAvatarUrl(string? avatarUrl)
     {
         var normalized = NormalizeOptional(avatarUrl, nameof(avatarUrl), 1024);
         if (normalized is not null && !Uri.TryCreate(normalized, UriKind.Absolute, out _))
@@ -160,7 +272,7 @@ public sealed class Ticket
             throw new ArgumentException("Avatar url must be a valid absolute URL.", nameof(avatarUrl));
         }
 
-        AvatarUrl = normalized;
+        return normalized;
     }
 
     private static string? NormalizeOptional(string? value, string paramName, int maxLength)
@@ -192,6 +304,14 @@ public sealed class Ticket
         if (managerId == Guid.Empty)
         {
             throw new ArgumentException("Manager id is required.", nameof(managerId));
+        }
+    }
+
+    private static void ValidateTicketType(TicketType ticketType)
+    {
+        if (!Enum.IsDefined(ticketType))
+        {
+            throw new ArgumentException("Ticket type is invalid.", nameof(ticketType));
         }
     }
 }
