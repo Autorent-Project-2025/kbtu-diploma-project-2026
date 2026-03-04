@@ -14,11 +14,5 @@ namespace BookingService.Application.DTOs.Booking
         public decimal? TotalPrice { get; set; }
         public DateTimeOffset CreatedAt { get; set; }
         public string? Status { get; set; }
-
-        // Backward-compatible aliases for old clients.
-        public int CarId => PartnerCarId;
-        public DateTime StartDate => StartTime.UtcDateTime;
-        public DateTime EndDate => EndTime.UtcDateTime;
-        public decimal? Price => TotalPrice;
     }
 }

@@ -99,47 +99,21 @@ namespace BookingService.Api.Controllers
         [HttpGet("available")]
         [AllowAnonymous]
         public async Task<IActionResult> CheckAvailable(
-            [FromQuery] int? partnerCarId,
-            [FromQuery] int? carId,
-            [FromQuery] DateTimeOffset? startTime,
-            [FromQuery] DateTimeOffset? endTime,
-            [FromQuery] DateTime? start,
-            [FromQuery] DateTime? end)
+            [FromQuery] int partnerCarId,
+            [FromQuery] DateTimeOffset startTime,
+            [FromQuery] DateTimeOffset endTime)
         {
-            var resolvedPartnerCarId = partnerCarId ?? carId;
-            if (!resolvedPartnerCarId.HasValue || resolvedPartnerCarId.Value <= 0)
+            if (partnerCarId <= 0)
             {
                 throw new ArgumentException("partnerCarId is required and must be greater than zero.");
             }
 
-            var resolvedStart = startTime ?? (start.HasValue ? NormalizeLegacyDateTime(start.Value) : null);
-            if (!resolvedStart.HasValue)
-            {
-                throw new ArgumentException("startTime is required.");
-            }
-
-            var resolvedEnd = endTime ?? (end.HasValue ? NormalizeLegacyDateTime(end.Value) : null);
-            if (!resolvedEnd.HasValue)
-            {
-                throw new ArgumentException("endTime is required.");
-            }
-
             var available = await _bookingService.IsPartnerCarAvailable(
-                resolvedPartnerCarId.Value,
-                resolvedStart.Value,
-                resolvedEnd.Value);
+                partnerCarId,
+                startTime,
+                endTime);
 
             return Ok(new { available });
-        }
-
-        private static DateTimeOffset NormalizeLegacyDateTime(DateTime value)
-        {
-            return value.Kind switch
-            {
-                DateTimeKind.Utc => new DateTimeOffset(value),
-                DateTimeKind.Local => value.ToUniversalTime(),
-                _ => new DateTimeOffset(DateTime.SpecifyKind(value, DateTimeKind.Utc))
-            };
         }
     }
 }

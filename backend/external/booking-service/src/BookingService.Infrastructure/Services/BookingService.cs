@@ -356,16 +356,6 @@ namespace BookingService.Infrastructure.Services
             }
 
             var normalized = sortBy.Trim().ToLowerInvariant();
-            if (normalized == "startdate")
-            {
-                return "starttime";
-            }
-
-            if (normalized == "enddate")
-            {
-                return "endtime";
-            }
-
             if (normalized is "id" or "starttime" or "endtime")
             {
                 return normalized;
