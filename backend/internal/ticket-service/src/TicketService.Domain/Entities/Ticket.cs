@@ -26,6 +26,8 @@ public sealed class Ticket
     public string? CarModel => Data is PartnerCarTicketData partnerCarData ? partnerCarData.CarModel : null;
     public int? CarYear => Data is PartnerCarTicketData partnerCarData ? partnerCarData.CarYear : null;
     public string? LicensePlate => Data is PartnerCarTicketData partnerCarData ? partnerCarData.LicensePlate : null;
+    public decimal? PriceHour => Data is PartnerCarTicketData partnerCarData ? partnerCarData.PriceHour : null;
+    public decimal? PriceDay => Data is PartnerCarTicketData partnerCarData ? partnerCarData.PriceDay : null;
     public string? OwnershipDocumentFileName => Data is PartnerCarTicketData partnerCarData ? partnerCarData.OwnershipDocumentFileName : null;
     public IReadOnlyCollection<PartnerCarTicketImageData> CarImages => Data is PartnerCarTicketData partnerCarData
         ? partnerCarData.CarImages
@@ -54,6 +56,8 @@ public sealed class Ticket
         string? carModel,
         int? carYear,
         string? licensePlate,
+        decimal? priceHour,
+        decimal? priceDay,
         string? ownershipDocumentFileName,
         IReadOnlyCollection<PartnerCarTicketImageData>? carImages,
         DateTime createdAt)
@@ -79,6 +83,8 @@ public sealed class Ticket
             carModel,
             carYear,
             licensePlate,
+            priceHour,
+            priceDay,
             ownershipDocumentFileName,
             carImages,
             Email);
@@ -91,6 +97,8 @@ public sealed class Ticket
         string? carModel,
         int? carYear,
         string? licensePlate,
+        decimal? priceHour,
+        decimal? priceDay,
         string? email)
     {
         EnsurePendingStatus();
@@ -100,7 +108,13 @@ public sealed class Ticket
             throw new InvalidOperationException("Partner car review fields can be updated only for partner car tickets.");
         }
 
-        var shouldUpdateData = carBrand is not null || carModel is not null || carYear is not null || licensePlate is not null;
+        var shouldUpdateData =
+            carBrand is not null ||
+            carModel is not null ||
+            carYear is not null ||
+            licensePlate is not null ||
+            priceHour is not null ||
+            priceDay is not null;
         if (shouldUpdateData)
         {
             Data = partnerCarData with
@@ -108,7 +122,9 @@ public sealed class Ticket
                 CarBrand = carBrand is null ? partnerCarData.CarBrand : NormalizeCarBrand(carBrand),
                 CarModel = carModel is null ? partnerCarData.CarModel : NormalizeCarModel(carModel),
                 CarYear = carYear is null ? partnerCarData.CarYear : NormalizeCarYear(carYear),
-                LicensePlate = licensePlate is null ? partnerCarData.LicensePlate : NormalizeLicensePlate(licensePlate)
+                LicensePlate = licensePlate is null ? partnerCarData.LicensePlate : NormalizeLicensePlate(licensePlate),
+                PriceHour = priceHour is null ? partnerCarData.PriceHour : NormalizePrice(priceHour, nameof(priceHour)),
+                PriceDay = priceDay is null ? partnerCarData.PriceDay : NormalizePrice(priceDay, nameof(priceDay))
             };
         }
 
@@ -189,6 +205,8 @@ public sealed class Ticket
         string? carModel,
         int? carYear,
         string? licensePlate,
+        decimal? priceHour,
+        decimal? priceDay,
         string? ownershipDocumentFileName,
         IReadOnlyCollection<PartnerCarTicketImageData>? carImages,
         string normalizedEmail)
@@ -249,6 +267,8 @@ public sealed class Ticket
             CarModel = NormalizeCarModel(carModel),
             CarYear = NormalizeCarYear(carYear),
             LicensePlate = NormalizeLicensePlate(licensePlate),
+            PriceHour = NormalizePrice(priceHour, nameof(priceHour)),
+            PriceDay = NormalizePrice(priceDay, nameof(priceDay)),
             OwnershipDocumentFileName = NormalizeOwnershipDocumentFileName(ownershipDocumentFileName),
             CarImages = NormalizePartnerCarImages(carImages),
             DecisionReason = null,
@@ -392,6 +412,32 @@ public sealed class Ticket
     private static string NormalizeLicensePlate(string? licensePlate)
     {
         return NormalizeRequired(licensePlate, nameof(licensePlate), 20).ToUpperInvariant();
+    }
+
+    private static decimal NormalizePrice(decimal? value, string paramName)
+    {
+        if (!value.HasValue)
+        {
+            throw new ArgumentException($"{paramName} is required.", paramName);
+        }
+
+        if (value.Value <= 0m)
+        {
+            throw new ArgumentException($"{paramName} must be greater than 0.", paramName);
+        }
+
+        if (value.Value > 1_000_000m)
+        {
+            throw new ArgumentException($"{paramName} must not exceed 1000000.", paramName);
+        }
+
+        var normalized = decimal.Round(value.Value, 2, MidpointRounding.AwayFromZero);
+        if (normalized <= 0m)
+        {
+            throw new ArgumentException($"{paramName} must be greater than 0.", paramName);
+        }
+
+        return normalized;
     }
 
     private static string NormalizeOwnershipDocumentFileName(string? ownershipDocumentFileName)

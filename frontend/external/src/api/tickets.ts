@@ -68,6 +68,8 @@ export interface CreatePartnerCarTicketPayload {
   carModel: string;
   carYear: number;
   licensePlate: string;
+  priceHour: number;
+  priceDay: number;
   ownershipDocumentFile: File;
   carImageFiles: File[];
 }
@@ -82,6 +84,8 @@ export async function createPartnerCarTicket(
   formData.append("carModel", payload.carModel);
   formData.append("carYear", String(payload.carYear));
   formData.append("licensePlate", payload.licensePlate);
+  formData.append("priceHour", String(payload.priceHour));
+  formData.append("priceDay", String(payload.priceDay));
   formData.append("ownershipDocumentFile", payload.ownershipDocumentFile);
 
   for (const file of payload.carImageFiles) {

@@ -45,6 +45,8 @@ public sealed class TicketEventPublisher : ITicketEventPublisher
             var carModel = RequireField(ticketApprovedEvent.CarModel, nameof(ticketApprovedEvent.CarModel));
             var carYear = RequireYear(ticketApprovedEvent.CarYear, nameof(ticketApprovedEvent.CarYear));
             var licensePlate = RequireField(ticketApprovedEvent.LicensePlate, nameof(ticketApprovedEvent.LicensePlate));
+            var priceHour = RequirePrice(ticketApprovedEvent.PriceHour, nameof(ticketApprovedEvent.PriceHour));
+            var priceDay = RequirePrice(ticketApprovedEvent.PriceDay, nameof(ticketApprovedEvent.PriceDay));
             var ownershipDocument = RequireField(ticketApprovedEvent.OwnershipDocumentFileName, nameof(ticketApprovedEvent.OwnershipDocumentFileName));
 
             if (ticketApprovedEvent.CarImages.Count == 0)
@@ -59,6 +61,8 @@ public sealed class TicketEventPublisher : ITicketEventPublisher
                     carModel,
                     carYear,
                     licensePlate,
+                    priceHour,
+                    priceDay,
                     ownershipDocument,
                     ticketApprovedEvent.CarImages
                         .Select(image => new ProvisionPartnerCarImageRequest(image.ImageId, image.ImageUrl))
@@ -220,5 +224,31 @@ public sealed class TicketEventPublisher : ITicketEventPublisher
         }
 
         return value.Value;
+    }
+
+    private static decimal RequirePrice(decimal? value, string fieldName)
+    {
+        if (!value.HasValue)
+        {
+            throw new InvalidOperationException($"{fieldName} is required.");
+        }
+
+        if (value.Value <= 0m)
+        {
+            throw new InvalidOperationException($"{fieldName} must be greater than 0.");
+        }
+
+        if (value.Value > 1_000_000m)
+        {
+            throw new InvalidOperationException($"{fieldName} must not exceed 1000000.");
+        }
+
+        var normalized = decimal.Round(value.Value, 2, MidpointRounding.AwayFromZero);
+        if (normalized <= 0m)
+        {
+            throw new InvalidOperationException($"{fieldName} must be greater than 0.");
+        }
+
+        return normalized;
     }
 }

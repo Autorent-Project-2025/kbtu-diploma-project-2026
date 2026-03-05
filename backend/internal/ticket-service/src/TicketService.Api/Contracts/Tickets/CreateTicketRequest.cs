@@ -19,6 +19,8 @@ public sealed class CreateTicketRequest
     public string? CarModel { get; init; }
     public int? CarYear { get; init; }
     public string? LicensePlate { get; init; }
+    public decimal? PriceHour { get; init; }
+    public decimal? PriceDay { get; init; }
     public IFormFile? OwnershipDocumentFile { get; init; }
     public List<IFormFile>? CarImageFiles { get; init; }
 }

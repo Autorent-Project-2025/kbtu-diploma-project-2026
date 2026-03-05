@@ -105,6 +105,34 @@
           </div>
 
           <div class="space-y-2">
+            <label for="priceHour" class="block text-sm font-semibold text-gray-700 dark:text-gray-300">Цена за час</label>
+            <input
+              id="priceHour"
+              v-model.number="form.priceHour"
+              type="number"
+              min="0.01"
+              max="1000000"
+              step="0.01"
+              required
+              class="w-full px-4 py-3 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white"
+            />
+          </div>
+
+          <div class="space-y-2">
+            <label for="priceDay" class="block text-sm font-semibold text-gray-700 dark:text-gray-300">Цена за день</label>
+            <input
+              id="priceDay"
+              v-model.number="form.priceDay"
+              type="number"
+              min="0.01"
+              max="1000000"
+              step="0.01"
+              required
+              class="w-full px-4 py-3 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white"
+            />
+          </div>
+
+          <div class="space-y-2">
             <label for="ownershipFile" class="block text-sm font-semibold text-gray-700 dark:text-gray-300">
               Подтверждение собственности (PDF)
             </label>
@@ -217,6 +245,8 @@ const form = reactive({
   customCarModel: "",
   carYear: null as number | null,
   licensePlate: "",
+  priceHour: null as number | null,
+  priceDay: null as number | null,
   ownershipDocumentFile: null as File | null,
   carImageFiles: [] as File[],
 });
@@ -355,6 +385,8 @@ function resetForm() {
   form.customCarModel = "";
   form.carYear = null;
   form.licensePlate = "";
+  form.priceHour = null;
+  form.priceDay = null;
   form.ownershipDocumentFile = null;
   form.carImageFiles = [];
 }
@@ -389,6 +421,18 @@ async function submitTicket() {
     return;
   }
 
+  const priceHour = Number(form.priceHour);
+  const priceDay = Number(form.priceDay);
+  if (!Number.isFinite(priceHour) || priceHour <= 0 || priceHour > 1_000_000) {
+    error("Цена за час должна быть больше 0 и не больше 1 000 000.");
+    return;
+  }
+
+  if (!Number.isFinite(priceDay) || priceDay <= 0 || priceDay > 1_000_000) {
+    error("Цена за день должна быть больше 0 и не больше 1 000 000.");
+    return;
+  }
+
   if (!form.ownershipDocumentFile) {
     error("Загрузите файл подтверждения собственности.");
     return;
@@ -407,6 +451,8 @@ async function submitTicket() {
       carModel,
       carYear,
       licensePlate: form.licensePlate.trim(),
+      priceHour,
+      priceDay,
       ownershipDocumentFile: form.ownershipDocumentFile,
       carImageFiles: form.carImageFiles,
     });

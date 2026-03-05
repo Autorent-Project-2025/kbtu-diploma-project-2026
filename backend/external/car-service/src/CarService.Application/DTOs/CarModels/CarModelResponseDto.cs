@@ -14,5 +14,7 @@ namespace CarService.Application.DTOs.CarModels
         public string? Description { get; set; }
         public decimal? Rating { get; set; }
         public int RatingsCount { get; set; }
+        public decimal? PriceHour { get; set; }
+        public decimal? PriceDay { get; set; }
     }
 }

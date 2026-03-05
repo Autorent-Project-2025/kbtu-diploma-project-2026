@@ -25,6 +25,8 @@ public static class TicketMappings
             ticket.CarModel,
             ticket.CarYear,
             ticket.LicensePlate,
+            ticket.PriceHour,
+            ticket.PriceDay,
             ticket.CarImages,
             ticket.Status,
             ticket.DecisionReason,

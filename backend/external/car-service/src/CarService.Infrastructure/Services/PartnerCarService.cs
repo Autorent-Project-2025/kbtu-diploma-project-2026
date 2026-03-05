@@ -173,6 +173,8 @@ namespace CarService.Infrastructure.Services
             var normalizedModel = NormalizeRequired(dto.CarModel, nameof(dto.CarModel), 255);
             var normalizedYear = NormalizeCarYear(dto.CarYear, nameof(dto.CarYear));
             var normalizedLicensePlate = NormalizeRequired(dto.LicensePlate, nameof(dto.LicensePlate), 20).ToUpperInvariant();
+            var normalizedPriceHour = NormalizePrice(dto.PriceHour, nameof(dto.PriceHour));
+            var normalizedPriceDay = NormalizePrice(dto.PriceDay, nameof(dto.PriceDay));
             var normalizedOwnershipFileName = NormalizeRequired(dto.OwnershipFileName, nameof(dto.OwnershipFileName), 255);
             var (brand, modelLookup) = await _catalogResolver.ResolveAsync(
                 normalizedBrand,
@@ -235,6 +237,8 @@ namespace CarService.Infrastructure.Services
                 CarModelId = model.Id,
                 LicensePlate = normalizedLicensePlate,
                 OwnershipFileName = normalizedOwnershipFileName,
+                PriceHour = normalizedPriceHour,
+                PriceDay = normalizedPriceDay,
                 Status = PartnerCarStatus.Available,
                 CreatedAt = DateTimeOffset.UtcNow,
                 RatingsCount = 0
@@ -704,6 +708,16 @@ namespace CarService.Infrastructure.Services
             }
 
             return value;
+        }
+
+        private static decimal NormalizePrice(decimal value, string paramName)
+        {
+            if (value <= 0m || value > 1_000_000m)
+            {
+                throw new ArgumentException($"{paramName} must be greater than 0 and less than or equal to 1000000.", paramName);
+            }
+
+            return Math.Round(value, 2, MidpointRounding.AwayFromZero);
         }
 
         private static double Normalize(double value, double min, double max)

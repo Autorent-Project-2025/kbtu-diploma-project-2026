@@ -60,8 +60,16 @@ namespace CarService.Infrastructure.Services
                 .Take(queryParams.PageSize)
                 .ToListAsync(cancellationToken);
 
+            var averagePricesByModelId = await GetAveragePricesByModelIdsAsync(
+                entities.Select(entity => entity.Id).ToArray(),
+                cancellationToken);
+
             var items = entities
-                .Select(MapToResponse)
+                .Select(entity =>
+                {
+                    averagePricesByModelId.TryGetValue(entity.Id, out var averagePrices);
+                    return MapToResponse(entity, averagePrices);
+                })
                 .ToList();
 
             return new PagedResult<CarModelResponseDto>
@@ -113,7 +121,15 @@ namespace CarService.Infrastructure.Services
                 .Include(entity => entity.ModelImages)
                 .FirstOrDefaultAsync(entity => entity.Id == id, cancellationToken);
 
-            return model is null ? null : MapToDetails(model);
+            if (model is null)
+            {
+                return null;
+            }
+
+            var averagePricesByModelId = await GetAveragePricesByModelIdsAsync([id], cancellationToken);
+            averagePricesByModelId.TryGetValue(model.Id, out var averagePrices);
+
+            return MapToDetails(model, averagePrices);
         }
 
         public async Task<CarModelResponseDto> CreateAsync(CarModelCreateDto dto, CancellationToken cancellationToken = default)
@@ -139,7 +155,7 @@ namespace CarService.Infrastructure.Services
 
             entity.Brand = brand;
             entity.ModelLookup = model;
-            return MapToResponse(entity);
+            return MapToResponse(entity, null);
         }
 
         public async Task<CarModelResponseDto?> UpdateAsync(
@@ -169,7 +185,7 @@ namespace CarService.Infrastructure.Services
 
             entity.Brand = brand;
             entity.ModelLookup = model;
-            return MapToResponse(entity);
+            return MapToResponse(entity, null);
         }
 
         public async Task<bool> DeleteAsync(int id, CancellationToken cancellationToken = default)
@@ -206,7 +222,35 @@ namespace CarService.Infrastructure.Services
             await _db.SaveChangesAsync(cancellationToken);
         }
 
-        private static CarModelResponseDto MapToResponse(Car entity)
+        private async Task<Dictionary<int, CarModelAveragePrices>> GetAveragePricesByModelIdsAsync(
+            IReadOnlyCollection<int> modelIds,
+            CancellationToken cancellationToken)
+        {
+            if (modelIds.Count == 0)
+            {
+                return new Dictionary<int, CarModelAveragePrices>();
+            }
+
+            var aggregates = await _db.PartnerCars
+                .AsNoTracking()
+                .Where(partnerCar => modelIds.Contains(partnerCar.CarModelId))
+                .GroupBy(partnerCar => partnerCar.CarModelId)
+                .Select(group => new
+                {
+                    CarModelId = group.Key,
+                    PriceHour = group.Average(partnerCar => partnerCar.PriceHour),
+                    PriceDay = group.Average(partnerCar => partnerCar.PriceDay)
+                })
+                .ToListAsync(cancellationToken);
+
+            return aggregates.ToDictionary(
+                aggregate => aggregate.CarModelId,
+                aggregate => new CarModelAveragePrices(
+                    NormalizeAveragePrice(aggregate.PriceHour),
+                    NormalizeAveragePrice(aggregate.PriceDay)));
+        }
+
+        private static CarModelResponseDto MapToResponse(Car entity, CarModelAveragePrices? averagePrices)
         {
             return new CarModelResponseDto
             {
@@ -221,11 +265,13 @@ namespace CarService.Infrastructure.Services
                 Doors = entity.Doors,
                 Description = entity.Description,
                 Rating = entity.Rating,
-                RatingsCount = entity.RatingsCount
+                RatingsCount = entity.RatingsCount,
+                PriceHour = averagePrices?.PriceHour,
+                PriceDay = averagePrices?.PriceDay
             };
         }
 
-        private static CarModelDetailsDto MapToDetails(Car entity)
+        private static CarModelDetailsDto MapToDetails(Car entity, CarModelAveragePrices? averagePrices)
         {
             return new CarModelDetailsDto
             {
@@ -241,6 +287,8 @@ namespace CarService.Infrastructure.Services
                 Description = entity.Description,
                 Rating = entity.Rating,
                 RatingsCount = entity.RatingsCount,
+                PriceHour = averagePrices?.PriceHour,
+                PriceDay = averagePrices?.PriceDay,
                 Features = entity.CarFeatures
                     .Select(carFeature => new CarFeatureDto
                     {
@@ -263,6 +311,16 @@ namespace CarService.Infrastructure.Services
             };
         }
 
+        private static decimal? NormalizeAveragePrice(decimal? value)
+        {
+            if (!value.HasValue)
+            {
+                return null;
+            }
+
+            return Math.Round(value.Value, 2, MidpointRounding.AwayFromZero);
+        }
+
         private static string? NormalizeOptional(string? value, int maxLength)
         {
             if (string.IsNullOrWhiteSpace(value))
@@ -278,5 +336,7 @@ namespace CarService.Infrastructure.Services
 
             return normalized;
         }
+
+        private sealed record CarModelAveragePrices(decimal? PriceHour, decimal? PriceDay);
     }
 }

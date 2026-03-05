@@ -6,6 +6,8 @@ public sealed record ProvisionPartnerCarRequest(
     string CarModel,
     int CarYear,
     string LicensePlate,
+    decimal PriceHour,
+    decimal PriceDay,
     string OwnershipDocumentFileName,
     IReadOnlyCollection<ProvisionPartnerCarImageRequest> Images);
 

@@ -59,6 +59,8 @@ export interface CarModelDetailsDto {
   description?: string | null;
   rating?: number | null;
   ratingsCount: number;
+  priceHour?: number | null;
+  priceDay?: number | null;
   features: CarModelFeatureDto[];
   images: CarModelImageDto[];
 }

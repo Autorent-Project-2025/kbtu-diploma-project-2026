@@ -114,6 +114,30 @@
               <label class="label" for="contactEmail">Email партнера</label>
               <input id="contactEmail" class="input" type="email" v-model="partnerCarForm.email" />
             </article>
+            <article class="detail-item">
+              <label class="label" for="priceHour">Цена за час</label>
+              <input
+                id="priceHour"
+                class="input"
+                type="number"
+                min="0.01"
+                max="1000000"
+                step="0.01"
+                v-model.number="partnerCarForm.priceHour"
+              />
+            </article>
+            <article class="detail-item">
+              <label class="label" for="priceDay">Цена за день</label>
+              <input
+                id="priceDay"
+                class="input"
+                type="number"
+                min="0.01"
+                max="1000000"
+                step="0.01"
+                v-model.number="partnerCarForm.priceDay"
+              />
+            </article>
           </div>
         </section>
 
@@ -209,6 +233,8 @@ const partnerCarForm = reactive({
   carYear: null as number | null,
   licensePlate: "",
   email: "",
+  priceHour: null as number | null,
+  priceDay: null as number | null,
 });
 
 const partnerCarImages = computed<PartnerCarTicketImageData[]>(() => {
@@ -286,6 +312,8 @@ function syncPartnerCarForm(ticket: Ticket | null) {
     partnerCarForm.carYear = null;
     partnerCarForm.licensePlate = "";
     partnerCarForm.email = "";
+    partnerCarForm.priceHour = null;
+    partnerCarForm.priceDay = null;
     return;
   }
 
@@ -296,6 +324,10 @@ function syncPartnerCarForm(ticket: Ticket | null) {
   partnerCarForm.carYear = Number.isInteger(rawCarYear) ? Number(rawCarYear) : null;
   partnerCarForm.licensePlate = (ticket.licensePlate ?? data?.licensePlate ?? "").trim();
   partnerCarForm.email = (ticket.email ?? "").trim();
+  const rawPriceHour = ticket.priceHour ?? data?.priceHour ?? null;
+  const rawPriceDay = ticket.priceDay ?? data?.priceDay ?? null;
+  partnerCarForm.priceHour = rawPriceHour === null ? null : Number(rawPriceHour);
+  partnerCarForm.priceDay = rawPriceDay === null ? null : Number(rawPriceDay);
 }
 
 function buildPartnerCarPayload(): PartnerCarReviewPayload | null | undefined {
@@ -308,6 +340,8 @@ function buildPartnerCarPayload(): PartnerCarReviewPayload | null | undefined {
   const carYear = Number(partnerCarForm.carYear);
   const licensePlate = partnerCarForm.licensePlate.trim();
   const email = partnerCarForm.email.trim();
+  const priceHour = Number(partnerCarForm.priceHour);
+  const priceDay = Number(partnerCarForm.priceDay);
 
   if (!carBrand || !carModel || !licensePlate || !email || !Number.isInteger(carYear)) {
     errorMessage.value = "Для заявки на машину партнера заполните марку, модель, год, гос номер и email.";
@@ -319,11 +353,23 @@ function buildPartnerCarPayload(): PartnerCarReviewPayload | null | undefined {
     return null;
   }
 
+  if (!Number.isFinite(priceHour) || !Number.isFinite(priceDay) || priceHour <= 0 || priceDay <= 0) {
+    errorMessage.value = "Укажите корректные значения цен за час и за день (больше 0).";
+    return null;
+  }
+
+  if (priceHour > 1_000_000 || priceDay > 1_000_000) {
+    errorMessage.value = "Цена за час и за день должна быть не больше 1 000 000.";
+    return null;
+  }
+
   return {
     carBrand,
     carModel,
     carYear,
     licensePlate,
+    priceHour,
+    priceDay,
     email,
   };
 }

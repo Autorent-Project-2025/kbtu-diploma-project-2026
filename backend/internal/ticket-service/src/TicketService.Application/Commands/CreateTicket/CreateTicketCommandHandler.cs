@@ -93,6 +93,8 @@ public sealed class CreateTicketCommandHandler
             command.CarModel,
             command.CarYear,
             command.LicensePlate,
+            command.PriceHour,
+            command.PriceDay,
             ownershipDocumentFileName,
             carImages,
             DateTime.UtcNow);
@@ -169,6 +171,16 @@ public sealed class CreateTicketCommandHandler
                 throw new ValidationException("License plate is required for partner car tickets.");
             }
 
+            if (!command.PriceHour.HasValue)
+            {
+                throw new ValidationException("Price per hour is required for partner car tickets.");
+            }
+
+            if (!command.PriceDay.HasValue)
+            {
+                throw new ValidationException("Price per day is required for partner car tickets.");
+            }
+
             if (!command.CarYear.HasValue)
             {
                 throw new ValidationException("Car year is required for partner car tickets.");
@@ -179,6 +191,9 @@ public sealed class CreateTicketCommandHandler
             {
                 throw new ValidationException($"Car year must be between 1886 and {maxAllowedCarYear}.");
             }
+
+            ValidatePrice(command.PriceHour.Value, nameof(command.PriceHour));
+            ValidatePrice(command.PriceDay.Value, nameof(command.PriceDay));
 
             if (command.OwnershipDocumentFile is null)
             {
@@ -305,6 +320,19 @@ public sealed class CreateTicketCommandHandler
             !(string.Equals(contentType, "application/octet-stream", StringComparison.OrdinalIgnoreCase) && hasKnownImageExtension))
         {
             throw new ValidationException($"{fieldName} files must be images.");
+        }
+    }
+
+    private static void ValidatePrice(decimal value, string fieldName)
+    {
+        if (value <= 0m)
+        {
+            throw new ValidationException($"{fieldName} must be greater than 0.");
+        }
+
+        if (value > 1_000_000m)
+        {
+            throw new ValidationException($"{fieldName} must not exceed 1000000.");
         }
     }
 }
