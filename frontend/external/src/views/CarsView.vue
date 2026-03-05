@@ -1,397 +1,135 @@
 <template>
-  <div
-    class="min-h-screen bg-gray-50 dark:bg-gray-950 py-24 px-4 sm:px-6 lg:px-8 transition-colors duration-300"
-  >
-    <div class="max-w-7xl mx-auto">
-      <!-- Header -->
-      <div class="mb-12 space-y-4 animate-slide-up">
-        <h1
-          class="text-4xl sm:text-5xl font-extrabold text-gray-900 dark:text-white"
-        >
-          Наш автопарк
+  <div class="min-h-screen bg-gray-50 dark:bg-gray-950 py-24 px-4 sm:px-6 lg:px-8 transition-colors duration-300">
+    <div class="max-w-7xl mx-auto space-y-8">
+      <header class="space-y-3 animate-slide-up">
+        <h1 class="text-4xl sm:text-5xl font-extrabold text-gray-900 dark:text-white">
+          Доступные модели
         </h1>
-        <p class="text-lg text-gray-600 dark:text-gray-400 max-w-2xl">
-          Выберите автомобиль вашей мечты из нашей коллекции премиальных и
-          бизнес-автомобилей
+        <p class="text-lg text-gray-600 dark:text-gray-400 max-w-3xl">
+          Выберите модель, посмотрите детали и забронируйте. Система сама подберет подходящую машину партнера на выбранные даты.
         </p>
-      </div>
+      </header>
 
-      <section
-        class="mb-8 p-6 bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 space-y-4"
-      >
-        <div class="space-y-1">
-          <h2 class="text-2xl font-bold text-gray-900 dark:text-white">
-            Автоподбор и бронирование
-          </h2>
-          <p class="text-sm text-gray-600 dark:text-gray-400">
-            Выберите модель и период. Система автоматически подберет лучшую машину партнера.
-          </p>
-        </div>
-
-        <div class="grid gap-4 md:grid-cols-4">
-          <div class="md:col-span-2">
-            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-              Модель
-            </label>
+      <section class="p-6 bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800">
+        <div class="flex flex-wrap items-center gap-4">
+          <div class="flex items-center gap-2">
+            <label class="text-sm font-semibold text-gray-700 dark:text-gray-300">Сортировка:</label>
             <select
-              v-model.number="selectedModelId"
-              class="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white"
+              v-model="sortType"
+              class="px-4 py-3 bg-gray-50 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white font-medium focus:border-primary-500 focus:outline-none transition-colors min-w-[220px]"
             >
-              <option :value="0" disabled>Выберите модель</option>
-              <option v-for="model in availableModels" :key="model.modelId" :value="model.modelId">
-                {{ model.brand }} {{ model.model }} {{ model.year }} · {{ model.availableCarsCount }} авто
-              </option>
+              <option value="popular">Популярные</option>
+              <option value="price_asc">Сначала дешевые</option>
+              <option value="price_desc">Сначала дорогие</option>
+              <option value="available">Больше доступных машин</option>
+              <option value="newest">Новее модель</option>
             </select>
           </div>
 
-          <div>
-            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-              Начало
-            </label>
-            <input
-              v-model="matchStartTime"
-              type="datetime-local"
-              :min="minDateTime"
-              class="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white"
-            />
-          </div>
-
-          <div>
-            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-              Конец
-            </label>
-            <input
-              v-model="matchEndTime"
-              type="datetime-local"
-              :min="matchStartTime || minDateTime"
-              class="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white"
-            />
-          </div>
-        </div>
-
-        <div class="flex flex-wrap items-center gap-3">
           <button
-            @click="bookByModel"
-            :disabled="matching"
-            class="px-6 py-3 rounded-xl bg-primary-600 hover:bg-primary-700 text-white font-bold transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
-          >
-            {{ matching ? "Подбор..." : "Подобрать и забронировать" }}
-          </button>
-          <button
-            @click="loadAvailableModels"
+            @click="loadModelCards"
             :disabled="matching"
             class="px-4 py-3 rounded-xl border-2 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 font-semibold hover:border-primary-500"
           >
-            Обновить модели
+            Обновить
           </button>
-        </div>
 
-        <div
-          v-if="matchSuggestions.length > 0"
-          class="rounded-xl border border-amber-300/70 bg-amber-50 dark:border-amber-500/30 dark:bg-amber-900/20 p-4 space-y-3"
-        >
-          <p class="text-amber-800 dark:text-amber-200 font-semibold">
-            На выбранный период все машины этой модели заняты. Ближайшие доступные даты:
-          </p>
-          <div class="flex flex-wrap gap-2">
-            <button
-              v-for="date in matchSuggestions"
-              :key="date"
-              @click="applySuggestedDate(date)"
-              class="px-3 py-2 text-sm rounded-lg bg-white dark:bg-gray-900 border border-amber-300/70 dark:border-amber-500/40 text-amber-800 dark:text-amber-200"
-            >
-              {{ formatSuggestionDate(date) }}
-            </button>
+          <div class="ml-auto text-sm text-gray-600 dark:text-gray-400 font-medium">
+            Моделей доступно:
+            <span class="font-bold text-gray-900 dark:text-white">{{ sortedModels.length }}</span>
           </div>
         </div>
       </section>
 
-      <!-- Filters and Sorting -->
-      <div
-        class="mb-8 p-6 bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800"
-      >
-        <div class="flex flex-wrap items-center gap-4">
-          <!-- Single Sort Selector -->
-          <div class="flex items-center gap-2">
-            <label
-              class="text-sm font-semibold text-gray-700 dark:text-gray-300"
-            >
-              Сортировка:
-            </label>
-            <select
-              v-model="sortType"
-              class="px-4 py-3 bg-gray-50 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white font-medium focus:border-primary-500 focus:outline-none transition-colors min-w-[200px]"
-            >
-              <option value="popular">Популярные</option>
-              <option value="newest">Новинки</option>
-              <option value="price_asc">Сначала дешевые</option>
-              <option value="price_desc">Сначала дорогие</option>
-              <option value="rating">Высокий рейтинг</option>
-            </select>
-          </div>
-
-          <!-- Results Count -->
-          <div
-            class="ml-auto text-sm text-gray-600 dark:text-gray-400 font-medium"
-          >
-            Всего автомобилей:
-            <span class="font-bold text-gray-900 dark:text-white">{{
-              totalCount
-            }}</span>
-          </div>
+      <div v-if="loading" class="text-center py-28">
+        <div class="inline-flex flex-col items-center gap-6">
+          <div class="w-16 h-16 rounded-full border-4 border-primary-200 dark:border-primary-900 border-t-primary-600 dark:border-t-primary-400 animate-spin"></div>
+          <p class="text-gray-600 dark:text-gray-400 text-lg font-medium">Загрузка доступных моделей...</p>
         </div>
       </div>
 
-      <!-- Cars Grid (3x3) -->
-      <div
-        v-if="cars.length > 0"
-        :key="gridKey"
-        class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8"
-      >
-        <div
-          v-for="(car, index) in carsWithStatus"
-          :key="`${car.id}-${index}-${sortType}`"
-          class="group relative bg-white dark:bg-gray-900 rounded-3xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-500 card-hover border border-gray-200 dark:border-gray-800 flex flex-col"
-          :class="{ 'opacity-75': !car.isAvailable }"
+      <div v-else-if="sortedModels.length === 0" class="text-center py-28">
+        <div class="inline-flex flex-col items-center gap-5 max-w-md mx-auto">
+          <div class="w-20 h-20 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+            <svg class="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+          </div>
+          <p class="text-xl font-bold text-gray-900 dark:text-white">Сейчас нет доступных моделей</p>
+        </div>
+      </div>
+
+      <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+        <article
+          v-for="model in sortedModels"
+          :key="model.modelId"
+          class="group relative bg-white dark:bg-gray-900 rounded-3xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-500 border border-gray-200 dark:border-gray-800 flex flex-col"
         >
-          <!-- Image Container -->
-          <div
-            class="relative h-64 overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900 flex-shrink-0"
-          >
+          <div class="relative h-64 overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900">
             <img
-              :src="car.imageUrl || config.app.defaultCarImage"
-              :alt="`${car.brand} ${car.model}`"
-              class="car-card-image w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-700"
+              :src="model.imageUrl || config.app.defaultCarImage"
+              :alt="`${model.brand} ${model.model}`"
+              class="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-700"
             />
-
-            <!-- Gradient Overlay -->
-            <div
-              class="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"
-            ></div>
-
-            <!-- Price Badge -->
-            <div
-              class="absolute top-4 right-4 glass px-4 py-2 rounded-full backdrop-blur-md"
-            >
-              <div class="flex items-baseline gap-1">
-                <span class="text-2xl font-bold text-white"
-                  >${{ car.priceHour }}</span
-                >
-                <span class="text-sm text-gray-300 font-medium">/час</span>
-              </div>
+            <div class="absolute top-4 left-4 glass px-3 py-1.5 rounded-full backdrop-blur-md">
+              <span class="text-sm font-semibold text-white">{{ model.year }}</span>
             </div>
-
-            <!-- Year Badge -->
-            <div
-              class="absolute top-4 left-4 glass px-3 py-1.5 rounded-full backdrop-blur-md"
-            >
-              <span class="text-sm font-semibold text-white">{{
-                car.year
-              }}</span>
-            </div>
-
-            <!-- ✅ ЗВЕЗДОЧКА С КОМПАКТНЫМ GLASS ФОНОМ -->
-            <div
-              v-if="car.rating !== null && car.rating !== undefined"
-              class="absolute bottom-4 right-4 glass px-2 py-1 rounded-full backdrop-blur-md"
-            >
-              <div class="inline-flex items-center gap-1">
-                <svg class="w-3.5 h-3.5 fill-yellow-400" viewBox="0 0 20 20">
-                  <path
-                    d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"
-                  />
-                </svg>
-                <span class="text-xs font-bold text-white">{{
-                  car.rating.toFixed(1)
-                }}</span>
-              </div>
-            </div>
-
-            <!-- Unavailable Overlay -->
-            <div
-              v-if="!car.isAvailable"
-              class="absolute inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center"
-            >
-              <div
-                class="bg-red-600 text-white px-6 py-3 rounded-full font-bold text-sm shadow-lg"
-              >
-                Забронирован
-              </div>
+            <div class="absolute top-4 right-4 glass px-3 py-1.5 rounded-full backdrop-blur-md">
+              <span class="text-sm font-semibold text-white">{{ model.availableCarsCount }} авто</span>
             </div>
           </div>
 
-          <!-- Content -->
-          <div class="p-6 flex flex-col flex-1">
-            <!-- Car Info -->
-            <div class="mb-4">
-              <h3
-                class="text-2xl font-bold text-gray-900 dark:text-white group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors mb-2"
-              >
-                {{ car.brand }} {{ car.model }}
-              </h3>
-              <p class="text-gray-600 dark:text-gray-400 text-sm font-medium">
-                {{ car.year }} год выпуска
+          <div class="p-6 flex flex-col gap-4 flex-1">
+            <div class="space-y-1">
+              <h2 class="text-2xl font-bold text-gray-900 dark:text-white">{{ model.brand }} {{ model.model }}</h2>
+              <p class="text-sm text-gray-600 dark:text-gray-400 line-clamp-2">
+                {{ model.description || "Описание модели пока не добавлено." }}
               </p>
             </div>
 
-            <!-- Features -->
-            <div class="flex flex-wrap gap-2 mb-6">
-              <span
-                class="px-3 py-1 bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300 text-xs font-semibold rounded-full"
-              >
-                Премиум
-              </span>
-              <span
-                :class="
-                  car.isAvailable
-                    ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300'
-                    : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300'
-                "
-                class="px-3 py-1 text-xs font-semibold rounded-full"
-              >
-                {{ car.isAvailable ? "Доступен" : "Забронирован" }}
+            <div class="flex items-center justify-between text-sm">
+              <span class="text-gray-600 dark:text-gray-400">Цена:</span>
+              <span class="font-bold text-primary-600 dark:text-primary-400">{{ formatPriceRange(model) }}</span>
+            </div>
+
+            <div class="flex items-center justify-between text-sm">
+              <span class="text-gray-600 dark:text-gray-400">Рейтинг:</span>
+              <span class="font-semibold text-gray-900 dark:text-white">
+                {{ model.averageRating ?? "нет" }}
               </span>
             </div>
 
-            <!-- Spacer -->
-            <div class="flex-1"></div>
-
-            <!-- Action Buttons -->
-            <div class="flex gap-3">
-              <!-- View Details Button -->
+            <div class="mt-auto grid grid-cols-2 gap-3">
               <router-link
-                :to="`/cars/${car.id}`"
-                class="flex-1 px-6 py-4 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-900 dark:text-white font-bold rounded-2xl transition-all hover:shadow-lg active:scale-95 flex items-center justify-center gap-2"
+                :to="`/cars/${model.modelId}`"
+                class="px-4 py-3 rounded-xl bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-900 dark:text-white font-semibold text-center"
               >
-                <span>Подробнее</span>
-                <svg
-                  class="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                </svg>
+                Подробнее
               </router-link>
-
-              <!-- Book Button -->
               <button
-                @click="openBookingModal(car)"
-                :disabled="!car.isAvailable"
-                class="flex-1 relative overflow-hidden bg-primary-600 hover:bg-primary-700 disabled:bg-gray-400 text-white font-bold py-4 px-6 rounded-2xl transition-all duration-300 hover:shadow-xl hover:shadow-primary-500/50 active:scale-95 disabled:cursor-not-allowed disabled:hover:shadow-none group/btn"
+                @click="openBookingModal(model)"
+                :disabled="matching"
+                class="px-4 py-3 rounded-xl bg-primary-600 hover:bg-primary-700 text-white font-semibold"
               >
-                <span
-                  class="relative z-10 flex items-center justify-center gap-2"
-                >
-                  <span v-if="car.isAvailable">Забронировать</span>
-                  <span v-else>Недоступен</span>
-                  <svg
-                    v-if="car.isAvailable"
-                    class="w-5 h-5 transform group-hover/btn:translate-x-1 transition-transform"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M13 7l5 5m0 0l-5 5m5-5H6"
-                    />
-                  </svg>
-                </span>
-
-                <!-- Shimmer effect -->
-                <div
-                  v-if="car.isAvailable"
-                  class="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-100%] group-hover/btn:translate-x-[100%] transition-transform duration-700"
-                ></div>
+                Забронировать
               </button>
             </div>
           </div>
-
-          <!-- Glow Effect on Hover -->
-          <div
-            v-if="car.isAvailable"
-            class="absolute inset-0 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
-            style="box-shadow: 0 0 40px rgba(59, 130, 246, 0.3)"
-          ></div>
-        </div>
-      </div>
-
-      <!-- Loading State -->
-      <div v-else-if="loading" class="text-center py-32">
-        <div class="inline-flex flex-col items-center gap-6">
-          <div class="relative">
-            <div
-              class="w-16 h-16 rounded-full border-4 border-primary-200 dark:border-primary-900 border-t-primary-600 dark:border-t-primary-400 animate-spin"
-            ></div>
-            <div
-              class="absolute inset-0 w-16 h-16 rounded-full glow-primary opacity-50"
-            ></div>
-          </div>
-          <p class="text-gray-600 dark:text-gray-400 text-lg font-medium">
-            Загрузка автомобилей...
-          </p>
-        </div>
-      </div>
-
-      <!-- Empty State -->
-      <div v-else class="text-center py-32">
-        <div class="inline-flex flex-col items-center gap-6 max-w-md mx-auto">
-          <div
-            class="w-24 h-24 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center"
-          >
-            <svg
-              class="w-12 h-12 text-gray-400"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-              />
-            </svg>
-          </div>
-          <div class="space-y-2">
-            <h3 class="text-2xl font-bold text-gray-900 dark:text-white">
-              Автомобили не найдены
-            </h3>
-            <p class="text-gray-600 dark:text-gray-400">
-              Попробуйте изменить параметры поиска
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <!-- Pagination (9 машин на страницу) -->
-      <div v-if="totalPages > 1" class="mt-12">
-        <Pagination
-          :current-page="currentPage"
-          :total-pages="totalPages"
-          @page-change="handlePageChange"
-        />
+        </article>
       </div>
     </div>
 
-    <!-- Booking Modal -->
     <BookingModal
-      v-if="selectedCar"
+      v-if="selectedModelAsCar"
       :is-open="isModalOpen"
-      :car="selectedCar"
+      :car="selectedModelAsCar"
+      :booking-error="bookingError"
+      :suggested-dates="bookingSuggestions"
       @close="closeBookingModal"
       @confirm="handleBookingConfirm"
+      @suggestion-click="handleSuggestionClick"
     />
 
-    <!-- Login Required Modal -->
     <LoginRequiredModal
       :is-open="showLoginModal"
       @close="showLoginModal = false"
@@ -401,245 +139,120 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed, watch, nextTick } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
-import {
-  getAvailableCarModels,
-  getCars,
-  matchCarByModel,
-  type AvailableCarModel,
-  type GetCarsParams,
-} from "../api/cars";
-import { createBooking, getCarBookings } from "../api/booking";
-import type { Car } from "../types/Car";
-import type { Booking } from "../types/Booking";
-import type { PaginatedResponse } from "../types/Pagination";
-import { config } from "../config";
-import { useToast } from "../composables/useToast";
-import { useAuth } from "../composables/useAuth";
-import { isCarAvailable } from "../utils/bookingUtils";
+import { createBooking } from "../api/booking";
+import { getAvailableModelCards, matchCarByModel, type AvailableModelCard } from "../api/cars";
 import BookingModal from "../components/BookingModal.vue";
 import LoginRequiredModal from "../components/LoginRequiredModal.vue";
-import Pagination from "../components/Pagination.vue";
-
-interface CarWithStatus extends Car {
-  isAvailable: boolean;
-  bookings: Booking[];
-}
+import { useAuth } from "../composables/useAuth";
+import { useToast } from "../composables/useToast";
+import { config } from "../config";
+import type { Car } from "../types/Car";
 
 const router = useRouter();
-const cars = ref<Car[]>([]);
-const carBookings = ref<Record<number, Booking[]>>({});
-const selectedCar = ref<Car | null>(null);
-const isModalOpen = ref(false);
-const showLoginModal = ref(false);
+const { isAuthenticated } = useAuth();
+const { success, error } = useToast();
+
 const loading = ref(true);
 const matching = ref(false);
-const availableModels = ref<AvailableCarModel[]>([]);
-const selectedModelId = ref(0);
-const matchStartTime = ref("");
-const matchEndTime = ref("");
-const matchSuggestions = ref<string[]>([]);
+const sortType = ref<"popular" | "price_asc" | "price_desc" | "available" | "newest">("popular");
 
-// ✅ ДОБАВЛЕН: gridKey для force re-render
-const gridKey = ref(0);
+const models = ref<AvailableModelCard[]>([]);
+const selectedModel = ref<AvailableModelCard | null>(null);
+const isModalOpen = ref(false);
+const showLoginModal = ref(false);
+const bookingError = ref("");
+const bookingSuggestions = ref<string[]>([]);
 
-// Pagination (9 машин на странице)
-const currentPage = ref(1);
-const pageSize = ref(9);
-const totalCount = ref(0);
-const totalPages = computed(() => Math.ceil(totalCount.value / pageSize.value));
+const sortedModels = computed(() => {
+  return [...models.value].sort((left, right) => {
+    if (sortType.value === "newest") {
+      return right.year - left.year;
+    }
 
-// Sorting
-const sortType = ref<
-  "popular" | "newest" | "price_asc" | "price_desc" | "rating"
->("popular");
+    if (sortType.value === "available") {
+      return right.availableCarsCount - left.availableCarsCount;
+    }
 
-const { success, error } = useToast();
-const { isAuthenticated } = useAuth();
+    if (sortType.value === "price_asc") {
+      return (left.minPriceHour ?? Number.MAX_SAFE_INTEGER) - (right.minPriceHour ?? Number.MAX_SAFE_INTEGER);
+    }
 
-const minDateTime = computed(() => {
-  const now = new Date();
-  now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-  return now.toISOString().slice(0, 16);
-});
+    if (sortType.value === "price_desc") {
+      return (right.maxPriceHour ?? 0) - (left.maxPriceHour ?? 0);
+    }
 
-// Вычисляем машины со статусом доступности
-const carsWithStatus = computed<CarWithStatus[]>(() => {
-  return cars.value.map((car) => {
-    const bookings = carBookings.value[car.id] || [];
-    const now = new Date();
-
-    const available = isCarAvailable(
-      bookings,
-      now,
-      new Date(now.getTime() + 1000)
-    );
-
-    return {
-      ...car,
-      isAvailable: available,
-      bookings,
-    };
+    return (right.averageRating ?? 0) - (left.averageRating ?? 0);
   });
 });
 
+const selectedModelAsCar = computed<Car | null>(() => {
+  if (!selectedModel.value) {
+    return null;
+  }
+
+  return {
+    id: selectedModel.value.modelId,
+    brand: selectedModel.value.brand,
+    model: selectedModel.value.model,
+    year: selectedModel.value.year,
+    priceHour: selectedModel.value.minPriceHour ?? null,
+    priceDay: null,
+    imageUrl: selectedModel.value.imageUrl,
+    rating: selectedModel.value.averageRating ?? null,
+    description: selectedModel.value.description ?? null,
+  };
+});
+
 onMounted(async () => {
-  initializeMatchRange();
-  await Promise.all([loadCars(), loadAvailableModels()]);
+  await loadModelCards();
 });
 
-// ✅ ИСПРАВЛЕНО: watch с force re-render
-watch(sortType, async () => {
-  currentPage.value = 1;
-  await loadCars();
-  // ✅ Force re-render grid
-  gridKey.value++;
-  await nextTick();
-});
-
-async function loadCars() {
+async function loadModelCards() {
   loading.value = true;
   try {
-    let sortBy: "rating" | "priceHour" | "year" = "rating";
-    let sortOrder: "asc" | "desc" = "desc";
-
-    switch (sortType.value) {
-      case "popular":
-        sortBy = "rating";
-        sortOrder = "desc";
-        break;
-      case "newest":
-        sortBy = "year";
-        sortOrder = "desc";
-        break;
-      case "price_asc":
-        sortBy = "priceHour";
-        sortOrder = "asc";
-        break;
-      case "price_desc":
-        sortBy = "priceHour";
-        sortOrder = "desc";
-        break;
-      case "rating":
-        sortBy = "rating";
-        sortOrder = "desc";
-        break;
-    }
-
-    const params: GetCarsParams = {
-      page: currentPage.value,
-      pageSize: pageSize.value,
-      sortBy,
-      sortOrder,
-    };
-
-    console.log("🔍 loadCars called with sortType:", sortType.value);
-    console.log("📊 Converted to params:", params);
-
-    const response = await getCars(params);
-
-    if (Array.isArray(response)) {
-      cars.value = response;
-      totalCount.value = response.length;
-    } else {
-      cars.value = response.items;
-      totalCount.value = response.totalCount;
-    }
-
-    // ✅ ПОДРОБНЫЙ ЛОГ - теперь видно ВСЕ машины с ценами
-    console.log(
-      "🚗 ALL cars after load:",
-      cars.value.map((car, idx) => ({
-        index: idx,
-        brand: car.brand,
-        model: car.model,
-        price: car.priceHour,
-        rating: car.rating,
-        year: car.year,
-      }))
-    );
-
-    await loadAllCarBookings();
+    models.value = await getAvailableModelCards();
   } catch (e) {
-    console.error("❌ Ошибка при загрузке авто:", e);
-    error("Не удалось загрузить список автомобилей");
+    console.error("Ошибка загрузки моделей:", e);
+    error("Не удалось загрузить доступные модели.");
   } finally {
     loading.value = false;
   }
 }
 
-function initializeMatchRange() {
-  const start = new Date();
-  start.setMinutes(start.getMinutes() - start.getTimezoneOffset());
-
-  const end = new Date(start.getTime() + 3 * 60 * 60 * 1000);
-  matchStartTime.value = start.toISOString().slice(0, 16);
-  matchEndTime.value = end.toISOString().slice(0, 16);
-}
-
-async function loadAvailableModels() {
-  try {
-    availableModels.value = await getAvailableCarModels();
-    if (availableModels.value.length > 0 && selectedModelId.value === 0) {
-      selectedModelId.value = availableModels.value[0]?.modelId ?? 0;
-    }
-  } catch (e) {
-    console.error("Ошибка загрузки доступных моделей:", e);
-    error("Не удалось загрузить доступные модели.");
+function formatPriceRange(model: AvailableModelCard): string {
+  if (model.minPriceHour == null && model.maxPriceHour == null) {
+    return "по запросу";
   }
-}
 
-async function loadAllCarBookings() {
-  try {
-    const bookingsPromises = cars.value.map(async (car) => {
-      try {
-        const bookings = await getCarBookings(car.id);
-        return { carId: car.id, bookings };
-      } catch (e) {
-        return { carId: car.id, bookings: [] };
-      }
-    });
-
-    const results = await Promise.all(bookingsPromises);
-
-    const bookingsMap: Record<number, Booking[]> = {};
-    results.forEach((result) => {
-      bookingsMap[result.carId] = result.bookings;
-    });
-
-    carBookings.value = bookingsMap;
-  } catch (e) {
-    console.error("Ошибка при загрузке бронирований:", e);
+  if (model.minPriceHour != null && model.maxPriceHour != null && model.minPriceHour !== model.maxPriceHour) {
+    return `$${model.minPriceHour} - $${model.maxPriceHour}/час`;
   }
+
+  const singlePrice = model.minPriceHour ?? model.maxPriceHour;
+  return singlePrice != null ? `$${singlePrice}/час` : "по запросу";
 }
 
-function handlePageChange(page: number) {
-  currentPage.value = page;
-  loadCars();
-  window.scrollTo({ top: 0, behavior: "smooth" });
-}
-
-function openBookingModal(car: CarWithStatus) {
+function openBookingModal(model: AvailableModelCard) {
   if (!isAuthenticated.value) {
     showLoginModal.value = true;
     return;
   }
 
-  if (!car.isAvailable) {
-    error("Этот автомобиль сейчас забронирован");
-    return;
-  }
-
-  selectedCar.value = car;
+  selectedModel.value = model;
+  bookingError.value = "";
+  bookingSuggestions.value = [];
   isModalOpen.value = true;
 }
 
 function closeBookingModal() {
   isModalOpen.value = false;
+  bookingError.value = "";
+  bookingSuggestions.value = [];
   setTimeout(() => {
-    selectedCar.value = null;
-  }, 300);
+    selectedModel.value = null;
+  }, 200);
 }
 
 function goToLogin() {
@@ -647,117 +260,44 @@ function goToLogin() {
   router.push("/login");
 }
 
+function handleSuggestionClick() {
+  bookingError.value = "";
+}
+
 async function handleBookingConfirm(startDate: string, endDate: string) {
-  if (!selectedCar.value) return;
-
-  const carId = selectedCar.value.id;
-  const bookings = carBookings.value[carId] || [];
-
-  const start = new Date(startDate);
-  const end = new Date(endDate);
-
-  if (!isCarAvailable(bookings, start, end)) {
-    error("Этот автомобиль уже забронирован на выбранный период");
-    return;
-  }
-
-  try {
-    await createBooking(carId, startDate, endDate);
-    success(
-      `${selectedCar.value.brand} ${selectedCar.value.model} успешно забронирован!`
-    );
-    closeBookingModal();
-    await loadAllCarBookings();
-  } catch (e) {
-    console.error("Ошибка бронирования:", e);
-    error("Ошибка бронирования. Попробуйте снова.");
-  }
-}
-
-function formatSuggestionDate(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-
-  return new Intl.DateTimeFormat("ru-RU", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(date);
-}
-
-function applySuggestedDate(value: string) {
-  const start = new Date(value);
-  if (Number.isNaN(start.getTime())) return;
-
-  const end = new Date(start.getTime() + 3 * 60 * 60 * 1000);
-
-  const localStart = new Date(start.getTime() - start.getTimezoneOffset() * 60000);
-  const localEnd = new Date(end.getTime() - end.getTimezoneOffset() * 60000);
-  matchStartTime.value = localStart.toISOString().slice(0, 16);
-  matchEndTime.value = localEnd.toISOString().slice(0, 16);
-}
-
-async function bookByModel() {
-  if (!isAuthenticated.value) {
-    showLoginModal.value = true;
-    return;
-  }
-
-  if (selectedModelId.value <= 0) {
-    error("Выберите модель машины.");
-    return;
-  }
-
-  if (!matchStartTime.value || !matchEndTime.value) {
-    error("Выберите дату начала и окончания.");
-    return;
-  }
-
-  const startDate = new Date(matchStartTime.value);
-  const endDate = new Date(matchEndTime.value);
-  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
-    error("Некорректный формат даты.");
-    return;
-  }
-
-  if (endDate <= startDate) {
-    error("Дата окончания должна быть позже даты начала.");
+  if (!selectedModel.value) {
     return;
   }
 
   matching.value = true;
-  try {
-    const startUtc = startDate.toISOString();
-    const endUtc = endDate.toISOString();
+  bookingError.value = "";
+  bookingSuggestions.value = [];
 
+  try {
     const matchResult = await matchCarByModel({
-      modelId: selectedModelId.value,
-      startTime: startUtc,
-      endTime: endUtc,
+      modelId: selectedModel.value.modelId,
+      startTime: startDate,
+      endTime: endDate,
     });
 
     if (!matchResult.isAvailable || !matchResult.partnerCarId) {
-      matchSuggestions.value = (matchResult.suggestedStartTimesUtc ?? []).slice(0, 5);
-      error("На выбранный период все машины заняты.");
+      bookingError.value = "На выбранные даты машин этой модели нет.";
+      bookingSuggestions.value = (matchResult.suggestedStartTimesUtc ?? []).slice(0, 5);
       return;
     }
 
-    await createBooking(matchResult.partnerCarId, startUtc, endUtc, {
+    await createBooking(matchResult.partnerCarId, startDate, endDate, {
       partnerId: matchResult.partnerId ?? undefined,
       priceHour: matchResult.priceHour ?? null,
     });
 
-    matchSuggestions.value = [];
-
-    const selectedModel = availableModels.value.find((model) => model.modelId === selectedModelId.value);
-    const modelLabel = selectedModel
-      ? `${selectedModel.brand} ${selectedModel.model} ${selectedModel.year}`
-      : "Выбранная модель";
-
-    success(`${modelLabel} успешно забронирована.`);
-    await loadAllCarBookings();
+    success(`${selectedModel.value.brand} ${selectedModel.value.model} успешно забронирована.`);
+    closeBookingModal();
+    await loadModelCards();
   } catch (e) {
     console.error("Ошибка автоподбора и бронирования:", e);
-    error("Не удалось подобрать и забронировать машину.");
+    bookingError.value = "Не удалось забронировать машину. Попробуйте снова.";
+    error("Не удалось забронировать машину.");
   } finally {
     matching.value = false;
   }

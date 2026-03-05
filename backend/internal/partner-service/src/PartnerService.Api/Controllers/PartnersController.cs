@@ -94,6 +94,28 @@ public sealed class PartnersController : ControllerBase
         return Ok(partner);
     }
 
+    [AllowAnonymous]
+    [HttpGet("public/by-related-user/{relatedUserId}")]
+    public async Task<IActionResult> GetPublicByRelatedUserId(string relatedUserId, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(relatedUserId))
+        {
+            return BadRequest(new { error = "Related user id is required." });
+        }
+
+        var partner = await _partnerService.GetByRelatedUserIdAsync(relatedUserId, cancellationToken);
+        if (partner is null)
+        {
+            return NotFound(new { error = "Partner not found." });
+        }
+
+        return Ok(new PublicPartnerProfileResponse
+        {
+            RelatedUserId = partner.RelatedUserId,
+            CarrierName = $"{partner.OwnerFirstName} {partner.OwnerLastName}".Trim()
+        });
+    }
+
     private static PartnerCreateDto MapToCreateDto(CreatePartnerRequest request)
     {
         return new PartnerCreateDto
