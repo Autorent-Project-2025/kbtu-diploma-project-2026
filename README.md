@@ -50,6 +50,16 @@ docker compose up --build
 - Email Service: `9182`
 - File Service: `9183`
 
+## Предсозданные пользователи (seed)
+После применения миграций `identity-service` доступны следующие логины:
+
+| Роль/назначение | Email | Пароль | Примечание |
+|---|---|---|---|
+| Superadmin | `superadmin@local` | `SuperAdmin123!` | Полный доступ (роль `superadmin`) |
+| Обычный пользователь | `user@autorent.local` | `DemoUser123!` | Роль `user` |
+| Партнер (demo) | `partner@autorent.local` | `DemoPartner123!` | Роль `user`, плюс seed-профиль в `partner-service` |
+| Менеджер | `manager@autorent.local` | `DemoManager123!` | Роль `manager`, доступ в internal panel |
+
 ## Сервисы
 | Сервис | Путь | Назначение |
 |---|---|---|
