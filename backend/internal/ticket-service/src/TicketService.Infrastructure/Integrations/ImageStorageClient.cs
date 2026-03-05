@@ -22,7 +22,7 @@ public sealed class ImageStorageClient : IImageStorageClient
         CancellationToken cancellationToken = default)
     {
         using var requestContent = new ByteArrayContent(payload.Content);
-        requestContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(payload.ContentType);
+        requestContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream");
 
         using var message = new HttpRequestMessage(HttpMethod.Post, "/api/images")
         {

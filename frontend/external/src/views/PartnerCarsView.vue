@@ -37,12 +37,17 @@
               v-model="form.carBrand"
               list="carBrandSuggestions"
               type="text"
+              placeholder="Начните вводить марку, например Toyota"
+              autocomplete="off"
               required
               class="w-full px-4 py-3 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white"
             />
             <datalist id="carBrandSuggestions">
               <option v-for="brand in brandSuggestions" :key="brand" :value="brand" />
             </datalist>
+            <p class="text-xs text-gray-500 dark:text-gray-400">
+              Подсказки берутся из каталога доступных марок.
+            </p>
           </div>
 
           <div class="space-y-2">
@@ -52,12 +57,15 @@
               v-model="form.carModel"
               list="carModelSuggestions"
               type="text"
+              placeholder="Начните вводить модель, например Camry"
+              autocomplete="off"
               required
               class="w-full px-4 py-3 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white"
             />
             <datalist id="carModelSuggestions">
               <option v-for="model in modelSuggestions" :key="model" :value="model" />
             </datalist>
+            <p class="text-xs text-gray-500 dark:text-gray-400">{{ modelSuggestionHint }}</p>
           </div>
 
           <div class="space-y-2">
@@ -181,6 +189,8 @@ const form = reactive({
   carImageFiles: [] as File[],
 });
 
+const suggestionLimit = 80;
+
 const brandSuggestions = computed(() => {
   return Array.from(
     new Set(
@@ -188,14 +198,16 @@ const brandSuggestions = computed(() => {
         .map((model) => model.brand.trim())
         .filter((brand) => brand.length > 0)
     )
-  ).sort((left, right) => left.localeCompare(right));
+  )
+    .sort((left, right) => left.localeCompare(right))
+    .slice(0, suggestionLimit);
 });
 
 const modelSuggestions = computed(() => {
   const selectedBrand = form.carBrand.trim().toLowerCase();
   const candidates = selectedBrand.length === 0
     ? carModels.value
-    : carModels.value.filter((item) => item.brand.trim().toLowerCase() === selectedBrand);
+    : carModels.value.filter((item) => item.brand.trim().toLowerCase().includes(selectedBrand));
 
   return Array.from(
     new Set(
@@ -203,7 +215,25 @@ const modelSuggestions = computed(() => {
         .map((item) => item.model.trim())
         .filter((model) => model.length > 0)
     )
-  ).sort((left, right) => left.localeCompare(right));
+  )
+    .sort((left, right) => left.localeCompare(right))
+    .slice(0, suggestionLimit);
+});
+
+const modelSuggestionHint = computed(() => {
+  if (carModels.value.length === 0) {
+    return "Подсказки появятся после загрузки каталога моделей.";
+  }
+
+  if (!form.carBrand.trim()) {
+    return "Сначала укажите марку или начните вводить модель.";
+  }
+
+  if (modelSuggestions.value.length === 0) {
+    return "Для введенной марки модели не найдены. Проверьте написание.";
+  }
+
+  return "Выберите модель из выпадающих подсказок.";
 });
 
 function isPdf(file: File): boolean {
