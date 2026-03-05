@@ -73,6 +73,36 @@ namespace CarService.Infrastructure.Services
             };
         }
 
+        public async Task<IReadOnlyCollection<string>> GetBrandsAsync(CancellationToken cancellationToken = default)
+        {
+            return await _db.CarBrands
+                .AsNoTracking()
+                .Select(brand => brand.Name)
+                .Where(name => name != string.Empty)
+                .OrderBy(name => name)
+                .ToListAsync(cancellationToken);
+        }
+
+        public async Task<IReadOnlyCollection<string>> GetModelsAsync(
+            string? brand,
+            CancellationToken cancellationToken = default)
+        {
+            IQueryable<CarModelLookup> query = _db.CarModelLookups
+                .AsNoTracking();
+
+            if (!string.IsNullOrWhiteSpace(brand))
+            {
+                var normalizedBrand = brand.Trim().ToLowerInvariant();
+                query = query.Where(entity => entity.Brand.Name.ToLower() == normalizedBrand);
+            }
+
+            return await query
+                .Select(entity => entity.Name)
+                .Where(name => name != string.Empty)
+                .OrderBy(name => name)
+                .ToListAsync(cancellationToken);
+        }
+
         public async Task<CarModelDetailsDto?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
         {
             var model = await _db.CarModels

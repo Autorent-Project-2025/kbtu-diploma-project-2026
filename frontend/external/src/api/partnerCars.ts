@@ -1,12 +1,5 @@
 import api from "./axios";
 
-export interface CarModelOption {
-  id: number;
-  brand: string;
-  model: string;
-  year: number;
-}
-
 export interface PartnerCarSummary {
   id: number;
   modelDisplayName: string;
@@ -52,13 +45,6 @@ export interface PartnerCarDetails {
   images: PartnerCarImage[];
 }
 
-interface CarModelsResponse {
-  items: CarModelOption[];
-  totalCount: number;
-  page: number;
-  pageSize: number;
-}
-
 export async function getMyPartnerCars(): Promise<PartnerCarSummary[]> {
   const response = await api.get("/cars/my");
   return (response.data ?? []) as PartnerCarSummary[];
@@ -69,14 +55,16 @@ export async function getMyPartnerCarDetails(carId: number): Promise<PartnerCarD
   return response.data as PartnerCarDetails;
 }
 
-export async function getCarModels(): Promise<CarModelOption[]> {
-  const response = await api.get("/cars/models", {
+export async function getCarBrands(): Promise<string[]> {
+  const response = await api.get("/cars/catalog/brands");
+  return (response.data ?? []) as string[];
+}
+
+export async function getCarModelNames(brand?: string | null): Promise<string[]> {
+  const response = await api.get("/cars/catalog/models", {
     params: {
-      page: 1,
-      pageSize: 300,
+      brand: brand?.trim() || undefined,
     },
   });
-
-  const payload = response.data as CarModelsResponse;
-  return payload.items ?? [];
+  return (response.data ?? []) as string[];
 }

@@ -32,40 +32,52 @@
 
           <div class="space-y-2">
             <label for="carBrand" class="block text-sm font-semibold text-gray-700 dark:text-gray-300">Марка</label>
-            <input
+            <select
               id="carBrand"
-              v-model="form.carBrand"
-              list="carBrandSuggestions"
-              type="text"
-              placeholder="Начните вводить марку, например Toyota"
-              autocomplete="off"
+              v-model="form.brandSelection"
               required
               class="w-full px-4 py-3 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white"
+            >
+              <option value="" disabled>Выберите марку</option>
+              <option v-for="brand in brandOptions" :key="brand" :value="brand">{{ brand }}</option>
+              <option :value="customOptionValue">Свой вариант</option>
+            </select>
+            <input
+              v-if="isCustomBrandSelected"
+              id="customCarBrand"
+              v-model="form.customCarBrand"
+              type="text"
+              placeholder="Введите свою марку"
+              autocomplete="off"
+              class="w-full px-4 py-3 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white"
             />
-            <datalist id="carBrandSuggestions">
-              <option v-for="brand in brandSuggestions" :key="brand" :value="brand" />
-            </datalist>
             <p class="text-xs text-gray-500 dark:text-gray-400">
-              Подсказки берутся из каталога доступных марок.
+              Марки загружаются из каталога. При необходимости можно указать свою.
             </p>
           </div>
 
           <div class="space-y-2">
             <label for="carModel" class="block text-sm font-semibold text-gray-700 dark:text-gray-300">Модель</label>
-            <input
+            <select
               id="carModel"
-              v-model="form.carModel"
-              list="carModelSuggestions"
-              type="text"
-              placeholder="Начните вводить модель, например Camry"
-              autocomplete="off"
+              v-model="form.modelSelection"
               required
               class="w-full px-4 py-3 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white"
+            >
+              <option value="" disabled>{{ modelPlaceholder }}</option>
+              <option v-for="model in modelOptions" :key="model" :value="model">{{ model }}</option>
+              <option :value="customOptionValue">Свой вариант</option>
+            </select>
+            <input
+              v-if="isCustomModelSelected"
+              id="customCarModel"
+              v-model="form.customCarModel"
+              type="text"
+              placeholder="Введите свою модель"
+              autocomplete="off"
+              class="w-full px-4 py-3 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white"
             />
-            <datalist id="carModelSuggestions">
-              <option v-for="model in modelSuggestions" :key="model" :value="model" />
-            </datalist>
-            <p class="text-xs text-gray-500 dark:text-gray-400">{{ modelSuggestionHint }}</p>
+            <p class="text-xs text-gray-500 dark:text-gray-400">{{ modelHint }}</p>
           </div>
 
           <div class="space-y-2">
@@ -175,12 +187,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from "vue";
+import { computed, onMounted, reactive, ref, watch } from "vue";
 import { createPartnerCarTicket } from "../api/tickets";
 import {
-  getCarModels,
+  getCarBrands,
+  getCarModelNames,
   getMyPartnerCars,
-  type CarModelOption,
   type PartnerCarSummary,
 } from "../api/partnerCars";
 import { useToast } from "../composables/useToast";
@@ -188,67 +200,60 @@ import { useToast } from "../composables/useToast";
 const { error, success } = useToast();
 
 const cars = ref<PartnerCarSummary[]>([]);
-const carModels = ref<CarModelOption[]>([]);
+const brandOptions = ref<string[]>([]);
+const modelOptions = ref<string[]>([]);
 const loadingCars = ref(false);
+const loadingModels = ref(false);
 const submitting = ref(false);
 const submitted = ref(false);
+const customOptionValue = "__custom__";
 const maxAllowedCarYear = new Date().getUTCFullYear() + 1;
 
 const form = reactive({
   email: "",
-  carBrand: "",
-  carModel: "",
+  brandSelection: "",
+  customCarBrand: "",
+  modelSelection: "",
+  customCarModel: "",
   carYear: null as number | null,
   licensePlate: "",
   ownershipDocumentFile: null as File | null,
   carImageFiles: [] as File[],
 });
 
-const suggestionLimit = 80;
+const isCustomBrandSelected = computed(() => form.brandSelection === customOptionValue);
+const isCustomModelSelected = computed(() => form.modelSelection === customOptionValue);
 
-const brandSuggestions = computed(() => {
-  return Array.from(
-    new Set(
-      carModels.value
-        .map((model) => model.brand.trim())
-        .filter((brand) => brand.length > 0)
-    )
-  )
-    .sort((left, right) => left.localeCompare(right))
-    .slice(0, suggestionLimit);
+const resolvedCarBrand = computed(() => {
+  return isCustomBrandSelected.value ? form.customCarBrand.trim() : form.brandSelection.trim();
 });
 
-const modelSuggestions = computed(() => {
-  const selectedBrand = form.carBrand.trim().toLowerCase();
-  const candidates = selectedBrand.length === 0
-    ? carModels.value
-    : carModels.value.filter((item) => item.brand.trim().toLowerCase().includes(selectedBrand));
-
-  return Array.from(
-    new Set(
-      candidates
-        .map((item) => item.model.trim())
-        .filter((model) => model.length > 0)
-    )
-  )
-    .sort((left, right) => left.localeCompare(right))
-    .slice(0, suggestionLimit);
+const resolvedCarModel = computed(() => {
+  return isCustomModelSelected.value ? form.customCarModel.trim() : form.modelSelection.trim();
 });
 
-const modelSuggestionHint = computed(() => {
-  if (carModels.value.length === 0) {
-    return "Подсказки появятся после загрузки каталога моделей.";
+const modelPlaceholder = computed(() => {
+  if (loadingModels.value) {
+    return "Загрузка моделей...";
   }
 
-  if (!form.carBrand.trim()) {
-    return "Сначала укажите марку или начните вводить модель.";
+  if (modelOptions.value.length === 0) {
+    return "Модели не найдены";
   }
 
-  if (modelSuggestions.value.length === 0) {
-    return "Для введенной марки модели не найдены. Проверьте написание.";
+  return "Выберите модель";
+});
+
+const modelHint = computed(() => {
+  if (loadingModels.value) {
+    return "Обновляем список моделей из каталога.";
   }
 
-  return "Выберите модель из выпадающих подсказок.";
+  if (modelOptions.value.length === 0) {
+    return "Для выбранной марки модели не найдены. Можно указать свой вариант.";
+  }
+
+  return "Модели загружаются из каталога. При необходимости можно указать свою.";
 });
 
 function isPdf(file: File): boolean {
@@ -306,17 +311,48 @@ async function loadCars() {
   }
 }
 
-async function loadModels() {
+async function loadBrandOptions() {
   try {
-    carModels.value = await getCarModels();
+    brandOptions.value = await getCarBrands();
   } catch (e: any) {
-    error(e?.response?.data?.error || "Не удалось загрузить список моделей.");
+    error(e?.response?.data?.error || "Не удалось загрузить список марок.");
   }
 }
 
+async function loadModelOptions(brand?: string | null) {
+  loadingModels.value = true;
+  try {
+    modelOptions.value = await getCarModelNames(brand);
+  } catch (e: any) {
+    modelOptions.value = [];
+    error(e?.response?.data?.error || "Не удалось загрузить список моделей.");
+  } finally {
+    loadingModels.value = false;
+  }
+}
+
+async function refreshModelOptionsForCurrentBrand() {
+  const brandFilter = isCustomBrandSelected.value ? null : form.brandSelection;
+  await loadModelOptions(brandFilter);
+}
+
+watch(
+  () => form.brandSelection,
+  async (nextBrand, previousBrand) => {
+    if (nextBrand !== previousBrand) {
+      form.modelSelection = "";
+      form.customCarModel = "";
+    }
+
+    await refreshModelOptionsForCurrentBrand();
+  }
+);
+
 function resetForm() {
-  form.carBrand = "";
-  form.carModel = "";
+  form.brandSelection = "";
+  form.customCarBrand = "";
+  form.modelSelection = "";
+  form.customCarModel = "";
   form.carYear = null;
   form.licensePlate = "";
   form.ownershipDocumentFile = null;
@@ -330,8 +366,8 @@ async function submitTicket() {
     return;
   }
 
-  const carBrand = form.carBrand.trim();
-  const carModel = form.carModel.trim();
+  const carBrand = resolvedCarBrand.value;
+  const carModel = resolvedCarModel.value;
   if (!carBrand || !carModel) {
     error("Укажите марку и модель машины.");
     return;
@@ -385,6 +421,6 @@ async function submitTicket() {
 }
 
 onMounted(async () => {
-  await Promise.all([loadCars(), loadModels()]);
+  await Promise.all([loadCars(), loadBrandOptions(), refreshModelOptionsForCurrentBrand()]);
 });
 </script>
