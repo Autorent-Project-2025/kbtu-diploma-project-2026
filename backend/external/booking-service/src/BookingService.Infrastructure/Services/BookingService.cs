@@ -23,34 +23,42 @@ namespace BookingService.Infrastructure.Services
             _db = db;
         }
 
-        public async Task<bool> IsCarAvailable(int carId, DateTime start, DateTime end)
+        public async Task<bool> IsPartnerCarAvailable(int partnerCarId, DateTimeOffset startTime, DateTimeOffset endTime)
         {
-            if (carId <= 0)
+            if (partnerCarId <= 0)
             {
-                throw new ArgumentException("CarId must be greater than zero.", nameof(carId));
+                throw new ArgumentException("PartnerCarId must be greater than zero.", nameof(partnerCarId));
             }
 
-            EnsureValidDateRange(start, end);
+            EnsureValidDateRange(startTime, endTime);
 
-            return !await HasOverlappingActiveBookings(carId, start, end);
+            return !await HasOverlappingActiveBookings(partnerCarId, startTime, endTime);
         }
 
-        public async Task<BookingResponseDto> CreateBooking(string userId, BookingCreateDto dto)
+        public async Task<BookingResponseDto> CreateBooking(Guid userId, BookingCreateDto dto)
         {
             ArgumentNullException.ThrowIfNull(dto);
-
             EnsureValidUserId(userId);
 
-            if (dto.CarId <= 0)
+            var partnerCarId = dto.ResolvePartnerCarId();
+            var startTime = dto.ResolveStartTime();
+            var endTime = dto.ResolveEndTime();
+
+            if (dto.PartnerId == Guid.Empty)
             {
-                throw new ArgumentException("CarId must be greater than zero.", nameof(dto.CarId));
+                throw new ArgumentException("PartnerId is required.", nameof(dto.PartnerId));
             }
 
-            EnsureValidDateRange(dto.StartDate, dto.EndDate);
+            if (dto.PriceHour.HasValue && dto.PriceHour.Value <= 0)
+            {
+                throw new ArgumentException("PriceHour must be greater than zero.", nameof(dto.PriceHour));
+            }
+
+            EnsureValidDateRange(startTime, endTime);
 
             if (!_db.Database.IsRelational())
             {
-                return await CreateBookingInMemory(userId, dto);
+                return await CreateBookingInMemory(userId, dto, partnerCarId, startTime, endTime);
             }
 
             for (var attempt = 1; attempt <= MaxSerializableRetries; attempt++)
@@ -58,7 +66,7 @@ namespace BookingService.Infrastructure.Services
                 await using var transaction = await _db.Database.BeginTransactionAsync(IsolationLevel.Serializable);
                 try
                 {
-                    var booking = await CreateBookingWithOverlapCheck(userId, dto);
+                    var booking = await CreateBookingWithOverlapCheck(userId, dto, partnerCarId, startTime, endTime);
                     await transaction.CommitAsync();
                     return booking.ToBookingResponseDto();
                 }
@@ -82,12 +90,24 @@ namespace BookingService.Infrastructure.Services
                         throw new InvalidOperationException("Car is already booked for this time.");
                     }
                 }
+                catch (PostgresException ex) when (IsOverlappingConstraintViolation(ex))
+                {
+                    await transaction.RollbackAsync();
+                    _db.ChangeTracker.Clear();
+                    throw new InvalidOperationException("Car is already booked for this time.");
+                }
+                catch (DbUpdateException ex) when (IsOverlappingConstraintViolation(ex))
+                {
+                    await transaction.RollbackAsync();
+                    _db.ChangeTracker.Clear();
+                    throw new InvalidOperationException("Car is already booked for this time.");
+                }
             }
 
             throw new InvalidOperationException("Car is already booked for this time.");
         }
 
-        public async Task<IEnumerable<BookingResponseDto>> GetUserBookings(string userId)
+        public async Task<IEnumerable<BookingResponseDto>> GetUserBookings(Guid userId)
         {
             EnsureValidUserId(userId);
 
@@ -98,10 +118,9 @@ namespace BookingService.Infrastructure.Services
                 .ToListAsync();
         }
 
-        public async Task<PagedResult<BookingResponseDto>> GetUserBookingsPaginated(string userId, BookingQueryParams queryParams)
+        public async Task<PagedResult<BookingResponseDto>> GetUserBookingsPaginated(Guid userId, BookingQueryParams queryParams)
         {
             ArgumentNullException.ThrowIfNull(queryParams);
-
             EnsureValidUserId(userId);
 
             var sortBy = NormalizeSortBy(queryParams.SortBy);
@@ -113,8 +132,8 @@ namespace BookingService.Infrastructure.Services
 
             query = sortBy switch
             {
-                "startdate" => isDescending ? query.OrderByDescending(b => b.StartDate) : query.OrderBy(b => b.StartDate),
-                "enddate" => isDescending ? query.OrderByDescending(b => b.EndDate) : query.OrderBy(b => b.EndDate),
+                "starttime" => isDescending ? query.OrderByDescending(b => b.StartTime) : query.OrderBy(b => b.StartTime),
+                "endtime" => isDescending ? query.OrderByDescending(b => b.EndTime) : query.OrderBy(b => b.EndTime),
                 _ => isDescending ? query.OrderByDescending(b => b.Id) : query.OrderBy(b => b.Id)
             };
 
@@ -135,7 +154,7 @@ namespace BookingService.Infrastructure.Services
             };
         }
 
-        public async Task<BookingResponseDto?> GetBooking(int id, string userId)
+        public async Task<BookingResponseDto?> GetBooking(int id, Guid userId)
         {
             if (id <= 0)
             {
@@ -151,7 +170,104 @@ namespace BookingService.Infrastructure.Services
                 .FirstOrDefaultAsync();
         }
 
-        public async Task<bool> CancelBooking(int id, string userId)
+        public async Task<IReadOnlyCollection<BookingResponseDto>> GetBookingsByPartnerCarId(int partnerCarId, CancellationToken cancellationToken = default)
+        {
+            if (partnerCarId <= 0)
+            {
+                throw new ArgumentException("PartnerCarId must be greater than zero.", nameof(partnerCarId));
+            }
+
+            return await _db.Bookings
+                .AsNoTracking()
+                .Where(booking => booking.PartnerCarId == partnerCarId)
+                .OrderByDescending(booking => booking.StartTime)
+                .ThenByDescending(booking => booking.Id)
+                .SelectToBookingResponseDto()
+                .ToListAsync(cancellationToken);
+        }
+
+        public async Task<IReadOnlyCollection<CarBookingCountDto>> GetBookingCountsByPartnerCarIds(IReadOnlyCollection<int> partnerCarIds, CancellationToken cancellationToken = default)
+        {
+            var normalizedIds = partnerCarIds
+                .Where(id => id > 0)
+                .Distinct()
+                .ToArray();
+
+            if (normalizedIds.Length == 0)
+            {
+                return [];
+            }
+
+            return await _db.Bookings
+                .AsNoTracking()
+                .Where(booking => normalizedIds.Contains(booking.PartnerCarId))
+                .GroupBy(booking => booking.PartnerCarId)
+                .Select(group => new CarBookingCountDto
+                {
+                    PartnerCarId = group.Key,
+                    Count = group.Count()
+                })
+                .ToListAsync(cancellationToken);
+        }
+
+        public async Task<IReadOnlyCollection<CarAvailabilityResultDto>> CheckAvailabilityByPartnerCarIds(
+            IReadOnlyCollection<int> partnerCarIds,
+            DateTimeOffset startTime,
+            DateTimeOffset endTime,
+            CancellationToken cancellationToken = default)
+        {
+            EnsureValidDateRange(startTime, endTime);
+
+            var normalizedIds = partnerCarIds
+                .Where(id => id > 0)
+                .Distinct()
+                .ToArray();
+
+            if (normalizedIds.Length == 0)
+            {
+                return [];
+            }
+
+            var requestedDuration = endTime - startTime;
+
+            var activeBookings = await _db.Bookings
+                .AsNoTracking()
+                .Where(booking =>
+                    normalizedIds.Contains(booking.PartnerCarId) &&
+                    (booking.Status == BookingStatus.Pending ||
+                     booking.Status == BookingStatus.Confirmed ||
+                     booking.Status == BookingStatus.Active) &&
+                    booking.EndTime > startTime)
+                .OrderBy(booking => booking.PartnerCarId)
+                .ThenBy(booking => booking.StartTime)
+                .ToListAsync(cancellationToken);
+
+            var bookingsByCarId = activeBookings
+                .GroupBy(booking => booking.PartnerCarId)
+                .ToDictionary(group => group.Key, group => group.ToList());
+
+            var results = new List<CarAvailabilityResultDto>(normalizedIds.Length);
+            foreach (var partnerCarId in normalizedIds)
+            {
+                var bookings = bookingsByCarId.GetValueOrDefault(partnerCarId, []);
+                var hasOverlap = bookings.Any(booking =>
+                    startTime < booking.EndTime &&
+                    endTime > booking.StartTime);
+
+                var nextAvailableFrom = FindEarliestAvailableStart(bookings, startTime, requestedDuration);
+
+                results.Add(new CarAvailabilityResultDto
+                {
+                    PartnerCarId = partnerCarId,
+                    IsAvailable = !hasOverlap,
+                    NextAvailableFrom = nextAvailableFrom
+                });
+            }
+
+            return results;
+        }
+
+        public async Task<bool> CancelBooking(int id, Guid userId)
         {
             var booking = await GetUserBookingEntity(id, userId);
             if (booking == null)
@@ -164,7 +280,7 @@ namespace BookingService.Infrastructure.Services
             return true;
         }
 
-        public async Task<bool> ConfirmBooking(int id, string userId)
+        public async Task<bool> ConfirmBooking(int id, Guid userId)
         {
             var booking = await GetUserBookingEntity(id, userId);
             if (booking == null)
@@ -177,7 +293,7 @@ namespace BookingService.Infrastructure.Services
             return true;
         }
 
-        public async Task<bool> CompleteBooking(int id, string userId)
+        public async Task<bool> CompleteBooking(int id, Guid userId)
         {
             var booking = await GetUserBookingEntity(id, userId);
             if (booking == null)
@@ -190,12 +306,17 @@ namespace BookingService.Infrastructure.Services
             return true;
         }
 
-        private async Task<BookingResponseDto> CreateBookingInMemory(string userId, BookingCreateDto dto)
+        private async Task<BookingResponseDto> CreateBookingInMemory(
+            Guid userId,
+            BookingCreateDto dto,
+            int partnerCarId,
+            DateTimeOffset startTime,
+            DateTimeOffset endTime)
         {
             await InMemoryCreateLock.WaitAsync();
             try
             {
-                var booking = await CreateBookingWithOverlapCheck(userId, dto);
+                var booking = await CreateBookingWithOverlapCheck(userId, dto, partnerCarId, startTime, endTime);
                 return booking.ToBookingResponseDto();
             }
             finally
@@ -204,23 +325,37 @@ namespace BookingService.Infrastructure.Services
             }
         }
 
-        private async Task<Booking> CreateBookingWithOverlapCheck(string userId, BookingCreateDto dto)
+        private async Task<Booking> CreateBookingWithOverlapCheck(
+            Guid userId,
+            BookingCreateDto dto,
+            int partnerCarId,
+            DateTimeOffset startTime,
+            DateTimeOffset endTime)
         {
-            if (await HasOverlappingActiveBookings(dto.CarId, dto.StartDate, dto.EndDate))
+            if (await HasOverlappingActiveBookings(partnerCarId, startTime, endTime))
             {
                 throw new InvalidOperationException("Car is already booked for this time.");
             }
 
-            var hours = (decimal)(dto.EndDate - dto.StartDate).TotalHours;
+            var totalHours = (decimal)(endTime - startTime).TotalHours;
+            decimal? totalPrice = null;
+
+            if (dto.PriceHour.HasValue)
+            {
+                totalPrice = decimal.Round(dto.PriceHour.Value * totalHours, 2, MidpointRounding.AwayFromZero);
+            }
 
             var booking = new Booking
             {
-                CarId = dto.CarId,
+                PartnerCarId = partnerCarId,
                 UserId = userId,
-                StartDate = dto.StartDate,
-                EndDate = dto.EndDate,
+                PartnerId = dto.PartnerId,
+                StartTime = startTime,
+                EndTime = endTime,
                 Status = BookingStatus.Pending,
-                Price = hours
+                PriceHour = dto.PriceHour,
+                TotalPrice = totalPrice,
+                CreatedAt = DateTimeOffset.UtcNow
             };
 
             _db.Bookings.Add(booking);
@@ -229,17 +364,17 @@ namespace BookingService.Infrastructure.Services
             return booking;
         }
 
-        private Task<bool> HasOverlappingActiveBookings(int carId, DateTime start, DateTime end)
+        private Task<bool> HasOverlappingActiveBookings(int partnerCarId, DateTimeOffset startTime, DateTimeOffset endTime)
         {
             return _db.Bookings
                 .AnyAsync(b =>
-                    b.CarId == carId &&
-                    (b.Status == BookingStatus.Pending || b.Status == BookingStatus.Confirmed) &&
-                    start < b.EndDate &&
-                    end > b.StartDate);
+                    b.PartnerCarId == partnerCarId &&
+                    (b.Status == BookingStatus.Pending || b.Status == BookingStatus.Confirmed || b.Status == BookingStatus.Active) &&
+                    startTime < b.EndTime &&
+                    endTime > b.StartTime);
         }
 
-        private async Task<Booking?> GetUserBookingEntity(int id, string userId)
+        private async Task<Booking?> GetUserBookingEntity(int id, Guid userId)
         {
             if (id <= 0)
             {
@@ -252,22 +387,44 @@ namespace BookingService.Infrastructure.Services
                 .FirstOrDefaultAsync(b => b.Id == id && b.UserId == userId);
         }
 
-        private static void EnsureValidDateRange(DateTime start, DateTime end)
+        private static void EnsureValidDateRange(DateTimeOffset startTime, DateTimeOffset endTime)
         {
-            if (start == default)
+            if (startTime == default)
             {
-                throw new ArgumentException("StartDate is required.", nameof(start));
+                throw new ArgumentException("StartTime is required.", nameof(startTime));
             }
 
-            if (end == default)
+            if (endTime == default)
             {
-                throw new ArgumentException("EndDate is required.", nameof(end));
+                throw new ArgumentException("EndTime is required.", nameof(endTime));
             }
 
-            if (end <= start)
+            if (endTime <= startTime)
             {
-                throw new ArgumentException("EndDate must be greater than StartDate.", nameof(end));
+                throw new ArgumentException("EndTime must be greater than StartTime.", nameof(endTime));
             }
+        }
+
+        private static DateTimeOffset FindEarliestAvailableStart(
+            IReadOnlyCollection<Booking> bookings,
+            DateTimeOffset requestedStartTime,
+            TimeSpan requestedDuration)
+        {
+            var cursor = requestedStartTime;
+            foreach (var booking in bookings.OrderBy(item => item.StartTime))
+            {
+                if (cursor + requestedDuration <= booking.StartTime)
+                {
+                    return cursor;
+                }
+
+                if (booking.EndTime > cursor)
+                {
+                    cursor = booking.EndTime;
+                }
+            }
+
+            return cursor;
         }
 
         private static string NormalizeSortBy(string? sortBy)
@@ -278,17 +435,17 @@ namespace BookingService.Infrastructure.Services
             }
 
             var normalized = sortBy.Trim().ToLowerInvariant();
-            if (normalized is "id" or "startdate" or "enddate")
+            if (normalized is "id" or "starttime" or "endtime")
             {
                 return normalized;
             }
 
-            throw new ArgumentException("SortBy must be one of: id, startDate, endDate.", nameof(sortBy));
+            throw new ArgumentException("SortBy must be one of: id, startTime, endTime.", nameof(sortBy));
         }
 
-        private static void EnsureValidUserId(string userId)
+        private static void EnsureValidUserId(Guid userId)
         {
-            if (string.IsNullOrWhiteSpace(userId))
+            if (userId == Guid.Empty)
             {
                 throw new ArgumentException("User id is required.", nameof(userId));
             }
@@ -304,7 +461,8 @@ namespace BookingService.Infrastructure.Services
             var isAllowed = booking.Status switch
             {
                 BookingStatus.Pending => targetStatus is BookingStatus.Confirmed or BookingStatus.Canceled,
-                BookingStatus.Confirmed => targetStatus is BookingStatus.Completed or BookingStatus.Canceled,
+                BookingStatus.Confirmed => targetStatus is BookingStatus.Active or BookingStatus.Completed or BookingStatus.Canceled,
+                BookingStatus.Active => targetStatus is BookingStatus.Completed,
                 BookingStatus.Completed => false,
                 BookingStatus.Canceled => false,
                 _ => false
@@ -327,6 +485,17 @@ namespace BookingService.Infrastructure.Services
         private static bool IsSerializationFailure(PostgresException ex)
         {
             return ex.SqlState == PostgresErrorCodes.SerializationFailure;
+        }
+
+        private static bool IsOverlappingConstraintViolation(DbUpdateException ex)
+        {
+            return ex.InnerException is PostgresException postgresException && IsOverlappingConstraintViolation(postgresException);
+        }
+
+        private static bool IsOverlappingConstraintViolation(PostgresException ex)
+        {
+            return ex.SqlState == PostgresErrorCodes.ExclusionViolation &&
+                   string.Equals(ex.ConstraintName, "prevent_overlapping_bookings", StringComparison.Ordinal);
         }
     }
 }

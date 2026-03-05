@@ -2,10 +2,12 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { createMailer } from "./mailer/mailer.ts";
 import {
   approvedTemplate,
+  partnerCarApprovedTemplate,
+  partnerCarRejectedTemplate,
   partnerApprovedTemplate,
   partnerRejectedTemplate,
   rejectedTemplate,
-} from "./mailer/templates.ts";
+} from "./mailer/templates/index.ts";
 
 type JsonBody = Record<string, unknown>;
 
@@ -166,6 +168,58 @@ async function main() {
         const reason = optionalString(body.reason, "reason");
 
         const template = partnerRejectedTemplate({ fullName, reason });
+        const result = await mailer.sendMail({
+          to,
+          subject: template.subject,
+          text: template.text,
+          html: template.html,
+        });
+
+        sendJson(res, 200, { message: "Email sent", ...result });
+        return;
+      }
+
+      if (req.method === "POST" && url.pathname === "/emails/partners/cars/approved") {
+        const body = await readJsonBody(req);
+        const to = requiredString(body.to, "to");
+        const fullName = requiredString(body.fullName, "fullName");
+        const carBrand = requiredString(body.carBrand, "carBrand");
+        const carModel = requiredString(body.carModel, "carModel");
+        const licensePlate = requiredString(body.licensePlate, "licensePlate");
+
+        const template = partnerCarApprovedTemplate({
+          fullName,
+          carBrand,
+          carModel,
+          licensePlate,
+        });
+        const result = await mailer.sendMail({
+          to,
+          subject: template.subject,
+          text: template.text,
+          html: template.html,
+        });
+
+        sendJson(res, 200, { message: "Email sent", ...result });
+        return;
+      }
+
+      if (req.method === "POST" && url.pathname === "/emails/partners/cars/rejected") {
+        const body = await readJsonBody(req);
+        const to = requiredString(body.to, "to");
+        const fullName = requiredString(body.fullName, "fullName");
+        const carBrand = requiredString(body.carBrand, "carBrand");
+        const carModel = requiredString(body.carModel, "carModel");
+        const licensePlate = requiredString(body.licensePlate, "licensePlate");
+        const reason = optionalString(body.reason, "reason");
+
+        const template = partnerCarRejectedTemplate({
+          fullName,
+          carBrand,
+          carModel,
+          licensePlate,
+          reason,
+        });
         const result = await mailer.sendMail({
           to,
           subject: template.subject,

@@ -1,259 +1,282 @@
 import api from "./axios";
-import type { Car, CarDetails } from "../types/Car";
+import { getPartnerPublicProfileByRelatedUserId } from "./partners";
 import type { PaginatedResponse } from "../types/Pagination";
 
-// Функция для преобразования PascalCase → camelCase
 function toCamelCase(obj: any): any {
   if (Array.isArray(obj)) {
     return obj.map(toCamelCase);
-  } else if (obj !== null && typeof obj === "object") {
+  }
+
+  if (obj !== null && typeof obj === "object") {
     return Object.keys(obj).reduce((result, key) => {
       const camelKey = key.charAt(0).toLowerCase() + key.slice(1);
       result[camelKey] = toCamelCase(obj[key]);
       return result;
     }, {} as any);
   }
+
   return obj;
 }
 
-export interface GetCarsParams {
-  brand?: string;
-  model?: string;
-  sortBy?: "rating" | "priceHour" | "year";
-  sortOrder?: "asc" | "desc";
-  page?: number;
-  pageSize?: number;
+export interface AvailableCarModel {
+  modelId: number;
+  brand: string;
+  model: string;
+  year: number;
+  availableCarsCount: number;
+  minPriceHour?: number | null;
+  maxPriceHour?: number | null;
+  averageRating?: number | null;
 }
 
-export interface GetCarCommentsParams {
-  page?: number;
-  pageSize?: number;
+export interface AvailableModelCard extends AvailableCarModel {
+  imageUrl: string | null;
+  description?: string | null;
 }
 
-/**
- * Получить список всех автомобилей с пагинацией
- */
-export async function getCars(
-  params?: GetCarsParams
-): Promise<PaginatedResponse<Car> | Car[]> {
-  console.log("🔍 getCars called with params:", params);
+export interface CarModelImageDto {
+  id: number;
+  imageId?: string | null;
+  imageUrl: string;
+  imageType: number;
+  displayOrder: number;
+}
+
+export interface CarModelFeatureDto {
+  name: string;
+}
+
+export interface CarModelDetailsDto {
+  id: number;
+  brand: string;
+  model: string;
+  year: number;
+  engine?: string | null;
+  transmission?: string | null;
+  seats?: number | null;
+  fuelType?: string | null;
+  doors?: number | null;
+  description?: string | null;
+  rating?: number | null;
+  ratingsCount: number;
+  priceHour?: number | null;
+  priceDay?: number | null;
+  features: CarModelFeatureDto[];
+  images: CarModelImageDto[];
+}
+
+export interface PartnerCarSummaryDto {
+  id: number;
+  partnerId: string;
+  carModelId: number;
+  licensePlate: string;
+  priceHour?: number | null;
+  priceDay?: number | null;
+  status: number;
+  rating?: number | null;
+  ratingsCount: number;
+  modelBrand: string;
+  modelName: string;
+  modelYear: number;
+}
+
+export interface CarCommentDto {
+  id: number;
+  userId: string;
+  userName: string;
+  carId: number;
+  partnerCarId?: number | null;
+  content: string;
+  rating: number;
+  createdOn: string;
+}
+
+export interface ModelReviewDto extends CarCommentDto {
+  carrierPartnerId: string;
+  carrierName: string;
+}
+
+export interface ModelDetailsPayload {
+  model: CarModelDetailsDto;
+  availability: AvailableCarModel | null;
+  reviews: ModelReviewDto[];
+  minPriceHour: number | null;
+  maxPriceHour: number | null;
+}
+
+export interface MatchCarByModelPayload {
+  modelId: number;
+  startTime: string;
+  endTime: string;
+}
+
+export interface MatchCarByModelResult {
+  isAvailable: boolean;
+  partnerCarId?: number | null;
+  partnerId?: string | null;
+  priceHour?: number | null;
+  modelBrand?: string | null;
+  modelName?: string | null;
+  modelYear?: number | null;
+  suggestedStartTimesUtc?: string[];
+}
+
+const unknownCarrierName = "Неизвестный перевозчик";
+const carrierNameCache = new Map<string, string>();
+
+function getMinPrice(cars: PartnerCarSummaryDto[]): number | null {
+  const prices = cars
+    .map((item) => item.priceHour)
+    .filter((value): value is number => value !== null && value !== undefined);
+
+  return prices.length > 0 ? Math.min(...prices) : null;
+}
+
+function getMaxPrice(cars: PartnerCarSummaryDto[]): number | null {
+  const prices = cars
+    .map((item) => item.priceHour)
+    .filter((value): value is number => value !== null && value !== undefined);
+
+  return prices.length > 0 ? Math.max(...prices) : null;
+}
+
+async function resolveCarrierName(relatedUserId: string): Promise<string> {
+  const normalized = (relatedUserId ?? "").trim();
+  if (!normalized) {
+    return unknownCarrierName;
+  }
+
+  const cached = carrierNameCache.get(normalized);
+  if (cached) {
+    return cached;
+  }
 
   try {
-    // Загружаем список машин через gateway
-    const queryParams = new URLSearchParams();
+    const profile = await getPartnerPublicProfileByRelatedUserId(normalized);
+    const resolved = (profile.carrierName ?? "").trim() || unknownCarrierName;
+    carrierNameCache.set(normalized, resolved);
+    return resolved;
+  } catch {
+    carrierNameCache.set(normalized, unknownCarrierName);
+    return unknownCarrierName;
+  }
+}
 
-    if (params?.brand) queryParams.append("brand", params.brand);
-    if (params?.model) queryParams.append("model", params.model);
+export async function getAvailableCarModels(): Promise<AvailableCarModel[]> {
+  const response = await api.get("/cars/available-models");
+  const payload = toCamelCase(response.data);
+  return (payload ?? []) as AvailableCarModel[];
+}
 
-    // ✅ ИСПРАВЛЕНО: Отправляем правильные имена полей в API
-    if (params?.sortBy) {
-      // Преобразуем camelCase → PascalCase для бэкенда
-      let apiSortBy: string = params.sortBy;
-      if (params.sortBy === "priceHour") {
-        apiSortBy = "PriceHour";
-      } else if (params.sortBy === "rating") {
-        apiSortBy = "Rating";
-      } else if (params.sortBy === "year") {
-        apiSortBy = "Year";
-      }
-      queryParams.append("sortBy", apiSortBy);
-      console.log("📤 Sending sortBy to API:", apiSortBy);
-    }
+export async function getCarModelDetails(modelId: number): Promise<CarModelDetailsDto> {
+  const response = await api.get(`/cars/models/${modelId}`);
+  return toCamelCase(response.data) as CarModelDetailsDto;
+}
 
-    if (params?.sortOrder) {
-      queryParams.append("sortOrder", params.sortOrder);
-      console.log("📤 Sending sortOrder to API:", params.sortOrder);
-    }
-
-    if (params?.page) queryParams.append("page", params.page.toString());
-    if (params?.pageSize)
-      queryParams.append("pageSize", params.pageSize.toString());
-
-    const url = `/cars${
-      queryParams.toString() ? "?" + queryParams.toString() : ""
-    }`;
-
-    console.log("🌐 API Request URL:", url);
-    const res = await api.get(url);
-
-    // Преобразуем PascalCase → camelCase
-    const transformed = toCamelCase(res.data);
-    console.log("✅ Transformed response:", transformed);
-
-    // Если ответ содержит items, это пагинированный ответ
-    if (transformed.items) {
-      console.log(
-        "📦 Returning paginated response with",
-        transformed.items.length,
-        "items"
-      );
-      return transformed as PaginatedResponse<Car>;
-    }
-
-    // Иначе это просто массив - оборачиваем в пагинированный формат
-    console.log("📦 Wrapping array response");
-    return {
-      items: transformed,
-      totalCount: transformed.length,
+export async function getPartnerCarsByModel(
+  modelId: number,
+  pageSize = 200
+): Promise<PartnerCarSummaryDto[]> {
+  const response = await api.get("/cars/partner-cars", {
+    params: {
+      carModelId: modelId,
       page: 1,
-      pageSize: transformed.length,
-      totalPages: 1,
-    };
-  } catch (error) {
-    // Fallback на тот же endpoint, если основной запрос не удался
-    console.log("⚠️ Primary endpoint failed, using fallback /cars");
-    const res = await api.get("/cars");
-    const items = toCamelCase(res.data);
-
-    console.log("📥 Fallback data received:", items);
-
-    // Применяем клиентскую сортировку и пагинацию
-    let sortedItems = [...items];
-
-    // ✅ ИСПРАВЛЕНО: Правильная сортировка с числовым сравнением
-    if (params?.sortBy) {
-      console.log(
-        "🔄 Applying client-side sort:",
-        params.sortBy,
-        params.sortOrder
-      );
-
-      sortedItems.sort((a, b) => {
-        const aVal = a[params.sortBy!];
-        const bVal = b[params.sortBy!];
-
-        // ✅ Числовое сравнение для чисел
-        const aNum = Number(aVal);
-        const bNum = Number(bVal);
-
-        if (params.sortOrder === "asc") {
-          return aNum - bNum;
-        } else {
-          return bNum - aNum;
-        }
-      });
-
-      console.log(
-        "✅ Sorted items (first 3):",
-        sortedItems.slice(0, 3).map((car) => ({
-          brand: car.brand,
-          [params.sortBy!]: car[params.sortBy!],
-        }))
-      );
-    }
-
-    // Пагинация
-    const page = params?.page || 1;
-    const pageSize = params?.pageSize || 9;
-    const startIndex = (page - 1) * pageSize;
-    const endIndex = startIndex + pageSize;
-    const paginatedItems = sortedItems.slice(startIndex, endIndex);
-
-    console.log("📄 Pagination:", {
-      page,
       pageSize,
-      startIndex,
-      endIndex,
-      totalItems: sortedItems.length,
-      returnedItems: paginatedItems.length,
+    },
+  });
+
+  const payload = toCamelCase(response.data);
+  if (Array.isArray(payload)) {
+    return payload as PartnerCarSummaryDto[];
+  }
+
+  return ((payload as PaginatedResponse<PartnerCarSummaryDto>).items ?? []) as PartnerCarSummaryDto[];
+}
+
+export async function getPartnerCarComments(
+  partnerCarId: number,
+  pageSize = 100
+): Promise<CarCommentDto[]> {
+  const response = await api.get(`/cars/comments/partner-cars/${partnerCarId}`, {
+    params: {
+      page: 1,
+      pageSize,
+    },
+  });
+
+  const payload = toCamelCase(response.data);
+  if (Array.isArray(payload)) {
+    return payload as CarCommentDto[];
+  }
+
+  return ((payload as PaginatedResponse<CarCommentDto>).items ?? []) as CarCommentDto[];
+}
+
+export async function getAvailableModelCards(): Promise<AvailableModelCard[]> {
+  const availableModels = await getAvailableCarModels();
+  const details = await Promise.all(
+    availableModels.map(async (item) => {
+      try {
+        return [item.modelId, await getCarModelDetails(item.modelId)] as const;
+      } catch {
+        return [item.modelId, null] as const;
+      }
+    })
+  );
+
+  const detailsMap = new Map<number, CarModelDetailsDto | null>(details);
+
+  return availableModels.map((item) => {
+    const detail = detailsMap.get(item.modelId);
+    return {
+      ...item,
+      imageUrl: detail?.images?.[0]?.imageUrl ?? null,
+      description: detail?.description ?? null,
+    };
+  });
+}
+
+export async function getModelDetailsPayload(modelId: number): Promise<ModelDetailsPayload> {
+  const [model, availableModels, partnerCars] = await Promise.all([
+    getCarModelDetails(modelId),
+    getAvailableCarModels(),
+    getPartnerCarsByModel(modelId),
+  ]);
+
+  const availability = availableModels.find((item) => item.modelId === modelId) ?? null;
+
+  const reviewsByPartnerCar = await Promise.all(
+    partnerCars.map(async (partnerCar) => {
+      const comments = await getPartnerCarComments(partnerCar.id);
+      const carrierName = await resolveCarrierName(partnerCar.partnerId);
+      return comments.map((comment) => ({
+        ...comment,
+        carrierPartnerId: partnerCar.partnerId,
+        carrierName,
+      }));
+    })
+  );
+
+  const reviews = reviewsByPartnerCar
+    .flat()
+    .sort((left, right) => {
+      const leftTime = new Date(left.createdOn).getTime();
+      const rightTime = new Date(right.createdOn).getTime();
+      return rightTime - leftTime;
     });
 
-    return {
-      items: paginatedItems,
-      totalCount: sortedItems.length,
-      page,
-      pageSize,
-      totalPages: Math.ceil(sortedItems.length / pageSize),
-    };
-  }
+  return {
+    model,
+    availability,
+    reviews,
+    minPriceHour: availability?.minPriceHour ?? getMinPrice(partnerCars),
+    maxPriceHour: availability?.maxPriceHour ?? getMaxPrice(partnerCars),
+  };
 }
 
-/**
- * Получить детали конкретного автомобиля
- */
-export async function getCarDetails(id: number): Promise<CarDetails> {
-  const res = await api.get(`/cars/${id}`);
-  console.log("Raw backend response:", res.data);
-  const transformed = toCamelCase(res.data);
-  console.log("Transformed to camelCase:", transformed);
-  return transformed;
-}
-
-/**
- * Получить комментарии для конкретного автомобиля с пагинацией
- */
-export async function getCarComments(
-  carId: number,
-  params?: GetCarCommentsParams
-): Promise<PaginatedResponse<any>> {
-  try {
-    // Сначала получаем детали машины (там есть комментарии)
-    const carDetails = await getCarDetails(carId);
-
-    // Извлекаем комментарии из деталей машины
-    const allComments = carDetails.comments || [];
-
-    // Применяем пагинацию
-    const page = params?.page || 1;
-    const pageSize = params?.pageSize || 3;
-    const startIndex = (page - 1) * pageSize;
-    const endIndex = startIndex + pageSize;
-    const paginatedComments = allComments.slice(startIndex, endIndex);
-
-    return {
-      items: paginatedComments,
-      totalCount: allComments.length,
-      page,
-      pageSize,
-      totalPages: Math.ceil(allComments.length / pageSize),
-    };
-  } catch (error) {
-    console.log("Error loading comments:", error);
-    return {
-      items: [],
-      totalCount: 0,
-      page: 1,
-      pageSize: params?.pageSize || 3,
-      totalPages: 0,
-    };
-  }
-}
-
-/**
- * Создать комментарий к машине
- */
-export async function createCarComment(
-  carId: number,
-  content: string,
-  rating: number
-) {
-  const res = await api.post("/cars/comment", {
-    carId,
-    content,
-    rating,
-  });
-  return toCamelCase(res.data);
-}
-
-/**
- * Обновить комментарий
- */
-export async function updateCarComment(
-  commentId: number,
-  content: string,
-  rating: number
-) {
-  const res = await api.put(`/cars/comment/${commentId}`, {
-    content,
-    rating,
-  });
-  return toCamelCase(res.data);
-}
-
-/**
- * Удалить комментарий
- */
-export async function deleteCarComment(commentId: number) {
-  const res = await api.delete(`/cars/comment/${commentId}`);
-  return res.data;
+export async function matchCarByModel(
+  payload: MatchCarByModelPayload
+): Promise<MatchCarByModelResult> {
+  const response = await api.post("/cars/match", payload);
+  return toCamelCase(response.data) as MatchCarByModelResult;
 }

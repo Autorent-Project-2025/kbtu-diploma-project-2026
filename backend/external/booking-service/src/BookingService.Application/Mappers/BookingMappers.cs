@@ -9,13 +9,17 @@ namespace BookingService.Application.Mappers
         private static readonly Expression<Func<Booking, BookingResponseDto>> BookingResponseProjection = booking => new BookingResponseDto
         {
             Id = booking.Id,
-            CarId = booking.CarId,
+            UserId = booking.UserId,
+            PartnerCarId = booking.PartnerCarId,
+            PartnerId = booking.PartnerId,
             CarBrand = string.Empty,
             CarModel = string.Empty,
-            StartDate = booking.StartDate,
-            EndDate = booking.EndDate,
-            Price = booking.Price,
-            Status = booking.Status.ToString()
+            StartTime = booking.StartTime,
+            EndTime = booking.EndTime,
+            PriceHour = booking.PriceHour,
+            TotalPrice = booking.TotalPrice,
+            CreatedAt = booking.CreatedAt,
+            Status = booking.Status.ToString().ToLowerInvariant()
         };
 
         public static IQueryable<BookingResponseDto> SelectToBookingResponseDto(this IQueryable<Booking> query)
@@ -28,13 +32,17 @@ namespace BookingService.Application.Mappers
             return new BookingResponseDto
             {
                 Id = booking.Id,
-                CarId = booking.CarId,
+                UserId = booking.UserId,
+                PartnerCarId = booking.PartnerCarId,
+                PartnerId = booking.PartnerId,
                 CarBrand = string.Empty,
                 CarModel = string.Empty,
-                StartDate = booking.StartDate,
-                EndDate = booking.EndDate,
-                Price = booking.Price,
-                Status = booking.Status.ToString()
+                StartTime = booking.StartTime,
+                EndTime = booking.EndTime,
+                PriceHour = booking.PriceHour,
+                TotalPrice = booking.TotalPrice,
+                CreatedAt = booking.CreatedAt,
+                Status = booking.Status.ToString().ToLowerInvariant()
             };
         }
     }

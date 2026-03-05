@@ -1,4 +1,4 @@
-﻿using CarService.Domain.Entities;
+using CarService.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 
 namespace CarService.Infrastructure.Persistance
@@ -8,9 +8,13 @@ namespace CarService.Infrastructure.Persistance
         public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
             : base(options) { }
 
-        public DbSet<Car> Cars => Set<Car>();
+        public DbSet<CarBrand> CarBrands => Set<CarBrand>();
+        public DbSet<CarModelLookup> CarModelLookups => Set<CarModelLookup>();
+        public DbSet<Car> CarModels => Set<Car>();
+        public DbSet<PartnerCar> PartnerCars => Set<PartnerCar>();
         public DbSet<CarComment> CarComments => Set<CarComment>();
-        public DbSet<CarImage> CarImages => Set<CarImage>();
+        public DbSet<CarModelImage> CarModelImages => Set<CarModelImage>();
+        public DbSet<PartnerCarImage> PartnerCarImages => Set<PartnerCarImage>();
         public DbSet<Feature> Features => Set<Feature>();
         public DbSet<CarFeature> CarFeatures => Set<CarFeature>();
 

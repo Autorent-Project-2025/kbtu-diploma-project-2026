@@ -61,3 +61,42 @@ export async function createPartnerTicket(
 
   return res.data as Ticket;
 }
+
+export interface CreatePartnerCarTicketPayload {
+  email: string;
+  carBrand: string;
+  carModel: string;
+  carYear: number;
+  licensePlate: string;
+  priceHour: number;
+  priceDay: number;
+  ownershipDocumentFile: File;
+  carImageFiles: File[];
+}
+
+export async function createPartnerCarTicket(
+  payload: CreatePartnerCarTicketPayload
+): Promise<Ticket> {
+  const formData = new FormData();
+  formData.append("ticketType", "PartnerCar");
+  formData.append("email", payload.email);
+  formData.append("carBrand", payload.carBrand);
+  formData.append("carModel", payload.carModel);
+  formData.append("carYear", String(payload.carYear));
+  formData.append("licensePlate", payload.licensePlate);
+  formData.append("priceHour", String(payload.priceHour));
+  formData.append("priceDay", String(payload.priceDay));
+  formData.append("ownershipDocumentFile", payload.ownershipDocumentFile);
+
+  for (const file of payload.carImageFiles) {
+    formData.append("carImageFiles", file);
+  }
+
+  const res = await api.post("/tickets", formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
+
+  return res.data as Ticket;
+}

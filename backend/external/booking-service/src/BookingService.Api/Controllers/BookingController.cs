@@ -20,17 +20,17 @@ namespace BookingService.Api.Controllers
             _bookingService = bookingService;
         }
 
-        private string GetUserId()
+        private Guid GetUserId()
         {
             var claimUserId = User.FindFirstValue(ClaimTypes.NameIdentifier)
                 ?? User.FindFirstValue("sub");
 
-            if (!string.IsNullOrWhiteSpace(claimUserId))
+            if (!Guid.TryParse(claimUserId, out var userId) || userId == Guid.Empty)
             {
-                return claimUserId;
+                throw new UnauthorizedAccessException("Authenticated user id claim must be a valid UUID.");
             }
 
-            throw new UnauthorizedAccessException("Authenticated user id claim is required.");
+            return userId;
         }
 
         [HttpPost]
@@ -98,9 +98,21 @@ namespace BookingService.Api.Controllers
 
         [HttpGet("available")]
         [AllowAnonymous]
-        public async Task<IActionResult> CheckAvailable([FromQuery] int carId, [FromQuery] DateTime start, [FromQuery] DateTime end)
+        public async Task<IActionResult> CheckAvailable(
+            [FromQuery] int partnerCarId,
+            [FromQuery] DateTimeOffset startTime,
+            [FromQuery] DateTimeOffset endTime)
         {
-            var available = await _bookingService.IsCarAvailable(carId, start, end);
+            if (partnerCarId <= 0)
+            {
+                throw new ArgumentException("partnerCarId is required and must be greater than zero.");
+            }
+
+            var available = await _bookingService.IsPartnerCarAvailable(
+                partnerCarId,
+                startTime,
+                endTime);
+
             return Ok(new { available });
         }
     }

@@ -157,13 +157,15 @@ const showLastPage = computed(() => {
 });
 
 const showLeftEllipsis = computed(() => {
-  return displayPages.value.length > 0 && displayPages.value[0] > 2;
+  const firstDisplayPage = displayPages.value[0] ?? 0;
+  return displayPages.value.length > 0 && firstDisplayPage > 2;
 });
 
 const showRightEllipsis = computed(() => {
+  const lastDisplayPage = displayPages.value[displayPages.value.length - 1] ?? 0;
   return (
     displayPages.value.length > 0 &&
-    displayPages.value[displayPages.value.length - 1] < props.totalPages - 1
+    lastDisplayPage < props.totalPages - 1
   );
 });
 

@@ -2,9 +2,21 @@ namespace CarService.Application.Constants
 {
     public static class PermissionConstants
     {
-        public const string CarCreate = "Car.Create";
-        public const string CarUpdate = "Car.Update";
-        public const string CarDelete = "Car.Delete";
-        public const string CarImageCreate = "Car.Image.Create";
+        public const string CarModelCreate = "CarModel.Create";
+        public const string CarModelUpdate = "CarModel.Update";
+        public const string CarModelDelete = "CarModel.Delete";
+
+        public const string PartnerCarCreate = "PartnerCar.Create";
+        public const string PartnerCarUpdate = "PartnerCar.Update";
+        public const string PartnerCarDelete = "PartnerCar.Delete";
+        public const string PartnerCarViewOwn = "PartnerCar.ViewOwn";
+
+        public const string CarCommentCreate = "CarComment.Create";
+        public const string CarCommentUpdate = "CarComment.Update";
+        public const string CarCommentDelete = "CarComment.Delete";
+
+        public const string CarImageCreate = "CarImage.Create";
+        public const string CarImageUpdate = "CarImage.Update";
+        public const string CarImageDelete = "CarImage.Delete";
     }
 }

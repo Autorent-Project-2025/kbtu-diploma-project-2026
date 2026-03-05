@@ -2,10 +2,13 @@ using PartnerService.Api.Middleware;
 using PartnerService.Api.Options;
 using PartnerService.Application.Constants;
 using PartnerService.Application.Interfaces;
+using PartnerService.Infrastructure.Integrations;
+using PartnerService.Infrastructure.Options;
 using PartnerService.Infrastructure.Persistence;
 using PartnerService.Infrastructure.Utils;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using System.Security.Cryptography;
 
@@ -14,6 +17,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.Configure<InternalAuthOptions>(builder.Configuration.GetSection(InternalAuthOptions.SectionName));
+builder.Services.Configure<FileServiceOptions>(builder.Configuration.GetSection(FileServiceOptions.SectionName));
 
 var connectionString = builder.Configuration.GetConnectionString("DbConnection");
 if (string.IsNullOrWhiteSpace(connectionString))
@@ -96,6 +100,21 @@ builder.Services.AddAuthorization(options =>
 });
 
 builder.Services.AddScoped<IPartnerService, PartnerService.Infrastructure.Services.PartnerService>();
+builder.Services.AddHttpClient<IFileStorageClient, FileStorageClient>((serviceProvider, client) =>
+{
+    var options = serviceProvider.GetRequiredService<IOptions<FileServiceOptions>>().Value;
+    if (string.IsNullOrWhiteSpace(options.BaseUrl))
+    {
+        throw new InvalidOperationException("FileService:BaseUrl configuration is required.");
+    }
+
+    if (string.IsNullOrWhiteSpace(options.InternalApiKey))
+    {
+        throw new InvalidOperationException("FileService:InternalApiKey configuration is required.");
+    }
+
+    client.BaseAddress = new Uri(NormalizeBaseUrl(options.BaseUrl));
+});
 
 var app = builder.Build();
 
@@ -107,3 +126,8 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
+
+static string NormalizeBaseUrl(string url)
+{
+    return url.Trim().TrimEnd('/');
+}

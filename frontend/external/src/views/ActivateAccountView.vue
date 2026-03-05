@@ -15,6 +15,18 @@
         >
           Токен активации не найден в ссылке
         </div>
+        <div
+          v-else-if="tokenChecking"
+          class="rounded-xl border border-blue-300/80 bg-blue-50 p-4 text-blue-800 dark:border-blue-500/30 dark:bg-blue-900/20 dark:text-blue-300"
+        >
+          Проверяем ссылку активации...
+        </div>
+        <div
+          v-else-if="tokenErrorMessage"
+          class="rounded-xl border border-rose-300/80 bg-rose-50 p-4 text-rose-800 dark:border-rose-500/30 dark:bg-rose-900/20 dark:text-rose-300"
+        >
+          {{ tokenErrorMessage }}
+        </div>
 
         <form v-else @submit.prevent="onActivate" class="space-y-4">
           <div class="space-y-2">
@@ -58,9 +70,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { activateUser } from "../api/auth";
+import { activateUser, getActivationTokenStatus } from "../api/auth";
 import { useToast } from "../composables/useToast";
 
 const route = useRoute();
@@ -72,9 +84,11 @@ const { success, error } = useToast();
 
 const token = computed(() => String(route.query.token ?? ""));
 const tokenMissing = computed(() => token.value.trim().length === 0);
+const tokenChecking = ref(false);
+const tokenErrorMessage = ref("");
 
 async function onActivate() {
-  if (loading.value || tokenMissing.value) return;
+  if (loading.value || tokenMissing.value || tokenErrorMessage.value) return;
 
   if (password.value.trim().length < 6) {
     error("Минимальная длина пароля 6 символов");
@@ -93,9 +107,52 @@ async function onActivate() {
     router.push("/login");
   } catch (e: any) {
     const errorMsg = e?.response?.data?.error || "Не удалось активировать аккаунт.";
+    if (e?.response?.status === 401) {
+      tokenErrorMessage.value = errorMsg;
+    }
     error(errorMsg);
   } finally {
     loading.value = false;
   }
 }
+
+function mapTokenErrorMessage(reason?: string | null, expiresAtUtc?: string | null): string {
+  if (reason === "used") {
+    return "Эта ссылка уже была использована. Запросите новую ссылку у менеджера.";
+  }
+
+  if (reason === "expired") {
+    if (expiresAtUtc) {
+      const expiresDate = new Date(expiresAtUtc);
+      if (!Number.isNaN(expiresDate.getTime())) {
+        return `Срок действия ссылки истек (${expiresDate.toLocaleString()}). Ссылка действует 24 часа.`;
+      }
+    }
+
+    return "Срок действия ссылки истек. Ссылка действует 24 часа.";
+  }
+
+  return "Ссылка активации недействительна. Запросите новую ссылку у менеджера.";
+}
+
+async function checkActivationToken() {
+  if (tokenMissing.value) return;
+
+  tokenChecking.value = true;
+  tokenErrorMessage.value = "";
+  try {
+    const status = await getActivationTokenStatus(token.value);
+    if (!status.isValid) {
+      tokenErrorMessage.value = mapTokenErrorMessage(status.reason, status.expiresAtUtc);
+    }
+  } catch {
+    tokenErrorMessage.value = "Не удалось проверить ссылку активации. Попробуйте обновить страницу.";
+  } finally {
+    tokenChecking.value = false;
+  }
+}
+
+onMounted(async () => {
+  await checkActivationToken();
+});
 </script>

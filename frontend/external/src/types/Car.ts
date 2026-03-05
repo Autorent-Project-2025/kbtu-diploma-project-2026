@@ -27,6 +27,13 @@ export interface CarDetails extends Car {
   images?: string[]; // Массив дополнительных изображений
   features?: string[]; // Массив особенностей
   specifications?: CarSpecifications; // Характеристики
+  engine?: string;
+  transmission?: string;
+  fuelType?: string;
+  seats?: number;
+  doors?: number;
+  color?: string;
+  mileage?: number;
 }
 
 export interface CarComment {

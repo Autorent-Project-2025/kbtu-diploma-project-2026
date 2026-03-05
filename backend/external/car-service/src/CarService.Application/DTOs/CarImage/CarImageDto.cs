@@ -6,12 +6,12 @@ namespace CarService.Application.DTOs.CarImage
     public class CarImageDto
     {
         public int Id { get; set; }
-
-        public required string ImageUrl { get; set; }
+        public string? ImageId { get; set; }
+        public string ImageUrl { get; set; } = string.Empty;
 
         [EnumName(typeof(CarImageType))]
-        public required CarImageType ImageType { get; set; }
+        public CarImageType ImageType { get; set; }
 
-        public required int DisplayOrder { get; set; }
+        public int DisplayOrder { get; set; }
     }
 }

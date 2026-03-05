@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 using System.Security.Claims;
 using TicketService.Api.Contracts.Tickets;
 using TicketService.Application.Commands.ApproveTicket;
@@ -49,29 +50,28 @@ public sealed class TicketsController : ControllerBase
     {
         var ticketType = ResolveTicketType(request.TicketType);
 
-        if (request.IdentityDocumentFile is null)
-        {
-            throw new ValidationException("Identity document PDF is required.");
-        }
-
-        if (ticketType == TicketType.Client && request.DriverLicenseFile is null)
-        {
-            throw new ValidationException("Driver license PDF is required for client tickets.");
-        }
-
         var result = await _createTicketCommandHandler.Handle(
             new CreateTicketCommand(
+                Request.Headers.Authorization.ToString(),
                 ticketType,
-                request.FirstName,
-                request.LastName,
+                request.FirstName ?? string.Empty,
+                request.LastName ?? string.Empty,
                 request.CompanyName,
                 request.ContactEmail,
-                request.Email,
+                request.Email ?? string.Empty,
                 request.BirthDate,
-                request.PhoneNumber,
+                request.PhoneNumber ?? string.Empty,
                 request.AvatarUrl,
-                await MapToFilePayloadAsync(request.IdentityDocumentFile, cancellationToken),
-                await MapToOptionalFilePayloadAsync(request.DriverLicenseFile, cancellationToken)),
+                await MapToOptionalFilePayloadAsync(request.IdentityDocumentFile, cancellationToken),
+                await MapToOptionalFilePayloadAsync(request.DriverLicenseFile, cancellationToken),
+                request.CarBrand,
+                request.CarModel,
+                request.CarYear,
+                request.LicensePlate,
+                request.PriceHour,
+                request.PriceDay,
+                await MapToOptionalFilePayloadAsync(request.OwnershipDocumentFile, cancellationToken),
+                await MapToFilePayloadCollectionAsync(request.CarImageFiles, cancellationToken)),
             cancellationToken);
 
         return Created($"/{result.Ticket.Id}", result.Ticket);
@@ -114,11 +114,14 @@ public sealed class TicketsController : ControllerBase
 
     [Authorize(Policy = "tickets:approve")]
     [HttpPost("{id:guid}/approve")]
-    public async Task<IActionResult> Approve([FromRoute] Guid id, CancellationToken cancellationToken)
+    public async Task<IActionResult> Approve(
+        [FromRoute] Guid id,
+        [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] ApproveTicketRequest? request,
+        CancellationToken cancellationToken)
     {
         var managerId = ResolveManagerId();
         var result = await _approveTicketCommandHandler.Handle(
-            new ApproveTicketCommand(id, managerId),
+            new ApproveTicketCommand(id, managerId, MapPartnerCarReviewData(request?.PartnerCarData)),
             cancellationToken);
 
         return Ok(result.Ticket);
@@ -133,7 +136,11 @@ public sealed class TicketsController : ControllerBase
     {
         var managerId = ResolveManagerId();
         var result = await _rejectTicketCommandHandler.Handle(
-            new RejectTicketCommand(id, managerId, request.DecisionReason),
+            new RejectTicketCommand(
+                id,
+                managerId,
+                request.DecisionReason,
+                MapPartnerCarReviewData(request.PartnerCarData)),
             cancellationToken);
 
         return Ok(result.Ticket);
@@ -176,6 +183,24 @@ public sealed class TicketsController : ControllerBase
         return await MapToFilePayloadAsync(file, cancellationToken);
     }
 
+    private static async Task<IReadOnlyCollection<TicketDocumentFilePayload>?> MapToFilePayloadCollectionAsync(
+        IReadOnlyCollection<IFormFile>? files,
+        CancellationToken cancellationToken)
+    {
+        if (files is null || files.Count == 0)
+        {
+            return null;
+        }
+
+        var payloads = new List<TicketDocumentFilePayload>(files.Count);
+        foreach (var file in files)
+        {
+            payloads.Add(await MapToFilePayloadAsync(file, cancellationToken));
+        }
+
+        return payloads;
+    }
+
     private static TicketType ResolveTicketType(string? value)
     {
         if (string.IsNullOrWhiteSpace(value))
@@ -187,7 +212,8 @@ public sealed class TicketsController : ControllerBase
         {
             "client" => TicketType.Client,
             "partner" => TicketType.Partner,
-            _ => throw new ValidationException("ticketType must be 'Client' or 'Partner'.")
+            "partnercar" or "partner-car" or "partner_car" => TicketType.PartnerCar,
+            _ => throw new ValidationException("ticketType must be 'Client', 'Partner' or 'PartnerCar'.")
         };
     }
 
@@ -198,7 +224,25 @@ public sealed class TicketsController : ControllerBase
         {
             "identity" or "identity-document" or "id" => ticket.IdentityDocumentFileName,
             "license" or "driver-license" => ticket.DriverLicenseFileName,
-            _ => throw new ValidationException("documentType must be 'identity' or 'license'.")
+            "ownership" or "ownership-document" => ticket.OwnershipDocumentFileName,
+            _ => throw new ValidationException("documentType must be 'identity', 'license' or 'ownership'.")
         };
+    }
+
+    private static PartnerCarTicketReviewData? MapPartnerCarReviewData(PartnerCarTicketReviewDataRequest? request)
+    {
+        if (request is null)
+        {
+            return null;
+        }
+
+        return new PartnerCarTicketReviewData(
+            request.CarBrand,
+            request.CarModel,
+            request.CarYear,
+            request.LicensePlate,
+            request.PriceHour,
+            request.PriceDay,
+            request.Email);
     }
 }

@@ -1,3 +1,4 @@
+using TicketService.Domain.Entities;
 using TicketService.Domain.Enums;
 
 namespace TicketService.Application.Events;
@@ -14,5 +15,14 @@ public sealed record TicketApprovedEvent(
     string? IdentityDocumentFileName,
     string? DriverLicenseFileName,
     string? AvatarUrl,
+    Guid? RelatedPartnerUserId,
+    string? CarBrand,
+    string? CarModel,
+    int? CarYear,
+    string? LicensePlate,
+    decimal? PriceHour,
+    decimal? PriceDay,
+    string? OwnershipDocumentFileName,
+    IReadOnlyCollection<PartnerCarTicketImageData> CarImages,
     Guid ManagerId,
     DateTime ReviewedAtUtc);

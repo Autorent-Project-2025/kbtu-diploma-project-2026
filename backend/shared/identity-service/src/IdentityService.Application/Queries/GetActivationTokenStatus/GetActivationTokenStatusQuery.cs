@@ -1,0 +1,3 @@
+namespace IdentityService.Application.Queries.GetActivationTokenStatus;
+
+public sealed record GetActivationTokenStatusQuery(string ActivationToken);

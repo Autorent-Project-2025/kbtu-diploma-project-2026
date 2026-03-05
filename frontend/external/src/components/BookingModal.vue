@@ -169,7 +169,7 @@
 
             <!-- Error Message -->
             <div
-              v-if="errorMessage"
+              v-if="displayError"
               class="flex items-center gap-3 p-4 bg-red-50 dark:bg-red-900/20 rounded-xl"
             >
               <svg
@@ -186,8 +186,28 @@
                 />
               </svg>
               <p class="text-sm text-red-600 dark:text-red-400">
-                {{ errorMessage }}
+                {{ displayError }}
               </p>
+            </div>
+
+            <div
+              v-if="(suggestedDates ?? []).length > 0"
+              class="space-y-3 p-4 rounded-xl border border-amber-300/80 bg-amber-50 dark:border-amber-500/40 dark:bg-amber-900/20"
+            >
+              <p class="text-sm font-semibold text-amber-800 dark:text-amber-200">
+                На выбранные даты все машины заняты. Ближайшие доступные:
+              </p>
+              <div class="flex flex-wrap gap-2">
+                <button
+                  v-for="date in suggestedDates"
+                  :key="date"
+                  type="button"
+                  @click="applySuggestedDate(date)"
+                  class="px-3 py-2 rounded-lg border border-amber-300/80 dark:border-amber-500/40 bg-white dark:bg-gray-900 text-xs font-semibold text-amber-800 dark:text-amber-200"
+                >
+                  {{ formatSuggestionDate(date) }}
+                </button>
+              </div>
             </div>
           </div>
 
@@ -237,11 +257,14 @@ import type { Car } from "../types/Car";
 interface Props {
   isOpen: boolean;
   car: Car;
+  bookingError?: string;
+  suggestedDates?: string[];
 }
 
 interface Emits {
   (e: "close"): void;
   (e: "confirm", startDate: string, endDate: string): void;
+  (e: "suggestion-click", value: string): void;
 }
 
 const props = defineProps<Props>();
@@ -250,7 +273,7 @@ const emit = defineEmits<Emits>();
 const isLoading = ref(false);
 const startDate = ref("");
 const endDate = ref("");
-const errorMessage = ref("");
+const validationError = ref("");
 
 // Минимальная дата - текущий момент
 const minDate = computed(() => {
@@ -271,10 +294,14 @@ watch(
       const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
       endDate.value = tomorrow.toISOString().slice(0, 16);
 
-      errorMessage.value = "";
+      validationError.value = "";
     }
   }
 );
+
+const displayError = computed(() => {
+  return props.bookingError?.trim() || validationError.value;
+});
 
 // Вычисление продолжительности
 const duration = computed(() => {
@@ -305,7 +332,7 @@ const estimatedPrice = computed(() => {
 // Валидация
 const isValid = computed(() => {
   if (!startDate.value || !endDate.value) {
-    errorMessage.value = "Заполните обе даты";
+    validationError.value = "Заполните обе даты";
     return false;
   }
 
@@ -314,12 +341,12 @@ const isValid = computed(() => {
   const now = new Date();
 
   if (start < now) {
-    errorMessage.value = "Дата начала не может быть в прошлом";
+    validationError.value = "Дата начала не может быть в прошлом";
     return false;
   }
 
   if (end <= start) {
-    errorMessage.value = "Дата окончания должна быть позже даты начала";
+    validationError.value = "Дата окончания должна быть позже даты начала";
     return false;
   }
 
@@ -327,13 +354,40 @@ const isValid = computed(() => {
   const minDuration = 60 * 60 * 1000; // 1 час
 
   if (diffMs < minDuration) {
-    errorMessage.value = "Минимальная продолжительность аренды - 1 час";
+    validationError.value = "Минимальная продолжительность аренды - 1 час";
     return false;
   }
 
-  errorMessage.value = "";
+  validationError.value = "";
   return true;
 });
+
+function formatSuggestionDate(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat("ru-RU", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(date);
+}
+
+function applySuggestedDate(value: string) {
+  const start = new Date(value);
+  if (Number.isNaN(start.getTime())) {
+    return;
+  }
+
+  const end = new Date(start.getTime() + 3 * 60 * 60 * 1000);
+  const localStart = new Date(start.getTime() - start.getTimezoneOffset() * 60000);
+  const localEnd = new Date(end.getTime() - end.getTimezoneOffset() * 60000);
+
+  startDate.value = localStart.toISOString().slice(0, 16);
+  endDate.value = localEnd.toISOString().slice(0, 16);
+  emit("suggestion-click", value);
+}
 
 function closeModal() {
   emit("close");

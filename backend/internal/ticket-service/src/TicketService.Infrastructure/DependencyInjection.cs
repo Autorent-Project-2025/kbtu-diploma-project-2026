@@ -23,6 +23,8 @@ public static class DependencyInjection
         services.Configure<ClientServiceOptions>(configuration.GetSection(ClientServiceOptions.SectionName));
         services.Configure<PartnerServiceOptions>(configuration.GetSection(PartnerServiceOptions.SectionName));
         services.Configure<FileServiceOptions>(configuration.GetSection(FileServiceOptions.SectionName));
+        services.Configure<ImageServiceOptions>(configuration.GetSection(ImageServiceOptions.SectionName));
+        services.Configure<CarServiceOptions>(configuration.GetSection(CarServiceOptions.SectionName));
         services.Configure<ActivationOptions>(configuration.GetSection(ActivationOptions.SectionName));
 
         var connectionString = configuration.GetConnectionString("DbConnection");
@@ -89,12 +91,45 @@ public static class DependencyInjection
             client.BaseAddress = new Uri(NormalizeBaseUrl(options.BaseUrl));
         });
 
+        services.AddHttpClient<IPartnerContextClient, PartnerContextClient>((serviceProvider, client) =>
+        {
+            var options = serviceProvider.GetRequiredService<IOptions<PartnerServiceOptions>>().Value;
+            if (string.IsNullOrWhiteSpace(options.BaseUrl))
+            {
+                throw new InvalidOperationException("PartnerService:BaseUrl configuration is required.");
+            }
+
+            client.BaseAddress = new Uri(NormalizeBaseUrl(options.BaseUrl));
+        });
+
+        services.AddHttpClient<IPartnerCarProvisioningClient, PartnerCarProvisioningClient>((serviceProvider, client) =>
+        {
+            var options = serviceProvider.GetRequiredService<IOptions<CarServiceOptions>>().Value;
+            if (string.IsNullOrWhiteSpace(options.BaseUrl))
+            {
+                throw new InvalidOperationException("CarService:BaseUrl configuration is required.");
+            }
+
+            client.BaseAddress = new Uri(NormalizeBaseUrl(options.BaseUrl));
+        });
+
         services.AddHttpClient<IFileStorageClient, FileStorageClient>((serviceProvider, client) =>
         {
             var options = serviceProvider.GetRequiredService<IOptions<FileServiceOptions>>().Value;
             if (string.IsNullOrWhiteSpace(options.BaseUrl))
             {
                 throw new InvalidOperationException("FileService:BaseUrl configuration is required.");
+            }
+
+            client.BaseAddress = new Uri(NormalizeBaseUrl(options.BaseUrl));
+        });
+
+        services.AddHttpClient<IImageStorageClient, ImageStorageClient>((serviceProvider, client) =>
+        {
+            var options = serviceProvider.GetRequiredService<IOptions<ImageServiceOptions>>().Value;
+            if (string.IsNullOrWhiteSpace(options.BaseUrl))
+            {
+                throw new InvalidOperationException("ImageService:BaseUrl configuration is required.");
             }
 
             client.BaseAddress = new Uri(NormalizeBaseUrl(options.BaseUrl));

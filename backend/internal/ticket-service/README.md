@@ -1,14 +1,17 @@
 # Ticket Service
 
 ## Назначение
-Сервис заявок на регистрацию/верификацию клиента и партнера. Отвечает за:
-- создание заявки пользователем;
-- просмотр pending-заявок менеджером;
-- approve/reject заявки;
-- интеграцию с `identity-service` (provision пользователя);
-- интеграцию с `client-service` (создание клиентского профиля при approve client-ticket);
-- интеграцию с `partner-service` (создание профиля партнера при approve partner-ticket);
-- интеграцию с `email-service` (approved/rejected уведомления).
+Сервис тикетов регистрации/верификации и оркестрации одобрения. Поддерживает типы:
+- `Client` - регистрация клиента;
+- `Partner` - регистрация партнера;
+- `PartnerCar` - добавление машины партнером через согласование.
+
+Основные задачи:
+- создание тикета;
+- просмотр pending-очереди менеджером;
+- approve/reject с фиксированием причины/менеджера/времени;
+- интеграции с другими сервисами при approve/reject;
+- выдача временных ссылок на документы тикета.
 
 ## Стек
 - ASP.NET Core (`net10.0`)
@@ -21,34 +24,101 @@
 Через gateway сервис доступен по префиксу `/tickets`.
 
 Маршруты:
-- `POST /` (`AllowAnonymous`) - создание заявки
+- `POST /` (`AllowAnonymous`) - создание тикета (`multipart/form-data`)
 - `GET /pending` (policy `tickets:view`)
 - `GET /{id:guid}` (policy `tickets:view`)
-- `GET /{id:guid}/documents/{identity|license}/temporary-link` (policy `tickets:view`)
+- `GET /{id:guid}/documents/{documentType}/temporary-link` (policy `tickets:view`)
+  - `documentType`: `identity` | `license` | `ownership`
 - `POST /{id:guid}/approve` (policy `tickets:approve`)
 - `POST /{id:guid}/reject` (policy `tickets:reject`)
 - `GET /healthz`
 
-Пример создания заявки:
+## Контракты
+### Создание тикета (`POST /`)
+Тип контента: `multipart/form-data`.
 
-`POST /` принимает `multipart/form-data`:
-- `ticketType` (`Client` | `Partner`, optional, default `Client`)
-- `firstName` (string)
-- `lastName` (string)
-- `email` (string)
-- `birthDate` (YYYY-MM-DD, required for `Client`)
-- `phoneNumber` (string)
-- `avatarUrl` (string, optional, for `Client`)
-- `identityDocumentFile` (PDF file, required)
-- `driverLicenseFile` (PDF file, required for `Client`)
+Общие поля:
+- `ticketType` (`Client` | `Partner` | `PartnerCar`, optional, default `Client`)
+- `email` (обязателен)
 
-Пример reject:
+Для `Client`:
+- `firstName`, `lastName`, `phoneNumber`, `birthDate` (обязательны)
+- `identityDocumentFile` (PDF, обязателен)
+- `driverLicenseFile` (PDF, обязателен)
+- `avatarUrl` (optional)
+
+Для `Partner`:
+- `firstName`, `lastName`, `phoneNumber` (обязательны)
+- `identityDocumentFile` (PDF, обязателен)
+- `companyName`, `contactEmail` (optional)
+
+Для `PartnerCar`:
+- `carBrand`, `carModel`, `licensePlate` (обязательны)
+- `ownershipDocumentFile` (PDF, обязателен)
+- `carImageFiles[]` (минимум 1 изображение)
+- `email` (обязателен, используется для уведомлений)
+
+Важно:
+- endpoint помечен как `AllowAnonymous`, но для `PartnerCar` требуется `Authorization` header:
+  - сервис извлекает текущего партнера из `partner-service /me`;
+  - имя/фамилия/телефон владельца подтягиваются автоматически.
+
+### Approve (`POST /{id}/approve`)
+Body необязателен.
+
+Для `PartnerCar` менеджер может передать правки перед approve:
 
 ```json
 {
-  "decisionReason": "Документы невалидны"
+  "partnerCarData": {
+    "carBrand": "Toyota",
+    "carModel": "Camry",
+    "licensePlate": "123ABC02",
+    "email": "partner@example.com"
+  }
 }
 ```
+
+### Reject (`POST /{id}/reject`)
+
+```json
+{
+  "decisionReason": "Некорректные данные",
+  "partnerCarData": {
+    "carBrand": "Toyota",
+    "carModel": "Camry",
+    "licensePlate": "123ABC02",
+    "email": "partner@example.com"
+  }
+}
+```
+
+`partnerCarData` optional и используется для фиксации отредактированных менеджером значений.
+
+## Интеграции
+При обработке тикетов сервис вызывает:
+
+- `identity-service`
+  - `POST /internal/users/provision` (`X-Internal-Api-Key`)
+- `client-service`
+  - `POST /internal/clients/provision` (`X-Internal-Api-Key`)
+- `partner-service`
+  - `POST /internal/partners/provision` (`X-Internal-Api-Key`)
+  - `GET /me` (с `Authorization`) для `PartnerCar` create
+- `file-service`
+  - `POST /api/internal/files/upload` (`X-Internal-Api-Key`)
+  - `POST /api/internal/files/temporary-link` (`X-Internal-Api-Key`)
+- `image-service`
+  - `POST /api/images` (с `Authorization`) для загрузки фото `PartnerCar`
+- `car-service`
+  - `POST /internal/partner-cars/provision` (`X-Internal-Api-Key`) после approve `PartnerCar`
+- `email-service`
+  - `POST /emails/approved`
+  - `POST /emails/rejected`
+  - `POST /emails/partners/approved`
+  - `POST /emails/partners/rejected`
+  - `POST /emails/partners/cars/approved`
+  - `POST /emails/partners/cars/rejected`
 
 ## Переменные окружения
 См. `./.env.example`:
@@ -63,23 +133,15 @@
 - `PartnerService__InternalApiKey`
 - `FileService__BaseUrl`
 - `FileService__InternalApiKey`
+- `ImageService__BaseUrl`
+- `CarService__BaseUrl`
+- `CarService__InternalApiKey`
 - `Activation__SetPasswordBaseUrl`
 - `EXTERNAL_PORT`
 - `POSTGRES_USER`
 - `POSTGRES_PASSWORD`
 - `POSTGRES_DB`
 - `POSTGRES_PORT`
-
-## Интеграции
-- `POST {IdentityService__BaseUrl}/internal/users/provision` + header `X-Internal-Api-Key`.
-- `POST {ClientService__BaseUrl}/internal/clients/provision` + header `X-Internal-Api-Key`.
-- `POST {PartnerService__BaseUrl}/internal/partners/provision` + header `X-Internal-Api-Key`.
-- `POST {FileService__BaseUrl}/api/internal/files/upload` + header `X-Internal-Api-Key`.
-- `POST {FileService__BaseUrl}/api/internal/files/temporary-link` + header `X-Internal-Api-Key`.
-- `POST {EmailService__BaseUrl}/emails/approved`.
-- `POST {EmailService__BaseUrl}/emails/rejected`.
-- `POST {EmailService__BaseUrl}/emails/partners/approved`.
-- `POST {EmailService__BaseUrl}/emails/partners/rejected`.
 
 ## Запуск
 В папке сервиса отдельного `docker-compose` нет. Рекомендуемый запуск - из корня репозитория:
@@ -88,16 +150,16 @@
 docker compose up --build ticket-db ticket-flyway ticket-service
 ```
 
-Сервис будет доступен на порту `TICKET_SERVICE_PORT` (по умолчанию `1248`).
+Сервис доступен на порту `TICKET_SERVICE_PORT` (по умолчанию `1248`).
 
 ## Необходимые права
 Права проверяются по claim `permissions` в JWT.
 
-Требуются permissions:
-- `Ticket.View` - просмотр pending-списка и карточки (`GET /pending`, `GET /{id}`)
-- `Ticket.Approve` - approve заявки (`POST /{id}/approve`)
-- `Ticket.Reject` - reject заявки (`POST /{id}/reject`)
+- `Ticket.View` - `GET /pending`, `GET /{id}`, `GET /{id}/documents/...`
+- `Ticket.Approve` - `POST /{id}/approve`
+- `Ticket.Reject` - `POST /{id}/reject`
 
 Публичный маршрут без JWT:
-- `POST /` (создание заявки)
+- `POST /` (для `Client` и `Partner`)
 
+Для `PartnerCar` create требуется валидный `Authorization` header текущего партнера.

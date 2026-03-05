@@ -41,6 +41,8 @@ public sealed class ApproveTicketCommandHandler
             throw new NotFoundException($"Ticket '{command.TicketId}' was not found.");
         }
 
+        ApplyPartnerCarReviewDataIfNeeded(ticket, command.PartnerCarData);
+
         var reviewedAtUtc = DateTime.UtcNow;
         ticket.Approve(command.ManagerId, reviewedAtUtc);
         await _ticketUnitOfWork.SaveChangesAsync(cancellationToken);
@@ -58,10 +60,38 @@ public sealed class ApproveTicketCommandHandler
                 ticket.IdentityDocumentFileName,
                 ticket.DriverLicenseFileName,
                 ticket.AvatarUrl,
+                ticket.RelatedPartnerUserId,
+                ticket.CarBrand,
+                ticket.CarModel,
+                ticket.CarYear,
+                ticket.LicensePlate,
+                ticket.PriceHour,
+                ticket.PriceDay,
+                ticket.OwnershipDocumentFileName,
+                ticket.CarImages,
                 command.ManagerId,
                 reviewedAtUtc),
             cancellationToken);
 
         return new ApproveTicketResult(ticket.ToDto());
+    }
+
+    private static void ApplyPartnerCarReviewDataIfNeeded(
+        Domain.Entities.Ticket ticket,
+        PartnerCarTicketReviewData? partnerCarData)
+    {
+        if (partnerCarData is null)
+        {
+            return;
+        }
+
+        ticket.UpdatePartnerCarDetailsForReview(
+            partnerCarData.CarBrand,
+            partnerCarData.CarModel,
+            partnerCarData.CarYear,
+            partnerCarData.LicensePlate,
+            partnerCarData.PriceHour,
+            partnerCarData.PriceDay,
+            partnerCarData.Email);
     }
 }

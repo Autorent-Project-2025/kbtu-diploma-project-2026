@@ -9,7 +9,7 @@ export function computeBookingStatus(booking: Booking): ComputedBookingStatus {
   const endDate = new Date(booking.endDate);
 
   // Если отменено - всегда отменено
-  if (booking.status === "Canceled") {
+  if (booking.status === "canceled") {
     return "canceled";
   }
 

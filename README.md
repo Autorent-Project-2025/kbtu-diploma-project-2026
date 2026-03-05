@@ -15,6 +15,18 @@ AutoRent - микросервисная платформа каршеринга.
 - Добавлено полноценное управление ролями: создание роли с начальными permissions и parent-ролями.
 - Добавлено наследование ролей (role inheritance): итоговые permissions вычисляются транзитивно и применяются в JWT, API и UI.
 
+## Новые бизнес-потоки
+- Добавлен поток согласования машин партнера через `ticket-service`:
+  - партнер создает тикет `PartnerCar` (марка/модель, госномер, PDF собственности, фото);
+  - менеджер в internal UI может отредактировать поля и approve/reject;
+  - при approve: создается `partner_car` в `car-service`, отправляется email партнеру;
+  - при reject: отправляется email с причиной.
+- Добавлен автоподбор машины по модели и времени через `car-service`:
+  - внешний фронтенд запрашивает `POST /cars/match`;
+  - `car-service` выбирает доступную машину с учетом загрузки партнера, рейтинга, количества бронирований и цены;
+  - если машин нет, возвращаются ближайшие доступные даты;
+  - при успешном подборе фронтенд создает бронирование в `booking-service`.
+
 ## Быстрый старт
 1. Заполните нужные `.env` файлы по `.env.example`.
 2. Из корня проекта выполните:
@@ -38,20 +50,30 @@ docker compose up --build
 - Email Service: `9182`
 - File Service: `9183`
 
+## Предсозданные пользователи (seed)
+После применения миграций `identity-service` доступны следующие логины:
+
+| Роль/назначение | Email | Пароль | Примечание |
+|---|---|---|---|
+| Superadmin | `superadmin@local` | `SuperAdmin123!` | Полный доступ (роль `superadmin`) |
+| Обычный пользователь | `user@autorent.local` | `DemoUser123!` | Роль `user` |
+| Партнер (demo) | `partner@autorent.local` | `DemoPartner123!` | Роль `user`, плюс seed-профиль в `partner-service` |
+| Менеджер | `manager@autorent.local` | `DemoManager123!` | Роль `manager`, доступ в internal panel |
+
 ## Сервисы
 | Сервис | Путь | Назначение |
 |---|---|---|
 | Identity Service | `backend/shared/identity-service` | Auth, users, roles, permissions, JWKS |
-| Car Service | `backend/external/car-service` | Каталог автомобилей |
-| Booking Service | `backend/external/booking-service` | Бронирования |
-| Ticket Service | `backend/internal/ticket-service` | Заявки на регистрацию/верификацию клиентов и партнеров |
+| Car Service | `backend/external/car-service` | Каталог, партнерские машины, автоподбор `/cars/match` |
+| Booking Service | `backend/external/booking-service` | Бронирования и internal-проверка доступности машин |
+| Ticket Service | `backend/internal/ticket-service` | Тикеты `Client/Partner/PartnerCar`, approve/reject и оркестрация |
 | Image Service | `backend/shared/image-service` | Загрузка/удаление изображений |
 | File Service | `backend/internal/file-service` | Хранение приватных файлов и выдача временных ссылок |
-| Email Service | `backend/shared/email-service` | SMTP-уведомления |
+| Email Service | `backend/shared/email-service` | SMTP-уведомления (client/partner/partner-car) |
 | API Gateway | `backend/external/reverse-proxy-service` | Проксирование `/identity`, `/cars`, `/bookings`, `/clients`, `/partners`, `/tickets`, `/files`, `/internal` |
 | Client Service | `backend/external/client-service` | Профили клиентов (CRUD + `/me`) |
 | Partner Service | `backend/internal/partner-service` | Профили партнеров (CRUD + `/me`) |
-| External Frontend | `frontend/external` | Пользовательский UI |
+| External Frontend | `frontend/external` | Пользовательский UI + автоподбор и бронирование по модели |
 | Internal Frontend | `frontend/internal` | UI менеджера |
 | Superadmin Frontend | `frontend/superadmin` | UI супер-админа |
 
@@ -62,7 +84,7 @@ docker compose up --build
 | Сервис | Необходимые права |
 |---|---|
 | Identity Service | `User.View`, `User.Create`, `User.Update`, `User.AssignRole`, `User.RemoveRole`, `User.Activate`, `User.Deactivate`, `User.Delete`, `Role.View`, `Role.Create`, `Role.AssignPermission`, `Permission.View`, `Permission.Create` |
-| Car Service | `Car.Create`, `Car.Update`, `Car.Delete`, `Car.Image.Create` |
+| Car Service | `CarModel.*`, `PartnerCar.*`, `CarComment.*`, `CarImage.*` (по endpoint-ам сервиса) |
 | Booking Service | `Booking.Create` (для создания), остальные пользовательские операции требуют валидный JWT |
 | Client Service | `Client.View`, `Client.Create`, `Client.Update`, `Client.Delete` |
 | Partner Service | `Partner.View`, `Partner.Create`, `Partner.Update`, `Partner.Delete` |
@@ -73,7 +95,7 @@ docker compose up --build
 | API Gateway | Не требуются (в текущей реализации) |
 
 ### Frontend-права
-- External Frontend: просмотр каталога и создание тикета без прав; бронирование требует JWT, создание брони - `Booking.Create`.
+- External Frontend: просмотр каталога и создание тикета без прав; бронирование и автоподбор требуют JWT, создание брони - `Booking.Create`.
 - Internal Frontend: доступ к списку заявок - `Ticket.View`; approve/reject - `Ticket.Approve`/`Ticket.Reject`.
 - Superadmin Frontend: вход в panel требует `User.View`; role management использует `Role.View`/`Role.Create`/`Role.AssignPermission`, user management использует `User.*`, загрузка справочника прав - `Permission.View`.
 

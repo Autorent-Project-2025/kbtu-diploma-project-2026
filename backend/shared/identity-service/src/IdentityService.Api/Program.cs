@@ -17,6 +17,7 @@ using IdentityService.Application.Commands.RemoveParentRoleFromRole;
 using IdentityService.Application.Commands.RemovePermissionFromRole;
 using IdentityService.Application.Commands.RemoveRoleFromUser;
 using IdentityService.Application.Commands.UpdateUser;
+using IdentityService.Application.Queries.GetActivationTokenStatus;
 using IdentityService.Application.Queries.GetPermissions;
 using IdentityService.Application.Queries.GetRoles;
 using IdentityService.Application.Queries.GetUserById;
@@ -54,6 +55,7 @@ builder.Services.AddScoped<GetUsersQueryHandler>();
 builder.Services.AddScoped<GetUserByIdQueryHandler>();
 builder.Services.AddScoped<GetRolesQueryHandler>();
 builder.Services.AddScoped<GetPermissionsQueryHandler>();
+builder.Services.AddScoped<GetActivationTokenStatusQueryHandler>();
 
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
 builder.Services.AddCors(options =>

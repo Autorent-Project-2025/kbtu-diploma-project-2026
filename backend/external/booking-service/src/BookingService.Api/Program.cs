@@ -1,4 +1,5 @@
 using BookingService.Api.Middleware;
+using BookingService.Api.Options;
 using BookingService.Application.Constants;
 using BookingService.Application.Interfaces;
 using BookingService.Infrastructure.Persistence;
@@ -12,6 +13,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
+builder.Services.Configure<InternalAuthOptions>(builder.Configuration.GetSection(InternalAuthOptions.SectionName));
 
 var connectionString = builder.Configuration.GetConnectionString("DbConnection");
 if (string.IsNullOrEmpty(connectionString))

@@ -4,6 +4,10 @@
 Сервис отправки email через SMTP. Поддерживает шаблоны:
 - `approved`;
 - `rejected`;
+- `partner approved`;
+- `partner rejected`;
+- `partner car approved`;
+- `partner car rejected`;
 - `custom`.
 
 ## Стек
@@ -20,6 +24,8 @@ Base path: `/`.
 - `POST /emails/rejected`
 - `POST /emails/partners/approved`
 - `POST /emails/partners/rejected`
+- `POST /emails/partners/cars/approved`
+- `POST /emails/partners/cars/rejected`
 - `POST /emails/custom`
 
 Пример `POST /emails/approved`:
@@ -79,6 +85,8 @@ docker compose up --build email-service
 - `POST /emails/rejected`
 - `POST /emails/partners/approved`
 - `POST /emails/partners/rejected`
+- `POST /emails/partners/cars/approved`
+- `POST /emails/partners/cars/rejected`
 - `POST /emails/custom`
 
 без проверки ролей/прав.

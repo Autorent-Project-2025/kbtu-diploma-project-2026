@@ -13,10 +13,14 @@ namespace PartnerService.Api.Controllers;
 public sealed class PartnersController : ControllerBase
 {
     private readonly IPartnerService _partnerService;
+    private readonly IFileStorageClient _fileStorageClient;
 
-    public PartnersController(IPartnerService partnerService)
+    public PartnersController(
+        IPartnerService partnerService,
+        IFileStorageClient fileStorageClient)
     {
         _partnerService = partnerService;
+        _fileStorageClient = fileStorageClient;
     }
 
     [HttpGet]
@@ -77,14 +81,7 @@ public sealed class PartnersController : ControllerBase
     [HttpGet("me")]
     public async Task<IActionResult> Me(CancellationToken cancellationToken)
     {
-        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier)
-            ?? User.FindFirstValue("sub");
-
-        if (string.IsNullOrWhiteSpace(userId))
-        {
-            throw new UnauthorizedAccessException("Authenticated user id claim is required.");
-        }
-
+        var userId = ResolveCurrentUserId();
         var partner = await _partnerService.GetByRelatedUserIdAsync(userId, cancellationToken);
         if (partner is null)
         {
@@ -92,6 +89,47 @@ public sealed class PartnersController : ControllerBase
         }
 
         return Ok(partner);
+    }
+
+    [HttpGet("me/files/temporary-link")]
+    public async Task<IActionResult> GetMyFileTemporaryLink([FromQuery] string? fileName, CancellationToken cancellationToken)
+    {
+        var userId = ResolveCurrentUserId();
+        var partner = await _partnerService.GetByRelatedUserIdAsync(userId, cancellationToken);
+        if (partner is null)
+        {
+            return NotFound(new { error = "Partner not found for current user" });
+        }
+
+        if (string.IsNullOrWhiteSpace(fileName))
+        {
+            return BadRequest(new { error = "fileName is required." });
+        }
+
+        var payload = await _fileStorageClient.GetTemporaryLinkAsync(fileName, cancellationToken: cancellationToken);
+        return Ok(payload);
+    }
+
+    [AllowAnonymous]
+    [HttpGet("public/by-related-user/{relatedUserId}")]
+    public async Task<IActionResult> GetPublicByRelatedUserId(string relatedUserId, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(relatedUserId))
+        {
+            return BadRequest(new { error = "Related user id is required." });
+        }
+
+        var partner = await _partnerService.GetByRelatedUserIdAsync(relatedUserId, cancellationToken);
+        if (partner is null)
+        {
+            return NotFound(new { error = "Partner not found." });
+        }
+
+        return Ok(new PublicPartnerProfileResponse
+        {
+            RelatedUserId = partner.RelatedUserId,
+            CarrierName = $"{partner.OwnerFirstName} {partner.OwnerLastName}".Trim()
+        });
     }
 
     private static PartnerCreateDto MapToCreateDto(CreatePartnerRequest request)
@@ -122,5 +160,18 @@ public sealed class PartnersController : ControllerBase
             RelatedUserId = request.RelatedUserId,
             PhoneNumber = request.PhoneNumber
         };
+    }
+
+    private string ResolveCurrentUserId()
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier)
+            ?? User.FindFirstValue("sub");
+
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            throw new UnauthorizedAccessException("Authenticated user id claim is required.");
+        }
+
+        return userId;
     }
 }

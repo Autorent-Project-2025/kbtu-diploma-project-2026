@@ -24,8 +24,13 @@
 - `POST /identity/auth/login`
 - `GET /tickets/pending`
 - `GET /tickets/{id}`
+- `GET /tickets/{id}/documents/{identity|license|ownership}/temporary-link`
 - `POST /tickets/{id}/approve`
 - `POST /tickets/{id}/reject`
+
+Дополнительно:
+- для тикетов типа `PartnerCar` менеджер может редактировать `carBrand`, `carModel`, `licensePlate`, `email` перед approve/reject;
+- UI поддерживает открытие ownership-документа и фото машины из тикета.
 
 ## Переменные окружения
 См. `./.env.example`:

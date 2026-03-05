@@ -7,5 +7,8 @@ public sealed record TicketRejectedEvent(
     TicketType TicketType,
     string FullName,
     string Email,
+    string? CarBrand,
+    string? CarModel,
+    string? LicensePlate,
     string DecisionReason,
     Guid ManagerId);

@@ -11,15 +11,21 @@ public sealed class CreateTicketCommandHandler
     private readonly ITicketRepository _ticketRepository;
     private readonly ITicketUnitOfWork _ticketUnitOfWork;
     private readonly IFileStorageClient _fileStorageClient;
+    private readonly IImageStorageClient _imageStorageClient;
+    private readonly IPartnerContextClient _partnerContextClient;
 
     public CreateTicketCommandHandler(
         ITicketRepository ticketRepository,
         ITicketUnitOfWork ticketUnitOfWork,
-        IFileStorageClient fileStorageClient)
+        IFileStorageClient fileStorageClient,
+        IImageStorageClient imageStorageClient,
+        IPartnerContextClient partnerContextClient)
     {
         _ticketRepository = ticketRepository;
         _ticketUnitOfWork = ticketUnitOfWork;
         _fileStorageClient = fileStorageClient;
+        _imageStorageClient = imageStorageClient;
+        _partnerContextClient = partnerContextClient;
     }
 
     public async Task<CreateTicketResult> Handle(
@@ -28,31 +34,69 @@ public sealed class CreateTicketCommandHandler
     {
         Validate(command);
 
-        var identityDocumentFileName = await _fileStorageClient.UploadFileAsync(
-            command.IdentityDocumentFile,
-            cancellationToken);
-
+        var firstName = command.FirstName;
+        var lastName = command.LastName;
+        var phoneNumber = command.PhoneNumber;
+        var email = command.Email;
+        string? identityDocumentFileName = null;
         string? driverLicenseFileName = null;
-        if (command.TicketType == TicketType.Client)
+        string? ownershipDocumentFileName = null;
+        Guid? relatedPartnerUserId = null;
+        IReadOnlyCollection<PartnerCarTicketImageData>? carImages = null;
+
+        if (command.TicketType == TicketType.PartnerCar)
         {
-            driverLicenseFileName = await _fileStorageClient.UploadFileAsync(
-                command.DriverLicenseFile!,
+            var partnerContext = await ResolvePartnerContextAsync(command.AuthorizationHeader, cancellationToken);
+            firstName = partnerContext.OwnerFirstName;
+            lastName = partnerContext.OwnerLastName;
+            phoneNumber = partnerContext.PhoneNumber;
+            relatedPartnerUserId = partnerContext.RelatedUserId;
+
+            ownershipDocumentFileName = await _fileStorageClient.UploadFileAsync(
+                command.OwnershipDocumentFile!,
                 cancellationToken);
+
+            carImages = await UploadPartnerCarImagesAsync(
+                command.CarImageFiles!,
+                command.AuthorizationHeader!,
+                cancellationToken);
+        }
+        else
+        {
+            identityDocumentFileName = await _fileStorageClient.UploadFileAsync(
+                command.IdentityDocumentFile!,
+                cancellationToken);
+
+            if (command.TicketType == TicketType.Client)
+            {
+                driverLicenseFileName = await _fileStorageClient.UploadFileAsync(
+                    command.DriverLicenseFile!,
+                    cancellationToken);
+            }
         }
 
         var ticket = new Ticket(
             Guid.NewGuid(),
             command.TicketType,
-            command.FirstName,
-            command.LastName,
-            command.Email,
+            firstName,
+            lastName,
+            email,
             command.BirthDate,
-            command.PhoneNumber,
+            phoneNumber,
             identityDocumentFileName,
             driverLicenseFileName,
             command.AvatarUrl,
             command.CompanyName,
             command.ContactEmail,
+            relatedPartnerUserId,
+            command.CarBrand,
+            command.CarModel,
+            command.CarYear,
+            command.LicensePlate,
+            command.PriceHour,
+            command.PriceDay,
+            ownershipDocumentFileName,
+            carImages,
             DateTime.UtcNow);
 
         await _ticketRepository.AddAsync(ticket, cancellationToken);
@@ -61,8 +105,116 @@ public sealed class CreateTicketCommandHandler
         return new CreateTicketResult(ticket.ToDto());
     }
 
+    private async Task<PartnerContextResult> ResolvePartnerContextAsync(
+        string? authorizationHeader,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(authorizationHeader))
+        {
+            throw new UnauthorizedException("Authorization header is required for partner car tickets.");
+        }
+
+        var context = await _partnerContextClient.GetCurrentPartnerAsync(authorizationHeader, cancellationToken);
+        if (context is null)
+        {
+            throw new UnauthorizedException("Current user is not a partner.");
+        }
+
+        return context;
+    }
+
+    private async Task<IReadOnlyCollection<PartnerCarTicketImageData>> UploadPartnerCarImagesAsync(
+        IReadOnlyCollection<TicketDocumentFilePayload> imageFiles,
+        string authorizationHeader,
+        CancellationToken cancellationToken)
+    {
+        var uploadedImages = new List<PartnerCarTicketImageData>(imageFiles.Count);
+        foreach (var imageFile in imageFiles)
+        {
+            var uploaded = await _imageStorageClient.UploadAsync(imageFile, authorizationHeader, cancellationToken);
+            uploadedImages.Add(new PartnerCarTicketImageData
+            {
+                ImageId = uploaded.ImageId,
+                ImageUrl = uploaded.ImageUrl
+            });
+        }
+
+        return uploadedImages;
+    }
+
     private static void Validate(CreateTicketCommand command)
     {
+        if (string.IsNullOrWhiteSpace(command.Email))
+        {
+            throw new ValidationException("Email is required.");
+        }
+
+        if (command.TicketType is not TicketType.Client and not TicketType.Partner and not TicketType.PartnerCar)
+        {
+            throw new ValidationException("Ticket type is invalid.");
+        }
+
+        if (command.TicketType == TicketType.PartnerCar)
+        {
+            if (string.IsNullOrWhiteSpace(command.CarBrand))
+            {
+                throw new ValidationException("Car brand is required for partner car tickets.");
+            }
+
+            if (string.IsNullOrWhiteSpace(command.CarModel))
+            {
+                throw new ValidationException("Car model is required for partner car tickets.");
+            }
+
+            if (string.IsNullOrWhiteSpace(command.LicensePlate))
+            {
+                throw new ValidationException("License plate is required for partner car tickets.");
+            }
+
+            if (!command.PriceHour.HasValue)
+            {
+                throw new ValidationException("Price per hour is required for partner car tickets.");
+            }
+
+            if (!command.PriceDay.HasValue)
+            {
+                throw new ValidationException("Price per day is required for partner car tickets.");
+            }
+
+            if (!command.CarYear.HasValue)
+            {
+                throw new ValidationException("Car year is required for partner car tickets.");
+            }
+
+            var maxAllowedCarYear = DateTime.UtcNow.Year + 1;
+            if (command.CarYear.Value < 1886 || command.CarYear.Value > maxAllowedCarYear)
+            {
+                throw new ValidationException($"Car year must be between 1886 and {maxAllowedCarYear}.");
+            }
+
+            ValidatePrice(command.PriceHour.Value, nameof(command.PriceHour));
+            ValidatePrice(command.PriceDay.Value, nameof(command.PriceDay));
+
+            if (command.OwnershipDocumentFile is null)
+            {
+                throw new ValidationException($"{nameof(command.OwnershipDocumentFile)} is required.");
+            }
+
+            if (command.CarImageFiles is null || command.CarImageFiles.Count == 0)
+            {
+                throw new ValidationException("At least one partner car image is required.");
+            }
+
+            ValidatePdf(command.OwnershipDocumentFile, nameof(command.OwnershipDocumentFile));
+
+            foreach (var file in command.CarImageFiles)
+            {
+                ValidateImage(file, nameof(command.CarImageFiles));
+            }
+
+            return;
+        }
+
         if (string.IsNullOrWhiteSpace(command.FirstName))
         {
             throw new ValidationException("First name is required.");
@@ -71,11 +223,6 @@ public sealed class CreateTicketCommandHandler
         if (string.IsNullOrWhiteSpace(command.LastName))
         {
             throw new ValidationException("Last name is required.");
-        }
-
-        if (string.IsNullOrWhiteSpace(command.Email))
-        {
-            throw new ValidationException("Email is required.");
         }
 
         if (string.IsNullOrWhiteSpace(command.PhoneNumber))
@@ -93,11 +240,6 @@ public sealed class CreateTicketCommandHandler
             throw new ValidationException("Contact email length must not exceed 255.");
         }
 
-        if (command.TicketType is not TicketType.Client and not TicketType.Partner)
-        {
-            throw new ValidationException("Ticket type is invalid.");
-        }
-
         if (command.TicketType == TicketType.Client)
         {
             if (command.BirthDate == default)
@@ -109,6 +251,11 @@ public sealed class CreateTicketCommandHandler
             {
                 throw new ValidationException("Birth date cannot be in the future.");
             }
+        }
+
+        if (command.IdentityDocumentFile is null)
+        {
+            throw new ValidationException($"{nameof(command.IdentityDocumentFile)} is required.");
         }
 
         ValidatePdf(command.IdentityDocumentFile, nameof(command.IdentityDocumentFile));
@@ -142,6 +289,50 @@ public sealed class CreateTicketCommandHandler
             !string.Equals(contentType, "application/octet-stream", StringComparison.OrdinalIgnoreCase))
         {
             throw new ValidationException($"{fieldName} content type must be application/pdf.");
+        }
+    }
+
+    private static void ValidateImage(TicketDocumentFilePayload file, string fieldName)
+    {
+        if (file.Content.Length == 0)
+        {
+            throw new ValidationException($"{fieldName} contains an empty file.");
+        }
+
+        var fileName = file.FileName?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(fileName))
+        {
+            throw new ValidationException($"{fieldName} contains a file with empty name.");
+        }
+
+        var contentType = file.ContentType?.Trim() ?? string.Empty;
+        var hasImageContentType = contentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase);
+        var extension = Path.GetExtension(fileName);
+        var hasKnownImageExtension =
+            extension.Equals(".jpg", StringComparison.OrdinalIgnoreCase) ||
+            extension.Equals(".jpeg", StringComparison.OrdinalIgnoreCase) ||
+            extension.Equals(".png", StringComparison.OrdinalIgnoreCase) ||
+            extension.Equals(".webp", StringComparison.OrdinalIgnoreCase) ||
+            extension.Equals(".gif", StringComparison.OrdinalIgnoreCase) ||
+            extension.Equals(".bmp", StringComparison.OrdinalIgnoreCase);
+
+        if (!hasImageContentType &&
+            !(string.Equals(contentType, "application/octet-stream", StringComparison.OrdinalIgnoreCase) && hasKnownImageExtension))
+        {
+            throw new ValidationException($"{fieldName} files must be images.");
+        }
+    }
+
+    private static void ValidatePrice(decimal value, string fieldName)
+    {
+        if (value <= 0m)
+        {
+            throw new ValidationException($"{fieldName} must be greater than 0.");
+        }
+
+        if (value > 1_000_000m)
+        {
+            throw new ValidationException($"{fieldName} must not exceed 1000000.");
         }
     }
 }

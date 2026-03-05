@@ -29,6 +29,7 @@
 - `PUT /{id:int}` (policy `partners:update`)
 - `DELETE /{id:int}` (policy `partners:delete`)
 - `GET /me` (требует валидный JWT, без отдельной policy)
+- `GET /public/by-related-user/{relatedUserId}` (`AllowAnonymous`, публичный профиль перевозчика: имя + relatedUserId)
 - `POST /internal/partners/provision` (внутренний endpoint, header `X-Internal-Api-Key`)
 
 Пример создания партнера:

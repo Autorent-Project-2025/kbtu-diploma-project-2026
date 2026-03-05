@@ -51,6 +51,17 @@ public sealed class TicketConfiguration : IEntityTypeConfiguration<Ticket>
         builder.Ignore(ticket => ticket.IdentityDocumentFileName);
         builder.Ignore(ticket => ticket.DriverLicenseFileName);
         builder.Ignore(ticket => ticket.AvatarUrl);
+        builder.Ignore(ticket => ticket.CompanyName);
+        builder.Ignore(ticket => ticket.ContactEmail);
+        builder.Ignore(ticket => ticket.RelatedPartnerUserId);
+        builder.Ignore(ticket => ticket.CarBrand);
+        builder.Ignore(ticket => ticket.CarModel);
+        builder.Ignore(ticket => ticket.CarYear);
+        builder.Ignore(ticket => ticket.LicensePlate);
+        builder.Ignore(ticket => ticket.PriceHour);
+        builder.Ignore(ticket => ticket.PriceDay);
+        builder.Ignore(ticket => ticket.OwnershipDocumentFileName);
+        builder.Ignore(ticket => ticket.CarImages);
         builder.Ignore(ticket => ticket.DecisionReason);
         builder.Ignore(ticket => ticket.ReviewedByManagerId);
         builder.Ignore(ticket => ticket.ReviewedAt);
@@ -119,6 +130,45 @@ public sealed class TicketConfiguration : IEntityTypeConfiguration<Ticket>
             };
         }
 
+        var relatedPartnerUserId = GetOptionalGuid(root, "relatedPartnerUserId");
+        var ownershipDocumentFileName = GetOptionalString(root, "ownershipDocumentFileName");
+        var carBrand = GetOptionalString(root, "carBrand");
+        var carModel = GetOptionalString(root, "carModel");
+        var carYear = GetOptionalInt(root, "carYear");
+        var licensePlate = GetOptionalString(root, "licensePlate");
+        var priceHour = GetOptionalDecimal(root, "priceHour");
+        var priceDay = GetOptionalDecimal(root, "priceDay");
+        if (relatedPartnerUserId.HasValue ||
+            !string.IsNullOrWhiteSpace(ownershipDocumentFileName) ||
+            !string.IsNullOrWhiteSpace(carBrand) ||
+            !string.IsNullOrWhiteSpace(carModel) ||
+            carYear.HasValue ||
+            !string.IsNullOrWhiteSpace(licensePlate) ||
+            priceHour.HasValue ||
+            priceDay.HasValue)
+        {
+            return new PartnerCarTicketData
+            {
+                FirstName = firstName,
+                LastName = lastName,
+                FullName = fullName,
+                PhoneNumber = phoneNumber,
+                IdentityDocumentFileName = identityDocumentFileName,
+                RelatedPartnerUserId = relatedPartnerUserId ?? Guid.Empty,
+                CarBrand = carBrand ?? string.Empty,
+                CarModel = carModel ?? string.Empty,
+                CarYear = carYear,
+                LicensePlate = licensePlate ?? string.Empty,
+                PriceHour = priceHour,
+                PriceDay = priceDay,
+                OwnershipDocumentFileName = ownershipDocumentFileName ?? string.Empty,
+                CarImages = GetPartnerCarImages(root),
+                DecisionReason = decisionReason,
+                ReviewedByManagerId = reviewedByManagerId,
+                ReviewedAt = reviewedAt
+            };
+        }
+
         return new PartnerTicketData
         {
             FirstName = firstName,
@@ -156,6 +206,31 @@ public sealed class TicketConfiguration : IEntityTypeConfiguration<Ticket>
         return null;
     }
 
+    private static IReadOnlyCollection<PartnerCarTicketImageData> GetPartnerCarImages(JsonElement root)
+    {
+        if (!root.TryGetProperty("carImages", out var value) || value.ValueKind != JsonValueKind.Array)
+        {
+            return [];
+        }
+
+        var images = new List<PartnerCarTicketImageData>();
+        foreach (var item in value.EnumerateArray())
+        {
+            if (item.ValueKind != JsonValueKind.Object)
+            {
+                continue;
+            }
+
+            images.Add(new PartnerCarTicketImageData
+            {
+                ImageId = GetString(item, "imageId"),
+                ImageUrl = GetString(item, "imageUrl")
+            });
+        }
+
+        return images;
+    }
+
     private static Guid? GetOptionalGuid(JsonElement root, string propertyName)
     {
         if (root.TryGetProperty(propertyName, out var value) &&
@@ -163,6 +238,47 @@ public sealed class TicketConfiguration : IEntityTypeConfiguration<Ticket>
             Guid.TryParse(value.GetString(), out var guidValue))
         {
             return guidValue;
+        }
+
+        return null;
+    }
+
+    private static int? GetOptionalInt(JsonElement root, string propertyName)
+    {
+        if (!root.TryGetProperty(propertyName, out var value))
+        {
+            return null;
+        }
+
+        if (value.ValueKind == JsonValueKind.Number && value.TryGetInt32(out var intValue))
+        {
+            return intValue;
+        }
+
+        if (value.ValueKind == JsonValueKind.String && int.TryParse(value.GetString(), out var parsedValue))
+        {
+            return parsedValue;
+        }
+
+        return null;
+    }
+
+    private static decimal? GetOptionalDecimal(JsonElement root, string propertyName)
+    {
+        if (!root.TryGetProperty(propertyName, out var value))
+        {
+            return null;
+        }
+
+        if (value.ValueKind == JsonValueKind.Number && value.TryGetDecimal(out var decimalValue))
+        {
+            return decimalValue;
+        }
+
+        if (value.ValueKind == JsonValueKind.String &&
+            decimal.TryParse(value.GetString(), out var parsedValue))
+        {
+            return parsedValue;
         }
 
         return null;
