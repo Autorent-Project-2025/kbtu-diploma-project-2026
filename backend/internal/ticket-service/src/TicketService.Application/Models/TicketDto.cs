@@ -20,6 +20,7 @@ public sealed record TicketDto(
     Guid? RelatedPartnerUserId,
     string? CarBrand,
     string? CarModel,
+    int? CarYear,
     string? LicensePlate,
     IReadOnlyCollection<PartnerCarTicketImageData> CarImages,
     TicketStatus Status,

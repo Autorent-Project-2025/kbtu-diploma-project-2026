@@ -91,6 +91,7 @@ public sealed class CreateTicketCommandHandler
             relatedPartnerUserId,
             command.CarBrand,
             command.CarModel,
+            command.CarYear,
             command.LicensePlate,
             ownershipDocumentFileName,
             carImages,
@@ -166,6 +167,17 @@ public sealed class CreateTicketCommandHandler
             if (string.IsNullOrWhiteSpace(command.LicensePlate))
             {
                 throw new ValidationException("License plate is required for partner car tickets.");
+            }
+
+            if (!command.CarYear.HasValue)
+            {
+                throw new ValidationException("Car year is required for partner car tickets.");
+            }
+
+            var maxAllowedCarYear = DateTime.UtcNow.Year + 1;
+            if (command.CarYear.Value < 1886 || command.CarYear.Value > maxAllowedCarYear)
+            {
+                throw new ValidationException($"Car year must be between 1886 and {maxAllowedCarYear}.");
             }
 
             if (command.OwnershipDocumentFile is null)

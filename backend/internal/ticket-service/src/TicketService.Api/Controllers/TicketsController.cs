@@ -66,6 +66,7 @@ public sealed class TicketsController : ControllerBase
                 await MapToOptionalFilePayloadAsync(request.DriverLicenseFile, cancellationToken),
                 request.CarBrand,
                 request.CarModel,
+                request.CarYear,
                 request.LicensePlate,
                 await MapToOptionalFilePayloadAsync(request.OwnershipDocumentFile, cancellationToken),
                 await MapToFilePayloadCollectionAsync(request.CarImageFiles, cancellationToken)),
@@ -236,6 +237,7 @@ public sealed class TicketsController : ControllerBase
         return new PartnerCarTicketReviewData(
             request.CarBrand,
             request.CarModel,
+            request.CarYear,
             request.LicensePlate,
             request.Email);
     }

@@ -17,6 +17,7 @@ public sealed class CreateTicketRequest
     public IFormFile? DriverLicenseFile { get; init; }
     public string? CarBrand { get; init; }
     public string? CarModel { get; init; }
+    public int? CarYear { get; init; }
     public string? LicensePlate { get; init; }
     public IFormFile? OwnershipDocumentFile { get; init; }
     public List<IFormFile>? CarImageFiles { get; init; }

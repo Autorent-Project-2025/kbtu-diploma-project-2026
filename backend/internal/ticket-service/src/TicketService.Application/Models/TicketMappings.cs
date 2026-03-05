@@ -23,6 +23,7 @@ public static class TicketMappings
             ticket.RelatedPartnerUserId,
             ticket.CarBrand,
             ticket.CarModel,
+            ticket.CarYear,
             ticket.LicensePlate,
             ticket.CarImages,
             ticket.Status,

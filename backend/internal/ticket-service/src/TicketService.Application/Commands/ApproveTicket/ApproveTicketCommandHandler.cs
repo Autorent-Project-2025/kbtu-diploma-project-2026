@@ -63,6 +63,7 @@ public sealed class ApproveTicketCommandHandler
                 ticket.RelatedPartnerUserId,
                 ticket.CarBrand,
                 ticket.CarModel,
+                ticket.CarYear,
                 ticket.LicensePlate,
                 ticket.OwnershipDocumentFileName,
                 ticket.CarImages,
@@ -85,6 +86,7 @@ public sealed class ApproveTicketCommandHandler
         ticket.UpdatePartnerCarDetailsForReview(
             partnerCarData.CarBrand,
             partnerCarData.CarModel,
+            partnerCarData.CarYear,
             partnerCarData.LicensePlate,
             partnerCarData.Email);
     }

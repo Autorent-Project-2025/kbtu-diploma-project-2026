@@ -33,6 +33,7 @@ export interface PartnerCarTicketData extends TicketDataBase {
   relatedPartnerUserId: string;
   carBrand: string;
   carModel: string;
+  carYear?: number | null;
   licensePlate: string;
   ownershipDocumentFileName: string;
   carImages: PartnerCarTicketImageData[];
@@ -57,6 +58,7 @@ export interface Ticket {
   relatedPartnerUserId?: string | null;
   carBrand?: string | null;
   carModel?: string | null;
+  carYear?: number | null;
   licensePlate?: string | null;
   carImages?: PartnerCarTicketImageData[];
   status: number;

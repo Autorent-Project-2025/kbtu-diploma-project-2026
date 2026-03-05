@@ -43,12 +43,19 @@ namespace CarService.Api.Controllers
                 return BadRequest(new { error = "RelatedUserId is required." });
             }
 
+            var maxAllowedCarYear = DateTime.UtcNow.Year + 1;
+            if (request.CarYear < 1886 || request.CarYear > maxAllowedCarYear)
+            {
+                return BadRequest(new { error = $"CarYear must be between 1886 and {maxAllowedCarYear}." });
+            }
+
             var created = await _partnerCarService.ProvisionAsync(
                 new PartnerCarProvisionDto
                 {
                     RelatedUserId = request.RelatedUserId,
                     CarBrand = request.CarBrand,
                     CarModel = request.CarModel,
+                    CarYear = request.CarYear,
                     LicensePlate = request.LicensePlate,
                     OwnershipFileName = request.OwnershipDocumentFileName,
                     Images = (request.Images ?? [])

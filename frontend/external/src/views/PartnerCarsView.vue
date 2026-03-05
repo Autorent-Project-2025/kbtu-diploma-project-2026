@@ -80,6 +80,19 @@
           </div>
 
           <div class="space-y-2">
+            <label for="carYear" class="block text-sm font-semibold text-gray-700 dark:text-gray-300">Год выпуска</label>
+            <input
+              id="carYear"
+              v-model.number="form.carYear"
+              type="number"
+              min="1886"
+              :max="maxAllowedCarYear"
+              required
+              class="w-full px-4 py-3 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white"
+            />
+          </div>
+
+          <div class="space-y-2">
             <label for="ownershipFile" class="block text-sm font-semibold text-gray-700 dark:text-gray-300">
               Подтверждение собственности (PDF)
             </label>
@@ -179,11 +192,13 @@ const carModels = ref<CarModelOption[]>([]);
 const loadingCars = ref(false);
 const submitting = ref(false);
 const submitted = ref(false);
+const maxAllowedCarYear = new Date().getUTCFullYear() + 1;
 
 const form = reactive({
   email: "",
   carBrand: "",
   carModel: "",
+  carYear: null as number | null,
   licensePlate: "",
   ownershipDocumentFile: null as File | null,
   carImageFiles: [] as File[],
@@ -302,6 +317,7 @@ async function loadModels() {
 function resetForm() {
   form.carBrand = "";
   form.carModel = "";
+  form.carYear = null;
   form.licensePlate = "";
   form.ownershipDocumentFile = null;
   form.carImageFiles = [];
@@ -318,6 +334,17 @@ async function submitTicket() {
   const carModel = form.carModel.trim();
   if (!carBrand || !carModel) {
     error("Укажите марку и модель машины.");
+    return;
+  }
+
+  const carYear = Number(form.carYear);
+  if (!Number.isInteger(carYear)) {
+    error("Укажите год выпуска машины.");
+    return;
+  }
+
+  if (carYear < 1886 || carYear > maxAllowedCarYear) {
+    error(`Год выпуска должен быть в диапазоне 1886-${maxAllowedCarYear}.`);
     return;
   }
 
@@ -342,6 +369,7 @@ async function submitTicket() {
       email: form.email.trim(),
       carBrand,
       carModel,
+      carYear,
       licensePlate: form.licensePlate.trim(),
       ownershipDocumentFile: form.ownershipDocumentFile,
       carImageFiles: form.carImageFiles,

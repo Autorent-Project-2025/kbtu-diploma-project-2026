@@ -24,6 +24,7 @@ public sealed class Ticket
     public Guid? RelatedPartnerUserId => Data is PartnerCarTicketData partnerCarData ? partnerCarData.RelatedPartnerUserId : null;
     public string? CarBrand => Data is PartnerCarTicketData partnerCarData ? partnerCarData.CarBrand : null;
     public string? CarModel => Data is PartnerCarTicketData partnerCarData ? partnerCarData.CarModel : null;
+    public int? CarYear => Data is PartnerCarTicketData partnerCarData ? partnerCarData.CarYear : null;
     public string? LicensePlate => Data is PartnerCarTicketData partnerCarData ? partnerCarData.LicensePlate : null;
     public string? OwnershipDocumentFileName => Data is PartnerCarTicketData partnerCarData ? partnerCarData.OwnershipDocumentFileName : null;
     public IReadOnlyCollection<PartnerCarTicketImageData> CarImages => Data is PartnerCarTicketData partnerCarData
@@ -51,6 +52,7 @@ public sealed class Ticket
         Guid? relatedPartnerUserId,
         string? carBrand,
         string? carModel,
+        int? carYear,
         string? licensePlate,
         string? ownershipDocumentFileName,
         IReadOnlyCollection<PartnerCarTicketImageData>? carImages,
@@ -75,6 +77,7 @@ public sealed class Ticket
             relatedPartnerUserId,
             carBrand,
             carModel,
+            carYear,
             licensePlate,
             ownershipDocumentFileName,
             carImages,
@@ -86,6 +89,7 @@ public sealed class Ticket
     public void UpdatePartnerCarDetailsForReview(
         string? carBrand,
         string? carModel,
+        int? carYear,
         string? licensePlate,
         string? email)
     {
@@ -96,13 +100,14 @@ public sealed class Ticket
             throw new InvalidOperationException("Partner car review fields can be updated only for partner car tickets.");
         }
 
-        var shouldUpdateData = carBrand is not null || carModel is not null || licensePlate is not null;
+        var shouldUpdateData = carBrand is not null || carModel is not null || carYear is not null || licensePlate is not null;
         if (shouldUpdateData)
         {
             Data = partnerCarData with
             {
                 CarBrand = carBrand is null ? partnerCarData.CarBrand : NormalizeCarBrand(carBrand),
                 CarModel = carModel is null ? partnerCarData.CarModel : NormalizeCarModel(carModel),
+                CarYear = carYear is null ? partnerCarData.CarYear : NormalizeCarYear(carYear),
                 LicensePlate = licensePlate is null ? partnerCarData.LicensePlate : NormalizeLicensePlate(licensePlate)
             };
         }
@@ -182,6 +187,7 @@ public sealed class Ticket
         Guid? relatedPartnerUserId,
         string? carBrand,
         string? carModel,
+        int? carYear,
         string? licensePlate,
         string? ownershipDocumentFileName,
         IReadOnlyCollection<PartnerCarTicketImageData>? carImages,
@@ -241,6 +247,7 @@ public sealed class Ticket
             RelatedPartnerUserId = NormalizePartnerUserId(relatedPartnerUserId),
             CarBrand = NormalizeCarBrand(carBrand),
             CarModel = NormalizeCarModel(carModel),
+            CarYear = NormalizeCarYear(carYear),
             LicensePlate = NormalizeLicensePlate(licensePlate),
             OwnershipDocumentFileName = NormalizeOwnershipDocumentFileName(ownershipDocumentFileName),
             CarImages = NormalizePartnerCarImages(carImages),
@@ -364,6 +371,22 @@ public sealed class Ticket
     private static string NormalizeCarModel(string? carModel)
     {
         return NormalizeRequired(carModel, nameof(carModel), 100);
+    }
+
+    private static int NormalizeCarYear(int? carYear)
+    {
+        if (!carYear.HasValue)
+        {
+            throw new ArgumentException("carYear is required.", nameof(carYear));
+        }
+
+        var maxAllowedCarYear = DateTime.UtcNow.Year + 1;
+        if (carYear.Value < 1886 || carYear.Value > maxAllowedCarYear)
+        {
+            throw new ArgumentException($"carYear must be between 1886 and {maxAllowedCarYear}.", nameof(carYear));
+        }
+
+        return carYear.Value;
     }
 
     private static string NormalizeLicensePlate(string? licensePlate)

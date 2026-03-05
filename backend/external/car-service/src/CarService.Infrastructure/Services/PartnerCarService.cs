@@ -171,6 +171,7 @@ namespace CarService.Infrastructure.Services
 
             var normalizedBrand = NormalizeRequired(dto.CarBrand, nameof(dto.CarBrand), 255);
             var normalizedModel = NormalizeRequired(dto.CarModel, nameof(dto.CarModel), 255);
+            var normalizedYear = NormalizeCarYear(dto.CarYear, nameof(dto.CarYear));
             var normalizedLicensePlate = NormalizeRequired(dto.LicensePlate, nameof(dto.LicensePlate), 20).ToUpperInvariant();
             var normalizedOwnershipFileName = NormalizeRequired(dto.OwnershipFileName, nameof(dto.OwnershipFileName), 255);
             var (brand, modelLookup) = await _catalogResolver.ResolveAsync(
@@ -182,9 +183,9 @@ namespace CarService.Infrastructure.Services
                 .AsNoTracking()
                 .Where(carModel =>
                     carModel.BrandId == brand.Id &&
-                    carModel.ModelId == modelLookup.Id)
-                .OrderByDescending(carModel => carModel.Year)
-                .ThenByDescending(carModel => carModel.Id)
+                    carModel.ModelId == modelLookup.Id &&
+                    carModel.Year == normalizedYear)
+                .OrderByDescending(carModel => carModel.Id)
                 .FirstOrDefaultAsync(cancellationToken);
 
             var images = (dto.Images ?? [])
@@ -208,7 +209,7 @@ namespace CarService.Infrastructure.Services
                 {
                     BrandId = brand.Id,
                     ModelId = modelLookup.Id,
-                    Year = DateTime.UtcNow.Year,
+                    Year = normalizedYear,
                     RatingsCount = 0
                 };
 
@@ -692,6 +693,17 @@ namespace CarService.Infrastructure.Services
             }
 
             return normalized;
+        }
+
+        private static int NormalizeCarYear(int value, string paramName)
+        {
+            var maxAllowedCarYear = DateTime.UtcNow.Year + 1;
+            if (value < 1886 || value > maxAllowedCarYear)
+            {
+                throw new ArgumentException($"{paramName} must be between 1886 and {maxAllowedCarYear}.", paramName);
+            }
+
+            return value;
         }
 
         private static double Normalize(double value, double min, double max)

@@ -56,6 +56,7 @@ public sealed class TicketConfiguration : IEntityTypeConfiguration<Ticket>
         builder.Ignore(ticket => ticket.RelatedPartnerUserId);
         builder.Ignore(ticket => ticket.CarBrand);
         builder.Ignore(ticket => ticket.CarModel);
+        builder.Ignore(ticket => ticket.CarYear);
         builder.Ignore(ticket => ticket.LicensePlate);
         builder.Ignore(ticket => ticket.OwnershipDocumentFileName);
         builder.Ignore(ticket => ticket.CarImages);
@@ -131,11 +132,13 @@ public sealed class TicketConfiguration : IEntityTypeConfiguration<Ticket>
         var ownershipDocumentFileName = GetOptionalString(root, "ownershipDocumentFileName");
         var carBrand = GetOptionalString(root, "carBrand");
         var carModel = GetOptionalString(root, "carModel");
+        var carYear = GetOptionalInt(root, "carYear");
         var licensePlate = GetOptionalString(root, "licensePlate");
         if (relatedPartnerUserId.HasValue ||
             !string.IsNullOrWhiteSpace(ownershipDocumentFileName) ||
             !string.IsNullOrWhiteSpace(carBrand) ||
             !string.IsNullOrWhiteSpace(carModel) ||
+            carYear.HasValue ||
             !string.IsNullOrWhiteSpace(licensePlate))
         {
             return new PartnerCarTicketData
@@ -148,6 +151,7 @@ public sealed class TicketConfiguration : IEntityTypeConfiguration<Ticket>
                 RelatedPartnerUserId = relatedPartnerUserId ?? Guid.Empty,
                 CarBrand = carBrand ?? string.Empty,
                 CarModel = carModel ?? string.Empty,
+                CarYear = carYear,
                 LicensePlate = licensePlate ?? string.Empty,
                 OwnershipDocumentFileName = ownershipDocumentFileName ?? string.Empty,
                 CarImages = GetPartnerCarImages(root),
@@ -226,6 +230,26 @@ public sealed class TicketConfiguration : IEntityTypeConfiguration<Ticket>
             Guid.TryParse(value.GetString(), out var guidValue))
         {
             return guidValue;
+        }
+
+        return null;
+    }
+
+    private static int? GetOptionalInt(JsonElement root, string propertyName)
+    {
+        if (!root.TryGetProperty(propertyName, out var value))
+        {
+            return null;
+        }
+
+        if (value.ValueKind == JsonValueKind.Number && value.TryGetInt32(out var intValue))
+        {
+            return intValue;
+        }
+
+        if (value.ValueKind == JsonValueKind.String && int.TryParse(value.GetString(), out var parsedValue))
+        {
+            return parsedValue;
         }
 
         return null;

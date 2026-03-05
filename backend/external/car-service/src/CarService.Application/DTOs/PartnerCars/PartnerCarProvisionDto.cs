@@ -5,6 +5,7 @@ namespace CarService.Application.DTOs.PartnerCars
         public Guid RelatedUserId { get; set; }
         public string CarBrand { get; set; } = string.Empty;
         public string CarModel { get; set; } = string.Empty;
+        public int CarYear { get; set; }
         public string LicensePlate { get; set; } = string.Empty;
         public string OwnershipFileName { get; set; } = string.Empty;
         public IReadOnlyCollection<PartnerCarProvisionImageDto> Images { get; set; } = [];

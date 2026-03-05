@@ -43,6 +43,7 @@ public sealed class TicketEventPublisher : ITicketEventPublisher
 
             var carBrand = RequireField(ticketApprovedEvent.CarBrand, nameof(ticketApprovedEvent.CarBrand));
             var carModel = RequireField(ticketApprovedEvent.CarModel, nameof(ticketApprovedEvent.CarModel));
+            var carYear = RequireYear(ticketApprovedEvent.CarYear, nameof(ticketApprovedEvent.CarYear));
             var licensePlate = RequireField(ticketApprovedEvent.LicensePlate, nameof(ticketApprovedEvent.LicensePlate));
             var ownershipDocument = RequireField(ticketApprovedEvent.OwnershipDocumentFileName, nameof(ticketApprovedEvent.OwnershipDocumentFileName));
 
@@ -56,6 +57,7 @@ public sealed class TicketEventPublisher : ITicketEventPublisher
                     ticketApprovedEvent.RelatedPartnerUserId.Value,
                     carBrand,
                     carModel,
+                    carYear,
                     licensePlate,
                     ownershipDocument,
                     ticketApprovedEvent.CarImages
@@ -202,5 +204,21 @@ public sealed class TicketEventPublisher : ITicketEventPublisher
         }
 
         return value;
+    }
+
+    private static int RequireYear(int? value, string fieldName)
+    {
+        if (!value.HasValue)
+        {
+            throw new InvalidOperationException($"{fieldName} is required.");
+        }
+
+        var maxAllowedCarYear = DateTime.UtcNow.Year + 1;
+        if (value.Value < 1886 || value.Value > maxAllowedCarYear)
+        {
+            throw new InvalidOperationException($"{fieldName} must be between 1886 and {maxAllowedCarYear}.");
+        }
+
+        return value.Value;
     }
 }

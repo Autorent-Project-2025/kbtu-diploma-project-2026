@@ -66,6 +66,7 @@ export interface CreatePartnerCarTicketPayload {
   email: string;
   carBrand: string;
   carModel: string;
+  carYear: number;
   licensePlate: string;
   ownershipDocumentFile: File;
   carImageFiles: File[];
@@ -79,6 +80,7 @@ export async function createPartnerCarTicket(
   formData.append("email", payload.email);
   formData.append("carBrand", payload.carBrand);
   formData.append("carModel", payload.carModel);
+  formData.append("carYear", String(payload.carYear));
   formData.append("licensePlate", payload.licensePlate);
   formData.append("ownershipDocumentFile", payload.ownershipDocumentFile);
 

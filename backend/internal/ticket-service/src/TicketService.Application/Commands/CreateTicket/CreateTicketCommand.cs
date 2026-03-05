@@ -18,6 +18,7 @@ public sealed record CreateTicketCommand(
     TicketDocumentFilePayload? DriverLicenseFile,
     string? CarBrand,
     string? CarModel,
+    int? CarYear,
     string? LicensePlate,
     TicketDocumentFilePayload? OwnershipDocumentFile,
     IReadOnlyCollection<TicketDocumentFilePayload>? CarImageFiles);

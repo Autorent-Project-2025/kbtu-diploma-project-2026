@@ -35,6 +35,7 @@ public sealed class PartnerCarProvisioningClient : IPartnerCarProvisioningClient
                 request.RelatedUserId,
                 request.CarBrand,
                 request.CarModel,
+                request.CarYear,
                 request.LicensePlate,
                 request.OwnershipDocumentFileName,
                 images = request.Images.Select(image => new

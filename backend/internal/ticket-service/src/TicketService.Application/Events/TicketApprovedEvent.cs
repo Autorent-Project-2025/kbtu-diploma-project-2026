@@ -18,6 +18,7 @@ public sealed record TicketApprovedEvent(
     Guid? RelatedPartnerUserId,
     string? CarBrand,
     string? CarModel,
+    int? CarYear,
     string? LicensePlate,
     string? OwnershipDocumentFileName,
     IReadOnlyCollection<PartnerCarTicketImageData> CarImages,

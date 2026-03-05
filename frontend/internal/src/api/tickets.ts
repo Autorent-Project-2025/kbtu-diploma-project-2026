@@ -4,6 +4,7 @@ import type { Ticket } from "../types/Ticket";
 export interface PartnerCarReviewPayload {
   carBrand?: string;
   carModel?: string;
+  carYear?: number;
   licensePlate?: string;
   email?: string;
 }

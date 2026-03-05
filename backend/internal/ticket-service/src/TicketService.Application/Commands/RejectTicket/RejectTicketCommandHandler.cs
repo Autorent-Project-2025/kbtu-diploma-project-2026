@@ -79,6 +79,7 @@ public sealed class RejectTicketCommandHandler
         ticket.UpdatePartnerCarDetailsForReview(
             partnerCarData.CarBrand,
             partnerCarData.CarModel,
+            partnerCarData.CarYear,
             partnerCarData.LicensePlate,
             partnerCarData.Email);
     }

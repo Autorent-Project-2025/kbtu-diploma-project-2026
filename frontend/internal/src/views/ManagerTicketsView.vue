@@ -96,6 +96,17 @@
               <input id="carModel" class="input" v-model="partnerCarForm.carModel" />
             </article>
             <article class="detail-item">
+              <label class="label" for="carYear">Год</label>
+              <input
+                id="carYear"
+                class="input"
+                type="number"
+                min="1886"
+                :max="maxAllowedCarYear"
+                v-model.number="partnerCarForm.carYear"
+              />
+            </article>
+            <article class="detail-item">
               <label class="label" for="licensePlate">Гос номер</label>
               <input id="licensePlate" class="input" v-model="partnerCarForm.licensePlate" />
             </article>
@@ -190,10 +201,12 @@ const loading = ref(false);
 const actionLoading = ref(false);
 const errorMessage = ref("");
 const successMessage = ref("");
+const maxAllowedCarYear = new Date().getUTCFullYear() + 1;
 
 const partnerCarForm = reactive({
   carBrand: "",
   carModel: "",
+  carYear: null as number | null,
   licensePlate: "",
   email: "",
 });
@@ -270,6 +283,7 @@ function syncPartnerCarForm(ticket: Ticket | null) {
   if (!ticket || !isPartnerCarTicket(ticket)) {
     partnerCarForm.carBrand = "";
     partnerCarForm.carModel = "";
+    partnerCarForm.carYear = null;
     partnerCarForm.licensePlate = "";
     partnerCarForm.email = "";
     return;
@@ -278,6 +292,8 @@ function syncPartnerCarForm(ticket: Ticket | null) {
   const data = (ticket.data as PartnerCarTicketData | undefined) ?? undefined;
   partnerCarForm.carBrand = (ticket.carBrand ?? data?.carBrand ?? "").trim();
   partnerCarForm.carModel = (ticket.carModel ?? data?.carModel ?? "").trim();
+  const rawCarYear = ticket.carYear ?? data?.carYear ?? null;
+  partnerCarForm.carYear = Number.isInteger(rawCarYear) ? Number(rawCarYear) : null;
   partnerCarForm.licensePlate = (ticket.licensePlate ?? data?.licensePlate ?? "").trim();
   partnerCarForm.email = (ticket.email ?? "").trim();
 }
@@ -289,17 +305,24 @@ function buildPartnerCarPayload(): PartnerCarReviewPayload | null | undefined {
 
   const carBrand = partnerCarForm.carBrand.trim();
   const carModel = partnerCarForm.carModel.trim();
+  const carYear = Number(partnerCarForm.carYear);
   const licensePlate = partnerCarForm.licensePlate.trim();
   const email = partnerCarForm.email.trim();
 
-  if (!carBrand || !carModel || !licensePlate || !email) {
-    errorMessage.value = "Для заявки на машину партнера заполните марку, модель, гос номер и email.";
+  if (!carBrand || !carModel || !licensePlate || !email || !Number.isInteger(carYear)) {
+    errorMessage.value = "Для заявки на машину партнера заполните марку, модель, год, гос номер и email.";
+    return null;
+  }
+
+  if (carYear < 1886 || carYear > maxAllowedCarYear) {
+    errorMessage.value = `Год машины должен быть в диапазоне 1886-${maxAllowedCarYear}.`;
     return null;
   }
 
   return {
     carBrand,
     carModel,
+    carYear,
     licensePlate,
     email,
   };
