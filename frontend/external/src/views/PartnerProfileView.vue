@@ -68,13 +68,27 @@
           </div>
           <div>
             <p class="text-sm text-gray-500 dark:text-gray-400">Удостоверение владельца</p>
-            <p class="text-lg font-semibold text-gray-900 dark:text-white">{{ partner.ownerIdentityFileName }}</p>
+            <button
+              type="button"
+              class="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-primary-600 hover:bg-primary-700 text-white text-sm font-semibold transition-colors disabled:opacity-60"
+              :disabled="openingIdentityDocument"
+              @click="openDocument(partner.ownerIdentityFileName, 'identity')"
+            >
+              {{ openingIdentityDocument ? "Открытие..." : "Посмотреть документ" }}
+            </button>
           </div>
           <div>
             <p class="text-sm text-gray-500 dark:text-gray-400">Файл контракта</p>
-            <p class="text-lg font-semibold text-gray-900 dark:text-white">
-              {{ partner.contractFileName || "Не загружен" }}
-            </p>
+            <button
+              v-if="partner.contractFileName"
+              type="button"
+              class="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-primary-600 hover:bg-primary-700 text-white text-sm font-semibold transition-colors disabled:opacity-60"
+              :disabled="openingContractDocument"
+              @click="openDocument(partner.contractFileName, 'contract')"
+            >
+              {{ openingContractDocument ? "Открытие..." : "Посмотреть документ" }}
+            </button>
+            <p v-else class="text-lg font-semibold text-gray-900 dark:text-white">Не загружен</p>
           </div>
           <div>
             <p class="text-sm text-gray-500 dark:text-gray-400">Создано</p>
@@ -88,12 +102,16 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
-import { getMyPartner } from "../api/partners";
+import { getMyPartner, getMyPartnerFileTemporaryLink } from "../api/partners";
+import { useToast } from "../composables/useToast";
 import type { Partner } from "../types/Partner";
 
+const { error } = useToast();
 const loading = ref(true);
 const errorMessage = ref("");
 const partner = ref<Partner | null>(null);
+const openingIdentityDocument = ref(false);
+const openingContractDocument = ref(false);
 
 function formatDate(value: string) {
   const date = new Date(value);
@@ -117,6 +135,46 @@ function formatDateTime(value: string) {
     hour: "2-digit",
     minute: "2-digit",
   }).format(date);
+}
+
+function openTemporaryLink(url: string) {
+  const openedWindow = window.open(url, "_blank", "noopener,noreferrer");
+  if (!openedWindow) {
+    window.location.href = url;
+  }
+}
+
+async function openDocument(fileName: string | null | undefined, documentType: "identity" | "contract") {
+  const normalizedFileName = (fileName ?? "").trim();
+  if (!normalizedFileName) {
+    error("Документ не найден.");
+    return;
+  }
+
+  const isIdentity = documentType === "identity";
+  if (isIdentity) {
+    openingIdentityDocument.value = true;
+  } else {
+    openingContractDocument.value = true;
+  }
+
+  try {
+    const temporaryLink = await getMyPartnerFileTemporaryLink(normalizedFileName);
+    openTemporaryLink(temporaryLink.url);
+  } catch (e: any) {
+    error(
+      e?.response?.data?.error ||
+      e?.response?.data?.message ||
+      e?.response?.data?.detail ||
+      "Не удалось открыть документ."
+    );
+  } finally {
+    if (isIdentity) {
+      openingIdentityDocument.value = false;
+    } else {
+      openingContractDocument.value = false;
+    }
+  }
 }
 
 onMounted(async () => {

@@ -30,7 +30,19 @@
             <p>Цена/час: <b>{{ car.priceHour ?? "—" }}</b></p>
             <p>Цена/день: <b>{{ car.priceDay ?? "—" }}</b></p>
             <p>Рейтинг: <b>{{ car.rating ?? "нет" }}</b></p>
-            <p>Файл собственности: <b>{{ car.ownershipFileName || "не указан" }}</b></p>
+            <p class="flex items-center gap-2">
+              Файл собственности:
+              <button
+                v-if="car.ownershipFileName"
+                type="button"
+                class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-primary-600 hover:bg-primary-700 text-white text-xs font-semibold transition-colors disabled:opacity-60"
+                :disabled="openingOwnershipDocument"
+                @click="openOwnershipDocument"
+              >
+                {{ openingOwnershipDocument ? "Открытие..." : "Посмотреть документ" }}
+              </button>
+              <b v-else>не указан</b>
+            </p>
           </div>
           <p v-if="car.description" class="text-gray-600 dark:text-gray-400">{{ car.description }}</p>
         </section>
@@ -60,11 +72,15 @@
 import { onMounted, ref } from "vue";
 import { useRoute } from "vue-router";
 import { getMyPartnerCarDetails, type PartnerCarDetails } from "../api/partnerCars";
+import { getMyPartnerFileTemporaryLink } from "../api/partners";
+import { useToast } from "../composables/useToast";
 
 const route = useRoute();
+const { error } = useToast();
 const loading = ref(true);
 const errorMessage = ref("");
 const car = ref<PartnerCarDetails | null>(null);
+const openingOwnershipDocument = ref(false);
 
 function statusLabel(status: number): string {
   if (status === 0) return "Доступна";
@@ -72,6 +88,35 @@ function statusLabel(status: number): string {
   if (status === 2) return "В поездке";
   if (status === 3) return "На обслуживании";
   return "Неизвестно";
+}
+
+function openTemporaryLink(url: string) {
+  const openedWindow = window.open(url, "_blank", "noopener,noreferrer");
+  if (!openedWindow) {
+    window.location.href = url;
+  }
+}
+
+async function openOwnershipDocument() {
+  if (!car.value?.ownershipFileName) {
+    error("Документ собственности не найден.");
+    return;
+  }
+
+  openingOwnershipDocument.value = true;
+  try {
+    const link = await getMyPartnerFileTemporaryLink(car.value.ownershipFileName);
+    openTemporaryLink(link.url);
+  } catch (e: any) {
+    error(
+      e?.response?.data?.error ||
+      e?.response?.data?.message ||
+      e?.response?.data?.detail ||
+      "Не удалось открыть документ собственности."
+    );
+  } finally {
+    openingOwnershipDocument.value = false;
+  }
 }
 
 onMounted(async () => {

@@ -6,6 +6,19 @@ export async function getMyPartner(): Promise<Partner> {
   return response.data as Partner;
 }
 
+export interface TemporaryFileLink {
+  fileName: string;
+  url: string;
+  expiresAtUtc: string;
+}
+
+export async function getMyPartnerFileTemporaryLink(fileName: string): Promise<TemporaryFileLink> {
+  const response = await api.get("/partners/me/files/temporary-link", {
+    params: { fileName },
+  });
+  return response.data as TemporaryFileLink;
+}
+
 export interface PartnerPublicProfile {
   relatedUserId: string;
   carrierName: string;

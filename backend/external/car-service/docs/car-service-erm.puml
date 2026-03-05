@@ -1,0 +1,139 @@
+@startuml
+!pragma layout smetana
+
+left to right direction
+hide circle
+skinparam shadowing false
+skinparam linetype ortho
+skinparam packageStyle rectangle
+skinparam defaultFontName Consolas
+
+title Car Service ERM (PostgreSQL)
+
+entity "brands" as brands {
+  *id : int <<PK>>
+  --
+  name : varchar(255) <<UQ>>
+}
+
+entity "models" as models {
+  *id : int <<PK>>
+  --
+  brand_id : int <<FK>>
+  name : varchar(255)
+  --
+  <<UQ>> (brand_id, name)
+}
+
+entity "car_models" as car_models {
+  *id : int <<PK>>
+  --
+  brand_id : int <<FK>>
+  model_id : int <<FK>>
+  year : int
+  engine : varchar(100)?
+  transmission : varchar(100)?
+  seats : int?
+  fuel_type : varchar(50)?
+  doors : int?
+  description : varchar(585)?
+  rating : numeric(2,1)?
+  ratings_count : int
+  --
+  <<UQ>> (brand_id, model_id, year)
+}
+
+entity "partner_cars" as partner_cars {
+  *id : int <<PK>>
+  --
+  partner_id : uuid
+  car_model_id : int <<FK>>
+  license_plate : varchar(20) <<UQ>>
+  ownership_file_name : varchar(255)?
+  color : varchar(50)?
+  price_hour : numeric(10,2)?
+  price_day : numeric(10,2)?
+  status : int
+  created_at : timestamptz
+  rating : numeric(2,1)?
+  ratings_count : int
+}
+
+entity "car_model_images" as car_model_images {
+  *id : int <<PK>>
+  --
+  model_id : int <<FK>>
+  image_url : text
+  image_id : varchar(255)?
+  image_type : int
+  display_order : int
+}
+
+entity "partner_car_images" as partner_car_images {
+  *id : int <<PK>>
+  --
+  car_id : int <<FK>>
+  image_url : text
+  image_id : varchar(255)?
+  image_type : int
+  display_order : int
+}
+
+entity "features" as features {
+  *id : int <<PK>>
+  --
+  name : text <<UQ>>
+  created_on : timestamp
+}
+
+entity "car_features" as car_features {
+  *id : int <<PK>>
+  --
+  car_id : int <<FK>>
+  feature_id : int <<FK>>
+  --
+  <<UQ>> (car_id, feature_id)
+}
+
+entity "car_comments" as car_comments {
+  *id : int <<PK>>
+  --
+  user_id : varchar(64)
+  user_name : varchar(255)
+  car_id : int <<FK>>
+  partner_car_id : int? <<FK>>
+  content : text
+  rating : int
+  created_on : timestamp
+}
+
+brands ||--o{ models
+brands ||--o{ car_models
+models ||--o{ car_models
+car_models ||--o{ partner_cars
+car_models ||--o{ car_model_images
+partner_cars ||--o{ partner_car_images
+car_models ||--o{ car_features
+features ||--o{ car_features
+car_models ||--o{ car_comments
+partner_cars |o--o{ car_comments
+
+note right of car_models
+Checks:
+- seats is null or 1..20
+- doors is null or 1..6
+- rating is null or 1..5
+end note
+
+note right of partner_cars
+Checks:
+- status in (0,1,2,3)
+- rating is null or 1..5
+end note
+
+note bottom of car_models
+Compatibility view in DB:
+public.cars = SELECT * FROM public.car_models
+end note
+
+@enduml

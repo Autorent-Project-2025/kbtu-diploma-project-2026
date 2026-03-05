@@ -46,6 +46,8 @@ services:
       - ASPNETCORE_ENVIRONMENT=Development
       - Jwt__PublicKey=${Jwt__PublicKey}
       - InternalAuth__ApiKey=${InternalAuth__ApiKey}
+      - FileService__BaseUrl=${FileService__BaseUrl}
+      - FileService__InternalApiKey=${FileService__InternalApiKey}
       - ConnectionStrings__DbConnection=Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
     depends_on:
       postgres:
