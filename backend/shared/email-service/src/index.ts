@@ -7,7 +7,7 @@ import {
   partnerApprovedTemplate,
   partnerRejectedTemplate,
   rejectedTemplate,
-} from "./mailer/templates.ts";
+} from "./mailer/templates/index.ts";
 
 type JsonBody = Record<string, unknown>;
 
