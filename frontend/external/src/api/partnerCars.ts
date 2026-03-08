@@ -1,4 +1,5 @@
 import api from "./axios";
+import { resolveAssetUrl } from "../utils/resolveAssetUrl";
 
 export interface PartnerCarSummary {
   id: number;
@@ -52,7 +53,15 @@ export async function getMyPartnerCars(): Promise<PartnerCarSummary[]> {
 
 export async function getMyPartnerCarDetails(carId: number): Promise<PartnerCarDetails> {
   const response = await api.get(`/cars/my/${carId}`);
-  return response.data as PartnerCarDetails;
+  const payload = response.data as PartnerCarDetails;
+
+  return {
+    ...payload,
+    images: (payload.images ?? []).map((image) => ({
+      ...image,
+      imageUrl: resolveAssetUrl(image.imageUrl) ?? image.imageUrl,
+    })),
+  };
 }
 
 export async function getCarBrands(): Promise<string[]> {
