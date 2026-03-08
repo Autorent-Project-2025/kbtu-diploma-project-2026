@@ -18,6 +18,7 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.Configure<InternalAuthOptions>(builder.Configuration.GetSection(InternalAuthOptions.SectionName));
 builder.Services.Configure<CarServiceOptions>(builder.Configuration.GetSection(CarServiceOptions.SectionName));
+builder.Services.Configure<PaymentServiceOptions>(builder.Configuration.GetSection(PaymentServiceOptions.SectionName));
 
 var connectionString = builder.Configuration.GetConnectionString("DbConnection");
 if (string.IsNullOrEmpty(connectionString))
@@ -94,6 +95,19 @@ builder.Services.AddHttpClient<IPartnerCarReadClient, PartnerCarReadClient>((ser
     if (string.IsNullOrWhiteSpace(options.BaseUrl))
     {
         throw new InvalidOperationException("Configuration value 'CarService:BaseUrl' is required.");
+    }
+
+    client.BaseAddress = new Uri(options.BaseUrl, UriKind.Absolute);
+});
+builder.Services.AddHttpClient<IPaymentSyncClient, PaymentSyncClient>((serviceProvider, client) =>
+{
+    var options = serviceProvider
+        .GetRequiredService<Microsoft.Extensions.Options.IOptions<PaymentServiceOptions>>()
+        .Value;
+
+    if (string.IsNullOrWhiteSpace(options.BaseUrl))
+    {
+        throw new InvalidOperationException("Configuration value 'PaymentService:BaseUrl' is required.");
     }
 
     client.BaseAddress = new Uri(options.BaseUrl, UriKind.Absolute);

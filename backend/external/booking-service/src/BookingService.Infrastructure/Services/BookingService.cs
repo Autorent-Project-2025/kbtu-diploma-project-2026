@@ -19,11 +19,16 @@ namespace BookingService.Infrastructure.Services
 
         private readonly ApplicationDbContext _db;
         private readonly IPartnerCarReadClient _partnerCarReadClient;
+        private readonly IPaymentSyncClient _paymentSyncClient;
 
-        public BookingService(ApplicationDbContext db, IPartnerCarReadClient partnerCarReadClient)
+        public BookingService(
+            ApplicationDbContext db,
+            IPartnerCarReadClient partnerCarReadClient,
+            IPaymentSyncClient paymentSyncClient)
         {
             _db = db;
             _partnerCarReadClient = partnerCarReadClient;
+            _paymentSyncClient = paymentSyncClient;
         }
 
         public async Task<bool> IsPartnerCarAvailable(int partnerCarId, DateTimeOffset startTime, DateTimeOffset endTime)
@@ -296,8 +301,10 @@ namespace BookingService.Infrastructure.Services
                 return false;
             }
 
-            ApplyStatusTransition(booking, BookingStatus.Canceled);
-            await _db.SaveChangesAsync();
+            await PersistStatusTransitionWithPaymentSync(
+                booking,
+                BookingStatus.Canceled,
+                item => _paymentSyncClient.RecordBookingCanceledAsync(item.Id));
             return true;
         }
 
@@ -309,8 +316,16 @@ namespace BookingService.Infrastructure.Services
                 return false;
             }
 
-            ApplyStatusTransition(booking, BookingStatus.Confirmed);
-            await _db.SaveChangesAsync();
+            await PersistStatusTransitionWithPaymentSync(
+                booking,
+                BookingStatus.Confirmed,
+                item => _paymentSyncClient.RecordBookingConfirmedAsync(
+                    item.Id,
+                    item.UserId,
+                    item.PartnerUserId,
+                    item.PartnerCarId,
+                    item.PriceHour,
+                    item.TotalPrice));
             return true;
         }
 
@@ -322,8 +337,10 @@ namespace BookingService.Infrastructure.Services
                 return false;
             }
 
-            ApplyStatusTransition(booking, BookingStatus.Completed);
-            await _db.SaveChangesAsync();
+            await PersistStatusTransitionWithPaymentSync(
+                booking,
+                BookingStatus.Completed,
+                item => _paymentSyncClient.RecordBookingCompletedAsync(item.Id));
             return true;
         }
 
@@ -416,6 +433,31 @@ namespace BookingService.Infrastructure.Services
                 .FirstOrDefaultAsync(b => b.Id == id && b.UserId == userId);
         }
 
+        private async Task PersistStatusTransitionWithPaymentSync(
+            Booking booking,
+            BookingStatus targetStatus,
+            Func<Booking, Task> paymentSyncAction)
+        {
+            var statusChanged = TryApplyStatusTransition(booking, targetStatus);
+            if (statusChanged)
+            {
+                await _db.SaveChangesAsync();
+            }
+
+            try
+            {
+                await paymentSyncAction(booking);
+            }
+            catch (Exception syncException)
+            {
+                throw new InvalidOperationException(
+                    statusChanged
+                        ? $"Booking status changed to {targetStatus}, but payment synchronization failed. Retry the same action to complete synchronization."
+                        : $"Booking is already {targetStatus}, but payment synchronization retry failed.",
+                    syncException);
+            }
+        }
+
         private static void EnsureValidDateRange(DateTimeOffset startTime, DateTimeOffset endTime)
         {
             if (startTime == default)
@@ -480,11 +522,11 @@ namespace BookingService.Infrastructure.Services
             }
         }
 
-        private static void ApplyStatusTransition(Booking booking, BookingStatus targetStatus)
+        private static bool TryApplyStatusTransition(Booking booking, BookingStatus targetStatus)
         {
             if (booking.Status == targetStatus)
             {
-                throw new InvalidOperationException($"Booking is already {targetStatus}.");
+                return false;
             }
 
             var isAllowed = booking.Status switch
@@ -504,6 +546,7 @@ namespace BookingService.Infrastructure.Services
             }
 
             booking.Status = targetStatus;
+            return true;
         }
 
         private static bool IsSerializationFailure(DbUpdateException ex)
