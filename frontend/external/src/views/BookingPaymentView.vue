@@ -55,6 +55,46 @@
               </article>
             </div>
 
+            <div class="grid md:grid-cols-2 gap-4">
+              <article
+                :class="[
+                  'p-5 rounded-2xl border transition-colors',
+                  isDeadlineCritical(sessionRemainingMs)
+                    ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
+                    : 'bg-sky-50 dark:bg-sky-900/20 border-sky-200 dark:border-sky-800',
+                ]"
+              >
+                <p class="text-sm font-bold uppercase tracking-[0.18em]" :class="isDeadlineCritical(sessionRemainingMs) ? 'text-red-700 dark:text-red-300' : 'text-sky-700 dark:text-sky-300'">
+                  Сессия оплаты
+                </p>
+                <p class="mt-3 text-3xl font-extrabold text-gray-900 dark:text-white">
+                  {{ formatCountdown(sessionRemainingMs) }}
+                </p>
+                <p class="mt-2 text-sm text-gray-600 dark:text-gray-300">
+                  {{ payment.paymentExpiresAt ? `Истекает ${formatDate(payment.paymentExpiresAt)}` : "Сессия ещё не создана" }}
+                </p>
+              </article>
+
+              <article
+                :class="[
+                  'p-5 rounded-2xl border transition-colors',
+                  isDeadlineCritical(bookingRemainingMs)
+                    ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
+                    : 'bg-violet-50 dark:bg-violet-900/20 border-violet-200 dark:border-violet-800',
+                ]"
+              >
+                <p class="text-sm font-bold uppercase tracking-[0.18em]" :class="isDeadlineCritical(bookingRemainingMs) ? 'text-red-700 dark:text-red-300' : 'text-violet-700 dark:text-violet-300'">
+                  Бронь удерживает слот
+                </p>
+                <p class="mt-3 text-3xl font-extrabold text-gray-900 dark:text-white">
+                  {{ formatCountdown(bookingRemainingMs) }}
+                </p>
+                <p class="mt-2 text-sm text-gray-600 dark:text-gray-300">
+                  {{ payment.bookingExpiresAt ? `Авто-отмена ${formatDate(payment.bookingExpiresAt)}` : "Для этой брони TTL больше не действует" }}
+                </p>
+              </article>
+            </div>
+
             <div
               :class="[
                 'rounded-2xl border px-5 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3',
@@ -255,7 +295,7 @@
 
 <script setup lang="ts">
 import axios from "axios";
-import { computed, onMounted, reactive, ref } from "vue";
+import { computed, onMounted, onUnmounted, reactive, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import {
   getBooking,
@@ -275,6 +315,8 @@ const payment = ref<BookingPaymentStatus | null>(null);
 const loading = ref(true);
 const submitting = ref(false);
 const formError = ref("");
+const now = ref(Date.now());
+let clockTimer: number | null = null;
 
 const currentYear = new Date().getFullYear();
 const form = reactive({
@@ -305,7 +347,17 @@ const submitDisabled = computed(() => {
 });
 
 onMounted(async () => {
+  clockTimer = window.setInterval(() => {
+    now.value = Date.now();
+  }, 1000);
+
   await loadCheckout();
+});
+
+onUnmounted(() => {
+  if (clockTimer !== null) {
+    window.clearInterval(clockTimer);
+  }
 });
 
 async function loadCheckout(startSession = true) {
@@ -449,6 +501,42 @@ const badgeTextClass = computed(() => {
       return "text-blue-700 dark:text-blue-300";
   }
 });
+
+const sessionRemainingMs = computed(() => {
+  if (!payment.value?.paymentExpiresAt) {
+    return null;
+  }
+
+  return new Date(payment.value.paymentExpiresAt).getTime() - now.value;
+});
+
+const bookingRemainingMs = computed(() => {
+  if (!payment.value?.bookingExpiresAt) {
+    return null;
+  }
+
+  return new Date(payment.value.bookingExpiresAt).getTime() - now.value;
+});
+
+function formatCountdown(remainingMs: number | null): string {
+  if (remainingMs == null) {
+    return "--:--";
+  }
+
+  const normalized = Math.max(0, Math.floor(remainingMs / 1000));
+  const minutes = Math.floor(normalized / 60);
+  const seconds = normalized % 60;
+
+  return `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
+}
+
+function isDeadlineCritical(remainingMs: number | null): boolean {
+  if (remainingMs == null) {
+    return false;
+  }
+
+  return remainingMs <= 60_000;
+}
 
 function resolveErrorMessage(value: unknown, fallback: string): string {
   if (axios.isAxiosError(value)) {

@@ -25,17 +25,20 @@ namespace BookingService.Infrastructure.Services
         private readonly IPartnerCarReadClient _partnerCarReadClient;
         private readonly IPaymentSyncClient _paymentSyncClient;
         private readonly PaymentServiceOptions _paymentServiceOptions;
+        private readonly PendingBookingExpirationOptions _pendingBookingExpirationOptions;
 
         public BookingService(
             ApplicationDbContext db,
             IPartnerCarReadClient partnerCarReadClient,
             IPaymentSyncClient paymentSyncClient,
-            IOptions<PaymentServiceOptions> paymentServiceOptions)
+            IOptions<PaymentServiceOptions> paymentServiceOptions,
+            IOptions<PendingBookingExpirationOptions> pendingBookingExpirationOptions)
         {
             _db = db;
             _partnerCarReadClient = partnerCarReadClient;
             _paymentSyncClient = paymentSyncClient;
             _paymentServiceOptions = paymentServiceOptions.Value;
+            _pendingBookingExpirationOptions = pendingBookingExpirationOptions.Value;
         }
 
         public async Task<bool> IsPartnerCarAvailable(int partnerCarId, DateTimeOffset startTime, DateTimeOffset endTime)
@@ -303,6 +306,12 @@ namespace BookingService.Infrastructure.Services
         public async Task<BookingPaymentStatusResponseDto> StartPayment(int id, Guid userId)
         {
             var booking = await GetRequiredUserBookingEntity(id, userId);
+            if (await ExpirePendingBookingIfNeededAsync(booking))
+            {
+                var latestExpiredAttempt = await _paymentSyncClient.GetLatestMockPaymentAsync(booking.Id, userId);
+                return MapBookingPaymentStatus(booking, latestExpiredAttempt);
+            }
+
             MockPaymentAttemptPayload? latestAttempt = null;
 
             if (booking.Status == BookingStatus.Pending)
@@ -324,6 +333,7 @@ namespace BookingService.Infrastructure.Services
         public async Task<BookingPaymentStatusResponseDto> GetPaymentStatus(int id, Guid userId)
         {
             var booking = await GetRequiredUserBookingEntity(id, userId);
+            await ExpirePendingBookingIfNeededAsync(booking);
             var latestAttempt = await _paymentSyncClient.GetLatestMockPaymentAsync(booking.Id, userId);
             return MapBookingPaymentStatus(booking, latestAttempt);
         }
@@ -333,6 +343,12 @@ namespace BookingService.Infrastructure.Services
             ArgumentNullException.ThrowIfNull(dto);
 
             var booking = await GetRequiredUserBookingEntity(id, userId);
+            if (await ExpirePendingBookingIfNeededAsync(booking))
+            {
+                var latestExpiredAttempt = await _paymentSyncClient.GetLatestMockPaymentAsync(booking.Id, userId);
+                return MapBookingPaymentStatus(booking, latestExpiredAttempt);
+            }
+
             var latestAttempt = await _paymentSyncClient.SubmitMockPaymentAsync(
                 booking.Id,
                 userId,
@@ -634,6 +650,9 @@ namespace BookingService.Infrastructure.Services
             var normalizedPaymentStatus = ResolvePaymentStatus(booking, latestAttempt);
             var canRetry = booking.Status == BookingStatus.Pending &&
                            normalizedPaymentStatus is "not_started" or "failed" or "expired";
+            DateTimeOffset? bookingExpiresAt = booking.Status == BookingStatus.Pending
+                ? booking.CreatedAt.AddMinutes(_pendingBookingExpirationOptions.TtlMinutes)
+                : null;
 
             return new BookingPaymentStatusResponseDto
             {
@@ -647,6 +666,8 @@ namespace BookingService.Infrastructure.Services
                 CardHolder = latestAttempt?.CardHolder,
                 CardLast4 = latestAttempt?.CardLast4,
                 FailureReason = latestAttempt?.FailureReason,
+                BookingCreatedAt = booking.CreatedAt,
+                BookingExpiresAt = bookingExpiresAt,
                 PaymentCreatedAt = latestAttempt?.CreatedAt,
                 PaymentUpdatedAt = latestAttempt?.UpdatedAt,
                 PaymentCompletedAt = latestAttempt?.CompletedAt,
@@ -671,6 +692,29 @@ namespace BookingService.Infrastructure.Services
                 BookingStatus.Confirmed or BookingStatus.Active or BookingStatus.Completed => "succeeded",
                 _ => "not_started"
             };
+        }
+
+        private async Task<bool> ExpirePendingBookingIfNeededAsync(
+            Booking booking,
+            CancellationToken cancellationToken = default)
+        {
+            if (booking.Status != BookingStatus.Pending)
+            {
+                return false;
+            }
+
+            if (!IsPendingBookingExpired(booking))
+            {
+                return false;
+            }
+
+            await PersistStatusTransitionWithPaymentOutbox(booking, BookingStatus.Canceled, cancellationToken);
+            return true;
+        }
+
+        private bool IsPendingBookingExpired(Booking booking)
+        {
+            return booking.CreatedAt.AddMinutes(_pendingBookingExpirationOptions.TtlMinutes) <= DateTimeOffset.UtcNow;
         }
 
         private static PaymentSyncOutboxMessage CreatePaymentSyncOutboxMessage(Booking booking, BookingStatus targetStatus)

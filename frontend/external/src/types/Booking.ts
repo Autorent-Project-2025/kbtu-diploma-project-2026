@@ -48,6 +48,8 @@ export interface BookingPaymentStatus {
   cardHolder?: string | null;
   cardLast4?: string | null;
   failureReason?: string | null;
+  bookingCreatedAt: string;
+  bookingExpiresAt?: string | null;
   paymentCreatedAt?: string | null;
   paymentUpdatedAt?: string | null;
   paymentCompletedAt?: string | null;

@@ -37,6 +37,8 @@ interface BookingPaymentStatusApiDto {
   cardHolder?: string | null;
   cardLast4?: string | null;
   failureReason?: string | null;
+  bookingCreatedAt?: string | null;
+  bookingExpiresAt?: string | null;
   paymentCreatedAt?: string | null;
   paymentUpdatedAt?: string | null;
   paymentCompletedAt?: string | null;
@@ -95,6 +97,8 @@ function mapBookingPaymentStatus(
     cardHolder: dto.cardHolder ?? null,
     cardLast4: dto.cardLast4 ?? null,
     failureReason: dto.failureReason ?? null,
+    bookingCreatedAt: dto.bookingCreatedAt ?? new Date().toISOString(),
+    bookingExpiresAt: dto.bookingExpiresAt ?? null,
     paymentCreatedAt: dto.paymentCreatedAt ?? null,
     paymentUpdatedAt: dto.paymentUpdatedAt ?? null,
     paymentCompletedAt: dto.paymentCompletedAt ?? null,

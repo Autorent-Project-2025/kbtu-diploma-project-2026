@@ -12,6 +12,8 @@ namespace BookingService.Application.DTOs.Booking
         public string? CardHolder { get; set; }
         public string? CardLast4 { get; set; }
         public string? FailureReason { get; set; }
+        public DateTimeOffset BookingCreatedAt { get; set; }
+        public DateTimeOffset? BookingExpiresAt { get; set; }
         public DateTimeOffset? PaymentCreatedAt { get; set; }
         public DateTimeOffset? PaymentUpdatedAt { get; set; }
         public DateTimeOffset? PaymentCompletedAt { get; set; }
