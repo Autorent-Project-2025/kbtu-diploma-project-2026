@@ -47,6 +47,36 @@
       </div>
 
       <template v-else>
+        <section class="rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-xl p-6">
+          <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+            <div>
+              <p class="text-sm uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400 font-bold">
+                Период аналитики
+              </p>
+              <h2 class="mt-2 text-2xl font-bold text-gray-900 dark:text-white">
+                Последние {{ selectedPeriod }} дней
+              </h2>
+            </div>
+
+            <div class="flex flex-wrap gap-2">
+              <button
+                v-for="period in periodOptions"
+                :key="period"
+                type="button"
+                @click="selectedPeriod = period"
+                :class="[
+                  'px-4 py-2 rounded-2xl text-sm font-bold transition-colors',
+                  selectedPeriod === period
+                    ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
+                    : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200',
+                ]"
+              >
+                {{ period }} дней
+              </button>
+            </div>
+          </div>
+        </section>
+
         <section class="grid sm:grid-cols-2 xl:grid-cols-4 gap-4">
           <article class="rounded-3xl border border-emerald-200/70 dark:border-emerald-700/40 bg-white dark:bg-gray-900 shadow-xl p-6 space-y-3">
             <p class="text-sm uppercase tracking-[0.18em] text-emerald-600 dark:text-emerald-400 font-bold">
@@ -86,13 +116,13 @@
 
           <article class="rounded-3xl border border-violet-200/70 dark:border-violet-700/40 bg-white dark:bg-gray-900 shadow-xl p-6 space-y-3">
             <p class="text-sm uppercase tracking-[0.18em] text-violet-600 dark:text-violet-400 font-bold">
-              Всего бронирований
+              Бронирований за период
             </p>
             <p class="text-4xl font-extrabold text-gray-900 dark:text-white">
-              {{ bookings.length }}
+              {{ bookingsInSelectedPeriod.length }}
             </p>
             <p class="text-sm text-gray-600 dark:text-gray-400">
-              Completed: {{ completedBookingsCount }} · Активных: {{ activeBookingsCount }}
+              Последние {{ selectedPeriod }} дней · Completed: {{ completedBookingsCount }} · Активных: {{ activeBookingsCount }}
             </p>
           </article>
         </section>
@@ -105,7 +135,7 @@
                   Чистая прибыль по дням
                 </p>
                 <h2 class="mt-2 text-2xl font-bold text-gray-900 dark:text-white">
-                  Последние {{ profitPoints.length }} дней
+                  Последние {{ selectedPeriod }} дней
                 </h2>
               </div>
               <div class="text-right">
@@ -148,7 +178,7 @@
                   Выручка и поток броней
                 </p>
                 <h2 class="mt-2 text-2xl font-bold text-gray-900 dark:text-white">
-                  Последние {{ revenuePoints.length }} дней
+                  Последние {{ selectedPeriod }} дней
                 </h2>
               </div>
               <div class="text-right">
@@ -213,24 +243,38 @@
               <h2 class="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
                 Все брони по вашим машинам
               </h2>
+              <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                Показаны бронирования, созданные за последние {{ selectedPeriod }} дней.
+              </p>
             </div>
 
-            <div class="flex flex-wrap gap-2">
+            <div class="flex flex-col sm:flex-row sm:items-center gap-3">
               <button
-                v-for="filter in statusFilters"
-                :key="filter.value"
                 type="button"
-                @click="statusFilter = filter.value"
-                :class="[
-                  'px-4 py-2 rounded-2xl text-sm font-bold transition-colors',
-                  statusFilter === filter.value
-                    ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
-                    : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200',
-                ]"
+                @click="exportFilteredBookingsCsv"
+                :disabled="filteredBookings.length === 0"
+                class="inline-flex items-center justify-center px-5 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed text-white font-semibold shadow-lg shadow-emerald-500/20"
               >
-                {{ filter.label }}
-                <span class="ml-2 opacity-70">{{ filter.count }}</span>
+                Экспорт CSV
               </button>
+
+              <div class="flex flex-wrap gap-2">
+                <button
+                  v-for="filter in statusFilters"
+                  :key="filter.value"
+                  type="button"
+                  @click="statusFilter = filter.value"
+                  :class="[
+                    'px-4 py-2 rounded-2xl text-sm font-bold transition-colors',
+                    statusFilter === filter.value
+                      ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
+                      : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200',
+                  ]"
+                >
+                  {{ filter.label }}
+                  <span class="ml-2 opacity-70">{{ filter.count }}</span>
+                </button>
+              </div>
             </div>
           </div>
 
@@ -314,6 +358,7 @@ import type { BookingStatus } from "../types/Booking";
 import type { PartnerBooking, PartnerLedgerEntry, PartnerWallet } from "../types/Partner";
 
 type BookingFilter = "all" | BookingStatus;
+type AnalyticsPeriod = 7 | 14 | 30;
 
 interface ChartPoint {
   isoDate: string;
@@ -324,6 +369,7 @@ interface ChartPoint {
   heightPercent: number;
 }
 
+const periodOptions: AnalyticsPeriod[] = [7, 14, 30];
 const { error } = useToast();
 
 const loading = ref(true);
@@ -332,16 +378,22 @@ const wallet = ref<PartnerWallet>(createEmptyWallet());
 const ledgerEntries = ref<PartnerLedgerEntry[]>([]);
 const bookings = ref<PartnerBooking[]>([]);
 const cars = ref<PartnerCarSummary[]>([]);
+const selectedPeriod = ref<AnalyticsPeriod>(14);
 const statusFilter = ref<BookingFilter>("all");
+
+const bookingsInSelectedPeriod = computed(() => {
+  const periodStart = buildPeriodStartDate(selectedPeriod.value);
+  return bookings.value.filter((booking) => isOnOrAfterDate(booking.createdAt, periodStart));
+});
 
 const statusFilters = computed(() => {
   const counts = {
-    all: bookings.value.length,
-    pending: bookings.value.filter((booking) => booking.status === "pending").length,
-    confirmed: bookings.value.filter((booking) => booking.status === "confirmed").length,
-    active: bookings.value.filter((booking) => booking.status === "active").length,
-    completed: bookings.value.filter((booking) => booking.status === "completed").length,
-    canceled: bookings.value.filter((booking) => booking.status === "canceled").length,
+    all: bookingsInSelectedPeriod.value.length,
+    pending: bookingsInSelectedPeriod.value.filter((booking) => booking.status === "pending").length,
+    confirmed: bookingsInSelectedPeriod.value.filter((booking) => booking.status === "confirmed").length,
+    active: bookingsInSelectedPeriod.value.filter((booking) => booking.status === "active").length,
+    completed: bookingsInSelectedPeriod.value.filter((booking) => booking.status === "completed").length,
+    canceled: bookingsInSelectedPeriod.value.filter((booking) => booking.status === "canceled").length,
   };
 
   return [
@@ -355,7 +407,7 @@ const statusFilters = computed(() => {
 });
 
 const filteredBookings = computed(() => {
-  const sorted = [...bookings.value].sort(
+  const sorted = [...bookingsInSelectedPeriod.value].sort(
     (left, right) => new Date(right.startTime).getTime() - new Date(left.startTime).getTime()
   );
 
@@ -371,15 +423,15 @@ const carsById = computed(() => {
 });
 
 const completedBookingsCount = computed(() => {
-  return bookings.value.filter((booking) => booking.status === "completed").length;
+  return bookingsInSelectedPeriod.value.filter((booking) => booking.status === "completed").length;
 });
 
 const activeBookingsCount = computed(() => {
-  return bookings.value.filter((booking) => booking.status === "active").length;
+  return bookingsInSelectedPeriod.value.filter((booking) => booking.status === "active").length;
 });
 
-const profitPoints = computed(() => buildChartPointsFromLedger(ledgerEntries.value, 14));
-const revenuePoints = computed(() => buildChartPointsFromBookings(bookings.value, 7));
+const profitPoints = computed(() => buildChartPointsFromLedger(ledgerEntries.value, selectedPeriod.value));
+const revenuePoints = computed(() => buildChartPointsFromBookings(bookingsInSelectedPeriod.value, selectedPeriod.value));
 
 const totalRealizedProfit = computed(() => {
   return profitPoints.value.reduce((sum, point) => sum + point.amount, 0);
@@ -489,6 +541,22 @@ function createEmptyWallet(): PartnerWallet {
   };
 }
 
+function buildPeriodStartDate(days: number) {
+  const date = new Date();
+  date.setHours(0, 0, 0, 0);
+  date.setDate(date.getDate() - (days - 1));
+  return date;
+}
+
+function isOnOrAfterDate(value: string, threshold: Date) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return false;
+  }
+
+  return date.getTime() >= threshold.getTime();
+}
+
 function buildChartPointsFromLedger(entries: PartnerLedgerEntry[], days: number): ChartPoint[] {
   const dateBuckets = buildRecentDateBuckets(days);
   const groupedAmounts = new Map<string, number>();
@@ -591,6 +659,58 @@ function resolveCarName(booking: PartnerBooking) {
 
 function resolveLicensePlate(booking: PartnerBooking) {
   return carsById.value.get(booking.partnerCarId)?.licensePlate || "Номер не найден";
+}
+
+function exportFilteredBookingsCsv() {
+  if (filteredBookings.value.length === 0) {
+    return;
+  }
+
+  const rows = [
+    [
+      "Booking ID",
+      "Status",
+      "Car",
+      "License Plate",
+      "Created At",
+      "Start Time",
+      "End Time",
+      "Total Price",
+      "Price Per Hour",
+    ],
+    ...filteredBookings.value.map((booking) => [
+      String(booking.id),
+      getBookingStatusLabel(booking.status),
+      resolveCarName(booking),
+      resolveLicensePlate(booking),
+      formatDateTime(booking.createdAt),
+      formatDateTime(booking.startTime),
+      formatDateTime(booking.endTime),
+      String(booking.totalPrice ?? 0),
+      booking.priceHour != null ? String(booking.priceHour) : "",
+    ]),
+  ];
+
+  const csvContent = rows
+    .map((row) => row.map((cell) => escapeCsvCell(cell)).join(","))
+    .join("\r\n");
+
+  const blob = new Blob([`\uFEFF${csvContent}`], {
+    type: "text/csv;charset=utf-8;",
+  });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `partner-bookings-${selectedPeriod.value}d-${statusFilter.value}.csv`;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+function escapeCsvCell(value: string) {
+  const escaped = value.split('"').join('""');
+  return `"${escaped}"`;
 }
 
 function formatMoney(amount: number, currency = wallet.value.currency || "KZT") {
