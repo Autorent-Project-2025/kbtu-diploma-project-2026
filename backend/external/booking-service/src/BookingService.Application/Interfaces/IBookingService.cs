@@ -17,6 +17,9 @@ namespace BookingService.Application.Interfaces
             DateTimeOffset startTime,
             DateTimeOffset endTime,
             CancellationToken cancellationToken = default);
+        Task<BookingPaymentStatusResponseDto> StartPayment(int id, Guid userId);
+        Task<BookingPaymentStatusResponseDto> GetPaymentStatus(int id, Guid userId);
+        Task<BookingPaymentStatusResponseDto> SubmitPayment(int id, Guid userId, BookingPaymentSubmitRequestDto dto);
         Task<bool> CancelBooking(int id, Guid userId);
         Task<bool> ConfirmBooking(int id, Guid userId);
         Task<bool> CompleteBooking(int id, Guid userId);

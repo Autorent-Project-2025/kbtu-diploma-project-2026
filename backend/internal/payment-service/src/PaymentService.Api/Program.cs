@@ -42,6 +42,7 @@ builder.Services.AddOptions<PaymentOptions>()
     .ValidateOnStart();
 
 builder.Services.AddScoped<IPaymentLedgerService, PaymentLedgerService>();
+builder.Services.AddScoped<IMockPaymentService, MockPaymentService>();
 
 var app = builder.Build();
 

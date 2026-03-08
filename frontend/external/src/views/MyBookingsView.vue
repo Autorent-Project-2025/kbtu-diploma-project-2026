@@ -203,6 +203,27 @@
                   {{ getStatusText(b.computedStatus) }}
                 </span>
 
+                <router-link
+                  v-if="canPay(b)"
+                  :to="`/bookings/${b.id}/payment`"
+                  class="px-6 py-3 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-xl transition-all hover:shadow-lg active:scale-95 flex items-center justify-center gap-2"
+                >
+                  <svg
+                    class="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M17 9V7a5 5 0 00-10 0v2m-2 0h14a2 2 0 012 2v7a2 2 0 01-2 2H5a2 2 0 01-2-2v-7a2 2 0 012-2z"
+                    />
+                  </svg>
+                  <span>Оплатить</span>
+                </router-link>
+
                 <!-- Cancel Button -->
                 <button
                   v-if="canCancel(b)"
@@ -320,7 +341,7 @@ interface BookingWithComputedStatus extends Booking {
 
 const bookings = ref<BookingWithComputedStatus[]>([]);
 const currentFilter = ref<
-  "all" | "upcoming" | "active" | "completed" | "canceled"
+  "all" | "paymentPending" | "upcoming" | "active" | "completed" | "canceled"
 >("all");
 const cancelingId = ref<number | null>(null);
 const bookingToCancel = ref<BookingWithComputedStatus | null>(null);
@@ -330,6 +351,9 @@ const { success, error } = useToast();
 // Filters configuration
 const filters = computed(() => {
   const all = bookings.value.length;
+  const paymentPending = bookings.value.filter(
+    (b) => b.computedStatus === "paymentPending"
+  ).length;
   const upcoming = bookings.value.filter(
     (b) => b.computedStatus === "upcoming"
   ).length;
@@ -345,6 +369,11 @@ const filters = computed(() => {
 
   return [
     { label: "Все", value: "all" as const, count: all },
+    {
+      label: "Ожидают оплаты",
+      value: "paymentPending" as const,
+      count: paymentPending,
+    },
     { label: "Предстоящие", value: "upcoming" as const, count: upcoming },
     { label: "Активные", value: "active" as const, count: active },
     { label: "Завершенные", value: "completed" as const, count: completed },
@@ -406,6 +435,10 @@ function canCancel(booking: BookingWithComputedStatus): boolean {
   return canCancelBooking(booking);
 }
 
+function canPay(booking: BookingWithComputedStatus): boolean {
+  return booking.computedStatus === "paymentPending";
+}
+
 function confirmCancel(booking: BookingWithComputedStatus) {
   bookingToCancel.value = booking;
   showCancelModal.value = true;
@@ -439,6 +472,8 @@ async function handleCancelConfirm() {
 
 function getStatusClass(status: ReturnType<typeof computeBookingStatus>) {
   switch (status) {
+    case "paymentPending":
+      return "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300";
     case "upcoming":
       return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300";
     case "active":
@@ -456,6 +491,8 @@ function getStatusIndicatorClass(
   status: ReturnType<typeof computeBookingStatus>
 ) {
   switch (status) {
+    case "paymentPending":
+      return "bg-amber-500";
     case "upcoming":
       return "bg-blue-500";
     case "active":
@@ -471,6 +508,8 @@ function getStatusIndicatorClass(
 
 function getStatusDotClass(status: ReturnType<typeof computeBookingStatus>) {
   switch (status) {
+    case "paymentPending":
+      return "bg-amber-600 dark:bg-amber-400";
     case "upcoming":
       return "bg-blue-600 dark:bg-blue-400";
     case "active":
@@ -486,6 +525,8 @@ function getStatusDotClass(status: ReturnType<typeof computeBookingStatus>) {
 
 function getStatusText(status: ReturnType<typeof computeBookingStatus>) {
   switch (status) {
+    case "paymentPending":
+      return "Ожидает оплаты";
     case "upcoming":
       return "Предстоящее";
     case "active":

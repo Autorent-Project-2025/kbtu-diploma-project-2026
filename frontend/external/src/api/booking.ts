@@ -1,5 +1,11 @@
 import api from "./axios";
-import type { Booking, BookingStatus } from "../types/Booking";
+import type {
+  Booking,
+  BookingPaymentState,
+  BookingPaymentStatus,
+  BookingStatus,
+  SubmitBookingPaymentPayload,
+} from "../types/Booking";
 import type { PaginatedResponse } from "../types/Pagination";
 
 export interface GetMyBookingsParams {
@@ -18,6 +24,25 @@ interface BookingApiDto {
   priceHour?: number | null;
   totalPrice?: number | null;
   status?: string | null;
+}
+
+interface BookingPaymentStatusApiDto {
+  bookingId: number;
+  bookingStatus?: string | null;
+  paymentStatus?: string | null;
+  paymentAttemptId?: number | null;
+  sessionKey?: string | null;
+  amount?: number | null;
+  currency?: string | null;
+  cardHolder?: string | null;
+  cardLast4?: string | null;
+  failureReason?: string | null;
+  paymentCreatedAt?: string | null;
+  paymentUpdatedAt?: string | null;
+  paymentCompletedAt?: string | null;
+  paymentExpiresAt?: string | null;
+  requiresInput?: boolean | null;
+  canRetry?: boolean | null;
 }
 
 function normalizeStatus(value: string | null | undefined): BookingStatus {
@@ -41,6 +66,41 @@ function mapBooking(dto: BookingApiDto): Booking {
     price: dto.totalPrice ?? null,
     priceHour: dto.priceHour ?? null,
     status: normalizeStatus(dto.status),
+  };
+}
+
+function normalizePaymentStatus(
+  value: string | null | undefined
+): BookingPaymentState {
+  const normalized = (value ?? "").trim().toLowerCase();
+  if (normalized === "started") return "started";
+  if (normalized === "succeeded") return "succeeded";
+  if (normalized === "failed") return "failed";
+  if (normalized === "expired") return "expired";
+  if (normalized === "canceled") return "canceled";
+  return "not_started";
+}
+
+function mapBookingPaymentStatus(
+  dto: BookingPaymentStatusApiDto
+): BookingPaymentStatus {
+  return {
+    bookingId: dto.bookingId,
+    bookingStatus: normalizeStatus(dto.bookingStatus),
+    paymentStatus: normalizePaymentStatus(dto.paymentStatus),
+    paymentAttemptId: dto.paymentAttemptId ?? null,
+    sessionKey: dto.sessionKey ?? null,
+    amount: dto.amount ?? null,
+    currency: dto.currency?.trim().toUpperCase() || "KZT",
+    cardHolder: dto.cardHolder ?? null,
+    cardLast4: dto.cardLast4 ?? null,
+    failureReason: dto.failureReason ?? null,
+    paymentCreatedAt: dto.paymentCreatedAt ?? null,
+    paymentUpdatedAt: dto.paymentUpdatedAt ?? null,
+    paymentCompletedAt: dto.paymentCompletedAt ?? null,
+    paymentExpiresAt: dto.paymentExpiresAt ?? null,
+    requiresInput: Boolean(dto.requiresInput),
+    canRetry: Boolean(dto.canRetry),
   };
 }
 
@@ -115,6 +175,33 @@ export async function createBooking(
   });
 
   return mapBooking(response.data as BookingApiDto);
+}
+
+export async function getBooking(bookingId: number): Promise<Booking> {
+  const response = await api.get(`/bookings/${bookingId}`);
+  return mapBooking(response.data as BookingApiDto);
+}
+
+export async function startBookingPayment(
+  bookingId: number
+): Promise<BookingPaymentStatus> {
+  const response = await api.post(`/bookings/${bookingId}/payment/start`);
+  return mapBookingPaymentStatus(response.data as BookingPaymentStatusApiDto);
+}
+
+export async function getBookingPaymentStatus(
+  bookingId: number
+): Promise<BookingPaymentStatus> {
+  const response = await api.get(`/bookings/${bookingId}/payment/status`);
+  return mapBookingPaymentStatus(response.data as BookingPaymentStatusApiDto);
+}
+
+export async function submitBookingPayment(
+  bookingId: number,
+  payload: SubmitBookingPaymentPayload
+): Promise<BookingPaymentStatus> {
+  const response = await api.post(`/bookings/${bookingId}/payment/submit`, payload);
+  return mapBookingPaymentStatus(response.data as BookingPaymentStatusApiDto);
 }
 
 /**

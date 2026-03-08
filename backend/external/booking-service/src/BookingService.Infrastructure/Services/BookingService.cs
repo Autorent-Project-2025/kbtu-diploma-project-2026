@@ -6,8 +6,10 @@ using BookingService.Application.Mappers;
 using BookingService.Domain.Entities;
 using BookingService.Domain.Enums;
 using BookingService.Infrastructure.Integrations;
+using BookingService.Infrastructure.Options;
 using BookingService.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Npgsql;
 using System.Data;
 using System.Text.Json;
@@ -21,13 +23,19 @@ namespace BookingService.Infrastructure.Services
 
         private readonly ApplicationDbContext _db;
         private readonly IPartnerCarReadClient _partnerCarReadClient;
+        private readonly IPaymentSyncClient _paymentSyncClient;
+        private readonly PaymentServiceOptions _paymentServiceOptions;
 
         public BookingService(
             ApplicationDbContext db,
-            IPartnerCarReadClient partnerCarReadClient)
+            IPartnerCarReadClient partnerCarReadClient,
+            IPaymentSyncClient paymentSyncClient,
+            IOptions<PaymentServiceOptions> paymentServiceOptions)
         {
             _db = db;
             _partnerCarReadClient = partnerCarReadClient;
+            _paymentSyncClient = paymentSyncClient;
+            _paymentServiceOptions = paymentServiceOptions.Value;
         }
 
         public async Task<bool> IsPartnerCarAvailable(int partnerCarId, DateTimeOffset startTime, DateTimeOffset endTime)
@@ -292,6 +300,58 @@ namespace BookingService.Infrastructure.Services
             return results;
         }
 
+        public async Task<BookingPaymentStatusResponseDto> StartPayment(int id, Guid userId)
+        {
+            var booking = await GetRequiredUserBookingEntity(id, userId);
+            MockPaymentAttemptPayload? latestAttempt = null;
+
+            if (booking.Status == BookingStatus.Pending)
+            {
+                latestAttempt = await _paymentSyncClient.StartMockPaymentAsync(
+                    booking.Id,
+                    userId,
+                    ResolveBookingPaymentAmount(booking),
+                    ResolvePaymentCurrency());
+            }
+            else
+            {
+                latestAttempt = await _paymentSyncClient.GetLatestMockPaymentAsync(booking.Id, userId);
+            }
+
+            return MapBookingPaymentStatus(booking, latestAttempt);
+        }
+
+        public async Task<BookingPaymentStatusResponseDto> GetPaymentStatus(int id, Guid userId)
+        {
+            var booking = await GetRequiredUserBookingEntity(id, userId);
+            var latestAttempt = await _paymentSyncClient.GetLatestMockPaymentAsync(booking.Id, userId);
+            return MapBookingPaymentStatus(booking, latestAttempt);
+        }
+
+        public async Task<BookingPaymentStatusResponseDto> SubmitPayment(int id, Guid userId, BookingPaymentSubmitRequestDto dto)
+        {
+            ArgumentNullException.ThrowIfNull(dto);
+
+            var booking = await GetRequiredUserBookingEntity(id, userId);
+            var latestAttempt = await _paymentSyncClient.SubmitMockPaymentAsync(
+                booking.Id,
+                userId,
+                dto.SessionKey,
+                dto.CardHolder,
+                dto.CardNumber,
+                dto.ExpiryMonth,
+                dto.ExpiryYear,
+                dto.Cvv);
+
+            if (booking.Status == BookingStatus.Pending &&
+                string.Equals(latestAttempt.Status, "succeeded", StringComparison.OrdinalIgnoreCase))
+            {
+                await PersistStatusTransitionWithPaymentOutbox(booking, BookingStatus.Confirmed);
+            }
+
+            return MapBookingPaymentStatus(booking, latestAttempt);
+        }
+
         public async Task<bool> CancelBooking(int id, Guid userId)
         {
             var booking = await GetUserBookingEntity(id, userId);
@@ -417,6 +477,12 @@ namespace BookingService.Infrastructure.Services
                 .FirstOrDefaultAsync(b => b.Id == id && b.UserId == userId);
         }
 
+        private async Task<Booking> GetRequiredUserBookingEntity(int id, Guid userId)
+        {
+            var booking = await GetUserBookingEntity(id, userId);
+            return booking ?? throw new KeyNotFoundException("Booking not found.");
+        }
+
         private async Task PersistStatusTransitionWithPaymentOutbox(
             Booking booking,
             BookingStatus targetStatus)
@@ -532,6 +598,72 @@ namespace BookingService.Infrastructure.Services
 
             booking.Status = targetStatus;
             return true;
+        }
+
+        private decimal ResolveBookingPaymentAmount(Booking booking)
+        {
+            if (!booking.TotalPrice.HasValue || booking.TotalPrice.Value <= 0m)
+            {
+                throw new InvalidOperationException("Booking total price must be greater than zero before payment can start.");
+            }
+
+            return booking.TotalPrice.Value;
+        }
+
+        private string ResolvePaymentCurrency()
+        {
+            if (string.IsNullOrWhiteSpace(_paymentServiceOptions.Currency))
+            {
+                throw new InvalidOperationException("PaymentService:Currency configuration is required.");
+            }
+
+            return _paymentServiceOptions.Currency;
+        }
+
+        private BookingPaymentStatusResponseDto MapBookingPaymentStatus(
+            Booking booking,
+            MockPaymentAttemptPayload? latestAttempt)
+        {
+            var normalizedPaymentStatus = ResolvePaymentStatus(booking, latestAttempt);
+            var canRetry = booking.Status == BookingStatus.Pending &&
+                           normalizedPaymentStatus is "not_started" or "failed" or "expired";
+
+            return new BookingPaymentStatusResponseDto
+            {
+                BookingId = booking.Id,
+                BookingStatus = booking.Status.ToString().ToLowerInvariant(),
+                PaymentStatus = normalizedPaymentStatus,
+                PaymentAttemptId = latestAttempt?.Id,
+                SessionKey = latestAttempt?.SessionKey,
+                Amount = latestAttempt?.Amount ?? booking.TotalPrice,
+                Currency = latestAttempt?.Currency ?? ResolvePaymentCurrency(),
+                CardHolder = latestAttempt?.CardHolder,
+                CardLast4 = latestAttempt?.CardLast4,
+                FailureReason = latestAttempt?.FailureReason,
+                PaymentCreatedAt = latestAttempt?.CreatedAt,
+                PaymentUpdatedAt = latestAttempt?.UpdatedAt,
+                PaymentCompletedAt = latestAttempt?.CompletedAt,
+                PaymentExpiresAt = latestAttempt?.ExpiresAt,
+                RequiresInput = booking.Status == BookingStatus.Pending &&
+                                normalizedPaymentStatus is "not_started" or "started",
+                CanRetry = canRetry
+            };
+        }
+
+        private static string ResolvePaymentStatus(Booking booking, MockPaymentAttemptPayload? latestAttempt)
+        {
+            if (latestAttempt is not null)
+            {
+                return latestAttempt.Status.Trim().ToLowerInvariant();
+            }
+
+            return booking.Status switch
+            {
+                BookingStatus.Pending => "not_started",
+                BookingStatus.Canceled => "canceled",
+                BookingStatus.Confirmed or BookingStatus.Active or BookingStatus.Completed => "succeeded",
+                _ => "not_started"
+            };
         }
 
         private static PaymentSyncOutboxMessage CreatePaymentSyncOutboxMessage(Booking booking, BookingStatus targetStatus)

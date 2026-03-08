@@ -286,11 +286,11 @@ async function handleBookingConfirm(startDate: string, endDate: string) {
       return;
     }
 
-    await createBooking(matchResult.partnerCarId, startDate, endDate);
+    const booking = await createBooking(matchResult.partnerCarId, startDate, endDate);
 
-    success(`${selectedModel.value.brand} ${selectedModel.value.model} успешно забронирована.`);
+    success(`${selectedModel.value.brand} ${selectedModel.value.model}: бронь создана, завершите оплату.`);
     closeBookingModal();
-    await loadModelCards();
+    await router.push(`/bookings/${booking.id}/payment`);
   } catch (e) {
     console.error("Ошибка автоподбора и бронирования:", e);
     bookingError.value = "Не удалось забронировать машину. Попробуйте снова.";

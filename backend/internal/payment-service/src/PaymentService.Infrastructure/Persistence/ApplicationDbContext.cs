@@ -14,6 +14,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<PartnerLedgerEntry> PartnerLedgerEntries => Set<PartnerLedgerEntry>();
     public DbSet<CustomerPayment> CustomerPayments => Set<CustomerPayment>();
     public DbSet<PartnerPayout> PartnerPayouts => Set<PartnerPayout>();
+    public DbSet<MockPaymentAttempt> MockPaymentAttempts => Set<MockPaymentAttempt>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

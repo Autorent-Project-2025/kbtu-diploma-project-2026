@@ -84,6 +84,27 @@ namespace BookingService.Api.Controllers
             return Ok(new CommonResponseDto { Message = "Booking confirmed" });
         }
 
+        [HttpPost("{id:int}/payment/start")]
+        public async Task<IActionResult> StartPayment(int id)
+        {
+            var payment = await _bookingService.StartPayment(id, GetUserId());
+            return Ok(payment);
+        }
+
+        [HttpGet("{id:int}/payment/status")]
+        public async Task<IActionResult> GetPaymentStatus(int id)
+        {
+            var payment = await _bookingService.GetPaymentStatus(id, GetUserId());
+            return Ok(payment);
+        }
+
+        [HttpPost("{id:int}/payment/submit")]
+        public async Task<IActionResult> SubmitPayment(int id, [FromBody] BookingPaymentSubmitRequestDto dto)
+        {
+            var payment = await _bookingService.SubmitPayment(id, GetUserId(), dto);
+            return Ok(payment);
+        }
+
         [HttpPost("{id:int}/complete")]
         public async Task<IActionResult> Complete(int id)
         {
