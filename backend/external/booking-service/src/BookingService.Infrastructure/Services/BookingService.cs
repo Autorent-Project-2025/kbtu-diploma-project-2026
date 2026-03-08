@@ -222,6 +222,19 @@ namespace BookingService.Infrastructure.Services
                 .ToListAsync(cancellationToken);
         }
 
+        public async Task<IReadOnlyCollection<BookingResponseDto>> GetBookingsByPartnerUserId(Guid partnerUserId, CancellationToken cancellationToken = default)
+        {
+            EnsureValidUserId(partnerUserId);
+
+            return await _db.Bookings
+                .AsNoTracking()
+                .Where(booking => booking.PartnerUserId == partnerUserId)
+                .OrderByDescending(booking => booking.StartTime)
+                .ThenByDescending(booking => booking.Id)
+                .SelectToBookingResponseDto()
+                .ToListAsync(cancellationToken);
+        }
+
         public async Task<IReadOnlyCollection<CarBookingCountDto>> GetBookingCountsByPartnerCarIds(IReadOnlyCollection<int> partnerCarIds, CancellationToken cancellationToken = default)
         {
             var normalizedIds = partnerCarIds

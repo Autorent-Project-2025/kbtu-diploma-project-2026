@@ -12,6 +12,7 @@ import CarDetailView from "@/views/CarDetailView.vue";
 import PartnerProfileView from "../views/PartnerProfileView.vue";
 import PartnerCarsView from "../views/PartnerCarsView.vue";
 import PartnerCarDetailView from "../views/PartnerCarDetailView.vue";
+import PartnerBookingsView from "../views/PartnerBookingsView.vue";
 import { auth } from "../store/auth";
 
 const routes = [
@@ -63,6 +64,11 @@ const routes = [
   {
     path: "/partner/cars",
     component: PartnerCarsView,
+    meta: { requiresAuth: true },
+  },
+  {
+    path: "/partner/bookings",
+    component: PartnerBookingsView,
     meta: { requiresAuth: true },
   },
   {

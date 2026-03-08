@@ -15,15 +15,18 @@ public sealed class PartnersController : ControllerBase
     private readonly IPartnerService _partnerService;
     private readonly IFileStorageClient _fileStorageClient;
     private readonly IPartnerPaymentClient _partnerPaymentClient;
+    private readonly IPartnerBookingClient _partnerBookingClient;
 
     public PartnersController(
         IPartnerService partnerService,
         IFileStorageClient fileStorageClient,
-        IPartnerPaymentClient partnerPaymentClient)
+        IPartnerPaymentClient partnerPaymentClient,
+        IPartnerBookingClient partnerBookingClient)
     {
         _partnerService = partnerService;
         _fileStorageClient = fileStorageClient;
         _partnerPaymentClient = partnerPaymentClient;
+        _partnerBookingClient = partnerBookingClient;
     }
 
     [HttpGet]
@@ -135,6 +138,14 @@ public sealed class PartnersController : ControllerBase
         var partnerUserId = await ResolveCurrentPartnerUserIdAsync(cancellationToken);
         var payouts = await _partnerPaymentClient.GetPayoutsAsync(partnerUserId, take, cancellationToken);
         return Ok(payouts);
+    }
+
+    [HttpGet("me/bookings")]
+    public async Task<IActionResult> GetMyBookings(CancellationToken cancellationToken)
+    {
+        var partnerUserId = await ResolveCurrentPartnerUserIdAsync(cancellationToken);
+        var bookings = await _partnerBookingClient.GetBookingsAsync(partnerUserId, cancellationToken);
+        return Ok(bookings);
     }
 
     [HttpGet("me/payouts/{payoutId:long}")]

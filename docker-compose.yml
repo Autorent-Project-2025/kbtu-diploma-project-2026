@@ -274,6 +274,8 @@ services:
       ConnectionStrings__DbConnection: Host=partner-db;Port=5432;Database=postgres_db;Username=postgres;Password=postgres
       PaymentService__BaseUrl: http://payment-service:8080
       PaymentService__InternalApiKey: local-internal-api-key
+      BookingService__BaseUrl: http://booking-service:8080
+      BookingService__InternalApiKey: local-internal-api-key
     ports:
       - "${PARTNER_SERVICE_PORT:-1832}:8080"
     depends_on:

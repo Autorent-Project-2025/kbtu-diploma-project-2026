@@ -32,13 +32,33 @@
         v-else-if="partner"
         class="glass p-8 rounded-3xl border border-gray-200 dark:border-gray-800 shadow-xl space-y-6"
       >
-        <div class="flex justify-end">
-          <router-link
-            to="/partner/cars"
-            class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-primary-600 hover:bg-primary-700 text-white font-semibold transition-colors"
-          >
-            Мои машины
-          </router-link>
+        <div class="grid md:grid-cols-[1.1fr,0.9fr] gap-6">
+          <div class="rounded-3xl border border-emerald-200/70 dark:border-emerald-700/40 bg-white dark:bg-gray-900 p-6 shadow-lg space-y-3">
+            <p class="text-sm uppercase tracking-[0.18em] text-emerald-600 dark:text-emerald-400 font-bold">
+              Доступный баланс
+            </p>
+            <p class="text-4xl font-extrabold text-gray-900 dark:text-white">
+              {{ formatMoney(wallet.availableAmount) }}
+            </p>
+            <p class="text-sm text-gray-600 dark:text-gray-400">
+              Pending: {{ formatMoney(wallet.pendingAmount) }} · Reserved: {{ formatMoney(wallet.reservedAmount) }}
+            </p>
+          </div>
+
+          <div class="flex flex-wrap items-start justify-end gap-3">
+            <router-link
+              to="/partner/bookings"
+              class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold transition-colors"
+            >
+              Финансы и бронирования
+            </router-link>
+            <router-link
+              to="/partner/cars"
+              class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-primary-600 hover:bg-primary-700 text-white font-semibold transition-colors"
+            >
+              Мои машины
+            </router-link>
+          </div>
         </div>
 
         <div class="grid sm:grid-cols-2 gap-6">
@@ -101,17 +121,34 @@
 </template>
 
 <script setup lang="ts">
+import axios from "axios";
 import { onMounted, ref } from "vue";
-import { getMyPartner, getMyPartnerFileTemporaryLink } from "../api/partners";
+import {
+  getMyPartner,
+  getMyPartnerFileTemporaryLink,
+  getMyPartnerWallet,
+} from "../api/partners";
 import { useToast } from "../composables/useToast";
-import type { Partner } from "../types/Partner";
+import type { Partner, PartnerWallet } from "../types/Partner";
 
 const { error } = useToast();
 const loading = ref(true);
 const errorMessage = ref("");
 const partner = ref<Partner | null>(null);
+const wallet = ref<PartnerWallet>(createEmptyWallet());
 const openingIdentityDocument = ref(false);
 const openingContractDocument = ref(false);
+
+function createEmptyWallet(): PartnerWallet {
+  return {
+    partnerUserId: "",
+    currency: "KZT",
+    pendingAmount: 0,
+    availableAmount: 0,
+    reservedAmount: 0,
+    updatedAt: new Date().toISOString(),
+  };
+}
 
 function formatDate(value: string) {
   const date = new Date(value);
@@ -135,6 +172,14 @@ function formatDateTime(value: string) {
     hour: "2-digit",
     minute: "2-digit",
   }).format(date);
+}
+
+function formatMoney(amount: number, currency = wallet.value.currency || "KZT") {
+  return new Intl.NumberFormat("ru-RU", {
+    style: "currency",
+    currency,
+    maximumFractionDigits: 2,
+  }).format(amount);
 }
 
 function openTemporaryLink(url: string) {
@@ -177,12 +222,30 @@ async function openDocument(fileName: string | null | undefined, documentType: "
   }
 }
 
+async function loadWallet() {
+  try {
+    wallet.value = await getMyPartnerWallet();
+  } catch (e) {
+    if (axios.isAxiosError(e) && e.response?.status === 404) {
+      wallet.value = createEmptyWallet();
+      return;
+    }
+
+    throw e;
+  }
+}
+
 onMounted(async () => {
   loading.value = true;
   errorMessage.value = "";
 
   try {
-    partner.value = await getMyPartner();
+    const [partnerResult] = await Promise.all([
+      getMyPartner(),
+      loadWallet(),
+    ]);
+
+    partner.value = partnerResult;
   } catch (error: any) {
     if (error?.response?.status === 404) {
       errorMessage.value = "Партнерский профиль для текущего пользователя не найден.";

@@ -41,6 +41,19 @@ public sealed class InternalBookingsController : ControllerBase
     }
 
     [AllowAnonymous]
+    [HttpGet("by-partner-user/{partnerUserId:guid}")]
+    public async Task<IActionResult> GetByPartnerUserId(Guid partnerUserId, CancellationToken cancellationToken)
+    {
+        if (!IsAuthorizedInternalRequest())
+        {
+            return Unauthorized(new { error = "Internal API key is invalid." });
+        }
+
+        var bookings = await _bookingService.GetBookingsByPartnerUserId(partnerUserId, cancellationToken);
+        return Ok(bookings);
+    }
+
+    [AllowAnonymous]
     [HttpGet("counts")]
     public async Task<IActionResult> GetCounts(
         [FromQuery] string? partnerCarIds,
