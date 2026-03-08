@@ -2,6 +2,9 @@ using BookingService.Api.Middleware;
 using BookingService.Api.Options;
 using BookingService.Application.Constants;
 using BookingService.Application.Interfaces;
+using BookingService.Application.Interfaces.Integrations;
+using BookingService.Infrastructure.Integrations;
+using BookingService.Infrastructure.Options;
 using BookingService.Infrastructure.Persistence;
 using BookingService.Infrastructure.Utils;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -14,6 +17,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.Configure<InternalAuthOptions>(builder.Configuration.GetSection(InternalAuthOptions.SectionName));
+builder.Services.Configure<CarServiceOptions>(builder.Configuration.GetSection(CarServiceOptions.SectionName));
 
 var connectionString = builder.Configuration.GetConnectionString("DbConnection");
 if (string.IsNullOrEmpty(connectionString))
@@ -80,6 +84,19 @@ builder.Services.AddAuthorization(options =>
 {
     options.AddPolicy("bookings:create", policy =>
         policy.RequireClaim("permissions", PermissionConstants.BookingCreate));
+});
+builder.Services.AddHttpClient<IPartnerCarReadClient, PartnerCarReadClient>((serviceProvider, client) =>
+{
+    var options = serviceProvider
+        .GetRequiredService<Microsoft.Extensions.Options.IOptions<CarServiceOptions>>()
+        .Value;
+
+    if (string.IsNullOrWhiteSpace(options.BaseUrl))
+    {
+        throw new InvalidOperationException("Configuration value 'CarService:BaseUrl' is required.");
+    }
+
+    client.BaseAddress = new Uri(options.BaseUrl, UriKind.Absolute);
 });
 builder.Services.AddScoped<IBookingService, BookingService.Infrastructure.Services.BookingService>();
 

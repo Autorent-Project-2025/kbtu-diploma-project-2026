@@ -159,6 +159,7 @@ services:
       ASPNETCORE_ENVIRONMENT: Development
       ConnectionStrings__DbConnection: Host=booking-db;Port=5432;Database=postgres_db;Username=postgres;Password=postgres
       InternalAuth__ApiKey: local-internal-api-key
+      CarService__BaseUrl: http://car-service:8080
     ports:
       - "${BOOKING_SERVICE_PORT:-1821}:8080"
     depends_on:

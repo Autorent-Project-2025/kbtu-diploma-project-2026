@@ -64,7 +64,7 @@ namespace CarService.Infrastructure.Services
                 throw new KeyNotFoundException($"Partner car with id {partnerCarId} was not found.");
             }
 
-            if (partnerCar.PartnerId != currentUserId)
+            if (partnerCar.PartnerUserId != currentUserId)
             {
                 throw new UnauthorizedAccessException("You are not allowed to add images for this partner car.");
             }
@@ -163,7 +163,7 @@ namespace CarService.Infrastructure.Services
                 return null;
             }
 
-            if (entity.Car.PartnerId != currentUserId)
+            if (entity.Car.PartnerUserId != currentUserId)
             {
                 throw new UnauthorizedAccessException("You are not allowed to update this partner car image.");
             }
@@ -214,7 +214,7 @@ namespace CarService.Infrastructure.Services
                 return false;
             }
 
-            if (entity.Car.PartnerId != currentUserId)
+            if (entity.Car.PartnerUserId != currentUserId)
             {
                 throw new UnauthorizedAccessException("You are not allowed to delete this partner car image.");
             }

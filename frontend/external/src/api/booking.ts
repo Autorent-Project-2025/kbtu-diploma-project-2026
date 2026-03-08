@@ -10,7 +10,7 @@ export interface GetMyBookingsParams {
 interface BookingApiDto {
   id: number;
   partnerCarId: number;
-  partnerId?: string;
+  partnerUserId?: string;
   carBrand: string;
   carModel: string;
   startTime: string;
@@ -33,7 +33,7 @@ function mapBooking(dto: BookingApiDto): Booking {
   return {
     id: dto.id,
     carId: dto.partnerCarId,
-    partnerId: dto.partnerId,
+    partnerUserId: dto.partnerUserId,
     carBrand: dto.carBrand ?? "",
     carModel: dto.carModel ?? "",
     startDate: dto.startTime,
@@ -99,11 +99,6 @@ export async function getMyBookings(
   };
 }
 
-export interface CreateBookingOptions {
-  partnerId?: string;
-  priceHour?: number | null;
-}
-
 /**
  * Создать новое бронирование.
  * partnerCarId - это id машины партнера.
@@ -111,33 +106,10 @@ export interface CreateBookingOptions {
 export async function createBooking(
   partnerCarId: number,
   start: string,
-  end: string,
-  options?: CreateBookingOptions
+  end: string
 ): Promise<Booking> {
-  let partnerId = options?.partnerId;
-  let priceHour = options?.priceHour;
-
-  if (!partnerId || priceHour === undefined) {
-    const carDetailsResponse = await api.get(`/cars/partner-cars/${partnerCarId}`);
-    const carDetails = carDetailsResponse.data as {
-      partnerId?: string;
-      priceHour?: number | null;
-    };
-
-    partnerId = partnerId ?? carDetails.partnerId;
-    if (priceHour === undefined) {
-      priceHour = carDetails.priceHour ?? null;
-    }
-  }
-
-  if (!partnerId) {
-    throw new Error("Не удалось получить владельца машины для бронирования.");
-  }
-
   const response = await api.post("/bookings", {
     partnerCarId,
-    partnerId,
-    priceHour: priceHour ?? null,
     startTime: start,
     endTime: end,
   });

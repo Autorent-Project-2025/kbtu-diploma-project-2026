@@ -20,7 +20,7 @@
 - `car_id` -> `partner_car_id`;
 - `user_id` хранится как `UUID`;
 - `start_date/end_date` -> `start_time/end_time` (`TIMESTAMPTZ`);
-- добавлены `partner_id`, `booking_range`, `price_hour`, `total_price`, `created_at`;
+- добавлены `partner_user_id`, `booking_range`, `price_hour`, `total_price`, `created_at`;
 - добавлен exclusion constraint `prevent_overlapping_bookings`:
   - не позволяет пересекать активные брони по одной машине;
   - статусы блокировки: `pending`, `confirmed`, `active`.
@@ -53,12 +53,12 @@
 ```json
 {
   "partnerCarId": 12,
-  "partnerId": "2c51e4d3-250d-4f6b-9f4c-1c8c7e62e35a",
-  "priceHour": 3500,
   "startTime": "2026-03-10T10:00:00Z",
   "endTime": "2026-03-10T14:00:00Z"
 }
 ```
+
+`partnerUserId` и `priceHour` в бронь сохраняются как снапшот, но теперь определяются самим `booking-service` через `car-service` по `partnerCarId`, а не принимаются из клиентского запроса.
 
 ### Статусы бронирования
 - `Pending`
@@ -101,6 +101,7 @@
 - `Jwt__PublicKey`
 - `Cors__AllowedOrigins__0`
 - `InternalAuth__ApiKey`
+- `CarService__BaseUrl`
 - `EXTERNAL_PORT`
 - `POSTGRES_USER`
 - `POSTGRES_PASSWORD`

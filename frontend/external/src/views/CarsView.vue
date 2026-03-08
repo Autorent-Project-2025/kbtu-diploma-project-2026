@@ -286,10 +286,7 @@ async function handleBookingConfirm(startDate: string, endDate: string) {
       return;
     }
 
-    await createBooking(matchResult.partnerCarId, startDate, endDate, {
-      partnerId: matchResult.partnerId ?? undefined,
-      priceHour: matchResult.priceHour ?? null,
-    });
+    await createBooking(matchResult.partnerCarId, startDate, endDate);
 
     success(`${selectedModel.value.brand} ${selectedModel.value.model} успешно забронирована.`);
     closeBookingModal();

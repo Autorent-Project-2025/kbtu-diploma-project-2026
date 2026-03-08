@@ -34,7 +34,7 @@
 - `DELETE /models/{id:int}` (policy `car-models:delete`)
 
 ### Партнерские машины (`/partner-cars`)
-- `GET /partner-cars` (`AllowAnonymous`, query: `carModelId`, `status`, `partnerId`, `page`, `pageSize`)
+- `GET /partner-cars` (`AllowAnonymous`, query: `carModelId`, `status`, `partnerUserId`, `page`, `pageSize`)
 - `GET /partner-cars/{id:int}` (`AllowAnonymous`)
 - `POST /partner-cars` (policy `partner-cars:create`)
 - `PUT /partner-cars/{id:int}` (policy `partner-cars:update`)
@@ -155,7 +155,7 @@
 {
   "isAvailable": true,
   "partnerCarId": 101,
-  "partnerId": "2c51e4d3-250d-4f6b-9f4c-1c8c7e62e35a",
+  "partnerUserId": "2c51e4d3-250d-4f6b-9f4c-1c8c7e62e35a",
   "priceHour": 3500,
   "modelBrand": "Toyota",
   "modelName": "Camry",
@@ -170,7 +170,7 @@
 {
   "isAvailable": false,
   "partnerCarId": null,
-  "partnerId": null,
+  "partnerUserId": null,
   "suggestedStartTimesUtc": [
     "2026-03-11T08:00:00Z",
     "2026-03-11T12:00:00Z"

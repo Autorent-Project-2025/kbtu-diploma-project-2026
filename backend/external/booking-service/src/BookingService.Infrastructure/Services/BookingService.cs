@@ -1,6 +1,7 @@
 using BookingService.Application.DTOs.Booking;
 using BookingService.Application.DTOs.Common;
 using BookingService.Application.Interfaces;
+using BookingService.Application.Interfaces.Integrations;
 using BookingService.Application.Mappers;
 using BookingService.Domain.Entities;
 using BookingService.Domain.Enums;
@@ -17,10 +18,12 @@ namespace BookingService.Infrastructure.Services
         private static readonly SemaphoreSlim InMemoryCreateLock = new(1, 1);
 
         private readonly ApplicationDbContext _db;
+        private readonly IPartnerCarReadClient _partnerCarReadClient;
 
-        public BookingService(ApplicationDbContext db)
+        public BookingService(ApplicationDbContext db, IPartnerCarReadClient partnerCarReadClient)
         {
             _db = db;
+            _partnerCarReadClient = partnerCarReadClient;
         }
 
         public async Task<bool> IsPartnerCarAvailable(int partnerCarId, DateTimeOffset startTime, DateTimeOffset endTime)
@@ -44,21 +47,33 @@ namespace BookingService.Infrastructure.Services
             var startTime = dto.ResolveStartTime();
             var endTime = dto.ResolveEndTime();
 
-            if (dto.PartnerId == Guid.Empty)
-            {
-                throw new ArgumentException("PartnerId is required.", nameof(dto.PartnerId));
-            }
-
-            if (dto.PriceHour.HasValue && dto.PriceHour.Value <= 0)
-            {
-                throw new ArgumentException("PriceHour must be greater than zero.", nameof(dto.PriceHour));
-            }
-
             EnsureValidDateRange(startTime, endTime);
+
+            var partnerCarSnapshot = await _partnerCarReadClient.GetByIdAsync(partnerCarId);
+            if (partnerCarSnapshot is null)
+            {
+                throw new KeyNotFoundException($"Partner car with id {partnerCarId} was not found.");
+            }
+
+            if (partnerCarSnapshot.PartnerUserId == Guid.Empty)
+            {
+                throw new InvalidOperationException("Partner car owner must be a valid UUID.");
+            }
+
+            if (partnerCarSnapshot.PriceHour.HasValue && partnerCarSnapshot.PriceHour.Value <= 0)
+            {
+                throw new InvalidOperationException("Partner car price hour must be greater than zero.");
+            }
 
             if (!_db.Database.IsRelational())
             {
-                return await CreateBookingInMemory(userId, dto, partnerCarId, startTime, endTime);
+                return await CreateBookingInMemory(
+                    userId,
+                    partnerCarId,
+                    partnerCarSnapshot.PartnerUserId,
+                    partnerCarSnapshot.PriceHour,
+                    startTime,
+                    endTime);
             }
 
             for (var attempt = 1; attempt <= MaxSerializableRetries; attempt++)
@@ -66,7 +81,13 @@ namespace BookingService.Infrastructure.Services
                 await using var transaction = await _db.Database.BeginTransactionAsync(IsolationLevel.Serializable);
                 try
                 {
-                    var booking = await CreateBookingWithOverlapCheck(userId, dto, partnerCarId, startTime, endTime);
+                    var booking = await CreateBookingWithOverlapCheck(
+                        userId,
+                        partnerCarId,
+                        partnerCarSnapshot.PartnerUserId,
+                        partnerCarSnapshot.PriceHour,
+                        startTime,
+                        endTime);
                     await transaction.CommitAsync();
                     return booking.ToBookingResponseDto();
                 }
@@ -308,15 +329,22 @@ namespace BookingService.Infrastructure.Services
 
         private async Task<BookingResponseDto> CreateBookingInMemory(
             Guid userId,
-            BookingCreateDto dto,
             int partnerCarId,
+            Guid partnerUserId,
+            decimal? priceHour,
             DateTimeOffset startTime,
             DateTimeOffset endTime)
         {
             await InMemoryCreateLock.WaitAsync();
             try
             {
-                var booking = await CreateBookingWithOverlapCheck(userId, dto, partnerCarId, startTime, endTime);
+                var booking = await CreateBookingWithOverlapCheck(
+                    userId,
+                    partnerCarId,
+                    partnerUserId,
+                    priceHour,
+                    startTime,
+                    endTime);
                 return booking.ToBookingResponseDto();
             }
             finally
@@ -327,8 +355,9 @@ namespace BookingService.Infrastructure.Services
 
         private async Task<Booking> CreateBookingWithOverlapCheck(
             Guid userId,
-            BookingCreateDto dto,
             int partnerCarId,
+            Guid partnerUserId,
+            decimal? priceHour,
             DateTimeOffset startTime,
             DateTimeOffset endTime)
         {
@@ -340,20 +369,20 @@ namespace BookingService.Infrastructure.Services
             var totalHours = (decimal)(endTime - startTime).TotalHours;
             decimal? totalPrice = null;
 
-            if (dto.PriceHour.HasValue)
+            if (priceHour.HasValue)
             {
-                totalPrice = decimal.Round(dto.PriceHour.Value * totalHours, 2, MidpointRounding.AwayFromZero);
+                totalPrice = decimal.Round(priceHour.Value * totalHours, 2, MidpointRounding.AwayFromZero);
             }
 
             var booking = new Booking
             {
                 PartnerCarId = partnerCarId,
                 UserId = userId,
-                PartnerId = dto.PartnerId,
+                PartnerUserId = partnerUserId,
                 StartTime = startTime,
                 EndTime = endTime,
                 Status = BookingStatus.Pending,
-                PriceHour = dto.PriceHour,
+                PriceHour = priceHour,
                 TotalPrice = totalPrice,
                 CreatedAt = DateTimeOffset.UtcNow
             };

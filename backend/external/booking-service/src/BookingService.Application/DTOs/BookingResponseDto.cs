@@ -5,7 +5,7 @@ namespace BookingService.Application.DTOs.Booking
         public int Id { get; set; }
         public Guid UserId { get; set; }
         public int PartnerCarId { get; set; }
-        public Guid PartnerId { get; set; }
+        public Guid PartnerUserId { get; set; }
         public string CarBrand { get; set; } = string.Empty;
         public string CarModel { get; set; } = string.Empty;
         public DateTimeOffset StartTime { get; set; }

@@ -5,7 +5,7 @@ namespace CarService.Application.DTOs.PartnerCars
     public class PartnerCarResponseDto
     {
         public int Id { get; set; }
-        public Guid PartnerId { get; set; }
+        public Guid PartnerUserId { get; set; }
         public int CarModelId { get; set; }
         public string LicensePlate { get; set; } = null!;
         public string? OwnershipFileName { get; set; }

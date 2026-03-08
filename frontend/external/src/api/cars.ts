@@ -67,7 +67,7 @@ export interface CarModelDetailsDto {
 
 export interface PartnerCarSummaryDto {
   id: number;
-  partnerId: string;
+  partnerUserId: string;
   carModelId: number;
   licensePlate: string;
   priceHour?: number | null;
@@ -92,7 +92,7 @@ export interface CarCommentDto {
 }
 
 export interface ModelReviewDto extends CarCommentDto {
-  carrierPartnerId: string;
+  carrierPartnerUserId: string;
   carrierName: string;
 }
 
@@ -113,7 +113,7 @@ export interface MatchCarByModelPayload {
 export interface MatchCarByModelResult {
   isAvailable: boolean;
   partnerCarId?: number | null;
-  partnerId?: string | null;
+  partnerUserId?: string | null;
   priceHour?: number | null;
   modelBrand?: string | null;
   modelName?: string | null;
@@ -248,10 +248,10 @@ export async function getModelDetailsPayload(modelId: number): Promise<ModelDeta
   const reviewsByPartnerCar = await Promise.all(
     partnerCars.map(async (partnerCar) => {
       const comments = await getPartnerCarComments(partnerCar.id);
-      const carrierName = await resolveCarrierName(partnerCar.partnerId);
+      const carrierName = await resolveCarrierName(partnerCar.partnerUserId);
       return comments.map((comment) => ({
         ...comment,
-        carrierPartnerId: partnerCar.partnerId,
+        carrierPartnerUserId: partnerCar.partnerUserId,
         carrierName,
       }));
     })

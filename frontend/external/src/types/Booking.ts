@@ -1,7 +1,7 @@
 export interface Booking {
   id: number;
   carId: number;
-  partnerId?: string;
+  partnerUserId?: string;
   carBrand: string;
   carModel: string;
   startDate: string;
