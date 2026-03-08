@@ -1,6 +1,7 @@
 import api from "./axios";
 import { getPartnerPublicProfileByRelatedUserId } from "./partners";
 import type { PaginatedResponse } from "../types/Pagination";
+import { resolveAssetUrl } from "../utils/resolveAssetUrl";
 
 function toCamelCase(obj: any): any {
   if (Array.isArray(obj)) {
@@ -170,7 +171,15 @@ export async function getAvailableCarModels(): Promise<AvailableCarModel[]> {
 
 export async function getCarModelDetails(modelId: number): Promise<CarModelDetailsDto> {
   const response = await api.get(`/cars/models/${modelId}`);
-  return toCamelCase(response.data) as CarModelDetailsDto;
+  const payload = toCamelCase(response.data) as CarModelDetailsDto;
+
+  return {
+    ...payload,
+    images: (payload.images ?? []).map((image) => ({
+      ...image,
+      imageUrl: resolveAssetUrl(image.imageUrl) ?? image.imageUrl,
+    })),
+  };
 }
 
 export async function getPartnerCarsByModel(
@@ -230,7 +239,7 @@ export async function getAvailableModelCards(): Promise<AvailableModelCard[]> {
     const detail = detailsMap.get(item.modelId);
     return {
       ...item,
-      imageUrl: detail?.images?.[0]?.imageUrl ?? null,
+      imageUrl: resolveAssetUrl(detail?.images?.[0]?.imageUrl ?? null),
       description: detail?.description ?? null,
     };
   });
