@@ -159,6 +159,9 @@ services:
       ASPNETCORE_ENVIRONMENT: Development
       ConnectionStrings__DbConnection: Host=booking-db;Port=5432;Database=postgres_db;Username=postgres;Password=postgres
       InternalAuth__ApiKey: local-internal-api-key
+      CarService__BaseUrl: http://car-service:8080
+      PaymentService__BaseUrl: http://payment-service:8080
+      PaymentService__InternalApiKey: local-internal-api-key
     ports:
       - "${BOOKING_SERVICE_PORT:-1821}:8080"
     depends_on:
@@ -166,6 +169,8 @@ services:
         condition: service_healthy
       booking-flyway:
         condition: service_completed_successfully
+      payment-service:
+        condition: service_started
 
   client-db:
     image: postgres:16
@@ -267,12 +272,75 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ConnectionStrings__DbConnection: Host=partner-db;Port=5432;Database=postgres_db;Username=postgres;Password=postgres
+      PaymentService__BaseUrl: http://payment-service:8080
+      PaymentService__InternalApiKey: local-internal-api-key
+      BookingService__BaseUrl: http://booking-service:8080
+      BookingService__InternalApiKey: local-internal-api-key
     ports:
       - "${PARTNER_SERVICE_PORT:-1832}:8080"
     depends_on:
       partner-db:
         condition: service_healthy
       partner-flyway:
+        condition: service_completed_successfully
+      payment-service:
+        condition: service_started
+
+  payment-db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres_db
+    ports:
+      - "${PAYMENT_DB_PORT:-1288}:5432"
+    volumes:
+      - payment_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+
+  payment-flyway:
+    image: flyway/flyway:12
+    restart: "no"
+    depends_on:
+      payment-db:
+        condition: service_healthy
+    command: migrate
+    volumes:
+      - ./backend/internal/payment-service/src/Migrations:/flyway/sql:ro
+    environment:
+      FLYWAY_URL: jdbc:postgresql://payment-db:5432/postgres_db
+      FLYWAY_USER: postgres
+      FLYWAY_PASSWORD: postgres
+      FLYWAY_CONNECT_RETRIES: 30
+
+  payment-service:
+    build:
+      context: ./backend/internal/payment-service/src
+      dockerfile: ./PaymentService.Api/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - path: ./backend/internal/payment-service/.env.example
+        required: true
+      - path: ./backend/internal/payment-service/.env
+        required: false
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__DbConnection: Host=payment-db;Port=5432;Database=postgres_db;Username=postgres;Password=postgres
+      InternalAuth__ApiKey: local-internal-api-key
+      Payment__Currency: KZT
+      Payment__PlatformCommissionRate: 0.10
+    ports:
+      - "${PAYMENT_SERVICE_PORT:-1834}:8080"
+    depends_on:
+      payment-db:
+        condition: service_healthy
+      payment-flyway:
         condition: service_completed_successfully
 
   ticket-db:
@@ -496,6 +564,7 @@ volumes:
   booking_pgdata:
   client_pgdata:
   partner_pgdata:
+  payment_pgdata:
   ticket_pgdata:
   image_uploads:
   file_uploads:

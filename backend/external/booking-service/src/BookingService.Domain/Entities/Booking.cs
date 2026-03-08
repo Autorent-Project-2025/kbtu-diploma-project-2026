@@ -14,8 +14,8 @@ namespace BookingService.Domain.Entities
         [Column("partner_car_id")]
         public int PartnerCarId { get; set; }
 
-        [Column("partner_id")]
-        public Guid PartnerId { get; set; }
+        [Column("partner_user_id")]
+        public Guid PartnerUserId { get; set; }
 
         [Column("start_time")]
         public DateTimeOffset StartTime { get; set; }

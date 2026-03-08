@@ -2,7 +2,11 @@ using BookingService.Api.Middleware;
 using BookingService.Api.Options;
 using BookingService.Application.Constants;
 using BookingService.Application.Interfaces;
+using BookingService.Application.Interfaces.Integrations;
+using BookingService.Infrastructure.Integrations;
+using BookingService.Infrastructure.Options;
 using BookingService.Infrastructure.Persistence;
+using BookingService.Infrastructure.Services;
 using BookingService.Infrastructure.Utils;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
@@ -14,6 +18,28 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.Configure<InternalAuthOptions>(builder.Configuration.GetSection(InternalAuthOptions.SectionName));
+builder.Services.Configure<CarServiceOptions>(builder.Configuration.GetSection(CarServiceOptions.SectionName));
+builder.Services.Configure<PaymentServiceOptions>(builder.Configuration.GetSection(PaymentServiceOptions.SectionName));
+builder.Services.AddOptions<PaymentSyncOutboxOptions>()
+    .Bind(builder.Configuration.GetSection(PaymentSyncOutboxOptions.SectionName))
+    .Validate(options =>
+        options.BatchSize > 0 &&
+        options.BatchSize <= 200 &&
+        options.PollIntervalSeconds > 0 &&
+        options.LockTimeoutSeconds > 0 &&
+        options.InitialRetryDelaySeconds > 0 &&
+        options.MaxRetryDelaySeconds >= options.InitialRetryDelaySeconds,
+        "Payment sync outbox configuration is invalid.");
+builder.Services.AddOptions<PendingBookingExpirationOptions>()
+    .Bind(builder.Configuration.GetSection(PendingBookingExpirationOptions.SectionName))
+    .Validate(options =>
+        options.TtlMinutes > 0 &&
+        options.TtlMinutes <= 1440 &&
+        options.PollIntervalSeconds > 0 &&
+        options.PollIntervalSeconds <= 3600 &&
+        options.BatchSize > 0 &&
+        options.BatchSize <= 500,
+        "Pending booking expiration configuration is invalid.");
 
 var connectionString = builder.Configuration.GetConnectionString("DbConnection");
 if (string.IsNullOrEmpty(connectionString))
@@ -81,7 +107,35 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("bookings:create", policy =>
         policy.RequireClaim("permissions", PermissionConstants.BookingCreate));
 });
+builder.Services.AddHttpClient<IPartnerCarReadClient, PartnerCarReadClient>((serviceProvider, client) =>
+{
+    var options = serviceProvider
+        .GetRequiredService<Microsoft.Extensions.Options.IOptions<CarServiceOptions>>()
+        .Value;
+
+    if (string.IsNullOrWhiteSpace(options.BaseUrl))
+    {
+        throw new InvalidOperationException("Configuration value 'CarService:BaseUrl' is required.");
+    }
+
+    client.BaseAddress = new Uri(options.BaseUrl, UriKind.Absolute);
+});
+builder.Services.AddHttpClient<IPaymentSyncClient, PaymentSyncClient>((serviceProvider, client) =>
+{
+    var options = serviceProvider
+        .GetRequiredService<Microsoft.Extensions.Options.IOptions<PaymentServiceOptions>>()
+        .Value;
+
+    if (string.IsNullOrWhiteSpace(options.BaseUrl))
+    {
+        throw new InvalidOperationException("Configuration value 'PaymentService:BaseUrl' is required.");
+    }
+
+    client.BaseAddress = new Uri(options.BaseUrl, UriKind.Absolute);
+});
 builder.Services.AddScoped<IBookingService, BookingService.Infrastructure.Services.BookingService>();
+builder.Services.AddHostedService<PaymentSyncOutboxDispatcher>();
+builder.Services.AddHostedService<PendingBookingExpirationDispatcher>();
 
 var app = builder.Build();
 

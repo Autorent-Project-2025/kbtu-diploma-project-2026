@@ -6,11 +6,13 @@ import PartnerApplyView from "../views/PartnerApplyView.vue";
 import ActivateAccountView from "../views/ActivateAccountView.vue";
 import CarsView from "../views/CarsView.vue";
 import MyBookingsView from "../views/MyBookingsView.vue";
+import BookingPaymentView from "../views/BookingPaymentView.vue";
 import NotFoundView from "../views/NotFoundView.vue";
 import CarDetailView from "@/views/CarDetailView.vue";
 import PartnerProfileView from "../views/PartnerProfileView.vue";
 import PartnerCarsView from "../views/PartnerCarsView.vue";
 import PartnerCarDetailView from "../views/PartnerCarDetailView.vue";
+import PartnerBookingsView from "../views/PartnerBookingsView.vue";
 import { auth } from "../store/auth";
 
 const routes = [
@@ -50,6 +52,11 @@ const routes = [
     meta: { requiresAuth: true }, // Только для авторизованных
   },
   {
+    path: "/bookings/:id/payment",
+    component: BookingPaymentView,
+    meta: { requiresAuth: true },
+  },
+  {
     path: "/partner/me",
     component: PartnerProfileView,
     meta: { requiresAuth: true },
@@ -57,6 +64,11 @@ const routes = [
   {
     path: "/partner/cars",
     component: PartnerCarsView,
+    meta: { requiresAuth: true },
+  },
+  {
+    path: "/partner/bookings",
+    component: PartnerBookingsView,
     meta: { requiresAuth: true },
   },
   {

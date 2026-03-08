@@ -325,14 +325,11 @@ async function handleBookingConfirm(startDate: string, endDate: string) {
       return;
     }
 
-    await createBooking(matchResult.partnerCarId, startDate, endDate, {
-      partnerId: matchResult.partnerId ?? undefined,
-      priceHour: matchResult.priceHour ?? null,
-    });
+    const booking = await createBooking(matchResult.partnerCarId, startDate, endDate);
 
-    success(`${payload.value.model.brand} ${payload.value.model.model} успешно забронирована.`);
+    success(`${payload.value.model.brand} ${payload.value.model.model}: бронь создана, завершите оплату.`);
     closeBookingModal();
-    await loadModelDetails();
+    await router.push(`/bookings/${booking.id}/payment`);
   } catch (e) {
     console.error("Ошибка бронирования:", e);
     bookingError.value = "Не удалось забронировать машину. Попробуйте снова.";

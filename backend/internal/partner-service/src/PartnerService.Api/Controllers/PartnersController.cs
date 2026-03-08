@@ -14,13 +14,19 @@ public sealed class PartnersController : ControllerBase
 {
     private readonly IPartnerService _partnerService;
     private readonly IFileStorageClient _fileStorageClient;
+    private readonly IPartnerPaymentClient _partnerPaymentClient;
+    private readonly IPartnerBookingClient _partnerBookingClient;
 
     public PartnersController(
         IPartnerService partnerService,
-        IFileStorageClient fileStorageClient)
+        IFileStorageClient fileStorageClient,
+        IPartnerPaymentClient partnerPaymentClient,
+        IPartnerBookingClient partnerBookingClient)
     {
         _partnerService = partnerService;
         _fileStorageClient = fileStorageClient;
+        _partnerPaymentClient = partnerPaymentClient;
+        _partnerBookingClient = partnerBookingClient;
     }
 
     [HttpGet]
@@ -110,6 +116,83 @@ public sealed class PartnersController : ControllerBase
         return Ok(payload);
     }
 
+    [HttpGet("me/wallet")]
+    public async Task<IActionResult> GetMyWallet(CancellationToken cancellationToken)
+    {
+        var partnerUserId = await ResolveCurrentPartnerUserIdAsync(cancellationToken);
+        var wallet = await _partnerPaymentClient.GetWalletAsync(partnerUserId, cancellationToken);
+        return Ok(wallet);
+    }
+
+    [HttpGet("me/ledger")]
+    public async Task<IActionResult> GetMyLedger([FromQuery] int take = 50, CancellationToken cancellationToken = default)
+    {
+        var partnerUserId = await ResolveCurrentPartnerUserIdAsync(cancellationToken);
+        var ledger = await _partnerPaymentClient.GetLedgerAsync(partnerUserId, take, cancellationToken);
+        return Ok(ledger);
+    }
+
+    [HttpGet("me/payouts")]
+    public async Task<IActionResult> GetMyPayouts([FromQuery] int take = 50, CancellationToken cancellationToken = default)
+    {
+        var partnerUserId = await ResolveCurrentPartnerUserIdAsync(cancellationToken);
+        var payouts = await _partnerPaymentClient.GetPayoutsAsync(partnerUserId, take, cancellationToken);
+        return Ok(payouts);
+    }
+
+    [HttpGet("me/bookings")]
+    public async Task<IActionResult> GetMyBookings(CancellationToken cancellationToken)
+    {
+        var partnerUserId = await ResolveCurrentPartnerUserIdAsync(cancellationToken);
+        var bookings = await _partnerBookingClient.GetBookingsAsync(partnerUserId, cancellationToken);
+        return Ok(bookings);
+    }
+
+    [HttpGet("me/payouts/{payoutId:long}")]
+    public async Task<IActionResult> GetMyPayout(long payoutId, CancellationToken cancellationToken)
+    {
+        var partnerUserId = await ResolveCurrentPartnerUserIdAsync(cancellationToken);
+        var payout = await _partnerPaymentClient.GetPayoutAsync(payoutId, cancellationToken);
+        if (payout is null || payout.PartnerUserId != partnerUserId)
+        {
+            return NotFound(new { error = "Payout not found." });
+        }
+
+        return Ok(payout);
+    }
+
+    [HttpPost("me/payouts")]
+    public async Task<IActionResult> RequestMyPayout(
+        [FromBody] RequestPartnerPayoutRequest request,
+        CancellationToken cancellationToken)
+    {
+        var partnerUserId = await ResolveCurrentPartnerUserIdAsync(cancellationToken);
+        var payout = await _partnerPaymentClient.RequestPayoutAsync(
+            partnerUserId,
+            request.Amount,
+            request.RequestKey,
+            cancellationToken);
+
+        return Ok(payout);
+    }
+
+    [HttpPost("me/payouts/{payoutId:long}/cancel")]
+    public async Task<IActionResult> CancelMyPayout(
+        long payoutId,
+        [FromBody] CancelPartnerPayoutRequest request,
+        CancellationToken cancellationToken)
+    {
+        var partnerUserId = await ResolveCurrentPartnerUserIdAsync(cancellationToken);
+        var existingPayout = await _partnerPaymentClient.GetPayoutAsync(payoutId, cancellationToken);
+        if (existingPayout is null || existingPayout.PartnerUserId != partnerUserId)
+        {
+            return NotFound(new { error = "Payout not found." });
+        }
+
+        var payout = await _partnerPaymentClient.CancelPayoutAsync(payoutId, request.Reason, cancellationToken);
+        return Ok(payout);
+    }
+
     [AllowAnonymous]
     [HttpGet("public/by-related-user/{relatedUserId}")]
     public async Task<IActionResult> GetPublicByRelatedUserId(string relatedUserId, CancellationToken cancellationToken)
@@ -173,5 +256,22 @@ public sealed class PartnersController : ControllerBase
         }
 
         return userId;
+    }
+
+    private async Task<Guid> ResolveCurrentPartnerUserIdAsync(CancellationToken cancellationToken)
+    {
+        var userId = ResolveCurrentUserId();
+        var partner = await _partnerService.GetByRelatedUserIdAsync(userId, cancellationToken);
+        if (partner is null)
+        {
+            throw new KeyNotFoundException("Partner not found for current user.");
+        }
+
+        if (!Guid.TryParse(userId, out var partnerUserId) || partnerUserId == Guid.Empty)
+        {
+            throw new UnauthorizedAccessException("Authenticated user id must be a valid GUID.");
+        }
+
+        return partnerUserId;
     }
 }

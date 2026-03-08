@@ -22,7 +22,7 @@ export interface PartnerCarImage {
 
 export interface PartnerCarDetails {
   id: number;
-  partnerId: string;
+  partnerUserId: string;
   licensePlate: string;
   ownershipFileName?: string | null;
   color?: string | null;

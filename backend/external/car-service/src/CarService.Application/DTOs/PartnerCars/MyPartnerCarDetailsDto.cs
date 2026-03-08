@@ -8,7 +8,7 @@ namespace CarService.Application.DTOs.PartnerCars
     public class MyPartnerCarDetailsDto
     {
         public int Id { get; set; }
-        public Guid PartnerId { get; set; }
+        public Guid PartnerUserId { get; set; }
         public string LicensePlate { get; set; } = string.Empty;
         public string? OwnershipFileName { get; set; }
         public string? Color { get; set; }

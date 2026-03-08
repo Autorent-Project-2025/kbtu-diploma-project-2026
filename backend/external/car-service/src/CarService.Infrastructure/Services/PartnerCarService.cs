@@ -47,9 +47,9 @@ namespace CarService.Infrastructure.Services
                 query = query.Where(partnerCar => partnerCar.Status == queryParams.Status.Value);
             }
 
-            if (queryParams.PartnerId.HasValue)
+            if (queryParams.PartnerUserId.HasValue)
             {
-                query = query.Where(partnerCar => partnerCar.PartnerId == queryParams.PartnerId.Value);
+                query = query.Where(partnerCar => partnerCar.PartnerUserId == queryParams.PartnerUserId.Value);
             }
 
             query = query
@@ -95,7 +95,7 @@ namespace CarService.Infrastructure.Services
             return new PartnerCarDetailsDto
             {
                 Id = entity.Id,
-                PartnerId = entity.PartnerId,
+                PartnerUserId = entity.PartnerUserId,
                 CarModelId = entity.CarModelId,
                 LicensePlate = entity.LicensePlate,
                 OwnershipFileName = entity.OwnershipFileName,
@@ -135,7 +135,7 @@ namespace CarService.Infrastructure.Services
 
             var entity = new PartnerCar
             {
-                PartnerId = currentUserId,
+                PartnerUserId = currentUserId,
                 CarModelId = dto.CarModelId,
                 LicensePlate = NormalizeRequired(dto.LicensePlate, nameof(dto.LicensePlate), 20),
                 OwnershipFileName = null,
@@ -233,7 +233,7 @@ namespace CarService.Infrastructure.Services
 
             var entity = new PartnerCar
             {
-                PartnerId = dto.RelatedUserId,
+                PartnerUserId = dto.RelatedUserId,
                 CarModelId = model.Id,
                 LicensePlate = normalizedLicensePlate,
                 OwnershipFileName = normalizedOwnershipFileName,
@@ -278,7 +278,7 @@ namespace CarService.Infrastructure.Services
                 return null;
             }
 
-            if (entity.PartnerId != currentUserId)
+            if (entity.PartnerUserId != currentUserId)
             {
                 throw new UnauthorizedAccessException("You are not allowed to update this partner car.");
             }
@@ -302,7 +302,7 @@ namespace CarService.Infrastructure.Services
                 return false;
             }
 
-            if (entity.PartnerId != currentUserId)
+            if (entity.PartnerUserId != currentUserId)
             {
                 throw new UnauthorizedAccessException("You are not allowed to delete this partner car.");
             }
@@ -319,7 +319,7 @@ namespace CarService.Infrastructure.Services
             var cars = await _db.PartnerCars
                 .AsNoTracking()
                 .IncludeModelCatalog()
-                .Where(partnerCar => partnerCar.PartnerId == currentUserId)
+                .Where(partnerCar => partnerCar.PartnerUserId == currentUserId)
                 .OrderByDescending(partnerCar => partnerCar.CreatedAt)
                 .ThenByDescending(partnerCar => partnerCar.Id)
                 .ToListAsync(cancellationToken);
@@ -353,7 +353,7 @@ namespace CarService.Infrastructure.Services
                 .IncludeModelCatalog()
                 .Include(partnerCar => partnerCar.Images)
                 .Include(partnerCar => partnerCar.Comments)
-                .FirstOrDefaultAsync(partnerCar => partnerCar.Id == carId && partnerCar.PartnerId == currentUserId, cancellationToken);
+                .FirstOrDefaultAsync(partnerCar => partnerCar.Id == carId && partnerCar.PartnerUserId == currentUserId, cancellationToken);
 
             if (entity is null)
             {
@@ -365,7 +365,7 @@ namespace CarService.Infrastructure.Services
             return new MyPartnerCarDetailsDto
             {
                 Id = entity.Id,
-                PartnerId = entity.PartnerId,
+                PartnerUserId = entity.PartnerUserId,
                 LicensePlate = entity.LicensePlate,
                 OwnershipFileName = entity.OwnershipFileName,
                 Color = entity.Color,
@@ -518,13 +518,13 @@ namespace CarService.Infrastructure.Services
             }
 
             var partnerLoadMap = candidates
-                .GroupBy(candidate => candidate.PartnerId)
+                .GroupBy(candidate => candidate.PartnerUserId)
                 .ToDictionary(
                     group => group.Key,
                     group => group.Sum(candidate => bookingCountMap.GetValueOrDefault(candidate.Id, 0)));
 
-            var minPartnerLoad = availableCandidates.Min(candidate => partnerLoadMap.GetValueOrDefault(candidate.PartnerId, 0));
-            var maxPartnerLoad = availableCandidates.Max(candidate => partnerLoadMap.GetValueOrDefault(candidate.PartnerId, 0));
+            var minPartnerLoad = availableCandidates.Min(candidate => partnerLoadMap.GetValueOrDefault(candidate.PartnerUserId, 0));
+            var maxPartnerLoad = availableCandidates.Max(candidate => partnerLoadMap.GetValueOrDefault(candidate.PartnerUserId, 0));
             var minBookingCount = availableCandidates.Min(candidate => bookingCountMap.GetValueOrDefault(candidate.Id, 0));
             var maxBookingCount = availableCandidates.Max(candidate => bookingCountMap.GetValueOrDefault(candidate.Id, 0));
 
@@ -544,7 +544,7 @@ namespace CarService.Infrastructure.Services
             var rankedCandidates = availableCandidates
                 .Select(candidate =>
                 {
-                    var partnerLoad = partnerLoadMap.GetValueOrDefault(candidate.PartnerId, 0);
+                    var partnerLoad = partnerLoadMap.GetValueOrDefault(candidate.PartnerUserId, 0);
                     var bookingCount = bookingCountMap.GetValueOrDefault(candidate.Id, 0);
                     var rating = candidate.Rating.HasValue ? Clamp01((double)candidate.Rating.Value / 5d) : 0d;
 
@@ -578,7 +578,7 @@ namespace CarService.Infrastructure.Services
             {
                 IsAvailable = true,
                 PartnerCarId = selected.Id,
-                PartnerId = selected.PartnerId,
+                PartnerUserId = selected.PartnerUserId,
                 PriceHour = selected.PriceHour,
                 ModelBrand = selected.CarModel.Brand.Name,
                 ModelName = selected.CarModel.ModelLookup.Name,
@@ -612,7 +612,7 @@ namespace CarService.Infrastructure.Services
             return new PartnerCarResponseDto
             {
                 Id = entity.Id,
-                PartnerId = entity.PartnerId,
+                PartnerUserId = entity.PartnerUserId,
                 CarModelId = entity.CarModelId,
                 LicensePlate = entity.LicensePlate,
                 OwnershipFileName = entity.OwnershipFileName,

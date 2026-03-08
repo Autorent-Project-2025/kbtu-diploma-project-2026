@@ -8,6 +8,10 @@ export function computeBookingStatus(booking: Booking): ComputedBookingStatus {
   const startDate = new Date(booking.startDate);
   const endDate = new Date(booking.endDate);
 
+  if (booking.status === "pending") {
+    return "paymentPending";
+  }
+
   // Если отменено - всегда отменено
   if (booking.status === "canceled") {
     return "canceled";
@@ -38,7 +42,7 @@ export function canCancelBooking(booking: Booking): boolean {
   const status = computeBookingStatus(booking);
 
   // Можно отменить только предстоящие или активные бронирования
-  return status === "upcoming" || status === "active";
+  return status === "paymentPending" || status === "upcoming" || status === "active";
 }
 
 /**
@@ -52,7 +56,7 @@ export function isCarAvailable(
   const activeBookings = carBookings.filter((booking) => {
     const status = computeBookingStatus(booking);
     // Учитываем только предстоящие и активные бронирования
-    return status === "upcoming" || status === "active";
+    return status === "paymentPending" || status === "upcoming" || status === "active";
   });
 
   // Проверяем пересечение дат

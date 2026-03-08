@@ -1,13 +1,18 @@
 using BookingService.Application.DTOs.Booking;
 using BookingService.Application.DTOs.Common;
 using BookingService.Application.Interfaces;
+using BookingService.Application.Interfaces.Integrations;
 using BookingService.Application.Mappers;
 using BookingService.Domain.Entities;
 using BookingService.Domain.Enums;
+using BookingService.Infrastructure.Integrations;
+using BookingService.Infrastructure.Options;
 using BookingService.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Npgsql;
 using System.Data;
+using System.Text.Json;
 
 namespace BookingService.Infrastructure.Services
 {
@@ -17,10 +22,23 @@ namespace BookingService.Infrastructure.Services
         private static readonly SemaphoreSlim InMemoryCreateLock = new(1, 1);
 
         private readonly ApplicationDbContext _db;
+        private readonly IPartnerCarReadClient _partnerCarReadClient;
+        private readonly IPaymentSyncClient _paymentSyncClient;
+        private readonly PaymentServiceOptions _paymentServiceOptions;
+        private readonly PendingBookingExpirationOptions _pendingBookingExpirationOptions;
 
-        public BookingService(ApplicationDbContext db)
+        public BookingService(
+            ApplicationDbContext db,
+            IPartnerCarReadClient partnerCarReadClient,
+            IPaymentSyncClient paymentSyncClient,
+            IOptions<PaymentServiceOptions> paymentServiceOptions,
+            IOptions<PendingBookingExpirationOptions> pendingBookingExpirationOptions)
         {
             _db = db;
+            _partnerCarReadClient = partnerCarReadClient;
+            _paymentSyncClient = paymentSyncClient;
+            _paymentServiceOptions = paymentServiceOptions.Value;
+            _pendingBookingExpirationOptions = pendingBookingExpirationOptions.Value;
         }
 
         public async Task<bool> IsPartnerCarAvailable(int partnerCarId, DateTimeOffset startTime, DateTimeOffset endTime)
@@ -44,21 +62,33 @@ namespace BookingService.Infrastructure.Services
             var startTime = dto.ResolveStartTime();
             var endTime = dto.ResolveEndTime();
 
-            if (dto.PartnerId == Guid.Empty)
-            {
-                throw new ArgumentException("PartnerId is required.", nameof(dto.PartnerId));
-            }
-
-            if (dto.PriceHour.HasValue && dto.PriceHour.Value <= 0)
-            {
-                throw new ArgumentException("PriceHour must be greater than zero.", nameof(dto.PriceHour));
-            }
-
             EnsureValidDateRange(startTime, endTime);
+
+            var partnerCarSnapshot = await _partnerCarReadClient.GetByIdAsync(partnerCarId);
+            if (partnerCarSnapshot is null)
+            {
+                throw new KeyNotFoundException($"Partner car with id {partnerCarId} was not found.");
+            }
+
+            if (partnerCarSnapshot.PartnerUserId == Guid.Empty)
+            {
+                throw new InvalidOperationException("Partner car owner must be a valid UUID.");
+            }
+
+            if (partnerCarSnapshot.PriceHour.HasValue && partnerCarSnapshot.PriceHour.Value <= 0)
+            {
+                throw new InvalidOperationException("Partner car price hour must be greater than zero.");
+            }
 
             if (!_db.Database.IsRelational())
             {
-                return await CreateBookingInMemory(userId, dto, partnerCarId, startTime, endTime);
+                return await CreateBookingInMemory(
+                    userId,
+                    partnerCarId,
+                    partnerCarSnapshot.PartnerUserId,
+                    partnerCarSnapshot.PriceHour,
+                    startTime,
+                    endTime);
             }
 
             for (var attempt = 1; attempt <= MaxSerializableRetries; attempt++)
@@ -66,7 +96,13 @@ namespace BookingService.Infrastructure.Services
                 await using var transaction = await _db.Database.BeginTransactionAsync(IsolationLevel.Serializable);
                 try
                 {
-                    var booking = await CreateBookingWithOverlapCheck(userId, dto, partnerCarId, startTime, endTime);
+                    var booking = await CreateBookingWithOverlapCheck(
+                        userId,
+                        partnerCarId,
+                        partnerCarSnapshot.PartnerUserId,
+                        partnerCarSnapshot.PriceHour,
+                        startTime,
+                        endTime);
                     await transaction.CommitAsync();
                     return booking.ToBookingResponseDto();
                 }
@@ -186,6 +222,19 @@ namespace BookingService.Infrastructure.Services
                 .ToListAsync(cancellationToken);
         }
 
+        public async Task<IReadOnlyCollection<BookingResponseDto>> GetBookingsByPartnerUserId(Guid partnerUserId, CancellationToken cancellationToken = default)
+        {
+            EnsureValidUserId(partnerUserId);
+
+            return await _db.Bookings
+                .AsNoTracking()
+                .Where(booking => booking.PartnerUserId == partnerUserId)
+                .OrderByDescending(booking => booking.StartTime)
+                .ThenByDescending(booking => booking.Id)
+                .SelectToBookingResponseDto()
+                .ToListAsync(cancellationToken);
+        }
+
         public async Task<IReadOnlyCollection<CarBookingCountDto>> GetBookingCountsByPartnerCarIds(IReadOnlyCollection<int> partnerCarIds, CancellationToken cancellationToken = default)
         {
             var normalizedIds = partnerCarIds
@@ -267,6 +316,71 @@ namespace BookingService.Infrastructure.Services
             return results;
         }
 
+        public async Task<BookingPaymentStatusResponseDto> StartPayment(int id, Guid userId)
+        {
+            var booking = await GetRequiredUserBookingEntity(id, userId);
+            if (await ExpirePendingBookingIfNeededAsync(booking))
+            {
+                var latestExpiredAttempt = await _paymentSyncClient.GetLatestMockPaymentAsync(booking.Id, userId);
+                return MapBookingPaymentStatus(booking, latestExpiredAttempt);
+            }
+
+            MockPaymentAttemptPayload? latestAttempt = null;
+
+            if (booking.Status == BookingStatus.Pending)
+            {
+                latestAttempt = await _paymentSyncClient.StartMockPaymentAsync(
+                    booking.Id,
+                    userId,
+                    ResolveBookingPaymentAmount(booking),
+                    ResolvePaymentCurrency());
+            }
+            else
+            {
+                latestAttempt = await _paymentSyncClient.GetLatestMockPaymentAsync(booking.Id, userId);
+            }
+
+            return MapBookingPaymentStatus(booking, latestAttempt);
+        }
+
+        public async Task<BookingPaymentStatusResponseDto> GetPaymentStatus(int id, Guid userId)
+        {
+            var booking = await GetRequiredUserBookingEntity(id, userId);
+            await ExpirePendingBookingIfNeededAsync(booking);
+            var latestAttempt = await _paymentSyncClient.GetLatestMockPaymentAsync(booking.Id, userId);
+            return MapBookingPaymentStatus(booking, latestAttempt);
+        }
+
+        public async Task<BookingPaymentStatusResponseDto> SubmitPayment(int id, Guid userId, BookingPaymentSubmitRequestDto dto)
+        {
+            ArgumentNullException.ThrowIfNull(dto);
+
+            var booking = await GetRequiredUserBookingEntity(id, userId);
+            if (await ExpirePendingBookingIfNeededAsync(booking))
+            {
+                var latestExpiredAttempt = await _paymentSyncClient.GetLatestMockPaymentAsync(booking.Id, userId);
+                return MapBookingPaymentStatus(booking, latestExpiredAttempt);
+            }
+
+            var latestAttempt = await _paymentSyncClient.SubmitMockPaymentAsync(
+                booking.Id,
+                userId,
+                dto.SessionKey,
+                dto.CardHolder,
+                dto.CardNumber,
+                dto.ExpiryMonth,
+                dto.ExpiryYear,
+                dto.Cvv);
+
+            if (booking.Status == BookingStatus.Pending &&
+                string.Equals(latestAttempt.Status, "succeeded", StringComparison.OrdinalIgnoreCase))
+            {
+                await PersistStatusTransitionWithPaymentOutbox(booking, BookingStatus.Confirmed);
+            }
+
+            return MapBookingPaymentStatus(booking, latestAttempt);
+        }
+
         public async Task<bool> CancelBooking(int id, Guid userId)
         {
             var booking = await GetUserBookingEntity(id, userId);
@@ -275,8 +389,7 @@ namespace BookingService.Infrastructure.Services
                 return false;
             }
 
-            ApplyStatusTransition(booking, BookingStatus.Canceled);
-            await _db.SaveChangesAsync();
+            await PersistStatusTransitionWithPaymentOutbox(booking, BookingStatus.Canceled);
             return true;
         }
 
@@ -288,8 +401,7 @@ namespace BookingService.Infrastructure.Services
                 return false;
             }
 
-            ApplyStatusTransition(booking, BookingStatus.Confirmed);
-            await _db.SaveChangesAsync();
+            await PersistStatusTransitionWithPaymentOutbox(booking, BookingStatus.Confirmed);
             return true;
         }
 
@@ -301,22 +413,28 @@ namespace BookingService.Infrastructure.Services
                 return false;
             }
 
-            ApplyStatusTransition(booking, BookingStatus.Completed);
-            await _db.SaveChangesAsync();
+            await PersistStatusTransitionWithPaymentOutbox(booking, BookingStatus.Completed);
             return true;
         }
 
         private async Task<BookingResponseDto> CreateBookingInMemory(
             Guid userId,
-            BookingCreateDto dto,
             int partnerCarId,
+            Guid partnerUserId,
+            decimal? priceHour,
             DateTimeOffset startTime,
             DateTimeOffset endTime)
         {
             await InMemoryCreateLock.WaitAsync();
             try
             {
-                var booking = await CreateBookingWithOverlapCheck(userId, dto, partnerCarId, startTime, endTime);
+                var booking = await CreateBookingWithOverlapCheck(
+                    userId,
+                    partnerCarId,
+                    partnerUserId,
+                    priceHour,
+                    startTime,
+                    endTime);
                 return booking.ToBookingResponseDto();
             }
             finally
@@ -327,8 +445,9 @@ namespace BookingService.Infrastructure.Services
 
         private async Task<Booking> CreateBookingWithOverlapCheck(
             Guid userId,
-            BookingCreateDto dto,
             int partnerCarId,
+            Guid partnerUserId,
+            decimal? priceHour,
             DateTimeOffset startTime,
             DateTimeOffset endTime)
         {
@@ -340,20 +459,20 @@ namespace BookingService.Infrastructure.Services
             var totalHours = (decimal)(endTime - startTime).TotalHours;
             decimal? totalPrice = null;
 
-            if (dto.PriceHour.HasValue)
+            if (priceHour.HasValue)
             {
-                totalPrice = decimal.Round(dto.PriceHour.Value * totalHours, 2, MidpointRounding.AwayFromZero);
+                totalPrice = decimal.Round(priceHour.Value * totalHours, 2, MidpointRounding.AwayFromZero);
             }
 
             var booking = new Booking
             {
                 PartnerCarId = partnerCarId,
                 UserId = userId,
-                PartnerId = dto.PartnerId,
+                PartnerUserId = partnerUserId,
                 StartTime = startTime,
                 EndTime = endTime,
                 Status = BookingStatus.Pending,
-                PriceHour = dto.PriceHour,
+                PriceHour = priceHour,
                 TotalPrice = totalPrice,
                 CreatedAt = DateTimeOffset.UtcNow
             };
@@ -385,6 +504,45 @@ namespace BookingService.Infrastructure.Services
 
             return await _db.Bookings
                 .FirstOrDefaultAsync(b => b.Id == id && b.UserId == userId);
+        }
+
+        private async Task<Booking> GetRequiredUserBookingEntity(int id, Guid userId)
+        {
+            var booking = await GetUserBookingEntity(id, userId);
+            return booking ?? throw new KeyNotFoundException("Booking not found.");
+        }
+
+        private async Task PersistStatusTransitionWithPaymentOutbox(
+            Booking booking,
+            BookingStatus targetStatus,
+            CancellationToken cancellationToken = default)
+        {
+            var entry = _db.Entry(booking);
+            if (entry.State != EntityState.Detached)
+            {
+                await entry.ReloadAsync(cancellationToken);
+            }
+
+            var statusChanged = TryApplyStatusTransition(booking, targetStatus);
+            var outboxMessage = CreatePaymentSyncOutboxMessage(booking, targetStatus);
+
+            var outboxExists = await _db.PaymentSyncOutboxMessages
+                .AnyAsync(message => message.EventKey == outboxMessage.EventKey, cancellationToken);
+
+            if (!statusChanged && outboxExists)
+            {
+                return;
+            }
+
+            if (!outboxExists)
+            {
+                _db.PaymentSyncOutboxMessages.Add(outboxMessage);
+            }
+
+            if (statusChanged || !outboxExists)
+            {
+                await _db.SaveChangesAsync(cancellationToken);
+            }
         }
 
         private static void EnsureValidDateRange(DateTimeOffset startTime, DateTimeOffset endTime)
@@ -451,11 +609,11 @@ namespace BookingService.Infrastructure.Services
             }
         }
 
-        private static void ApplyStatusTransition(Booking booking, BookingStatus targetStatus)
+        private static bool TryApplyStatusTransition(Booking booking, BookingStatus targetStatus)
         {
             if (booking.Status == targetStatus)
             {
-                throw new InvalidOperationException($"Booking is already {targetStatus}.");
+                return false;
             }
 
             var isAllowed = booking.Status switch
@@ -475,6 +633,141 @@ namespace BookingService.Infrastructure.Services
             }
 
             booking.Status = targetStatus;
+            return true;
+        }
+
+        private decimal ResolveBookingPaymentAmount(Booking booking)
+        {
+            if (!booking.TotalPrice.HasValue || booking.TotalPrice.Value <= 0m)
+            {
+                throw new InvalidOperationException("Booking total price must be greater than zero before payment can start.");
+            }
+
+            return booking.TotalPrice.Value;
+        }
+
+        private string ResolvePaymentCurrency()
+        {
+            if (string.IsNullOrWhiteSpace(_paymentServiceOptions.Currency))
+            {
+                throw new InvalidOperationException("PaymentService:Currency configuration is required.");
+            }
+
+            return _paymentServiceOptions.Currency;
+        }
+
+        private BookingPaymentStatusResponseDto MapBookingPaymentStatus(
+            Booking booking,
+            MockPaymentAttemptPayload? latestAttempt)
+        {
+            var normalizedPaymentStatus = ResolvePaymentStatus(booking, latestAttempt);
+            var canRetry = booking.Status == BookingStatus.Pending &&
+                           normalizedPaymentStatus is "not_started" or "failed" or "expired";
+            DateTimeOffset? bookingExpiresAt = booking.Status == BookingStatus.Pending
+                ? booking.CreatedAt.AddMinutes(_pendingBookingExpirationOptions.TtlMinutes)
+                : null;
+
+            return new BookingPaymentStatusResponseDto
+            {
+                BookingId = booking.Id,
+                BookingStatus = booking.Status.ToString().ToLowerInvariant(),
+                PaymentStatus = normalizedPaymentStatus,
+                PaymentAttemptId = latestAttempt?.Id,
+                SessionKey = latestAttempt?.SessionKey,
+                Amount = latestAttempt?.Amount ?? booking.TotalPrice,
+                Currency = latestAttempt?.Currency ?? ResolvePaymentCurrency(),
+                CardHolder = latestAttempt?.CardHolder,
+                CardLast4 = latestAttempt?.CardLast4,
+                FailureReason = latestAttempt?.FailureReason,
+                BookingCreatedAt = booking.CreatedAt,
+                BookingExpiresAt = bookingExpiresAt,
+                PaymentCreatedAt = latestAttempt?.CreatedAt,
+                PaymentUpdatedAt = latestAttempt?.UpdatedAt,
+                PaymentCompletedAt = latestAttempt?.CompletedAt,
+                PaymentExpiresAt = latestAttempt?.ExpiresAt,
+                RequiresInput = booking.Status == BookingStatus.Pending &&
+                                normalizedPaymentStatus is "not_started" or "started",
+                CanRetry = canRetry
+            };
+        }
+
+        private static string ResolvePaymentStatus(Booking booking, MockPaymentAttemptPayload? latestAttempt)
+        {
+            if (latestAttempt is not null)
+            {
+                return latestAttempt.Status.Trim().ToLowerInvariant();
+            }
+
+            return booking.Status switch
+            {
+                BookingStatus.Pending => "not_started",
+                BookingStatus.Canceled => "canceled",
+                BookingStatus.Confirmed or BookingStatus.Active or BookingStatus.Completed => "succeeded",
+                _ => "not_started"
+            };
+        }
+
+        private async Task<bool> ExpirePendingBookingIfNeededAsync(
+            Booking booking,
+            CancellationToken cancellationToken = default)
+        {
+            if (booking.Status != BookingStatus.Pending)
+            {
+                return false;
+            }
+
+            if (!IsPendingBookingExpired(booking))
+            {
+                return false;
+            }
+
+            await PersistStatusTransitionWithPaymentOutbox(booking, BookingStatus.Canceled, cancellationToken);
+            return true;
+        }
+
+        private bool IsPendingBookingExpired(Booking booking)
+        {
+            return booking.CreatedAt.AddMinutes(_pendingBookingExpirationOptions.TtlMinutes) <= DateTimeOffset.UtcNow;
+        }
+
+        private static PaymentSyncOutboxMessage CreatePaymentSyncOutboxMessage(Booking booking, BookingStatus targetStatus)
+        {
+            var now = DateTimeOffset.UtcNow;
+            var eventType = targetStatus switch
+            {
+                BookingStatus.Confirmed => PaymentSyncOutboxEventTypes.BookingConfirmed,
+                BookingStatus.Canceled => PaymentSyncOutboxEventTypes.BookingCanceled,
+                BookingStatus.Completed => PaymentSyncOutboxEventTypes.BookingCompleted,
+                _ => throw new InvalidOperationException($"Booking status {targetStatus} does not produce a payment outbox event.")
+            };
+
+            var payload = targetStatus switch
+            {
+                BookingStatus.Confirmed => new PaymentSyncOutboxPayload
+                {
+                    BookingId = booking.Id,
+                    UserId = booking.UserId,
+                    PartnerUserId = booking.PartnerUserId,
+                    PartnerCarId = booking.PartnerCarId,
+                    PriceHour = booking.PriceHour,
+                    TotalPrice = booking.TotalPrice
+                },
+                BookingStatus.Canceled or BookingStatus.Completed => new PaymentSyncOutboxPayload
+                {
+                    BookingId = booking.Id
+                },
+                _ => throw new InvalidOperationException($"Booking status {targetStatus} does not produce a payment outbox event.")
+            };
+
+            return new PaymentSyncOutboxMessage
+            {
+                BookingId = booking.Id,
+                EventKey = $"booking:{booking.Id}:status:{targetStatus.ToString().ToLowerInvariant()}",
+                EventType = eventType,
+                Payload = JsonSerializer.Serialize(payload),
+                CreatedAt = now,
+                NextAttemptAt = now
+            };
         }
 
         private static bool IsSerializationFailure(DbUpdateException ex)

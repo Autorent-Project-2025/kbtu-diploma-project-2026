@@ -7,8 +7,6 @@ namespace BookingService.Application.DTOs.Booking
         [Range(1, int.MaxValue)]
         public int PartnerCarId { get; set; }
 
-        public Guid PartnerId { get; set; }
-        public decimal? PriceHour { get; set; }
         public DateTimeOffset? StartTime { get; set; }
         public DateTimeOffset? EndTime { get; set; }
 
@@ -49,16 +47,6 @@ namespace BookingService.Application.DTOs.Booking
                 yield return new ValidationResult(
                     "PartnerCarId is required and must be greater than zero.",
                     new[] { nameof(PartnerCarId) });
-            }
-
-            if (PartnerId == Guid.Empty)
-            {
-                yield return new ValidationResult("PartnerId is required.", new[] { nameof(PartnerId) });
-            }
-
-            if (PriceHour.HasValue && PriceHour.Value <= 0)
-            {
-                yield return new ValidationResult("PriceHour must be greater than zero.", new[] { nameof(PriceHour) });
             }
 
             if (!StartTime.HasValue)

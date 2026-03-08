@@ -8,8 +8,8 @@ namespace CarService.Domain.Entities
         [Column("id")]
         public int Id { get; set; }
 
-        [Column("partner_id")]
-        public Guid PartnerId { get; set; }
+        [Column("partner_user_id")]
+        public Guid PartnerUserId { get; set; }
 
         [Column("car_model_id")]
         public int CarModelId { get; set; }

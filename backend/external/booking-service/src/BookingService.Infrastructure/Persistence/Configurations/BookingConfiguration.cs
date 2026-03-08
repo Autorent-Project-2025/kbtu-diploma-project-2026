@@ -25,8 +25,8 @@ namespace BookingService.Infrastructure.Persistence.Configurations
             builder.HasIndex(b => b.UserId)
                 .HasDatabaseName("idx_booking_user");
 
-            builder.HasIndex(b => b.PartnerId)
-                .HasDatabaseName("idx_booking_partner");
+            builder.HasIndex(b => b.PartnerUserId)
+                .HasDatabaseName("idx_booking_partner_user");
         }
 
         private static BookingStatus ParseBookingStatus(string value)
