@@ -485,13 +485,20 @@ namespace BookingService.Infrastructure.Services
 
         private async Task PersistStatusTransitionWithPaymentOutbox(
             Booking booking,
-            BookingStatus targetStatus)
+            BookingStatus targetStatus,
+            CancellationToken cancellationToken = default)
         {
+            var entry = _db.Entry(booking);
+            if (entry.State != EntityState.Detached)
+            {
+                await entry.ReloadAsync(cancellationToken);
+            }
+
             var statusChanged = TryApplyStatusTransition(booking, targetStatus);
             var outboxMessage = CreatePaymentSyncOutboxMessage(booking, targetStatus);
 
             var outboxExists = await _db.PaymentSyncOutboxMessages
-                .AnyAsync(message => message.EventKey == outboxMessage.EventKey);
+                .AnyAsync(message => message.EventKey == outboxMessage.EventKey, cancellationToken);
 
             if (!statusChanged && outboxExists)
             {
@@ -505,7 +512,7 @@ namespace BookingService.Infrastructure.Services
 
             if (statusChanged || !outboxExists)
             {
-                await _db.SaveChangesAsync();
+                await _db.SaveChangesAsync(cancellationToken);
             }
         }
 
