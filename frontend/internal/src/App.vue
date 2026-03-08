@@ -1,31 +1,39 @@
 <template>
-  <div class="app-shell">
-    <header class="topbar">
-      <div class="container topbar-inner">
-        <div class="brand">
-          <span class="brand-mark">AR</span>
-          <div class="brand-copy">
-            <strong>AutoRent Internal</strong>
-            <small>Manager workspace</small>
-          </div>
-        </div>
-        <button v-if="isAuthenticated" class="btn btn-outline" @click="logout">Выйти</button>
+  <div v-if="showWorkspace" class="workspace-shell">
+    <aside class="workspace-sidebar">
+      <div class="workspace-sidebar__header">
+        <strong>AutoRent</strong>
+        <p>Панель заявок</p>
       </div>
-    </header>
 
-    <main class="app-main">
+      <nav class="workspace-nav" aria-label="Основная навигация">
+        <router-link class="workspace-nav__link" exact-active-class="is-active" to="/tickets">Заявки</router-link>
+      </nav>
+
+      <div class="workspace-sidebar__footer">
+        <button class="btn btn-secondary workspace-sidebar__logout" @click="logout">Выйти</button>
+      </div>
+    </aside>
+
+    <main class="workspace-main">
       <router-view />
     </main>
+  </div>
+
+  <div v-else class="auth-shell">
+    <router-view />
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { auth } from "./store/auth";
 
+const route = useRoute();
 const router = useRouter();
 const isAuthenticated = computed(() => Boolean(auth.token));
+const showWorkspace = computed(() => isAuthenticated.value && route.path !== "/login");
 
 function logout() {
   auth.logout();
