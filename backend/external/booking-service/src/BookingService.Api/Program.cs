@@ -19,6 +19,16 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.Configure<InternalAuthOptions>(builder.Configuration.GetSection(InternalAuthOptions.SectionName));
 builder.Services.Configure<CarServiceOptions>(builder.Configuration.GetSection(CarServiceOptions.SectionName));
 builder.Services.Configure<PaymentServiceOptions>(builder.Configuration.GetSection(PaymentServiceOptions.SectionName));
+builder.Services.AddOptions<PaymentSyncOutboxOptions>()
+    .Bind(builder.Configuration.GetSection(PaymentSyncOutboxOptions.SectionName))
+    .Validate(options =>
+        options.BatchSize > 0 &&
+        options.BatchSize <= 200 &&
+        options.PollIntervalSeconds > 0 &&
+        options.LockTimeoutSeconds > 0 &&
+        options.InitialRetryDelaySeconds > 0 &&
+        options.MaxRetryDelaySeconds >= options.InitialRetryDelaySeconds,
+        "Payment sync outbox configuration is invalid.");
 
 var connectionString = builder.Configuration.GetConnectionString("DbConnection");
 if (string.IsNullOrEmpty(connectionString))
@@ -113,6 +123,7 @@ builder.Services.AddHttpClient<IPaymentSyncClient, PaymentSyncClient>((servicePr
     client.BaseAddress = new Uri(options.BaseUrl, UriKind.Absolute);
 });
 builder.Services.AddScoped<IBookingService, BookingService.Infrastructure.Services.BookingService>();
+builder.Services.AddHostedService<PaymentSyncOutboxDispatcher>();
 
 var app = builder.Build();
 

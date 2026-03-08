@@ -5,10 +5,12 @@ using BookingService.Application.Interfaces.Integrations;
 using BookingService.Application.Mappers;
 using BookingService.Domain.Entities;
 using BookingService.Domain.Enums;
+using BookingService.Infrastructure.Integrations;
 using BookingService.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using System.Data;
+using System.Text.Json;
 
 namespace BookingService.Infrastructure.Services
 {
@@ -19,16 +21,13 @@ namespace BookingService.Infrastructure.Services
 
         private readonly ApplicationDbContext _db;
         private readonly IPartnerCarReadClient _partnerCarReadClient;
-        private readonly IPaymentSyncClient _paymentSyncClient;
 
         public BookingService(
             ApplicationDbContext db,
-            IPartnerCarReadClient partnerCarReadClient,
-            IPaymentSyncClient paymentSyncClient)
+            IPartnerCarReadClient partnerCarReadClient)
         {
             _db = db;
             _partnerCarReadClient = partnerCarReadClient;
-            _paymentSyncClient = paymentSyncClient;
         }
 
         public async Task<bool> IsPartnerCarAvailable(int partnerCarId, DateTimeOffset startTime, DateTimeOffset endTime)
@@ -301,10 +300,7 @@ namespace BookingService.Infrastructure.Services
                 return false;
             }
 
-            await PersistStatusTransitionWithPaymentSync(
-                booking,
-                BookingStatus.Canceled,
-                item => _paymentSyncClient.RecordBookingCanceledAsync(item.Id));
+            await PersistStatusTransitionWithPaymentOutbox(booking, BookingStatus.Canceled);
             return true;
         }
 
@@ -316,16 +312,7 @@ namespace BookingService.Infrastructure.Services
                 return false;
             }
 
-            await PersistStatusTransitionWithPaymentSync(
-                booking,
-                BookingStatus.Confirmed,
-                item => _paymentSyncClient.RecordBookingConfirmedAsync(
-                    item.Id,
-                    item.UserId,
-                    item.PartnerUserId,
-                    item.PartnerCarId,
-                    item.PriceHour,
-                    item.TotalPrice));
+            await PersistStatusTransitionWithPaymentOutbox(booking, BookingStatus.Confirmed);
             return true;
         }
 
@@ -337,10 +324,7 @@ namespace BookingService.Infrastructure.Services
                 return false;
             }
 
-            await PersistStatusTransitionWithPaymentSync(
-                booking,
-                BookingStatus.Completed,
-                item => _paymentSyncClient.RecordBookingCompletedAsync(item.Id));
+            await PersistStatusTransitionWithPaymentOutbox(booking, BookingStatus.Completed);
             return true;
         }
 
@@ -433,28 +417,29 @@ namespace BookingService.Infrastructure.Services
                 .FirstOrDefaultAsync(b => b.Id == id && b.UserId == userId);
         }
 
-        private async Task PersistStatusTransitionWithPaymentSync(
+        private async Task PersistStatusTransitionWithPaymentOutbox(
             Booking booking,
-            BookingStatus targetStatus,
-            Func<Booking, Task> paymentSyncAction)
+            BookingStatus targetStatus)
         {
             var statusChanged = TryApplyStatusTransition(booking, targetStatus);
-            if (statusChanged)
+            var outboxMessage = CreatePaymentSyncOutboxMessage(booking, targetStatus);
+
+            var outboxExists = await _db.PaymentSyncOutboxMessages
+                .AnyAsync(message => message.EventKey == outboxMessage.EventKey);
+
+            if (!statusChanged && outboxExists)
             {
-                await _db.SaveChangesAsync();
+                return;
             }
 
-            try
+            if (!outboxExists)
             {
-                await paymentSyncAction(booking);
+                _db.PaymentSyncOutboxMessages.Add(outboxMessage);
             }
-            catch (Exception syncException)
+
+            if (statusChanged || !outboxExists)
             {
-                throw new InvalidOperationException(
-                    statusChanged
-                        ? $"Booking status changed to {targetStatus}, but payment synchronization failed. Retry the same action to complete synchronization."
-                        : $"Booking is already {targetStatus}, but payment synchronization retry failed.",
-                    syncException);
+                await _db.SaveChangesAsync();
             }
         }
 
@@ -547,6 +532,46 @@ namespace BookingService.Infrastructure.Services
 
             booking.Status = targetStatus;
             return true;
+        }
+
+        private static PaymentSyncOutboxMessage CreatePaymentSyncOutboxMessage(Booking booking, BookingStatus targetStatus)
+        {
+            var now = DateTimeOffset.UtcNow;
+            var eventType = targetStatus switch
+            {
+                BookingStatus.Confirmed => PaymentSyncOutboxEventTypes.BookingConfirmed,
+                BookingStatus.Canceled => PaymentSyncOutboxEventTypes.BookingCanceled,
+                BookingStatus.Completed => PaymentSyncOutboxEventTypes.BookingCompleted,
+                _ => throw new InvalidOperationException($"Booking status {targetStatus} does not produce a payment outbox event.")
+            };
+
+            var payload = targetStatus switch
+            {
+                BookingStatus.Confirmed => new PaymentSyncOutboxPayload
+                {
+                    BookingId = booking.Id,
+                    UserId = booking.UserId,
+                    PartnerUserId = booking.PartnerUserId,
+                    PartnerCarId = booking.PartnerCarId,
+                    PriceHour = booking.PriceHour,
+                    TotalPrice = booking.TotalPrice
+                },
+                BookingStatus.Canceled or BookingStatus.Completed => new PaymentSyncOutboxPayload
+                {
+                    BookingId = booking.Id
+                },
+                _ => throw new InvalidOperationException($"Booking status {targetStatus} does not produce a payment outbox event.")
+            };
+
+            return new PaymentSyncOutboxMessage
+            {
+                BookingId = booking.Id,
+                EventKey = $"booking:{booking.Id}:status:{targetStatus.ToString().ToLowerInvariant()}",
+                EventType = eventType,
+                Payload = JsonSerializer.Serialize(payload),
+                CreatedAt = now,
+                NextAttemptAt = now
+            };
         }
 
         private static bool IsSerializationFailure(DbUpdateException ex)

@@ -208,6 +208,248 @@ public sealed class PaymentLedgerService : IPaymentLedgerService
         await transaction.CommitAsync(cancellationToken);
     }
 
+    public async Task<PartnerPayoutResponseDto> RequestPayoutAsync(
+        Guid partnerUserId,
+        decimal amount,
+        string requestKey,
+        CancellationToken cancellationToken = default)
+    {
+        if (partnerUserId == Guid.Empty)
+        {
+            throw new ArgumentException("Partner user id is required.", nameof(partnerUserId));
+        }
+
+        var normalizedAmount = NormalizeAmount(amount);
+        var normalizedRequestKey = NormalizeRequestKey(requestKey);
+
+        await using var transaction = await _db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+
+        var existingPayout = await _db.PartnerPayouts
+            .FirstOrDefaultAsync(payout => payout.RequestKey == normalizedRequestKey, cancellationToken);
+
+        if (existingPayout is not null)
+        {
+            if (existingPayout.PartnerUserId != partnerUserId || existingPayout.Amount != normalizedAmount)
+            {
+                throw new InvalidOperationException("Payout request key is already used for another payout.");
+            }
+
+            await transaction.CommitAsync(cancellationToken);
+            return MapToPartnerPayoutResponseDto(existingPayout);
+        }
+
+        var wallet = await GetRequiredWalletAsync(partnerUserId, cancellationToken);
+        var currency = NormalizeCurrency(wallet.Currency);
+
+        if (wallet.AvailableAmount < normalizedAmount)
+        {
+            throw new InvalidOperationException("Insufficient available balance for payout request.");
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        wallet.AvailableAmount = EnsureNonNegative(wallet.AvailableAmount - normalizedAmount, "available amount");
+        wallet.ReservedAmount = decimal.Round(wallet.ReservedAmount + normalizedAmount, 2, MidpointRounding.AwayFromZero);
+        wallet.UpdatedAt = now;
+
+        var payout = new PartnerPayout
+        {
+            RequestKey = normalizedRequestKey,
+            PartnerUserId = partnerUserId,
+            Amount = normalizedAmount,
+            Currency = currency,
+            Status = PartnerPayoutStatus.Requested,
+            RequestedAt = now
+        };
+
+        _db.PartnerPayouts.Add(payout);
+        await _db.SaveChangesAsync(cancellationToken);
+
+        _db.PartnerLedgerEntries.AddRange(
+            new PartnerLedgerEntry
+            {
+                PartnerWalletId = wallet.Id,
+                PartnerPayoutId = payout.Id,
+                EntryType = LedgerEntryType.PayoutAvailableDebit,
+                Bucket = LedgerBucket.Available,
+                AmountDelta = decimal.Round(-normalizedAmount, 2, MidpointRounding.AwayFromZero),
+                Currency = currency,
+                Description = $"Payout {payout.Id} requested: available amount reserved.",
+                CreatedAt = now
+            },
+            new PartnerLedgerEntry
+            {
+                PartnerWalletId = wallet.Id,
+                PartnerPayoutId = payout.Id,
+                EntryType = LedgerEntryType.PayoutReservedCredit,
+                Bucket = LedgerBucket.Reserved,
+                AmountDelta = normalizedAmount,
+                Currency = currency,
+                Description = $"Payout {payout.Id} requested: reserved amount credited.",
+                CreatedAt = now
+            });
+
+        await _db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+
+        return MapToPartnerPayoutResponseDto(payout);
+    }
+
+    public async Task<PartnerPayoutResponseDto> MarkPayoutProcessingAsync(long payoutId, CancellationToken cancellationToken = default)
+    {
+        var payout = await GetRequiredPayoutAsync(payoutId, cancellationToken);
+
+        if (payout.Status == PartnerPayoutStatus.Processing)
+        {
+            return MapToPartnerPayoutResponseDto(payout);
+        }
+
+        if (payout.Status != PartnerPayoutStatus.Requested)
+        {
+            throw new InvalidOperationException($"Payout {payout.Id} cannot move from {payout.Status} to Processing.");
+        }
+
+        payout.Status = PartnerPayoutStatus.Processing;
+        payout.FailureReason = null;
+
+        await _db.SaveChangesAsync(cancellationToken);
+        return MapToPartnerPayoutResponseDto(payout);
+    }
+
+    public async Task<PartnerPayoutResponseDto> MarkPayoutPaidAsync(long payoutId, CancellationToken cancellationToken = default)
+    {
+        if (payoutId <= 0)
+        {
+            throw new ArgumentException("Payout id must be greater than zero.", nameof(payoutId));
+        }
+
+        await using var transaction = await _db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+
+        var payout = await GetRequiredPayoutAsync(payoutId, cancellationToken);
+
+        if (payout.Status == PartnerPayoutStatus.Paid)
+        {
+            await transaction.CommitAsync(cancellationToken);
+            return MapToPartnerPayoutResponseDto(payout);
+        }
+
+        if (payout.Status is not PartnerPayoutStatus.Requested and not PartnerPayoutStatus.Processing)
+        {
+            throw new InvalidOperationException($"Payout {payout.Id} cannot move from {payout.Status} to Paid.");
+        }
+
+        var wallet = await GetRequiredWalletAsync(payout.PartnerUserId, cancellationToken);
+        EnsureMatchingCurrency(wallet.Currency, payout.Currency);
+
+        var now = DateTimeOffset.UtcNow;
+        wallet.ReservedAmount = EnsureNonNegative(wallet.ReservedAmount - payout.Amount, "reserved amount");
+        wallet.UpdatedAt = now;
+
+        payout.Status = PartnerPayoutStatus.Paid;
+        payout.ProcessedAt = now;
+        payout.FailureReason = null;
+
+        _db.PartnerLedgerEntries.Add(new PartnerLedgerEntry
+        {
+            PartnerWalletId = wallet.Id,
+            PartnerPayoutId = payout.Id,
+            EntryType = LedgerEntryType.PayoutReservedRelease,
+            Bucket = LedgerBucket.Reserved,
+            AmountDelta = decimal.Round(-payout.Amount, 2, MidpointRounding.AwayFromZero),
+            Currency = payout.Currency,
+            Description = $"Payout {payout.Id} paid: reserved amount released.",
+            CreatedAt = now
+        });
+
+        await _db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+
+        return MapToPartnerPayoutResponseDto(payout);
+    }
+
+    public async Task<PartnerPayoutResponseDto> MarkPayoutFailedAsync(
+        long payoutId,
+        string? failureReason,
+        CancellationToken cancellationToken = default)
+    {
+        return await ReverseReservedPayoutAsync(
+            payoutId,
+            PartnerPayoutStatus.Failed,
+            NormalizeFailureReason(failureReason) ?? "Payout failed.",
+            "failed",
+            cancellationToken);
+    }
+
+    public async Task<PartnerPayoutResponseDto> CancelPayoutAsync(
+        long payoutId,
+        string? reason,
+        CancellationToken cancellationToken = default)
+    {
+        return await ReverseReservedPayoutAsync(
+            payoutId,
+            PartnerPayoutStatus.Canceled,
+            NormalizeFailureReason(reason) ?? "Payout canceled.",
+            "canceled",
+            cancellationToken);
+    }
+
+    public async Task<PartnerPayoutResponseDto?> GetPayoutAsync(long payoutId, CancellationToken cancellationToken = default)
+    {
+        if (payoutId <= 0)
+        {
+            throw new ArgumentException("Payout id must be greater than zero.", nameof(payoutId));
+        }
+
+        return await _db.PartnerPayouts
+            .AsNoTracking()
+            .Where(payout => payout.Id == payoutId)
+            .Select(payout => new PartnerPayoutResponseDto
+            {
+                Id = payout.Id,
+                RequestKey = payout.RequestKey,
+                PartnerUserId = payout.PartnerUserId,
+                Amount = payout.Amount,
+                Currency = payout.Currency,
+                Status = payout.Status.ToString(),
+                RequestedAt = payout.RequestedAt,
+                ProcessedAt = payout.ProcessedAt,
+                FailureReason = payout.FailureReason
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyCollection<PartnerPayoutResponseDto>> GetPayoutsAsync(
+        Guid partnerUserId,
+        int take,
+        CancellationToken cancellationToken = default)
+    {
+        if (partnerUserId == Guid.Empty)
+        {
+            throw new ArgumentException("Partner user id is required.", nameof(partnerUserId));
+        }
+
+        var normalizedTake = Math.Clamp(take, 1, 200);
+
+        return await _db.PartnerPayouts
+            .AsNoTracking()
+            .Where(payout => payout.PartnerUserId == partnerUserId)
+            .OrderByDescending(payout => payout.RequestedAt)
+            .ThenByDescending(payout => payout.Id)
+            .Take(normalizedTake)
+            .Select(payout => new PartnerPayoutResponseDto
+            {
+                Id = payout.Id,
+                RequestKey = payout.RequestKey,
+                PartnerUserId = payout.PartnerUserId,
+                Amount = payout.Amount,
+                Currency = payout.Currency,
+                Status = payout.Status.ToString(),
+                RequestedAt = payout.RequestedAt,
+                ProcessedAt = payout.ProcessedAt,
+                FailureReason = payout.FailureReason
+            })
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<PartnerWalletResponseDto?> GetWalletAsync(Guid partnerUserId, CancellationToken cancellationToken = default)
     {
         if (partnerUserId == Guid.Empty)
@@ -305,6 +547,103 @@ public sealed class PaymentLedgerService : IPaymentLedgerService
         return wallet;
     }
 
+    private async Task<PartnerPayout> GetRequiredPayoutAsync(long payoutId, CancellationToken cancellationToken)
+    {
+        if (payoutId <= 0)
+        {
+            throw new ArgumentException("Payout id must be greater than zero.", nameof(payoutId));
+        }
+
+        var payout = await _db.PartnerPayouts
+            .FirstOrDefaultAsync(item => item.Id == payoutId, cancellationToken);
+
+        if (payout is null)
+        {
+            throw new KeyNotFoundException($"Partner payout {payoutId} was not found.");
+        }
+
+        return payout;
+    }
+
+    private async Task<PartnerPayoutResponseDto> ReverseReservedPayoutAsync(
+        long payoutId,
+        PartnerPayoutStatus targetStatus,
+        string reason,
+        string actionLabel,
+        CancellationToken cancellationToken)
+    {
+        if (payoutId <= 0)
+        {
+            throw new ArgumentException("Payout id must be greater than zero.", nameof(payoutId));
+        }
+
+        await using var transaction = await _db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+
+        var payout = await GetRequiredPayoutAsync(payoutId, cancellationToken);
+
+        if (payout.Status == targetStatus)
+        {
+            await transaction.CommitAsync(cancellationToken);
+            return MapToPartnerPayoutResponseDto(payout);
+        }
+
+        if (payout.Status is PartnerPayoutStatus.Paid)
+        {
+            throw new InvalidOperationException($"Paid payout {payout.Id} cannot be marked as {targetStatus}.");
+        }
+
+        if (targetStatus == PartnerPayoutStatus.Canceled && payout.Status == PartnerPayoutStatus.Failed)
+        {
+            throw new InvalidOperationException($"Failed payout {payout.Id} cannot be canceled.");
+        }
+
+        if (targetStatus == PartnerPayoutStatus.Failed && payout.Status == PartnerPayoutStatus.Canceled)
+        {
+            throw new InvalidOperationException($"Canceled payout {payout.Id} cannot be failed.");
+        }
+
+        var wallet = await GetRequiredWalletAsync(payout.PartnerUserId, cancellationToken);
+        EnsureMatchingCurrency(wallet.Currency, payout.Currency);
+
+        var now = DateTimeOffset.UtcNow;
+        wallet.ReservedAmount = EnsureNonNegative(wallet.ReservedAmount - payout.Amount, "reserved amount");
+        wallet.AvailableAmount = decimal.Round(wallet.AvailableAmount + payout.Amount, 2, MidpointRounding.AwayFromZero);
+        wallet.UpdatedAt = now;
+
+        payout.Status = targetStatus;
+        payout.ProcessedAt = now;
+        payout.FailureReason = reason;
+
+        _db.PartnerLedgerEntries.AddRange(
+            new PartnerLedgerEntry
+            {
+                PartnerWalletId = wallet.Id,
+                PartnerPayoutId = payout.Id,
+                EntryType = LedgerEntryType.PayoutReservedRollback,
+                Bucket = LedgerBucket.Reserved,
+                AmountDelta = decimal.Round(-payout.Amount, 2, MidpointRounding.AwayFromZero),
+                Currency = payout.Currency,
+                Description = $"Payout {payout.Id} {actionLabel}: reserved amount rolled back.",
+                CreatedAt = now
+            },
+            new PartnerLedgerEntry
+            {
+                PartnerWalletId = wallet.Id,
+                PartnerPayoutId = payout.Id,
+                EntryType = LedgerEntryType.PayoutAvailableReturn,
+                Bucket = LedgerBucket.Available,
+                AmountDelta = payout.Amount,
+                Currency = payout.Currency,
+                Description = $"Payout {payout.Id} {actionLabel}: available amount returned.",
+                CreatedAt = now
+            });
+
+        await _db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+
+        return MapToPartnerPayoutResponseDto(payout);
+    }
+
     private static void ValidateSnapshot(BookingPaymentSnapshot snapshot)
     {
         if (snapshot.BookingId <= 0)
@@ -374,6 +713,46 @@ public sealed class PaymentLedgerService : IPaymentLedgerService
         return decimal.Round(rate, 4, MidpointRounding.AwayFromZero);
     }
 
+    private static string NormalizeRequestKey(string requestKey)
+    {
+        if (string.IsNullOrWhiteSpace(requestKey))
+        {
+            throw new ArgumentException("Payout request key is required.", nameof(requestKey));
+        }
+
+        var normalized = requestKey.Trim();
+        if (normalized.Length > 128)
+        {
+            throw new ArgumentException("Payout request key length must not exceed 128 characters.", nameof(requestKey));
+        }
+
+        return normalized;
+    }
+
+    private static string? NormalizeFailureReason(string? reason)
+    {
+        if (string.IsNullOrWhiteSpace(reason))
+        {
+            return null;
+        }
+
+        var normalized = reason.Trim();
+        if (normalized.Length > 2048)
+        {
+            throw new ArgumentException("Failure reason length must not exceed 2048 characters.", nameof(reason));
+        }
+
+        return normalized;
+    }
+
+    private static void EnsureMatchingCurrency(string walletCurrency, string payoutCurrency)
+    {
+        if (!string.Equals(walletCurrency, payoutCurrency, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("Partner payout currency mismatch.");
+        }
+    }
+
     private static decimal EnsureNonNegative(decimal amount, string bucketName)
     {
         var normalized = decimal.Round(amount, 2, MidpointRounding.AwayFromZero);
@@ -383,5 +762,21 @@ public sealed class PaymentLedgerService : IPaymentLedgerService
         }
 
         return normalized;
+    }
+
+    private static PartnerPayoutResponseDto MapToPartnerPayoutResponseDto(PartnerPayout payout)
+    {
+        return new PartnerPayoutResponseDto
+        {
+            Id = payout.Id,
+            RequestKey = payout.RequestKey,
+            PartnerUserId = payout.PartnerUserId,
+            Amount = payout.Amount,
+            Currency = payout.Currency,
+            Status = payout.Status.ToString(),
+            RequestedAt = payout.RequestedAt,
+            ProcessedAt = payout.ProcessedAt,
+            FailureReason = payout.FailureReason
+        };
     }
 }

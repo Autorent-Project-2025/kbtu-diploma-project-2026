@@ -18,6 +18,7 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.Configure<InternalAuthOptions>(builder.Configuration.GetSection(InternalAuthOptions.SectionName));
 builder.Services.Configure<FileServiceOptions>(builder.Configuration.GetSection(FileServiceOptions.SectionName));
+builder.Services.Configure<PaymentServiceOptions>(builder.Configuration.GetSection(PaymentServiceOptions.SectionName));
 
 var connectionString = builder.Configuration.GetConnectionString("DbConnection");
 if (string.IsNullOrWhiteSpace(connectionString))
@@ -111,6 +112,21 @@ builder.Services.AddHttpClient<IFileStorageClient, FileStorageClient>((servicePr
     if (string.IsNullOrWhiteSpace(options.InternalApiKey))
     {
         throw new InvalidOperationException("FileService:InternalApiKey configuration is required.");
+    }
+
+    client.BaseAddress = new Uri(NormalizeBaseUrl(options.BaseUrl));
+});
+builder.Services.AddHttpClient<IPartnerPaymentClient, PartnerPaymentClient>((serviceProvider, client) =>
+{
+    var options = serviceProvider.GetRequiredService<IOptions<PaymentServiceOptions>>().Value;
+    if (string.IsNullOrWhiteSpace(options.BaseUrl))
+    {
+        throw new InvalidOperationException("PaymentService:BaseUrl configuration is required.");
+    }
+
+    if (string.IsNullOrWhiteSpace(options.InternalApiKey))
+    {
+        throw new InvalidOperationException("PaymentService:InternalApiKey configuration is required.");
     }
 
     client.BaseAddress = new Uri(NormalizeBaseUrl(options.BaseUrl));

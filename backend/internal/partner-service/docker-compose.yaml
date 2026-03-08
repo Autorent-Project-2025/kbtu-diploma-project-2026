@@ -48,6 +48,8 @@ services:
       - InternalAuth__ApiKey=${InternalAuth__ApiKey}
       - FileService__BaseUrl=${FileService__BaseUrl}
       - FileService__InternalApiKey=${FileService__InternalApiKey}
+      - PaymentService__BaseUrl=${PaymentService__BaseUrl}
+      - PaymentService__InternalApiKey=${PaymentService__InternalApiKey}
       - ConnectionStrings__DbConnection=Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
     depends_on:
       postgres:

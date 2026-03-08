@@ -8,6 +8,9 @@ public class PartnerPayout
     [Column("id")]
     public long Id { get; set; }
 
+    [Column("request_key")]
+    public string RequestKey { get; set; } = string.Empty;
+
     [Column("partner_user_id")]
     public Guid PartnerUserId { get; set; }
 

@@ -9,6 +9,7 @@ namespace BookingService.Infrastructure.Persistence
             : base(options) { }
 
         public DbSet<Booking> Bookings => Set<Booking>();
+        public DbSet<PaymentSyncOutboxMessage> PaymentSyncOutboxMessages => Set<PaymentSyncOutboxMessage>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

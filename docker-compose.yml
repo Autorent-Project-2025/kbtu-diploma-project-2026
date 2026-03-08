@@ -272,6 +272,8 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ConnectionStrings__DbConnection: Host=partner-db;Port=5432;Database=postgres_db;Username=postgres;Password=postgres
+      PaymentService__BaseUrl: http://payment-service:8080
+      PaymentService__InternalApiKey: local-internal-api-key
     ports:
       - "${PARTNER_SERVICE_PORT:-1832}:8080"
     depends_on:
@@ -279,6 +281,8 @@ services:
         condition: service_healthy
       partner-flyway:
         condition: service_completed_successfully
+      payment-service:
+        condition: service_started
 
   payment-db:
     image: postgres:16

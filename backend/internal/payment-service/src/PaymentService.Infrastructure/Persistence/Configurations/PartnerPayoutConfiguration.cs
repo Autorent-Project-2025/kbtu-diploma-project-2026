@@ -13,6 +13,10 @@ public sealed class PartnerPayoutConfiguration : IEntityTypeConfiguration<Partne
 
         builder.HasKey(payout => payout.Id);
 
+        builder.Property(payout => payout.RequestKey)
+            .HasMaxLength(128)
+            .IsRequired();
+
         builder.Property(payout => payout.Amount)
             .HasColumnType("numeric(18,2)")
             .IsRequired();
@@ -35,6 +39,11 @@ public sealed class PartnerPayoutConfiguration : IEntityTypeConfiguration<Partne
 
         builder.Property(payout => payout.FailureReason)
             .HasMaxLength(2048);
+
+        builder.HasIndex(payout => payout.RequestKey)
+            .IsUnique();
+
+        builder.HasIndex(payout => new { payout.PartnerUserId, payout.RequestedAt });
     }
 
     private static PartnerPayoutStatus ParseStatus(string value)

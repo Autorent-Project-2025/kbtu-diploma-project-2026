@@ -77,6 +77,119 @@ public sealed class InternalPaymentsController : ControllerBase
         return Ok(new { message = "Booking payment completed." });
     }
 
+    [HttpPost("payouts/request")]
+    public async Task<IActionResult> RequestPayout(
+        [FromBody] RequestPartnerPayoutRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!IsAuthorizedInternalRequest())
+        {
+            return Unauthorized(new { error = "Internal API key is invalid." });
+        }
+
+        var payout = await _paymentLedgerService.RequestPayoutAsync(
+            request.PartnerUserId,
+            request.Amount,
+            request.RequestKey,
+            cancellationToken);
+
+        return Ok(payout);
+    }
+
+    [HttpPost("payouts/{payoutId:long}/processing")]
+    public async Task<IActionResult> MarkPayoutProcessing(long payoutId, CancellationToken cancellationToken)
+    {
+        if (!IsAuthorizedInternalRequest())
+        {
+            return Unauthorized(new { error = "Internal API key is invalid." });
+        }
+
+        var payout = await _paymentLedgerService.MarkPayoutProcessingAsync(payoutId, cancellationToken);
+        return Ok(payout);
+    }
+
+    [HttpPost("payouts/{payoutId:long}/paid")]
+    public async Task<IActionResult> MarkPayoutPaid(long payoutId, CancellationToken cancellationToken)
+    {
+        if (!IsAuthorizedInternalRequest())
+        {
+            return Unauthorized(new { error = "Internal API key is invalid." });
+        }
+
+        var payout = await _paymentLedgerService.MarkPayoutPaidAsync(payoutId, cancellationToken);
+        return Ok(payout);
+    }
+
+    [HttpPost("payouts/{payoutId:long}/failed")]
+    public async Task<IActionResult> MarkPayoutFailed(
+        long payoutId,
+        [FromBody] PayoutFailureRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!IsAuthorizedInternalRequest())
+        {
+            return Unauthorized(new { error = "Internal API key is invalid." });
+        }
+
+        var payout = await _paymentLedgerService.MarkPayoutFailedAsync(
+            payoutId,
+            request.Reason,
+            cancellationToken);
+
+        return Ok(payout);
+    }
+
+    [HttpPost("payouts/{payoutId:long}/cancel")]
+    public async Task<IActionResult> CancelPayout(
+        long payoutId,
+        [FromBody] PayoutFailureRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!IsAuthorizedInternalRequest())
+        {
+            return Unauthorized(new { error = "Internal API key is invalid." });
+        }
+
+        var payout = await _paymentLedgerService.CancelPayoutAsync(
+            payoutId,
+            request.Reason,
+            cancellationToken);
+
+        return Ok(payout);
+    }
+
+    [HttpGet("payouts/{payoutId:long}")]
+    public async Task<IActionResult> GetPayout(long payoutId, CancellationToken cancellationToken)
+    {
+        if (!IsAuthorizedInternalRequest())
+        {
+            return Unauthorized(new { error = "Internal API key is invalid." });
+        }
+
+        var payout = await _paymentLedgerService.GetPayoutAsync(payoutId, cancellationToken);
+        if (payout is null)
+        {
+            return NotFound(new { error = "Partner payout not found." });
+        }
+
+        return Ok(payout);
+    }
+
+    [HttpGet("payouts/by-partner/{partnerUserId:guid}")]
+    public async Task<IActionResult> GetPayouts(
+        Guid partnerUserId,
+        [FromQuery] int take = 50,
+        CancellationToken cancellationToken = default)
+    {
+        if (!IsAuthorizedInternalRequest())
+        {
+            return Unauthorized(new { error = "Internal API key is invalid." });
+        }
+
+        var payouts = await _paymentLedgerService.GetPayoutsAsync(partnerUserId, take, cancellationToken);
+        return Ok(payouts);
+    }
+
     [HttpGet("wallets/{partnerUserId:guid}")]
     public async Task<IActionResult> GetWallet(Guid partnerUserId, CancellationToken cancellationToken)
     {
