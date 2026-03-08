@@ -1,28 +1,47 @@
 <template>
-  <div class="container manager-page">
-    <section class="card manager-hero">
+  <div class="page">
+    <header class="page-header">
       <div>
-        <p class="manager-hero__eyebrow">Manager Panel</p>
-        <h1>Заявки на согласование</h1>
-        <p class="manager-hero__subtitle">Проверяйте данные и принимайте решение по каждой заявке.</p>
+        <h1>Рабочая очередь</h1>
+        <p>Проверяйте новые регистрации, открывайте документы и принимайте решение по каждой заявке.</p>
       </div>
-      <div class="manager-hero__actions">
-        <span class="hero-stat">Pending: {{ tickets.length }}</span>
-        <button class="btn btn-outline" @click="loadPending" :disabled="loading">Обновить</button>
+
+      <div class="page-header__actions">
+        <div class="overview-strip">
+          <div class="overview-strip__item">
+            <strong>{{ tickets.length }}</strong>
+            <span>В очереди</span>
+          </div>
+          <div class="overview-strip__item">
+            <strong>{{ ticketStats.client }}</strong>
+            <span>Клиенты</span>
+          </div>
+          <div class="overview-strip__item">
+            <strong>{{ ticketStats.partner }}</strong>
+            <span>Партнёры</span>
+          </div>
+          <div class="overview-strip__item">
+            <strong>{{ ticketStats.partnerCar }}</strong>
+            <span>Авто</span>
+          </div>
+        </div>
+
+        <button class="btn btn-secondary" @click="loadPending" :disabled="loading">Обновить</button>
       </div>
-    </section>
+    </header>
 
     <div v-if="errorMessage" class="error">{{ errorMessage }}</div>
     <div v-if="successMessage" class="success">{{ successMessage }}</div>
 
-    <div v-if="loading" class="card state-card">Загрузка заявок...</div>
-    <div v-else-if="tickets.length === 0" class="card state-card">Сейчас нет заявок в статусе Pending.</div>
+    <section v-if="loading" class="panel state-panel">Загрузка заявок...</section>
+    <section v-else-if="tickets.length === 0" class="panel state-panel">Сейчас нет заявок на рассмотрении.</section>
 
-    <div v-else class="tickets-layout">
-      <aside class="card ticket-list-card">
-        <div class="ticket-list-head">
-          <h2>Очередь заявок</h2>
-          <span>{{ tickets.length }} шт.</span>
+    <div v-else class="review-layout">
+      <aside class="panel queue-panel">
+        <div class="panel-head">
+          <h2>Очередь</h2>
+          <p v-if="lastUpdatedAt">Обновлено {{ formatDate(lastUpdatedAt) }}</p>
+          <p v-else>{{ tickets.length }} заявок ожидают решения.</p>
         </div>
 
         <ul class="ticket-list">
@@ -32,174 +51,250 @@
               :class="{ 'ticket-item--active': selectedTicketId === ticket.id }"
               @click="selectTicket(ticket.id)"
             >
-              <div class="ticket-item__top">
-                <strong>{{ ticket.fullName }}</strong>
-                <span class="type-pill" :class="ticketTypeClass(ticket.ticketType)">
-                  {{ ticketTypeLabel(ticket.ticketType) }}
-                </span>
+              <div class="ticket-item__row">
+                <div class="ticket-item__identity">
+                  <span class="avatar">{{ getInitials(ticket.fullName) }}</span>
+                  <div class="ticket-item__copy">
+                    <strong>{{ ticket.fullName }}</strong>
+                    <p>{{ ticket.email }}</p>
+                  </div>
+                </div>
+
+                <span class="ticket-item__type">{{ ticketTypeLabel(ticket.ticketType) }}</span>
               </div>
-              <p>{{ ticket.email }}</p>
+
               <div class="ticket-item__meta">
+                <span>{{ ticket.phoneNumber }}</span>
                 <span>{{ formatDate(ticket.createdAt) }}</span>
-                <span class="status-pill" :class="statusClass(ticket.status)">
-                  {{ statusLabel(ticket.status) }}
-                </span>
               </div>
             </button>
           </li>
         </ul>
       </aside>
 
-      <section class="card ticket-details" v-if="selectedTicket">
-        <header class="ticket-details__header">
-          <div>
-            <h2>{{ selectedTicket.fullName }}</h2>
-            <p>{{ selectedTicket.email }}</p>
+      <section v-if="selectedTicket" class="panel detail-panel">
+        <header class="detail-header">
+          <div class="detail-header__identity">
+            <span class="avatar avatar--large">{{ getInitials(selectedTicket.fullName) }}</span>
+            <div>
+              <h2>{{ selectedTicket.fullName }}</h2>
+              <p>{{ ticketTypeLabel(selectedTicket.ticketType) }} · {{ selectedTicket.email }}</p>
+            </div>
           </div>
-          <span class="status-pill" :class="statusClass(selectedTicket.status)">
-            {{ statusLabel(selectedTicket.status) }}
-          </span>
+
+          <div class="detail-header__meta">
+            <span>Статус: {{ statusLabel(selectedTicket.status) }}</span>
+            <span>Создана: {{ formatDate(selectedTicket.createdAt) }}</span>
+          </div>
         </header>
 
-        <div class="details-grid">
-          <article class="detail-item">
-            <span class="detail-label">Ticket ID</span>
-            <span class="detail-value detail-value--mono">{{ selectedTicket.id }}</span>
-          </article>
-          <article class="detail-item">
-            <span class="detail-label">Тип заявки</span>
-            <span class="detail-value">{{ ticketTypeLabel(selectedTicket.ticketType) }}</span>
-          </article>
-          <article class="detail-item">
-            <span class="detail-label">Телефон</span>
-            <span class="detail-value">{{ selectedTicket.phoneNumber }}</span>
-          </article>
-          <article class="detail-item" v-if="isClientTicket(selectedTicket)">
-            <span class="detail-label">Дата рождения</span>
-            <span class="detail-value">{{ selectedTicket.birthDate || "Не указана" }}</span>
-          </article>
-          <article class="detail-item">
-            <span class="detail-label">Создана</span>
-            <span class="detail-value">{{ formatDate(selectedTicket.createdAt) }}</span>
-          </article>
+        <div class="detail-layout">
+          <div class="detail-main">
+            <section class="section-block">
+              <h3>Основные данные</h3>
+
+              <dl class="field-grid">
+                <div class="field">
+                  <dt>ID заявки</dt>
+                  <dd class="field-value field-value--mono">{{ selectedTicket.id }}</dd>
+                </div>
+                <div class="field">
+                  <dt>Тип заявки</dt>
+                  <dd class="field-value">{{ ticketTypeLabel(selectedTicket.ticketType) }}</dd>
+                </div>
+                <div class="field">
+                  <dt>Email</dt>
+                  <dd class="field-value">{{ selectedTicket.email }}</dd>
+                </div>
+                <div class="field">
+                  <dt>Телефон</dt>
+                  <dd class="field-value">{{ selectedTicket.phoneNumber }}</dd>
+                </div>
+                <div v-if="isClientTicket(selectedTicket)" class="field">
+                  <dt>Дата рождения</dt>
+                  <dd class="field-value">{{ selectedTicket.birthDate || "Не указана" }}</dd>
+                </div>
+                <div class="field">
+                  <dt>Создана</dt>
+                  <dd class="field-value">{{ formatDate(selectedTicket.createdAt) }}</dd>
+                </div>
+              </dl>
+            </section>
+
+            <section v-if="isPartnerCarTicket(selectedTicket)" class="section-block">
+              <div class="section-block__header">
+                <h3>Данные автомобиля</h3>
+                <p>При необходимости скорректируйте карточку перед финальным решением.</p>
+              </div>
+
+              <div class="form-grid">
+                <div class="form-field">
+                  <label class="label" for="carBrand">Марка</label>
+                  <input id="carBrand" class="input" v-model="partnerCarForm.carBrand" />
+                </div>
+                <div class="form-field">
+                  <label class="label" for="carModel">Модель</label>
+                  <input id="carModel" class="input" v-model="partnerCarForm.carModel" />
+                </div>
+                <div class="form-field">
+                  <label class="label" for="carYear">Год</label>
+                  <input
+                    id="carYear"
+                    class="input"
+                    type="number"
+                    min="1886"
+                    :max="maxAllowedCarYear"
+                    v-model.number="partnerCarForm.carYear"
+                  />
+                </div>
+                <div class="form-field">
+                  <label class="label" for="licensePlate">Госномер</label>
+                  <input id="licensePlate" class="input" v-model="partnerCarForm.licensePlate" />
+                </div>
+                <div class="form-field">
+                  <label class="label" for="contactEmail">Email партнёра</label>
+                  <input id="contactEmail" class="input" type="email" v-model="partnerCarForm.email" />
+                </div>
+                <div class="form-field">
+                  <label class="label" for="priceHour">Цена за час</label>
+                  <input
+                    id="priceHour"
+                    class="input"
+                    type="number"
+                    min="0.01"
+                    max="1000000"
+                    step="0.01"
+                    v-model.number="partnerCarForm.priceHour"
+                  />
+                </div>
+                <div class="form-field">
+                  <label class="label" for="priceDay">Цена за день</label>
+                  <input
+                    id="priceDay"
+                    class="input"
+                    type="number"
+                    min="0.01"
+                    max="1000000"
+                    step="0.01"
+                    v-model.number="partnerCarForm.priceDay"
+                  />
+                </div>
+              </div>
+            </section>
+
+            <section class="section-block">
+              <div class="section-block__header">
+                <h3>Документы</h3>
+                <p>Проверьте приложенные файлы перед принятием решения.</p>
+              </div>
+
+              <ul v-if="hasSelectedDocuments" class="document-list">
+                <li v-if="selectedTicket.identityDocumentFileName" class="document-item">
+                  <div>
+                    <strong>{{ isPartnerTicket(selectedTicket) ? "Документ владельца" : "Документ личности" }}</strong>
+                    <span>{{ selectedTicket.identityDocumentFileName }}</span>
+                  </div>
+
+                  <button class="btn btn-secondary" @click="openDocument('identity')" :disabled="actionLoading">
+                    Открыть
+                  </button>
+                </li>
+
+                <li v-if="isClientTicket(selectedTicket) && selectedTicket.driverLicenseFileName" class="document-item">
+                  <div>
+                    <strong>Водительские права</strong>
+                    <span>{{ selectedTicket.driverLicenseFileName }}</span>
+                  </div>
+
+                  <button class="btn btn-secondary" @click="openDocument('license')" :disabled="actionLoading">
+                    Открыть
+                  </button>
+                </li>
+
+                <li
+                  v-if="isPartnerCarTicket(selectedTicket) && selectedTicket.ownershipDocumentFileName"
+                  class="document-item"
+                >
+                  <div>
+                    <strong>Документ собственности</strong>
+                    <span>{{ selectedTicket.ownershipDocumentFileName }}</span>
+                  </div>
+
+                  <button class="btn btn-secondary" @click="openDocument('ownership')" :disabled="actionLoading">
+                    Открыть
+                  </button>
+                </li>
+              </ul>
+
+              <p v-else class="section-empty">К заявке пока не прикреплены документы.</p>
+
+              <div v-if="isPartnerCarTicket(selectedTicket) && partnerCarImages.length > 0" class="section-block__subsection">
+                <h3>Фотографии автомобиля</h3>
+                <div class="image-list">
+                  <button
+                    v-for="(image, index) in partnerCarImages"
+                    :key="`${image.imageId}-${index}`"
+                    class="btn btn-secondary"
+                    @click="openImage(image.imageUrl)"
+                  >
+                    Фото {{ index + 1 }}
+                  </button>
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <aside class="detail-side">
+            <section class="section-block section-block--aside">
+              <h3>Сводка</h3>
+
+              <dl class="summary-list">
+                <div class="summary-list__item">
+                  <dt>Статус</dt>
+                  <dd>{{ statusLabel(selectedTicket.status) }}</dd>
+                </div>
+                <div class="summary-list__item">
+                  <dt>Тип</dt>
+                  <dd>{{ ticketTypeLabel(selectedTicket.ticketType) }}</dd>
+                </div>
+                <div class="summary-list__item">
+                  <dt>Документы</dt>
+                  <dd>{{ selectedDocumentCount }}</dd>
+                </div>
+                <div class="summary-list__item" v-if="isPartnerCarTicket(selectedTicket)">
+                  <dt>Фотографии</dt>
+                  <dd>{{ partnerCarImages.length }}</dd>
+                </div>
+              </dl>
+            </section>
+
+            <section class="section-block section-block--aside">
+              <div class="section-block__header">
+                <h3>Решение</h3>
+                <p>Причину нужно указать только для отказа.</p>
+              </div>
+
+              <div>
+                <label class="label" for="rejectReason">Причина отказа</label>
+                <textarea
+                  id="rejectReason"
+                  class="textarea"
+                  v-model="rejectReason"
+                  placeholder="Укажите причину, если заявка отклоняется"
+                />
+              </div>
+
+              <div class="decision-actions">
+                <button class="btn btn-primary" @click="approveSelected" :disabled="actionLoading">
+                  {{ actionLoading ? "Обработка..." : "Одобрить" }}
+                </button>
+                <button class="btn btn-danger" @click="rejectSelected" :disabled="actionLoading">
+                  {{ actionLoading ? "Обработка..." : "Отклонить" }}
+                </button>
+              </div>
+            </section>
+          </aside>
         </div>
-
-        <section class="docs-block" v-if="isPartnerCarTicket(selectedTicket)">
-          <h3>Данные машины (редактируются перед решением)</h3>
-          <div class="details-grid">
-            <article class="detail-item">
-              <label class="label" for="carBrand">Марка</label>
-              <input id="carBrand" class="input" v-model="partnerCarForm.carBrand" />
-            </article>
-            <article class="detail-item">
-              <label class="label" for="carModel">Модель</label>
-              <input id="carModel" class="input" v-model="partnerCarForm.carModel" />
-            </article>
-            <article class="detail-item">
-              <label class="label" for="carYear">Год</label>
-              <input
-                id="carYear"
-                class="input"
-                type="number"
-                min="1886"
-                :max="maxAllowedCarYear"
-                v-model.number="partnerCarForm.carYear"
-              />
-            </article>
-            <article class="detail-item">
-              <label class="label" for="licensePlate">Гос номер</label>
-              <input id="licensePlate" class="input" v-model="partnerCarForm.licensePlate" />
-            </article>
-            <article class="detail-item">
-              <label class="label" for="contactEmail">Email партнера</label>
-              <input id="contactEmail" class="input" type="email" v-model="partnerCarForm.email" />
-            </article>
-            <article class="detail-item">
-              <label class="label" for="priceHour">Цена за час</label>
-              <input
-                id="priceHour"
-                class="input"
-                type="number"
-                min="0.01"
-                max="1000000"
-                step="0.01"
-                v-model.number="partnerCarForm.priceHour"
-              />
-            </article>
-            <article class="detail-item">
-              <label class="label" for="priceDay">Цена за день</label>
-              <input
-                id="priceDay"
-                class="input"
-                type="number"
-                min="0.01"
-                max="1000000"
-                step="0.01"
-                v-model.number="partnerCarForm.priceDay"
-              />
-            </article>
-          </div>
-        </section>
-
-        <section class="docs-block">
-          <h3>Проверка документов</h3>
-          <div class="doc-actions">
-            <button
-              v-if="selectedTicket.identityDocumentFileName"
-              class="btn btn-outline"
-              @click="openDocument('identity')"
-              :disabled="actionLoading"
-            >
-              {{ isPartnerTicket(selectedTicket) ? "Открыть удостоверение владельца" : "Открыть документ личности" }}
-            </button>
-            <button
-              v-if="isClientTicket(selectedTicket)"
-              class="btn btn-outline"
-              @click="openDocument('license')"
-              :disabled="actionLoading || !selectedTicket.driverLicenseFileName"
-            >
-              Открыть водительские права
-            </button>
-            <button
-              v-if="isPartnerCarTicket(selectedTicket)"
-              class="btn btn-outline"
-              @click="openDocument('ownership')"
-              :disabled="actionLoading || !selectedTicket.ownershipDocumentFileName"
-            >
-              Открыть файл собственности
-            </button>
-          </div>
-
-          <div v-if="isPartnerCarTicket(selectedTicket) && partnerCarImages.length > 0" class="doc-actions">
-            <button
-              v-for="(image, index) in partnerCarImages"
-              :key="`${image.imageId}-${index}`"
-              class="btn btn-outline"
-              @click="openImage(image.imageUrl)"
-            >
-              Фото машины #{{ index + 1 }}
-            </button>
-          </div>
-        </section>
-
-        <section class="decision-block">
-          <label class="label" for="rejectReason">Причина отказа</label>
-          <textarea
-            id="rejectReason"
-            class="textarea"
-            v-model="rejectReason"
-            placeholder="Укажите причину, если заявка отклоняется"
-          />
-
-          <div class="decision-actions">
-            <button class="btn btn-primary" @click="approveSelected" :disabled="actionLoading">
-              {{ actionLoading ? "Обработка..." : "Одобрить" }}
-            </button>
-            <button class="btn btn-danger" @click="rejectSelected" :disabled="actionLoading">
-              {{ actionLoading ? "Обработка..." : "Отклонить" }}
-            </button>
-          </div>
-        </section>
       </section>
     </div>
   </div>
@@ -225,6 +320,7 @@ const loading = ref(false);
 const actionLoading = ref(false);
 const errorMessage = ref("");
 const successMessage = ref("");
+const lastUpdatedAt = ref<string>("");
 const maxAllowedCarYear = new Date().getUTCFullYear() + 1;
 
 const partnerCarForm = reactive({
@@ -254,30 +350,88 @@ const partnerCarImages = computed<PartnerCarTicketImageData[]>(() => {
   return [];
 });
 
-function statusLabel(status: number) {
-  if (status === 1) return "Pending";
-  if (status === 2) return "Approved";
-  if (status === 3) return "Rejected";
-  return "Unknown";
-}
+const ticketStats = computed(() => {
+  const stats = {
+    client: 0,
+    partner: 0,
+    partnerCar: 0,
+  };
 
-function statusClass(status: number) {
-  if (status === 1) return "status-pill--pending";
-  if (status === 2) return "status-pill--approved";
-  if (status === 3) return "status-pill--rejected";
-  return "";
+  for (const ticket of tickets.value) {
+    if (ticket.ticketType === 2) {
+      stats.partner += 1;
+      continue;
+    }
+
+    if (ticket.ticketType === 3) {
+      stats.partnerCar += 1;
+      continue;
+    }
+
+    stats.client += 1;
+  }
+
+  return stats;
+});
+
+const hasSelectedDocuments = computed(() => {
+  if (!selectedTicket.value) {
+    return false;
+  }
+
+  return Boolean(
+    selectedTicket.value.identityDocumentFileName ||
+      (isClientTicket(selectedTicket.value) && selectedTicket.value.driverLicenseFileName) ||
+      (isPartnerCarTicket(selectedTicket.value) && selectedTicket.value.ownershipDocumentFileName),
+  );
+});
+
+const selectedDocumentCount = computed(() => {
+  if (!selectedTicket.value) {
+    return 0;
+  }
+
+  let count = 0;
+  if (selectedTicket.value.identityDocumentFileName) {
+    count += 1;
+  }
+
+  if (isClientTicket(selectedTicket.value) && selectedTicket.value.driverLicenseFileName) {
+    count += 1;
+  }
+
+  if (isPartnerCarTicket(selectedTicket.value) && selectedTicket.value.ownershipDocumentFileName) {
+    count += 1;
+  }
+
+  return count;
+});
+
+function statusLabel(status: number) {
+  if (status === 1) return "На рассмотрении";
+  if (status === 2) return "Одобрена";
+  if (status === 3) return "Отклонена";
+  return "Неизвестно";
 }
 
 function ticketTypeLabel(ticketType: number) {
-  if (ticketType === 2) return "Партнер";
-  if (ticketType === 3) return "Машина партнера";
+  if (ticketType === 2) return "Партнёр";
+  if (ticketType === 3) return "Авто партнёра";
   return "Клиент";
 }
 
-function ticketTypeClass(ticketType: number) {
-  if (ticketType === 2) return "type-pill--partner";
-  if (ticketType === 3) return "type-pill--partner-car";
-  return "type-pill--client";
+function getInitials(value: string) {
+  const parts = value
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2);
+
+  if (parts.length === 0) {
+    return "AR";
+  }
+
+  return parts.map((part) => part[0]?.toUpperCase() ?? "").join("");
 }
 
 function isClientTicket(ticket: Ticket) {
@@ -344,7 +498,7 @@ function buildPartnerCarPayload(): PartnerCarReviewPayload | null | undefined {
   const priceDay = Number(partnerCarForm.priceDay);
 
   if (!carBrand || !carModel || !licensePlate || !email || !Number.isInteger(carYear)) {
-    errorMessage.value = "Для заявки на машину партнера заполните марку, модель, год, гос номер и email.";
+    errorMessage.value = "Для заявки на авто партнёра заполните марку, модель, год, госномер и email.";
     return null;
   }
 
@@ -382,6 +536,7 @@ async function loadPending() {
   try {
     const data = await getPendingTickets();
     tickets.value = data;
+    lastUpdatedAt.value = new Date().toISOString();
 
     if (data.length === 0) {
       selectedTicket.value = null;
