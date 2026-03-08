@@ -295,7 +295,7 @@
 
 <script setup lang="ts">
 import axios from "axios";
-import { computed, onMounted, onUnmounted, reactive, ref } from "vue";
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import {
   getBooking,
@@ -314,6 +314,7 @@ const booking = ref<Booking | null>(null);
 const payment = ref<BookingPaymentStatus | null>(null);
 const loading = ref(true);
 const submitting = ref(false);
+const autoRefreshing = ref(false);
 const formError = ref("");
 const now = ref(Date.now());
 let clockTimer: number | null = null;
@@ -339,6 +340,7 @@ const submitDisabled = computed(() => {
   }
 
   return (
+    autoRefreshing.value ||
     submitting.value ||
     payment.value.paymentStatus === "succeeded" ||
     payment.value.bookingStatus === "canceled" ||
@@ -370,10 +372,10 @@ async function loadCheckout(startSession = true) {
       throw new Error("Некорректный идентификатор бронирования.");
     }
 
-    booking.value = await getBooking(bookingId);
     payment.value = startSession
       ? await startBookingPayment(bookingId)
       : await getBookingPaymentStatus(bookingId);
+    booking.value = await getBooking(bookingId);
   } catch (e) {
     console.error("Failed to load booking payment page", e);
     error(resolveErrorMessage(e, "Не удалось открыть страницу оплаты."));
@@ -429,6 +431,23 @@ async function restartSession() {
   } catch (e) {
     console.error("Failed to restart mock payment session", e);
     error(resolveErrorMessage(e, "Не удалось создать новую платёжную сессию."));
+  }
+}
+
+async function refreshCheckoutStatus() {
+  if (!booking.value || autoRefreshing.value || submitting.value) {
+    return;
+  }
+
+  autoRefreshing.value = true;
+
+  try {
+    payment.value = await getBookingPaymentStatus(booking.value.id);
+    booking.value = await getBooking(booking.value.id);
+  } catch (e) {
+    console.error("Failed to auto-refresh booking payment status", e);
+  } finally {
+    autoRefreshing.value = false;
   }
 }
 
@@ -518,6 +537,18 @@ const bookingRemainingMs = computed(() => {
   return new Date(payment.value.bookingExpiresAt).getTime() - now.value;
 });
 
+watch(sessionRemainingMs, async (currentValue, previousValue) => {
+  if (shouldAutoRefreshDeadline(currentValue, previousValue)) {
+    await refreshCheckoutStatus();
+  }
+});
+
+watch(bookingRemainingMs, async (currentValue, previousValue) => {
+  if (shouldAutoRefreshDeadline(currentValue, previousValue)) {
+    await refreshCheckoutStatus();
+  }
+});
+
 function formatCountdown(remainingMs: number | null): string {
   if (remainingMs == null) {
     return "--:--";
@@ -536,6 +567,17 @@ function isDeadlineCritical(remainingMs: number | null): boolean {
   }
 
   return remainingMs <= 60_000;
+}
+
+function shouldAutoRefreshDeadline(
+  currentValue: number | null,
+  previousValue: number | null | undefined
+): boolean {
+  if (previousValue == null || currentValue == null) {
+    return false;
+  }
+
+  return previousValue > 0 && currentValue <= 0;
 }
 
 function resolveErrorMessage(value: unknown, fallback: string): string {
