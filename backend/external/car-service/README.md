@@ -15,6 +15,9 @@
 - `models` - справочник моделей (`Camry`, `Skyline`, ...) c ссылкой на `brands`.
 - `car_models` - основная сущность каталога, содержит тех. характеристики/год и ссылки на `brands` + `models`.
 
+### ERM Диаграмма
+![ERM](./docs/images/erm.png)
+
 ## Стек
 - ASP.NET Core (`net10.0`)
 - PostgreSQL
