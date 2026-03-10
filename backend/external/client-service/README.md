@@ -11,6 +11,10 @@
 - номер телефона;
 - ссылка на аватар (из image-service).
 
+### ERM Диаграмма
+![ERM](./docs/images/erm.png)
+
+
 ## Стек
 - ASP.NET Core (`net10.0`)
 - PostgreSQL

@@ -1,0 +1,72 @@
+@startuml
+!pragma layout smetana
+
+left to right direction
+hide circle
+skinparam shadowing false
+skinparam linetype ortho
+skinparam packageStyle rectangle
+skinparam defaultFontName Consolas
+
+title Booking Service ERM (PostgreSQL)
+
+entity "bookings" as bookings {
+  *id : int <<PK>>
+  --
+  user_id : uuid
+  partner_car_id : int
+  partner_user_id : uuid
+  start_time : timestamptz
+  end_time : timestamptz
+  booking_range : tstzrange
+  price_hour : numeric(10,2)?
+  total_price : numeric(10,2)?
+  status : varchar(50)
+  created_at : timestamptz
+}
+
+entity "payment_sync_outbox_messages" as payment_sync_outbox_messages {
+  *id : bigint <<PK>>
+  --
+  booking_id : int
+  event_key : varchar(200) <<UQ>>
+  event_type : varchar(100)
+  payload : jsonb
+  attempt_count : int
+  last_error : text?
+  created_at : timestamptz
+  next_attempt_at : timestamptz
+  processed_at : timestamptz?
+  locked_until : timestamptz?
+  --
+  <<CHK>> attempt_count >= 0
+}
+
+bookings ||--o{ payment_sync_outbox_messages : booking_id (logical)
+
+note right of bookings
+Key DB constraints:
+- GiST exclusion on (partner_car_id, booking_range)
+  for statuses pending / confirmed / active
+- trigger keeps booking_range in sync
+  with start_time and end_time
+end note
+
+note bottom of bookings
+Logical external references:
+- user_id -> identity-service.users.id
+- partner_user_id -> identity-service.users.id
+- partner_car_id -> car-service.partner_cars.id
+
+Legacy note:
+- old column price may still exist in upgraded DBs,
+  but runtime model uses price_hour + total_price
+end note
+
+note bottom of payment_sync_outbox_messages
+Outbox drives eventual sync to payment-service
+for booking confirmed / canceled / completed events.
+No FK is enforced on booking_id.
+end note
+
+@enduml

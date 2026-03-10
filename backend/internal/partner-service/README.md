@@ -12,6 +12,9 @@
 - связанный `relatedUserId` (id пользователя из identity-service);
 - номер телефона.
 
+### ERM Диаграмма
+![ERM](./docs/images/erm.png)
+
 ## Стек
 - ASP.NET Core (`net10.0`)
 - PostgreSQL

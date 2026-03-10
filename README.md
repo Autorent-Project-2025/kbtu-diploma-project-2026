@@ -8,7 +8,8 @@ AutoRent - микросервисная платформа каршеринга.
 - 3 frontend-приложения (external/internal/superadmin);
 - общая оркестрация через `docker-compose.yml` в корне.
 
-Диаграмма архитектуры: `docs/project-architecture.puml`.
+## Диаграмма общей структуры проекта
+![Диаграмма проекта](./docs/images/project-architecture.png)
 
 ## Новое в админке
 - Superadmin UI обновлен до формата control center: отдельные секции `Role Management` и `User Management`, метрики и улучшенная адаптивность.
@@ -45,6 +46,7 @@ docker compose up --build
 - Booking Service: `1821`
 - Client Service: `1831`
 - Partner Service: `1832`
+- Payment Service: `1834`
 - Ticket Service: `1248`
 - Image Service: `9181`
 - Email Service: `9182`
@@ -67,6 +69,7 @@ docker compose up --build
 | Car Service | `backend/external/car-service` | Каталог, партнерские машины, автоподбор `/cars/match` |
 | Booking Service | `backend/external/booking-service` | Бронирования и internal-проверка доступности машин |
 | Ticket Service | `backend/internal/ticket-service` | Тикеты `Client/Partner/PartnerCar`, approve/reject и оркестрация |
+| Payment Service | `backend/internal/payment-service` | Внутренние mock-платежи, wallet, ledger и payouts партнеров |
 | Image Service | `backend/shared/image-service` | Загрузка/удаление изображений |
 | File Service | `backend/internal/file-service` | Хранение приватных файлов и выдача временных ссылок |
 | Email Service | `backend/shared/email-service` | SMTP-уведомления (client/partner/partner-car) |
@@ -89,6 +92,7 @@ docker compose up --build
 | Client Service | `Client.View`, `Client.Create`, `Client.Update`, `Client.Delete` |
 | Partner Service | `Partner.View`, `Partner.Create`, `Partner.Update`, `Partner.Delete` |
 | Ticket Service | `Ticket.View`, `Ticket.Approve`, `Ticket.Reject` |
+| Payment Service | Пользовательские permissions не требуются; сервис доступен только по внутреннему `X-Internal-Api-Key` |
 | File Service | `File.Create`, `File.Read`, `File.Delete` |
 | Image Service | `Image.Create`, `Image.Delete` |
 | Email Service | Не требуются (в текущей реализации) |

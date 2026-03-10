@@ -1,0 +1,93 @@
+@startuml
+!pragma layout smetana
+
+left to right direction
+hide circle
+skinparam shadowing false
+skinparam linetype ortho
+skinparam packageStyle rectangle
+skinparam defaultFontName Consolas
+
+title Identity Service ERM (PostgreSQL)
+
+entity "users" as users {
+  *id : uuid <<PK>>
+  --
+  username : varchar(100) <<UQ>>
+  email : varchar(255) <<UQ>>
+  password_hash : varchar(255)
+  is_active : boolean
+}
+
+entity "roles" as roles {
+  *id : uuid <<PK>>
+  --
+  name : varchar(100) <<UQ>>
+}
+
+entity "permissions" as permissions {
+  *id : uuid <<PK>>
+  --
+  name : varchar(150) <<UQ>>
+  description : varchar(500)
+}
+
+entity "user_roles" as user_roles {
+  *user_id : uuid <<PK,FK>>
+  *role_id : uuid <<PK,FK>>
+}
+
+entity "role_permissions" as role_permissions {
+  *role_id : uuid <<PK,FK>>
+  *permission_id : uuid <<PK,FK>>
+}
+
+entity "role_inheritance" as role_inheritance {
+  *child_role_id : uuid <<PK,FK>>
+  *parent_role_id : uuid <<PK,FK>>
+  --
+  <<CHK>> child_role_id <> parent_role_id
+}
+
+entity "refresh_tokens" as refresh_tokens {
+  *id : uuid <<PK>>
+  --
+  user_id : uuid <<FK>>
+  token_hash : varchar(128) <<UQ>>
+  created_at_utc : timestamptz
+  expires_at_utc : timestamptz
+  revoked_at_utc : timestamptz?
+}
+
+entity "activation_tokens" as activation_tokens {
+  *id : uuid <<PK>>
+  --
+  user_id : uuid <<FK>>
+  token_hash : varchar(128) <<UQ>>
+  created_at_utc : timestamptz
+  expires_at_utc : timestamptz
+  used_at_utc : timestamptz?
+}
+
+users ||--o{ user_roles
+roles ||--o{ user_roles
+roles ||--o{ role_permissions
+permissions ||--o{ role_permissions
+roles ||--o{ role_inheritance : child
+roles ||--o{ role_inheritance : parent
+users ||--o{ refresh_tokens
+users ||--o{ activation_tokens
+
+note right of role_inheritance
+Role graph is self-referencing:
+- child_role_id -> inherited role
+- parent_role_id -> parent role
+end note
+
+note bottom of users
+Service-level rules:
+- username and email are unique
+- is_active gates login and API access
+end note
+
+@enduml

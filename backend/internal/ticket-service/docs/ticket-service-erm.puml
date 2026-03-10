@@ -1,0 +1,48 @@
+@startuml
+!pragma layout smetana
+
+left to right direction
+hide circle
+skinparam shadowing false
+skinparam linetype ortho
+skinparam packageStyle rectangle
+skinparam defaultFontName Consolas
+
+title Ticket Service ERM (PostgreSQL)
+
+entity "tickets" as tickets {
+  *id : uuid <<PK>>
+  --
+  ticket_type : int
+  email : varchar(255)
+  status : int
+  created_at : timestamptz
+  data : jsonb
+}
+
+note right of tickets
+ticket_type:
+- 1 = Client
+- 2 = Partner
+- 3 = PartnerCar
+
+status:
+- 1 = Pending
+- 2 = Approved
+- 3 = Rejected
+end note
+
+note bottom of tickets
+data JSONB stores polymorphic payloads:
+- client ticket fields
+- partner ticket fields
+- partner-car ticket fields
+
+Logical external references inside JSON:
+- reviewedByManagerId -> identity-service.users.id
+- relatedPartnerUserId -> identity-service.users.id
+- file names -> file-service objects
+- car image ids / urls -> image-service objects
+end note
+
+@enduml
