@@ -13,6 +13,10 @@
 - интеграции с другими сервисами при approve/reject;
 - выдача временных ссылок на документы тикета.
 
+### ERM Диаграмма
+![ERM](./docs/images/erm.png)
+
+
 ## Стек
 - ASP.NET Core (`net10.0`)
 - PostgreSQL

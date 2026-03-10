@@ -8,6 +8,9 @@
 - внутренний provisioning пользователя для `ticket-service`;
 - публикацию JWKS (`/.well-known/jwks.json`).
 
+### ERM Диаграмма
+![ERM](./docs/images/erm.png)
+
 ## Стек
 - ASP.NET Core (`net10.0`)
 - PostgreSQL

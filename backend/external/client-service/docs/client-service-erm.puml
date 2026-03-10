@@ -1,0 +1,35 @@
+@startuml
+!pragma layout smetana
+
+left to right direction
+hide circle
+skinparam shadowing false
+skinparam linetype ortho
+skinparam packageStyle rectangle
+skinparam defaultFontName Consolas
+
+title Client Service ERM (PostgreSQL)
+
+entity "clients" as clients {
+  *id : int <<PK>>
+  --
+  first_name : varchar(100)
+  last_name : varchar(100)
+  created_on : timestamptz
+  birth_date : date
+  identity_document_file_name : varchar(255)?
+  driver_license_file_name : varchar(255)?
+  related_user_id : varchar(64) <<UQ>>
+  phone_number : varchar(32)
+  avatar_url : varchar(1024)?
+}
+
+note right of clients
+Logical external references:
+- related_user_id -> identity-service.users.id
+- identity_document_file_name -> file-service object
+- driver_license_file_name -> file-service object
+- avatar_url -> image-service or external URL
+end note
+
+@enduml

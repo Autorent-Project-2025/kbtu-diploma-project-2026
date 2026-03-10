@@ -1,0 +1,129 @@
+@startuml
+!pragma layout smetana
+
+left to right direction
+hide circle
+skinparam shadowing false
+skinparam linetype ortho
+skinparam packageStyle rectangle
+skinparam defaultFontName Consolas
+
+title Payment Service ERM (PostgreSQL)
+
+entity "partner_wallets" as partner_wallets {
+  *id : bigint <<PK>>
+  --
+  partner_user_id : uuid <<UQ>>
+  currency : varchar(3)
+  pending_amount : numeric(18,2)
+  available_amount : numeric(18,2)
+  reserved_amount : numeric(18,2)
+  created_at : timestamptz
+  updated_at : timestamptz
+  --
+  <<CHK>> pending_amount >= 0
+  <<CHK>> available_amount >= 0
+  <<CHK>> reserved_amount >= 0
+}
+
+entity "customer_payments" as customer_payments {
+  *id : bigint <<PK>>
+  --
+  booking_id : int <<UQ>>
+  user_id : uuid
+  partner_user_id : uuid
+  partner_car_id : int
+  price_hour : numeric(18,2)?
+  gross_amount : numeric(18,2)
+  platform_commission_rate : numeric(5,4)
+  platform_commission_amount : numeric(18,2)
+  partner_amount : numeric(18,2)
+  currency : varchar(3)
+  status : varchar(32)
+  created_at : timestamptz
+  updated_at : timestamptz
+  confirmed_at : timestamptz
+  available_at : timestamptz?
+  canceled_at : timestamptz?
+  --
+  <<CHK>> gross_amount >= 0
+  <<CHK>> 0 <= platform_commission_rate <= 1
+  <<CHK>> platform_commission_amount >= 0
+  <<CHK>> partner_amount >= 0
+}
+
+entity "partner_payouts" as partner_payouts {
+  *id : bigint <<PK>>
+  --
+  partner_user_id : uuid
+  request_key : varchar(128) <<UQ>>
+  amount : numeric(18,2)
+  currency : varchar(3)
+  status : varchar(32)
+  requested_at : timestamptz
+  processed_at : timestamptz?
+  failure_reason : text?
+  --
+  <<CHK>> amount >= 0
+}
+
+entity "partner_ledger_entries" as partner_ledger_entries {
+  *id : bigint <<PK>>
+  --
+  partner_wallet_id : bigint <<FK>>
+  booking_id : int?
+  customer_payment_id : bigint? <<FK>>
+  partner_payout_id : bigint? <<FK>>
+  entry_type : varchar(64)
+  bucket : varchar(32)
+  amount_delta : numeric(18,2)
+  currency : varchar(3)
+  description : varchar(255)?
+  created_at : timestamptz
+}
+
+entity "mock_payment_attempts" as mock_payment_attempts {
+  *id : bigint <<PK>>
+  --
+  booking_id : int
+  user_id : uuid
+  session_key : varchar(64) <<UQ>>
+  amount : numeric(18,2)
+  currency : varchar(3)
+  status : varchar(32)
+  card_holder : varchar(128)?
+  card_last4 : varchar(4)?
+  failure_reason : text?
+  created_at : timestamptz
+  updated_at : timestamptz
+  completed_at : timestamptz?
+  expires_at : timestamptz
+  --
+  <<CHK>> amount > 0
+}
+
+partner_wallets ||--o{ partner_ledger_entries
+customer_payments |o--o{ partner_ledger_entries
+partner_payouts |o--o{ partner_ledger_entries
+
+note right of partner_wallets
+Logical external reference:
+- partner_user_id -> identity-service.users.id
+end note
+
+note bottom of customer_payments
+Logical external references:
+- booking_id -> booking-service.bookings.id
+- user_id -> identity-service.users.id
+- partner_user_id -> identity-service.users.id
+- partner_car_id -> car-service.partner_cars.id
+end note
+
+note bottom of mock_payment_attempts
+Mock payment attempts are internal only.
+Logical external references:
+- booking_id -> booking-service.bookings.id
+- user_id -> identity-service.users.id
+end note
+
+@enduml

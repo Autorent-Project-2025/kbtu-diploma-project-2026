@@ -1,0 +1,39 @@
+@startuml
+!pragma layout smetana
+
+left to right direction
+hide circle
+skinparam shadowing false
+skinparam linetype ortho
+skinparam packageStyle rectangle
+skinparam defaultFontName Consolas
+
+title File Service Data Model (No Relational DB)
+
+entity "stored_files\n(logical object, not SQL table)" as stored_files {
+  *file_name : uuid.ext
+  --
+  content : binary
+  storage_backend : local fs | gcs
+  original_extension : derived
+}
+
+entity "temporary_links\n(ephemeral response model)" as temporary_links {
+  *file_name : uuid.ext
+  --
+  url : text
+  expires_at_utc : timestamptz
+}
+
+stored_files ||--o{ temporary_links
+
+note bottom of stored_files
+Actual persistence:
+- local filesystem (/app/uploads), or
+- Google Cloud Storage bucket
+
+The service does not keep relational metadata.
+This diagram is a logical storage model only.
+end note
+
+@enduml

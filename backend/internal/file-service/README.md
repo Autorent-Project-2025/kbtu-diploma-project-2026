@@ -13,6 +13,9 @@
 По умолчанию используется Google Cloud Storage (`USE_WEB_STORAGE=true`).
 Для локальной отладки можно переключить `USE_WEB_STORAGE=false`.
 
+### ERM Диаграмма
+![ERM](./docs/images/erm.png)
+
 ## Стек
 - Node.js + TypeScript
 - Express

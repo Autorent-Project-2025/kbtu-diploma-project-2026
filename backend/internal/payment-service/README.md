@@ -22,3 +22,7 @@
 - `POST /internal/payments/bookings/complete`
 - `GET /internal/payments/wallets/{partnerUserId}`
 - `GET /internal/payments/ledger/{partnerUserId}?take=50`
+
+
+## ERM Диаграмма
+![ERM](./docs/images/erm.png)

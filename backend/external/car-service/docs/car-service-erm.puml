@@ -46,7 +46,7 @@ entity "car_models" as car_models {
 entity "partner_cars" as partner_cars {
   *id : int <<PK>>
   --
-  partner_id : uuid
+  partner_user_id : uuid
   car_model_id : int <<FK>>
   license_plate : varchar(20) <<UQ>>
   ownership_file_name : varchar(255)?
@@ -129,6 +129,9 @@ note right of partner_cars
 Checks:
 - status in (0,1,2,3)
 - rating is null or 1..5
+Logical refs:
+- partner_user_id -> identity / partner service user
+- ownership_file_name -> file-service object
 end note
 
 note bottom of car_models

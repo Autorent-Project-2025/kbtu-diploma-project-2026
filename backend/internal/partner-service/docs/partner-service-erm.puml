@@ -1,0 +1,34 @@
+@startuml
+!pragma layout smetana
+
+left to right direction
+hide circle
+skinparam shadowing false
+skinparam linetype ortho
+skinparam packageStyle rectangle
+skinparam defaultFontName Consolas
+
+title Partner Service ERM (PostgreSQL)
+
+entity "partners" as partners {
+  *id : int <<PK>>
+  --
+  owner_first_name : varchar(100)
+  owner_last_name : varchar(100)
+  created_on : timestamptz
+  contract_file_name : varchar(255)?
+  owner_identity_file_name : varchar(255)
+  registration_date : date
+  partnership_end_date : date
+  related_user_id : varchar(64) <<UQ>>
+  phone_number : varchar(32)
+}
+
+note right of partners
+Logical external references:
+- related_user_id -> identity-service.users.id
+- contract_file_name -> file-service object
+- owner_identity_file_name -> file-service object
+end note
+
+@enduml
