@@ -1,13 +1,9 @@
 import { reactive } from "vue";
-import { login as apiLogin } from "../api/auth";
-
-interface TokenData {
-  token: string;
-  timestamp: number;
-}
+import { login as apiLogin, refreshAccessToken } from "../api/auth";
 
 interface JwtPayload {
   sub?: string;
+  exp?: number;
   permissions?: string[] | string;
   [key: string]: unknown;
 }
@@ -34,42 +30,62 @@ export const auth = reactive({
   user: null as any,
 
   async login(email: string, password: string) {
-    const token = await apiLogin(email, password);
-    this.token = token;
-
-    const tokenData: TokenData = {
-      token,
-      timestamp: Date.now(),
-    };
-
-    localStorage.setItem("token", token);
-    localStorage.setItem("tokenTimestamp", tokenData.timestamp.toString());
+    const { accessToken, refreshToken } = await apiLogin(email, password);
+    this.token = accessToken;
+    localStorage.setItem("token", accessToken);
+    if (refreshToken) {
+      localStorage.setItem("refreshToken", refreshToken);
+    }
   },
 
   logout() {
     this.token = "";
     localStorage.removeItem("token");
+    localStorage.removeItem("refreshToken");
     localStorage.removeItem("tokenTimestamp");
     localStorage.removeItem("user");
   },
 
   isTokenExpired(): boolean {
     const token = localStorage.getItem("token");
+    if (!token) return true;
+
+    // Читаем exp прямо из JWT
+    const payload = decodeJwtPayload(token);
+    if (payload?.exp) {
+      // exp в секундах, добавляем 10с буфер
+      return Date.now() / 1000 >= payload.exp - 10;
+    }
+
+    // Fallback: клиентский таймстамп
     const timestampStr = localStorage.getItem("tokenTimestamp");
-
-    if (!token || !timestampStr) {
-      return true;
-    }
-
+    if (!timestampStr) return true;
     const timestamp = parseInt(timestampStr, 10);
-    if (isNaN(timestamp)) {
+    if (isNaN(timestamp)) return true;
+    const expiryHours = parseInt(
+      import.meta.env.VITE_TOKEN_EXPIRY_HOURS || "3",
+      10,
+    );
+    return Date.now() - timestamp >= expiryHours * 60 * 60 * 1000;
+  },
+
+  async tryRefresh(): Promise<boolean> {
+    const refreshToken = localStorage.getItem("refreshToken");
+    if (!refreshToken) return false;
+
+    try {
+      const { accessToken, refreshToken: newRefreshToken } =
+        await refreshAccessToken(refreshToken);
+      this.token = accessToken;
+      localStorage.setItem("token", accessToken);
+      if (newRefreshToken) {
+        localStorage.setItem("refreshToken", newRefreshToken);
+      }
       return true;
+    } catch {
+      this.logout();
+      return false;
     }
-
-    const expiryHours = parseInt(import.meta.env.VITE_TOKEN_EXPIRY_HOURS || "3", 10);
-    const expiryMs = expiryHours * 60 * 60 * 1000;
-
-    return Date.now() - timestamp >= expiryMs;
   },
 
   checkTokenValidity(): boolean {
@@ -77,7 +93,6 @@ export const auth = reactive({
       this.logout();
       return false;
     }
-
     return true;
   },
 
@@ -87,18 +102,15 @@ export const auth = reactive({
     const claim = payload?.permissions;
 
     if (!claim) return [];
-    if (Array.isArray(claim)) {
-      return claim;
-    }
-
+    if (Array.isArray(claim)) return claim;
     return [claim];
   },
 
   hasPermission(permission: string): boolean {
     if (!permission) return false;
-
     return this.getPermissions().some(
-      (claimPermission) => claimPermission.toLowerCase() === permission.toLowerCase()
+      (claimPermission) =>
+        claimPermission.toLowerCase() === permission.toLowerCase(),
     );
   },
 
