@@ -222,4 +222,71 @@ public class ClientService : IClientService
         string RelatedUserId,
         string PhoneNumber,
         string? AvatarUrl);
+
+        
+    public async Task<ClientResponseDto?> GetByRelatedUserIdAsync(
+        string relatedUserId,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(relatedUserId))
+        {
+            throw new ArgumentException("RelatedUserId is required.", nameof(relatedUserId));
+        }
+
+        return await _db.Clients
+            .AsNoTracking()
+            .Where(client => client.RelatedUserId == relatedUserId)
+            .SelectToClientResponseDto()
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    public async Task<ClientResponseDto?> UpdateByRelatedUserIdAsync(
+        string relatedUserId,
+        ProfileUpdateDto dto,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(relatedUserId))
+        {
+            throw new ArgumentException("RelatedUserId is required.", nameof(relatedUserId));
+        }
+
+        ArgumentNullException.ThrowIfNull(dto);
+
+        var entity = await _db.Clients
+            .FirstOrDefaultAsync(client => client.RelatedUserId == relatedUserId, cancellationToken);
+
+        if (entity is null)
+        {
+            return null;
+        }
+
+        if (dto.BirthDate == default)
+        {
+            throw new ArgumentException("BirthDate is required.", nameof(dto.BirthDate));
+        }
+
+        if (dto.BirthDate > DateOnly.FromDateTime(DateTime.UtcNow))
+        {
+            throw new ArgumentException("BirthDate cannot be in the future.", nameof(dto.BirthDate));
+        }
+
+        entity.FirstName = NormalizeRequired(dto.FirstName, nameof(dto.FirstName), 100);
+        entity.LastName = NormalizeRequired(dto.LastName, nameof(dto.LastName), 100);
+        entity.BirthDate = dto.BirthDate;
+        entity.PhoneNumber = NormalizeRequired(dto.PhoneNumber, nameof(dto.PhoneNumber), 32);
+
+        var normalizedAvatarUrl = NormalizeOptional(dto.AvatarUrl, nameof(dto.AvatarUrl), 1024);
+        if (normalizedAvatarUrl is not null &&
+            !Uri.TryCreate(normalizedAvatarUrl, UriKind.Absolute, out _))
+        {
+            throw new ArgumentException("AvatarUrl must be a valid absolute URL.", nameof(dto.AvatarUrl));
+        }
+
+        entity.AvatarUrl = normalizedAvatarUrl;
+
+        await _db.SaveChangesAsync(cancellationToken);
+
+        return entity.ToClientResponseDto();
+    }
+
 }
