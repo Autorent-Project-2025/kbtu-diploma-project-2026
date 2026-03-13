@@ -24,5 +24,8 @@ namespace BookingService.Application.Interfaces
         Task<bool> CancelBooking(int id, Guid userId);
         Task<bool> ConfirmBooking(int id, Guid userId);
         Task<bool> CompleteBooking(int id, Guid userId);
+
+        // Profile stats
+        Task<BookingStatsDto> GetUserBookingStats(Guid userId, CancellationToken cancellationToken = default);
     }
 }

@@ -44,6 +44,41 @@ namespace CarService.Infrastructure.Services
             };
         }
 
+        
+        public async Task<PagedResult<CarCommentResponseDto>> GetByUserIdPaginatedAsync(
+            string userId,
+            PaginationParams paginationParams,
+            CancellationToken cancellationToken = default)
+        {
+            if (string.IsNullOrWhiteSpace(userId))
+            {
+                throw new ArgumentException("UserId is required.", nameof(userId));
+            }
+
+            var query = _db.CarComments
+                .AsNoTracking()
+                .Where(comment => comment.UserId == userId);
+
+            var totalCount = await query.CountAsync(cancellationToken);
+
+            var items = await query
+                .OrderByDescending(comment => comment.CreatedOn)
+                .ThenByDescending(comment => comment.Id)
+                .Skip((paginationParams.Page - 1) * paginationParams.PageSize)
+                .Take(paginationParams.PageSize)
+                .Select(comment => MapToDto(comment))
+                .ToListAsync(cancellationToken);
+
+            return new PagedResult<CarCommentResponseDto>
+            {
+                Items = items,
+                TotalCount = totalCount,
+                Page = paginationParams.Page,
+                PageSize = paginationParams.PageSize
+            };
+        }
+
+
         public async Task<CarCommentResponseDto?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
         {
             var entity = await _db.CarComments

@@ -1,346 +1,669 @@
 <template>
-  <div class="container admin-page">
-    <section class="card card-elevated admin-hero">
-      <div>
-        <h1 class="hero-title">Control Center</h1>
-        <p class="hero-subtitle">Управление пользователями, ролями, permissions и inheritance.</p>
-      </div>
-      <button class="btn btn-outline" @click="loadData" :disabled="loading">
-        {{ loading ? "Обновление..." : "Обновить данные" }}
-      </button>
-    </section>
-
-    <section class="stats-grid">
-      <article class="card stat-card">
-        <div class="stat-label">Пользователи</div>
-        <div class="stat-value">{{ users.length }}</div>
-      </article>
-      <article class="card stat-card">
-        <div class="stat-label">Активные</div>
-        <div class="stat-value">{{ activeUsersCount }}</div>
-      </article>
-      <article class="card stat-card">
-        <div class="stat-label">Роли</div>
-        <div class="stat-value">{{ roles.length }}</div>
-      </article>
-      <article class="card stat-card">
-        <div class="stat-label">Permissions</div>
-        <div class="stat-value">{{ permissions.length }}</div>
-      </article>
-    </section>
-
-    <div v-if="errorMessage" class="error">{{ errorMessage }}</div>
-    <div v-if="successMessage" class="success">{{ successMessage }}</div>
-
-    <section class="section-switch card">
-      <button
-        class="switch-btn"
-        :class="{ 'switch-btn-active': activeSection === 'roles' }"
-        @click="activeSection = 'roles'"
+  <div class="max-w-7xl mx-auto px-6 py-8 space-y-6">
+    <!-- Hero header -->
+    <header
+      class="relative overflow-hidden rounded-[28px] border border-gray-200 dark:border-gray-800 bg-[radial-gradient(circle_at_top_left,_rgba(139,92,246,0.18),_transparent_38%),radial-gradient(circle_at_bottom_right,_rgba(59,130,246,0.16),_transparent_40%),linear-gradient(135deg,_rgba(255,255,255,0.96),_rgba(243,244,246,0.92))] dark:bg-[radial-gradient(circle_at_top_left,_rgba(139,92,246,0.22),_transparent_35%),radial-gradient(circle_at_bottom_right,_rgba(59,130,246,0.22),_transparent_40%),linear-gradient(135deg,_rgba(17,24,39,0.98),_rgba(3,7,18,0.96))] shadow-2xl p-8"
+    >
+      <div
+        class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6"
       >
-        Role Management
-      </button>
-      <button
-        class="switch-btn"
-        :class="{ 'switch-btn-active': activeSection === 'users' }"
-        @click="activeSection = 'users'"
-      >
-        User Management
-      </button>
-    </section>
-
-    <section v-if="activeSection === 'roles'" class="workspace-grid">
-      <aside class="card workspace-sidebar">
-        <div class="sidebar-header">
-          <h2 class="section-title">Роли</h2>
-          <span class="sidebar-count">{{ filteredRoles.length }}</span>
+        <div class="space-y-3">
+          <p
+            class="text-xs font-bold uppercase tracking-[0.3em] text-violet-600 dark:text-violet-400"
+          >
+            Superadmin
+          </p>
+          <h1 class="text-4xl font-extrabold text-gray-900 dark:text-white">
+            Control Center
+          </h1>
+          <p class="text-gray-600 dark:text-gray-400">
+            Управление пользователями, ролями, permissions и inheritance.
+          </p>
         </div>
+        <button
+          @click="loadData"
+          :disabled="loading"
+          class="self-start px-5 py-3 rounded-2xl border border-gray-300 dark:border-gray-700 text-gray-800 dark:text-gray-100 font-semibold hover:border-violet-500 transition-colors disabled:opacity-60"
+        >
+          {{ loading ? "Обновление..." : "Обновить данные" }}
+        </button>
+      </div>
+    </header>
 
-        <label class="label" for="roleSearch">Поиск роли</label>
-        <input
-          id="roleSearch"
-          v-model="roleSearchQuery"
-          class="input"
-          type="text"
-          placeholder="Название или permission"
-        />
+    <!-- Stats -->
+    <section class="grid sm:grid-cols-2 xl:grid-cols-4 gap-4">
+      <article
+        v-for="stat in statsCards"
+        :key="stat.label"
+        :class="[
+          'rounded-3xl border bg-white dark:bg-gray-900 shadow-xl p-6 space-y-2',
+          stat.borderClass,
+        ]"
+      >
+        <p
+          :class="[
+            'text-xs font-bold uppercase tracking-[0.18em]',
+            stat.labelClass,
+          ]"
+        >
+          {{ stat.label }}
+        </p>
+        <p class="text-4xl font-extrabold text-gray-900 dark:text-white">
+          {{ stat.value }}
+        </p>
+      </article>
+    </section>
 
-        <ul v-if="filteredRoles.length > 0" class="entity-list">
+    <!-- Error / success -->
+    <div
+      v-if="errorMessage"
+      class="rounded-2xl border border-red-300/70 dark:border-red-500/30 bg-red-50 dark:bg-red-900/20 px-5 py-4 text-red-700 dark:text-red-300 font-medium"
+    >
+      {{ errorMessage }}
+    </div>
+    <div
+      v-if="successMessage"
+      class="rounded-2xl border border-emerald-300/70 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-900/20 px-5 py-4 text-emerald-700 dark:text-emerald-300 font-medium"
+    >
+      {{ successMessage }}
+    </div>
+
+    <!-- Section switcher -->
+    <section
+      class="rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-xl p-2 flex gap-2"
+    >
+      <button
+        v-for="section in sections"
+        :key="section.value"
+        @click="activeSection = section.value"
+        :class="[
+          'flex-1 px-5 py-3 rounded-2xl text-sm font-bold transition-colors',
+          activeSection === section.value
+            ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
+            : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white',
+        ]"
+      >
+        {{ section.label }}
+      </button>
+    </section>
+
+    <!-- ROLES section -->
+    <section
+      v-if="activeSection === 'roles'"
+      class="grid xl:grid-cols-[320px,1fr] gap-6 items-start"
+    >
+      <!-- Roles list -->
+      <div
+        class="rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-xl overflow-hidden"
+      >
+        <div
+          class="px-5 py-4 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between"
+        >
+          <h2 class="font-bold text-gray-900 dark:text-white">Роли</h2>
+          <span
+            class="text-xs font-bold bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 px-2.5 py-1 rounded-full"
+            >{{ filteredRoles.length }}</span
+          >
+        </div>
+        <div class="p-4">
+          <input
+            v-model="roleSearchQuery"
+            type="text"
+            placeholder="Название или permission"
+            class="w-full px-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 transition-colors placeholder-gray-400"
+          />
+        </div>
+        <ul
+          class="divide-y divide-gray-100 dark:divide-gray-800 max-h-[60vh] overflow-y-auto"
+        >
           <li v-for="role in filteredRoles" :key="role.id">
             <button
-              class="entity-button"
-              :class="{ 'entity-button-active': selectedRole?.id === role.id }"
               @click="selectRole(role.id)"
+              :class="[
+                'w-full px-5 py-3.5 text-left transition-colors border-l-4',
+                selectedRole?.id === role.id
+                  ? 'bg-violet-50 dark:bg-violet-900/20 border-violet-500'
+                  : 'hover:bg-gray-50 dark:hover:bg-gray-800/60 border-transparent',
+              ]"
             >
-              <div class="entity-title">{{ role.name }}</div>
-              <div class="entity-meta">Effective: {{ role.permissions.length }} permission(s)</div>
+              <p class="font-bold text-sm text-gray-900 dark:text-white">
+                {{ role.name }}
+              </p>
+              <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                Permissions: {{ role.permissions.length }}
+              </p>
             </button>
           </li>
+          <li
+            v-if="filteredRoles.length === 0"
+            class="px-5 py-4 text-sm text-gray-400 dark:text-gray-500"
+          >
+            Роли не найдены.
+          </li>
         </ul>
-
-        <div v-else class="empty-text">Роли не найдены.</div>
-      </aside>
-
-      <div class="workspace-main">
-        <article class="card form-card">
-          <h2 class="section-title">Создать роль</h2>
-
-          <form @submit.prevent="createNewRole" class="form-grid form-grid-3">
-            <div class="form-field">
-              <label class="label" for="createRoleName">Название роли</label>
-              <input id="createRoleName" v-model="createRoleName" class="input" type="text" required />
-            </div>
-
-            <div class="form-field">
-              <label class="label" for="createRolePermissions">Прямые permissions</label>
-              <select id="createRolePermissions" v-model="createRolePermissionIds" class="select" multiple size="7">
-                <option v-for="permission in permissions" :key="permission.id" :value="permission.id">
-                  {{ permission.name }}
-                </option>
-              </select>
-            </div>
-
-            <div class="form-field">
-              <label class="label" for="createRoleParents">Родительские роли</label>
-              <select id="createRoleParents" v-model="createRoleParentRoleIds" class="select" multiple size="7">
-                <option v-for="role in roles" :key="role.id" :value="role.id">
-                  {{ role.name }}
-                </option>
-              </select>
-            </div>
-
-            <div class="form-actions">
-              <button class="btn btn-primary" type="submit" :disabled="actionLoading || loading">Создать роль</button>
-            </div>
-          </form>
-        </article>
-
-        <article v-if="selectedRole" class="card detail-card">
-          <h2 class="section-title">Роль: {{ selectedRole.name }}</h2>
-
-          <div class="detail-columns">
-            <section>
-              <h3 class="subsection-title">Прямые permissions</h3>
-              <div v-if="selectedRole.directPermissions.length === 0" class="empty-text">
-                Прямые permissions не назначены.
-              </div>
-              <ul v-else class="chip-list">
-                <li v-for="permissionName in selectedRole.directPermissions" :key="permissionName" class="chip-row">
-                  <span class="badge badge-neutral">{{ permissionName }}</span>
-                  <button
-                    class="btn btn-outline"
-                    @click="removePermissionFromSelectedRole(permissionName)"
-                    :disabled="actionLoading"
-                  >
-                    Убрать
-                  </button>
-                </li>
-              </ul>
-
-              <div class="inline-form">
-                <div class="form-field">
-                  <label class="label" for="permissionToAssign">Добавить permission</label>
-                  <select id="permissionToAssign" v-model="permissionToAssignId" class="select">
-                    <option value="">Выберите permission</option>
-                    <option
-                      v-for="permission in availablePermissionsForSelectedRole"
-                      :key="permission.id"
-                      :value="permission.id"
-                    >
-                      {{ permission.name }}
-                    </option>
-                  </select>
-                </div>
-                <button class="btn btn-primary" @click="addPermissionToSelectedRole" :disabled="actionLoading">
-                  Добавить
-                </button>
-              </div>
-            </section>
-
-            <section>
-              <h3 class="subsection-title">Наследуемые роли</h3>
-              <div v-if="selectedRole.parentRoles.length === 0" class="empty-text">Наследование не настроено.</div>
-              <ul v-else class="chip-list">
-                <li v-for="parentRole in selectedRole.parentRoles" :key="parentRole.id" class="chip-row">
-                  <span class="badge badge-neutral">{{ parentRole.name }}</span>
-                  <button
-                    class="btn btn-outline"
-                    @click="removeParentRoleFromSelectedRole(parentRole.id)"
-                    :disabled="actionLoading"
-                  >
-                    Убрать
-                  </button>
-                </li>
-              </ul>
-
-              <div class="inline-form">
-                <div class="form-field">
-                  <label class="label" for="parentRoleToAssign">Добавить parent role</label>
-                  <select id="parentRoleToAssign" v-model="parentRoleToAssignId" class="select">
-                    <option value="">Выберите роль</option>
-                    <option v-for="role in availableParentRolesForSelectedRole" :key="role.id" :value="role.id">
-                      {{ role.name }}
-                    </option>
-                  </select>
-                </div>
-                <button class="btn btn-primary" @click="addParentRoleToSelectedRole" :disabled="actionLoading">
-                  Добавить
-                </button>
-              </div>
-            </section>
-          </div>
-
-          <section>
-            <h3 class="subsection-title">Итоговые permissions</h3>
-            <div class="badge-group">
-              <span v-for="permissionName in selectedRole.permissions" :key="permissionName" class="badge badge-neutral">
-                {{ permissionName }}
-              </span>
-            </div>
-          </section>
-        </article>
-        <article v-else class="card detail-card">
-          <div class="empty-text">Выберите роль слева для редактирования inheritance и permissions.</div>
-        </article>
       </div>
-    </section>
 
-    <section v-else class="workspace-grid">
-      <aside class="card workspace-sidebar">
-        <div class="sidebar-header">
-          <h2 class="section-title">Пользователи</h2>
-          <span class="sidebar-count">{{ filteredUsers.length }}</span>
-        </div>
-
-        <label class="label" for="searchUser">Поиск пользователя</label>
-        <input
-          id="searchUser"
-          v-model="searchQuery"
-          class="input"
-          type="text"
-          placeholder="Username или email"
-        />
-
-        <ul v-if="filteredUsers.length > 0" class="entity-list">
-          <li v-for="user in filteredUsers" :key="user.id">
-            <button
-              class="entity-button"
-              :class="{ 'entity-button-active': selectedUser?.id === user.id }"
-              @click="selectUser(user.id)"
-            >
-              <div class="entity-title">{{ user.username }}</div>
-              <div class="entity-meta">{{ user.email }}</div>
-              <span :class="user.isActive ? 'badge badge-active' : 'badge badge-inactive'">
-                {{ user.isActive ? "Active" : "Inactive" }}
-              </span>
-            </button>
-          </li>
-        </ul>
-        <div v-else class="empty-text">Пользователи не найдены.</div>
-      </aside>
-
-      <div class="workspace-main">
-        <article class="card form-card">
-          <h2 class="section-title">Создать пользователя</h2>
-
-          <form @submit.prevent="createNewUser" class="form-grid form-grid-3">
-            <div class="form-field">
-              <label class="label" for="createUsername">Username</label>
-              <input id="createUsername" v-model="createUsername" class="input" type="text" required />
+      <!-- Roles right panel -->
+      <div class="space-y-6">
+        <!-- Create role -->
+        <div
+          class="rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-xl p-6 space-y-5"
+        >
+          <h2 class="text-lg font-bold text-gray-900 dark:text-white">
+            Создать роль
+          </h2>
+          <form @submit.prevent="createNewRole" class="space-y-4">
+            <div>
+              <label
+                class="block text-xs font-bold uppercase tracking-[0.1em] text-gray-500 dark:text-gray-400 mb-2"
+                >Название роли</label
+              >
+              <input
+                v-model="createRoleName"
+                type="text"
+                required
+                class="w-full px-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 transition-colors"
+              />
             </div>
-            <div class="form-field">
-              <label class="label" for="createEmail">Email</label>
-              <input id="createEmail" v-model="createEmail" class="input" type="email" required />
-            </div>
-            <div class="form-field">
-              <label class="label" for="createPassword">Password</label>
-              <input id="createPassword" v-model="createPassword" class="input" type="password" required />
-            </div>
-
-            <div class="form-field form-field-wide">
-              <label class="label" for="createRoles">Роли (опционально)</label>
-              <select id="createRoles" v-model="createRoleNames" class="select" multiple size="7">
-                <option v-for="role in roles" :key="role.id" :value="role.name">
-                  {{ role.name }}
-                </option>
-              </select>
-              <p class="hint-text">Если роли не выбраны, назначается роль по умолчанию.</p>
-            </div>
-
-            <div class="form-actions">
-              <button class="btn btn-primary" type="submit" :disabled="actionLoading || loading">
-                Создать пользователя
-              </button>
-            </div>
-          </form>
-        </article>
-
-        <article v-if="selectedUser" class="card detail-card">
-          <h2 class="section-title">Пользователь: {{ selectedUser.username }}</h2>
-          <p class="section-subtitle">ID: {{ selectedUser.id }}</p>
-
-          <div class="form-grid form-grid-2">
-            <div class="form-field">
-              <label class="label" for="username">Username</label>
-              <input id="username" v-model="editUsername" class="input" type="text" />
-            </div>
-            <div class="form-field">
-              <label class="label" for="email">Email</label>
-              <input id="email" v-model="editEmail" class="input" type="email" />
-            </div>
-          </div>
-
-          <div class="action-row">
-            <button class="btn btn-primary" @click="saveUser" :disabled="actionLoading">Сохранить</button>
-            <button class="btn btn-outline" @click="toggleActive" :disabled="actionLoading">
-              {{ selectedUser.isActive ? "Деактивировать" : "Активировать" }}
-            </button>
-            <button class="btn btn-danger" @click="deleteSelectedUser" :disabled="actionLoading">Удалить</button>
-          </div>
-
-          <section>
-            <h3 class="subsection-title">Роли пользователя</h3>
-            <div v-if="selectedUser.roles.length === 0" class="empty-text">Роли отсутствуют.</div>
-            <ul v-else class="chip-list">
-              <li v-for="roleName in selectedUser.roles" :key="roleName" class="chip-row">
-                <div>
-                  <strong>{{ roleName }}</strong>
-                  <div class="hint-text">{{ getRolePermissionsPreview(roleName) }}</div>
-                </div>
-                <button class="btn btn-outline" @click="removeRoleFromSelectedUser(roleName)" :disabled="actionLoading">
-                  Убрать
-                </button>
-              </li>
-            </ul>
-
-            <div class="inline-form">
-              <div class="form-field">
-                <label class="label" for="roleSelect">Добавить роль</label>
-                <select id="roleSelect" v-model="roleToAssignId" class="select">
-                  <option value="">Выберите роль</option>
-                  <option v-for="role in availableRolesForAssignment" :key="role.id" :value="role.id">
+            <div class="grid sm:grid-cols-2 gap-4">
+              <div>
+                <label
+                  class="block text-xs font-bold uppercase tracking-[0.1em] text-gray-500 dark:text-gray-400 mb-2"
+                  >Прямые permissions</label
+                >
+                <select
+                  v-model="createRolePermissionIds"
+                  multiple
+                  size="6"
+                  class="w-full px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:border-violet-500"
+                >
+                  <option v-for="p in permissions" :key="p.id" :value="p.id">
+                    {{ p.name }}
+                  </option>
+                </select>
+              </div>
+              <div>
+                <label
+                  class="block text-xs font-bold uppercase tracking-[0.1em] text-gray-500 dark:text-gray-400 mb-2"
+                  >Родительские роли</label
+                >
+                <select
+                  v-model="createRoleParentRoleIds"
+                  multiple
+                  size="6"
+                  class="w-full px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:border-violet-500"
+                >
+                  <option v-for="role in roles" :key="role.id" :value="role.id">
                     {{ role.name }}
                   </option>
                 </select>
               </div>
-              <button class="btn btn-primary" @click="assignRoleToSelectedUser" :disabled="actionLoading">
+            </div>
+            <button
+              type="submit"
+              :disabled="actionLoading || loading"
+              class="px-5 py-2.5 rounded-2xl bg-violet-600 hover:bg-violet-700 disabled:opacity-60 text-white font-bold text-sm shadow-lg shadow-violet-500/20 transition-colors"
+            >
+              Создать роль
+            </button>
+          </form>
+        </div>
+
+        <!-- Selected role detail -->
+        <div
+          v-if="selectedRole"
+          class="rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-xl p-6 space-y-6"
+        >
+          <h2 class="text-lg font-bold text-gray-900 dark:text-white">
+            Роль: {{ selectedRole.name }}
+          </h2>
+
+          <div class="grid sm:grid-cols-2 gap-6">
+            <!-- Direct permissions -->
+            <div class="space-y-3">
+              <h3
+                class="text-sm font-bold uppercase tracking-[0.15em] text-gray-500 dark:text-gray-400"
+              >
+                Прямые permissions
+              </h3>
+              <p
+                v-if="selectedRole.directPermissions.length === 0"
+                class="text-sm text-gray-400"
+              >
+                Не назначены.
+              </p>
+              <ul v-else class="space-y-2">
+                <li
+                  v-for="name in selectedRole.directPermissions"
+                  :key="name"
+                  class="flex items-center justify-between gap-3 rounded-xl border border-gray-200 dark:border-gray-800 px-3 py-2"
+                >
+                  <span
+                    class="text-sm font-medium text-gray-700 dark:text-gray-300"
+                    >{{ name }}</span
+                  >
+                  <button
+                    @click="removePermissionFromSelectedRole(name)"
+                    :disabled="actionLoading"
+                    class="text-xs text-gray-400 hover:text-red-500 font-semibold transition-colors disabled:opacity-60"
+                  >
+                    Убрать
+                  </button>
+                </li>
+              </ul>
+              <div class="flex gap-2 items-end">
+                <div class="flex-1">
+                  <select
+                    v-model="permissionToAssignId"
+                    class="w-full px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:border-violet-500"
+                  >
+                    <option value="">Выберите permission</option>
+                    <option
+                      v-for="p in availablePermissionsForSelectedRole"
+                      :key="p.id"
+                      :value="p.id"
+                    >
+                      {{ p.name }}
+                    </option>
+                  </select>
+                </div>
+                <button
+                  @click="addPermissionToSelectedRole"
+                  :disabled="actionLoading"
+                  class="px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-700 disabled:opacity-60 text-white font-bold text-sm transition-colors"
+                >
+                  +
+                </button>
+              </div>
+            </div>
+
+            <!-- Parent roles -->
+            <div class="space-y-3">
+              <h3
+                class="text-sm font-bold uppercase tracking-[0.15em] text-gray-500 dark:text-gray-400"
+              >
+                Наследуемые роли
+              </h3>
+              <p
+                v-if="selectedRole.parentRoles.length === 0"
+                class="text-sm text-gray-400"
+              >
+                Наследование не настроено.
+              </p>
+              <ul v-else class="space-y-2">
+                <li
+                  v-for="parent in selectedRole.parentRoles"
+                  :key="parent.id"
+                  class="flex items-center justify-between gap-3 rounded-xl border border-gray-200 dark:border-gray-800 px-3 py-2"
+                >
+                  <span
+                    class="text-sm font-medium text-gray-700 dark:text-gray-300"
+                    >{{ parent.name }}</span
+                  >
+                  <button
+                    @click="removeParentRoleFromSelectedRole(parent.id)"
+                    :disabled="actionLoading"
+                    class="text-xs text-gray-400 hover:text-red-500 font-semibold transition-colors disabled:opacity-60"
+                  >
+                    Убрать
+                  </button>
+                </li>
+              </ul>
+              <div class="flex gap-2 items-end">
+                <div class="flex-1">
+                  <select
+                    v-model="parentRoleToAssignId"
+                    class="w-full px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:border-violet-500"
+                  >
+                    <option value="">Выберите роль</option>
+                    <option
+                      v-for="role in availableParentRolesForSelectedRole"
+                      :key="role.id"
+                      :value="role.id"
+                    >
+                      {{ role.name }}
+                    </option>
+                  </select>
+                </div>
+                <button
+                  @click="addParentRoleToSelectedRole"
+                  :disabled="actionLoading"
+                  class="px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-700 disabled:opacity-60 text-white font-bold text-sm transition-colors"
+                >
+                  +
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Effective permissions -->
+          <div
+            class="space-y-3 pt-4 border-t border-gray-100 dark:border-gray-800"
+          >
+            <h3
+              class="text-sm font-bold uppercase tracking-[0.15em] text-gray-500 dark:text-gray-400"
+            >
+              Итоговые permissions
+            </h3>
+            <div class="flex flex-wrap gap-2">
+              <span
+                v-for="name in selectedRole.permissions"
+                :key="name"
+                class="inline-flex px-3 py-1 rounded-full text-xs font-bold bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300"
+                >{{ name }}</span
+              >
+            </div>
+          </div>
+        </div>
+        <div
+          v-else
+          class="rounded-3xl border border-dashed border-gray-300 dark:border-gray-700 p-8 text-center text-gray-400 dark:text-gray-500 text-sm"
+        >
+          Выберите роль слева для редактирования.
+        </div>
+      </div>
+    </section>
+
+    <!-- USERS section -->
+    <section v-else class="grid xl:grid-cols-[320px,1fr] gap-6 items-start">
+      <!-- Users list -->
+      <div
+        class="rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-xl overflow-hidden"
+      >
+        <div
+          class="px-5 py-4 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between"
+        >
+          <h2 class="font-bold text-gray-900 dark:text-white">Пользователи</h2>
+          <span
+            class="text-xs font-bold bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 px-2.5 py-1 rounded-full"
+            >{{ filteredUsers.length }}</span
+          >
+        </div>
+        <div class="p-4">
+          <input
+            v-model="searchQuery"
+            type="text"
+            placeholder="Username или email"
+            class="w-full px-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 transition-colors placeholder-gray-400"
+          />
+        </div>
+        <ul
+          class="divide-y divide-gray-100 dark:divide-gray-800 max-h-[60vh] overflow-y-auto"
+        >
+          <li v-for="user in filteredUsers" :key="user.id">
+            <button
+              @click="selectUser(user.id)"
+              :class="[
+                'w-full px-5 py-3.5 text-left transition-colors border-l-4',
+                selectedUser?.id === user.id
+                  ? 'bg-violet-50 dark:bg-violet-900/20 border-violet-500'
+                  : 'hover:bg-gray-50 dark:hover:bg-gray-800/60 border-transparent',
+              ]"
+            >
+              <div class="flex items-center justify-between gap-2">
+                <p
+                  class="font-bold text-sm text-gray-900 dark:text-white truncate"
+                >
+                  {{ user.username }}
+                </p>
+                <span
+                  :class="
+                    user.isActive
+                      ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300'
+                      : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
+                  "
+                  class="inline-flex px-2 py-0.5 rounded-full text-xs font-bold flex-shrink-0"
+                >
+                  {{ user.isActive ? "Active" : "Inactive" }}
+                </span>
+              </div>
+              <p
+                class="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate"
+              >
+                {{ user.email }}
+              </p>
+            </button>
+          </li>
+          <li
+            v-if="filteredUsers.length === 0"
+            class="px-5 py-4 text-sm text-gray-400 dark:text-gray-500"
+          >
+            Пользователи не найдены.
+          </li>
+        </ul>
+      </div>
+
+      <!-- Users right panel -->
+      <div class="space-y-6">
+        <!-- Create user -->
+        <div
+          class="rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-xl p-6 space-y-5"
+        >
+          <h2 class="text-lg font-bold text-gray-900 dark:text-white">
+            Создать пользователя
+          </h2>
+          <form @submit.prevent="createNewUser" class="space-y-4">
+            <div class="grid sm:grid-cols-3 gap-4">
+              <div>
+                <label
+                  class="block text-xs font-bold uppercase tracking-[0.1em] text-gray-500 dark:text-gray-400 mb-2"
+                  >Username</label
+                >
+                <input
+                  v-model="createUsername"
+                  type="text"
+                  required
+                  class="w-full px-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 transition-colors"
+                />
+              </div>
+              <div>
+                <label
+                  class="block text-xs font-bold uppercase tracking-[0.1em] text-gray-500 dark:text-gray-400 mb-2"
+                  >Email</label
+                >
+                <input
+                  v-model="createEmail"
+                  type="email"
+                  required
+                  class="w-full px-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 transition-colors"
+                />
+              </div>
+              <div>
+                <label
+                  class="block text-xs font-bold uppercase tracking-[0.1em] text-gray-500 dark:text-gray-400 mb-2"
+                  >Password</label
+                >
+                <input
+                  v-model="createPassword"
+                  type="password"
+                  required
+                  class="w-full px-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 transition-colors"
+                />
+              </div>
+            </div>
+            <div>
+              <label
+                class="block text-xs font-bold uppercase tracking-[0.1em] text-gray-500 dark:text-gray-400 mb-2"
+                >Роли (опционально)</label
+              >
+              <select
+                v-model="createRoleNames"
+                multiple
+                size="5"
+                class="w-full px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:border-violet-500"
+              >
+                <option v-for="role in roles" :key="role.id" :value="role.name">
+                  {{ role.name }}
+                </option>
+              </select>
+              <p class="text-xs text-gray-400 dark:text-gray-500 mt-1.5">
+                Если роли не выбраны, назначается роль по умолчанию.
+              </p>
+            </div>
+            <button
+              type="submit"
+              :disabled="actionLoading || loading"
+              class="px-5 py-2.5 rounded-2xl bg-violet-600 hover:bg-violet-700 disabled:opacity-60 text-white font-bold text-sm shadow-lg shadow-violet-500/20 transition-colors"
+            >
+              Создать пользователя
+            </button>
+          </form>
+        </div>
+
+        <!-- Selected user detail -->
+        <div
+          v-if="selectedUser"
+          class="rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-xl p-6 space-y-6"
+        >
+          <div>
+            <h2 class="text-lg font-bold text-gray-900 dark:text-white">
+              {{ selectedUser.username }}
+            </h2>
+            <p class="text-xs text-gray-400 dark:text-gray-500 font-mono mt-1">
+              {{ selectedUser.id }}
+            </p>
+          </div>
+
+          <div class="grid sm:grid-cols-2 gap-4">
+            <div>
+              <label
+                class="block text-xs font-bold uppercase tracking-[0.1em] text-gray-500 dark:text-gray-400 mb-2"
+                >Username</label
+              >
+              <input
+                v-model="editUsername"
+                type="text"
+                class="w-full px-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 transition-colors"
+              />
+            </div>
+            <div>
+              <label
+                class="block text-xs font-bold uppercase tracking-[0.1em] text-gray-500 dark:text-gray-400 mb-2"
+                >Email</label
+              >
+              <input
+                v-model="editEmail"
+                type="email"
+                class="w-full px-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 transition-colors"
+              />
+            </div>
+          </div>
+
+          <div class="flex flex-wrap gap-3">
+            <button
+              @click="saveUser"
+              :disabled="actionLoading"
+              class="px-5 py-2.5 rounded-2xl bg-violet-600 hover:bg-violet-700 disabled:opacity-60 text-white font-bold text-sm transition-colors"
+            >
+              Сохранить
+            </button>
+            <button
+              @click="toggleActive"
+              :disabled="actionLoading"
+              class="px-5 py-2.5 rounded-2xl border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:border-violet-500 disabled:opacity-60 font-bold text-sm transition-colors"
+            >
+              {{ selectedUser.isActive ? "Деактивировать" : "Активировать" }}
+            </button>
+            <button
+              @click="deleteSelectedUser"
+              :disabled="actionLoading"
+              class="px-5 py-2.5 rounded-2xl border border-red-300 dark:border-red-700 text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-60 font-bold text-sm transition-colors"
+            >
+              Удалить
+            </button>
+          </div>
+
+          <!-- User roles -->
+          <div
+            class="space-y-3 pt-4 border-t border-gray-100 dark:border-gray-800"
+          >
+            <h3
+              class="text-sm font-bold uppercase tracking-[0.15em] text-gray-500 dark:text-gray-400"
+            >
+              Роли пользователя
+            </h3>
+            <p
+              v-if="selectedUser.roles.length === 0"
+              class="text-sm text-gray-400"
+            >
+              Роли отсутствуют.
+            </p>
+            <ul v-else class="space-y-2">
+              <li
+                v-for="roleName in selectedUser.roles"
+                :key="roleName"
+                class="rounded-xl border border-gray-200 dark:border-gray-800 px-4 py-3"
+              >
+                <div class="flex items-start justify-between gap-3">
+                  <div>
+                    <p class="font-bold text-sm text-gray-900 dark:text-white">
+                      {{ roleName }}
+                    </p>
+                    <p class="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+                      {{ getRolePermissionsPreview(roleName) }}
+                    </p>
+                  </div>
+                  <button
+                    @click="removeRoleFromSelectedUser(roleName)"
+                    :disabled="actionLoading"
+                    class="text-xs text-gray-400 hover:text-red-500 font-semibold transition-colors disabled:opacity-60 flex-shrink-0"
+                  >
+                    Убрать
+                  </button>
+                </div>
+              </li>
+            </ul>
+            <div class="flex gap-2 items-end">
+              <div class="flex-1">
+                <select
+                  v-model="roleToAssignId"
+                  class="w-full px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:border-violet-500"
+                >
+                  <option value="">Добавить роль...</option>
+                  <option
+                    v-for="role in availableRolesForAssignment"
+                    :key="role.id"
+                    :value="role.id"
+                  >
+                    {{ role.name }}
+                  </option>
+                </select>
+              </div>
+              <button
+                @click="assignRoleToSelectedUser"
+                :disabled="actionLoading"
+                class="px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-700 disabled:opacity-60 text-white font-bold text-sm transition-colors"
+              >
                 Назначить
               </button>
             </div>
-          </section>
+          </div>
 
-          <section>
-            <h3 class="subsection-title">Итоговые permissions пользователя</h3>
-            <div class="badge-group">
-              <span v-for="permission in selectedUser.permissions" :key="permission" class="badge badge-neutral">
-                {{ permission }}
-              </span>
+          <!-- Effective permissions -->
+          <div
+            class="space-y-3 pt-4 border-t border-gray-100 dark:border-gray-800"
+          >
+            <h3
+              class="text-sm font-bold uppercase tracking-[0.15em] text-gray-500 dark:text-gray-400"
+            >
+              Итоговые permissions
+            </h3>
+            <div class="flex flex-wrap gap-2">
+              <span
+                v-for="permission in selectedUser.permissions"
+                :key="permission"
+                class="inline-flex px-3 py-1 rounded-full text-xs font-bold bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300"
+                >{{ permission }}</span
+              >
             </div>
-          </section>
-        </article>
-        <article v-else class="card detail-card">
-          <div class="empty-text">Выберите пользователя слева для редактирования.</div>
-        </article>
+          </div>
+        </div>
+        <div
+          v-else
+          class="rounded-3xl border border-dashed border-gray-300 dark:border-gray-700 p-8 text-center text-gray-400 dark:text-gray-500 text-sm"
+        >
+          Выберите пользователя слева для редактирования.
+        </div>
       </div>
     </section>
   </div>
@@ -372,6 +695,11 @@ import type { Permission } from "../types/Permission";
 import type { Role } from "../types/Role";
 import type { User } from "../types/User";
 
+const sections = [
+  { label: "Role Management", value: "roles" as const },
+  { label: "User Management", value: "users" as const },
+];
+
 const loading = ref(false);
 const actionLoading = ref(false);
 const errorMessage = ref("");
@@ -394,103 +722,114 @@ const createUsername = ref("");
 const createEmail = ref("");
 const createPassword = ref("");
 const createRoleNames = ref<string[]>([]);
-
 const createRoleName = ref("");
 const createRolePermissionIds = ref<string[]>([]);
 const createRoleParentRoleIds = ref<string[]>([]);
 const permissionToAssignId = ref("");
 const parentRoleToAssignId = ref("");
 
-const selectedRole = computed(() => roles.value.find((role) => role.id === selectedRoleId.value) ?? null);
-const activeUsersCount = computed(() => users.value.filter((user) => user.isActive).length);
+const selectedRole = computed(
+  () => roles.value.find((r) => r.id === selectedRoleId.value) ?? null,
+);
+const activeUsersCount = computed(
+  () => users.value.filter((u) => u.isActive).length,
+);
+
+const statsCards = computed(() => [
+  {
+    label: "Пользователи",
+    value: users.value.length,
+    borderClass: "border-violet-200/70 dark:border-violet-700/40",
+    labelClass: "text-violet-600 dark:text-violet-400",
+  },
+  {
+    label: "Активные",
+    value: activeUsersCount.value,
+    borderClass: "border-emerald-200/70 dark:border-emerald-700/40",
+    labelClass: "text-emerald-600 dark:text-emerald-400",
+  },
+  {
+    label: "Роли",
+    value: roles.value.length,
+    borderClass: "border-blue-200/70 dark:border-blue-700/40",
+    labelClass: "text-blue-600 dark:text-blue-400",
+  },
+  {
+    label: "Permissions",
+    value: permissions.value.length,
+    borderClass: "border-amber-200/70 dark:border-amber-700/40",
+    labelClass: "text-amber-600 dark:text-amber-400",
+  },
+]);
 
 const filteredUsers = computed(() => {
-  const query = searchQuery.value.trim().toLowerCase();
-  if (!query) return users.value;
-
+  const q = searchQuery.value.trim().toLowerCase();
+  if (!q) return users.value;
   return users.value.filter(
-    (user) => user.username.toLowerCase().includes(query) || user.email.toLowerCase().includes(query)
+    (u) =>
+      u.username.toLowerCase().includes(q) || u.email.toLowerCase().includes(q),
   );
 });
 
 const filteredRoles = computed(() => {
-  const query = roleSearchQuery.value.trim().toLowerCase();
-  if (!query) return roles.value;
-
-  return roles.value.filter((role) => {
-    if (role.name.toLowerCase().includes(query)) {
-      return true;
-    }
-
-    return role.permissions.some((permission) => permission.toLowerCase().includes(query));
-  });
+  const q = roleSearchQuery.value.trim().toLowerCase();
+  if (!q) return roles.value;
+  return roles.value.filter(
+    (r) =>
+      r.name.toLowerCase().includes(q) ||
+      r.permissions.some((p) => p.toLowerCase().includes(q)),
+  );
 });
 
 const availableRolesForAssignment = computed(() => {
   if (!selectedUser.value) return [];
-
-  const assignedRoleNames = new Set(selectedUser.value.roles.map((role) => role.toLowerCase()));
-  return roles.value.filter((role) => !assignedRoleNames.has(role.name.toLowerCase()));
+  const assigned = new Set(
+    selectedUser.value.roles.map((r) => r.toLowerCase()),
+  );
+  return roles.value.filter((r) => !assigned.has(r.name.toLowerCase()));
 });
 
 const availablePermissionsForSelectedRole = computed(() => {
   if (!selectedRole.value) return [];
-
-  const directPermissionNames = new Set(selectedRole.value.directPermissions.map((permission) => permission.toLowerCase()));
-  return permissions.value.filter((permission) => !directPermissionNames.has(permission.name.toLowerCase()));
+  const direct = new Set(
+    selectedRole.value.directPermissions.map((p) => p.toLowerCase()),
+  );
+  return permissions.value.filter((p) => !direct.has(p.name.toLowerCase()));
 });
 
 const availableParentRolesForSelectedRole = computed(() => {
   if (!selectedRole.value) return [];
-
-  const currentRole = selectedRole.value;
-  const currentParentRoleIds = new Set(currentRole.parentRoles.map((role) => role.id));
-
-  return roles.value.filter((role) => {
-    if (role.id === currentRole.id) {
-      return false;
-    }
-
-    if (currentParentRoleIds.has(role.id)) {
-      return false;
-    }
-
-    const roleAncestors = collectAncestorRoleIds(role.id);
-    return !roleAncestors.has(currentRole.id);
+  const cur = selectedRole.value;
+  const parentIds = new Set(cur.parentRoles.map((r) => r.id));
+  return roles.value.filter((r) => {
+    if (r.id === cur.id || parentIds.has(r.id)) return false;
+    return !collectAncestorRoleIds(r.id).has(cur.id);
   });
 });
 
-function collectAncestorRoleIds(roleId: string, visited = new Set<string>()): Set<string> {
-  const role = roles.value.find((item) => item.id === roleId);
+function collectAncestorRoleIds(
+  roleId: string,
+  visited = new Set<string>(),
+): Set<string> {
+  const role = roles.value.find((r) => r.id === roleId);
   if (!role) return visited;
-
-  for (const parentRole of role.parentRoles) {
-    if (visited.has(parentRole.id)) {
-      continue;
-    }
-
-    visited.add(parentRole.id);
-    collectAncestorRoleIds(parentRole.id, visited);
+  for (const p of role.parentRoles) {
+    if (visited.has(p.id)) continue;
+    visited.add(p.id);
+    collectAncestorRoleIds(p.id, visited);
   }
-
   return visited;
 }
 
-function selectRole(roleId: string) {
-  selectedRoleId.value = roleId;
+function selectRole(id: string) {
+  selectedRoleId.value = id;
   permissionToAssignId.value = "";
   parentRoleToAssignId.value = "";
 }
 
 function syncEditableFields() {
-  if (!selectedUser.value) {
-    editUsername.value = "";
-    editEmail.value = "";
-    return;
-  }
-
-  editUsername.value = selectedUser.value.username;
-  editEmail.value = selectedUser.value.email;
+  editUsername.value = selectedUser.value?.username ?? "";
+  editEmail.value = selectedUser.value?.email ?? "";
 }
 
 function resetCreateUserForm() {
@@ -499,80 +838,65 @@ function resetCreateUserForm() {
   createPassword.value = "";
   createRoleNames.value = [];
 }
-
 function resetCreateRoleForm() {
   createRoleName.value = "";
   createRolePermissionIds.value = [];
   createRoleParentRoleIds.value = [];
 }
 
-async function reloadRolesAndKeepSelection(preferredRoleId = "") {
-  const loadedRoles = await getRoles();
-  roles.value = loadedRoles;
-
-  if (loadedRoles.length === 0) {
+async function reloadRolesAndKeepSelection(preferredId = "") {
+  const loaded = await getRoles();
+  roles.value = loaded;
+  if (loaded.length === 0) {
     selectedRoleId.value = "";
     return;
   }
+  const has = preferredId ? loaded.some((r) => r.id === preferredId) : false;
+  selectRole(has ? preferredId : (loaded[0]?.id ?? ""));
+}
 
-  const hasPreferredRole = preferredRoleId
-    ? loadedRoles.some((role) => role.id === preferredRoleId)
-    : false;
-
-  selectRole(hasPreferredRole ? preferredRoleId : loadedRoles[0]?.id ?? "");
+async function reloadUsersAndKeepSelection(preferredId = "") {
+  const loaded = await getUsers();
+  users.value = loaded;
+  if (loaded.length === 0) {
+    selectedUser.value = null;
+    selectedUserId.value = "";
+    syncEditableFields();
+    return;
+  }
+  const has = preferredId ? loaded.some((u) => u.id === preferredId) : false;
+  const target = has ? preferredId : (loaded[0]?.id ?? "");
+  if (!target) {
+    selectedUser.value = null;
+    selectedUserId.value = "";
+    syncEditableFields();
+    return;
+  }
+  await selectUser(target);
 }
 
 async function loadData() {
   loading.value = true;
   errorMessage.value = "";
   successMessage.value = "";
-
   try {
-    const [loadedPermissions] = await Promise.all([getPermissions()]);
-    permissions.value = loadedPermissions;
-
+    const [loadedPerms] = await Promise.all([getPermissions()]);
+    permissions.value = loadedPerms;
     await reloadRolesAndKeepSelection(selectedRoleId.value);
     await reloadUsersAndKeepSelection(selectedUserId.value);
   } catch (e: any) {
-    errorMessage.value = e?.response?.data?.error || "Не удалось загрузить данные.";
+    errorMessage.value =
+      e?.response?.data?.error || "Не удалось загрузить данные.";
   } finally {
     loading.value = false;
   }
 }
 
-async function reloadUsersAndKeepSelection(preferredUserId = "") {
-  const loadedUsers = await getUsers();
-  users.value = loadedUsers;
-
-  if (loadedUsers.length === 0) {
-    selectedUser.value = null;
-    selectedUserId.value = "";
-    syncEditableFields();
-    return;
-  }
-
-  const hasPreferred = preferredUserId
-    ? loadedUsers.some((user) => user.id === preferredUserId)
-    : false;
-
-  const targetUserId = hasPreferred ? preferredUserId : loadedUsers[0]?.id ?? "";
-  if (!targetUserId) {
-    selectedUser.value = null;
-    selectedUserId.value = "";
-    syncEditableFields();
-    return;
-  }
-
-  await selectUser(targetUserId);
-}
-
 async function selectUser(userId: string) {
   if (!userId) return;
-
   selectedUserId.value = userId;
   roleToAssignId.value = "";
   errorMessage.value = "";
-
   const user = await getUserById(userId);
   selectedUser.value = user;
   syncEditableFields();
@@ -580,37 +904,32 @@ async function selectUser(userId: string) {
 
 async function createNewRole() {
   if (actionLoading.value || loading.value) return;
-
-  const roleName = createRoleName.value.trim();
-  if (!roleName) {
+  const name = createRoleName.value.trim();
+  if (!name) {
     errorMessage.value = "Введите название роли.";
     return;
   }
-
-  const uniquePermissionIds = Array.from(new Set(createRolePermissionIds.value.filter((id) => id)));
-  const uniqueParentRoleIds = Array.from(new Set(createRoleParentRoleIds.value.filter((id) => id)));
-
   actionLoading.value = true;
   errorMessage.value = "";
   successMessage.value = "";
-
   try {
     await createRoleApi({
-      name: roleName,
-      permissionIds: uniquePermissionIds,
-      parentRoleIds: uniqueParentRoleIds,
+      name,
+      permissionIds: [
+        ...new Set(createRolePermissionIds.value.filter(Boolean)),
+      ],
+      parentRoleIds: [
+        ...new Set(createRoleParentRoleIds.value.filter(Boolean)),
+      ],
     });
-
     resetCreateRoleForm();
     await reloadRolesAndKeepSelection(selectedRoleId.value);
-
-    const createdRole = roles.value.find((role) => role.name.toLowerCase() === roleName.toLowerCase());
-    if (createdRole) {
-      selectRole(createdRole.id);
-    }
-
+    const created = roles.value.find(
+      (r) => r.name.toLowerCase() === name.toLowerCase(),
+    );
+    if (created) selectRole(created.id);
     activeSection.value = "roles";
-    successMessage.value = `Роль ${roleName} создана.`;
+    successMessage.value = `Роль ${name} создана.`;
   } catch (e: any) {
     errorMessage.value = e?.response?.data?.error || "Не удалось создать роль.";
   } finally {
@@ -618,54 +937,54 @@ async function createNewRole() {
   }
 }
 
-function getPermissionIdByName(permissionName: string): string | null {
-  const normalizedPermissionName = permissionName.trim().toLowerCase();
-  const permission = permissions.value.find((item) => item.name.toLowerCase() === normalizedPermissionName);
-  return permission?.id ?? null;
+function getPermissionIdByName(name: string) {
+  return (
+    permissions.value.find(
+      (p) => p.name.toLowerCase() === name.trim().toLowerCase(),
+    )?.id ?? null
+  );
 }
 
 async function addPermissionToSelectedRole() {
   if (!selectedRole.value || actionLoading.value) return;
   if (!permissionToAssignId.value) {
-    errorMessage.value = "Выберите permission для добавления.";
+    errorMessage.value = "Выберите permission.";
     return;
   }
-
   actionLoading.value = true;
   errorMessage.value = "";
   successMessage.value = "";
-
   try {
-    await assignPermissionToRole(selectedRole.value.id, permissionToAssignId.value);
+    await assignPermissionToRole(
+      selectedRole.value.id,
+      permissionToAssignId.value,
+    );
     permissionToAssignId.value = "";
     await reloadRolesAndKeepSelection(selectedRole.value.id);
-    successMessage.value = "Permission добавлен в роль.";
+    successMessage.value = "Permission добавлен.";
   } catch (e: any) {
-    errorMessage.value = e?.response?.data?.error || "Не удалось добавить permission.";
+    errorMessage.value = e?.response?.data?.error || "Ошибка.";
   } finally {
     actionLoading.value = false;
   }
 }
 
-async function removePermissionFromSelectedRole(permissionName: string) {
+async function removePermissionFromSelectedRole(name: string) {
   if (!selectedRole.value || actionLoading.value) return;
-
-  const permissionId = getPermissionIdByName(permissionName);
-  if (!permissionId) {
-    errorMessage.value = `Permission ${permissionName} не найден в справочнике.`;
+  const id = getPermissionIdByName(name);
+  if (!id) {
+    errorMessage.value = `Permission ${name} не найден.`;
     return;
   }
-
   actionLoading.value = true;
   errorMessage.value = "";
   successMessage.value = "";
-
   try {
-    await removePermissionFromRole(selectedRole.value.id, permissionId);
+    await removePermissionFromRole(selectedRole.value.id, id);
     await reloadRolesAndKeepSelection(selectedRole.value.id);
-    successMessage.value = "Permission убран из роли.";
+    successMessage.value = "Permission убран.";
   } catch (e: any) {
-    errorMessage.value = e?.response?.data?.error || "Не удалось убрать permission.";
+    errorMessage.value = e?.response?.data?.error || "Ошибка.";
   } finally {
     actionLoading.value = false;
   }
@@ -677,36 +996,35 @@ async function addParentRoleToSelectedRole() {
     errorMessage.value = "Выберите parent role.";
     return;
   }
-
   actionLoading.value = true;
   errorMessage.value = "";
   successMessage.value = "";
-
   try {
-    await assignParentRoleToRole(selectedRole.value.id, parentRoleToAssignId.value);
+    await assignParentRoleToRole(
+      selectedRole.value.id,
+      parentRoleToAssignId.value,
+    );
     parentRoleToAssignId.value = "";
     await reloadRolesAndKeepSelection(selectedRole.value.id);
-    successMessage.value = "Наследование роли добавлено.";
+    successMessage.value = "Наследование добавлено.";
   } catch (e: any) {
-    errorMessage.value = e?.response?.data?.error || "Не удалось добавить наследование роли.";
+    errorMessage.value = e?.response?.data?.error || "Ошибка.";
   } finally {
     actionLoading.value = false;
   }
 }
 
-async function removeParentRoleFromSelectedRole(parentRoleId: string) {
+async function removeParentRoleFromSelectedRole(parentId: string) {
   if (!selectedRole.value || actionLoading.value) return;
-
   actionLoading.value = true;
   errorMessage.value = "";
   successMessage.value = "";
-
   try {
-    await removeParentRoleFromRole(selectedRole.value.id, parentRoleId);
+    await removeParentRoleFromRole(selectedRole.value.id, parentId);
     await reloadRolesAndKeepSelection(selectedRole.value.id);
-    successMessage.value = "Наследование роли удалено.";
+    successMessage.value = "Наследование удалено.";
   } catch (e: any) {
-    errorMessage.value = e?.response?.data?.error || "Не удалось удалить наследование роли.";
+    errorMessage.value = e?.response?.data?.error || "Ошибка.";
   } finally {
     actionLoading.value = false;
   }
@@ -714,28 +1032,19 @@ async function removeParentRoleFromSelectedRole(parentRoleId: string) {
 
 async function createNewUser() {
   if (actionLoading.value || loading.value) return;
-
-  const username = createUsername.value.trim();
-  const email = createEmail.value.trim();
-  const password = createPassword.value;
-
+  const username = createUsername.value.trim(),
+    email = createEmail.value.trim(),
+    password = createPassword.value;
   if (!username || !email || !password) {
     errorMessage.value = "Заполните username, email и password.";
     return;
   }
-
-  const uniqueRoles = Array.from(
-    new Set(
-      createRoleNames.value
-        .map((roleName) => roleName.trim())
-        .filter((roleName) => roleName.length > 0)
-    )
-  );
-
+  const uniqueRoles = [
+    ...new Set(createRoleNames.value.map((r) => r.trim()).filter(Boolean)),
+  ];
   actionLoading.value = true;
   errorMessage.value = "";
   successMessage.value = "";
-
   try {
     const created = await createUserApi({
       username,
@@ -743,50 +1052,51 @@ async function createNewUser() {
       password,
       roles: uniqueRoles.length > 0 ? uniqueRoles : undefined,
     });
-
     resetCreateUserForm();
     await reloadUsersAndKeepSelection(created.userId);
     activeSection.value = "users";
     successMessage.value = `Пользователь ${created.username} создан.`;
   } catch (e: any) {
-    errorMessage.value = e?.response?.data?.error || "Не удалось создать пользователя.";
+    errorMessage.value =
+      e?.response?.data?.error || "Не удалось создать пользователя.";
   } finally {
     actionLoading.value = false;
   }
 }
 
-function getRoleIdByName(roleName: string): string | null {
-  const normalizedRoleName = roleName.trim().toLowerCase();
-  const role = roles.value.find((item) => item.name.toLowerCase() === normalizedRoleName);
-  return role?.id ?? null;
+function getRoleIdByName(name: string) {
+  return (
+    roles.value.find((r) => r.name.toLowerCase() === name.trim().toLowerCase())
+      ?.id ?? null
+  );
 }
 
-function getRolePermissionsPreview(roleName: string): string {
-  const normalizedRoleName = roleName.trim().toLowerCase();
-  const role = roles.value.find((item) => item.name.toLowerCase() === normalizedRoleName);
-
-  if (!role || role.permissions.length === 0) {
+function getRolePermissionsPreview(name: string) {
+  const role = roles.value.find(
+    (r) => r.name.toLowerCase() === name.trim().toLowerCase(),
+  );
+  if (!role || role.permissions.length === 0)
     return "Permissions не настроены.";
-  }
-
   const preview = role.permissions.slice(0, 4).join(", ");
   return role.permissions.length > 4 ? `${preview}...` : preview;
 }
 
 async function saveUser() {
   if (!selectedUser.value || actionLoading.value) return;
-
   actionLoading.value = true;
   errorMessage.value = "";
   successMessage.value = "";
-
   try {
-    const updated = await updateUser(selectedUser.value.id, editUsername.value.trim(), editEmail.value.trim());
+    const updated = await updateUser(
+      selectedUser.value.id,
+      editUsername.value.trim(),
+      editEmail.value.trim(),
+    );
     selectedUser.value = updated;
     await reloadUsersAndKeepSelection(updated.id);
     successMessage.value = "Пользователь обновлён.";
   } catch (e: any) {
-    errorMessage.value = e?.response?.data?.error || "Не удалось сохранить пользователя.";
+    errorMessage.value = e?.response?.data?.error || "Ошибка.";
   } finally {
     actionLoading.value = false;
   }
@@ -794,11 +1104,9 @@ async function saveUser() {
 
 async function toggleActive() {
   if (!selectedUser.value || actionLoading.value) return;
-
   actionLoading.value = true;
   errorMessage.value = "";
   successMessage.value = "";
-
   try {
     if (selectedUser.value.isActive) {
       await deactivateUser(selectedUser.value.id);
@@ -807,10 +1115,9 @@ async function toggleActive() {
       await activateUser(selectedUser.value.id);
       successMessage.value = "Пользователь активирован.";
     }
-
     await reloadUsersAndKeepSelection(selectedUser.value.id);
   } catch (e: any) {
-    errorMessage.value = e?.response?.data?.error || "Не удалось изменить статус пользователя.";
+    errorMessage.value = e?.response?.data?.error || "Ошибка.";
   } finally {
     actionLoading.value = false;
   }
@@ -818,21 +1125,19 @@ async function toggleActive() {
 
 async function deleteSelectedUser() {
   if (!selectedUser.value || actionLoading.value) return;
-  if (!window.confirm(`Удалить пользователя ${selectedUser.value.username}?`)) return;
-
+  if (!window.confirm(`Удалить пользователя ${selectedUser.value.username}?`))
+    return;
   actionLoading.value = true;
   errorMessage.value = "";
   successMessage.value = "";
-
   try {
-    const deletedUserId = selectedUser.value.id;
-    await deleteUser(deletedUserId);
+    const deletedId = selectedUser.value.id;
+    await deleteUser(deletedId);
     successMessage.value = "Пользователь удалён.";
-
-    const nextUserId = users.value.find((user) => user.id !== deletedUserId)?.id ?? "";
-    await reloadUsersAndKeepSelection(nextUserId);
+    const nextId = users.value.find((u) => u.id !== deletedId)?.id ?? "";
+    await reloadUsersAndKeepSelection(nextId);
   } catch (e: any) {
-    errorMessage.value = e?.response?.data?.error || "Не удалось удалить пользователя.";
+    errorMessage.value = e?.response?.data?.error || "Ошибка.";
   } finally {
     actionLoading.value = false;
   }
@@ -841,45 +1146,40 @@ async function deleteSelectedUser() {
 async function assignRoleToSelectedUser() {
   if (!selectedUser.value || actionLoading.value) return;
   if (!roleToAssignId.value) {
-    errorMessage.value = "Выберите роль для назначения.";
+    errorMessage.value = "Выберите роль.";
     return;
   }
-
   actionLoading.value = true;
   errorMessage.value = "";
   successMessage.value = "";
-
   try {
     await assignRole(selectedUser.value.id, roleToAssignId.value);
     roleToAssignId.value = "";
     await reloadUsersAndKeepSelection(selectedUser.value.id);
     successMessage.value = "Роль назначена.";
   } catch (e: any) {
-    errorMessage.value = e?.response?.data?.error || "Не удалось назначить роль.";
+    errorMessage.value = e?.response?.data?.error || "Ошибка.";
   } finally {
     actionLoading.value = false;
   }
 }
 
-async function removeRoleFromSelectedUser(roleName: string) {
+async function removeRoleFromSelectedUser(name: string) {
   if (!selectedUser.value || actionLoading.value) return;
-
-  const roleId = getRoleIdByName(roleName);
-  if (!roleId) {
-    errorMessage.value = `Роль ${roleName} не найдена в справочнике ролей.`;
+  const id = getRoleIdByName(name);
+  if (!id) {
+    errorMessage.value = `Роль ${name} не найдена.`;
     return;
   }
-
   actionLoading.value = true;
   errorMessage.value = "";
   successMessage.value = "";
-
   try {
-    await removeRole(selectedUser.value.id, roleId);
+    await removeRole(selectedUser.value.id, id);
     await reloadUsersAndKeepSelection(selectedUser.value.id);
-    successMessage.value = "Роль удалена у пользователя.";
+    successMessage.value = "Роль удалена.";
   } catch (e: any) {
-    errorMessage.value = e?.response?.data?.error || "Не удалось убрать роль.";
+    errorMessage.value = e?.response?.data?.error || "Ошибка.";
   } finally {
     actionLoading.value = false;
   }

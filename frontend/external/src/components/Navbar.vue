@@ -58,7 +58,6 @@
               ></span>
             </router-link>
 
-            <!-- Мои бронирования - только для авторизованных -->
             <router-link
               v-if="isAuthenticated"
               to="/bookings"
@@ -70,7 +69,6 @@
                 class="absolute bottom-0 left-0 w-0 h-0.5 bg-primary-600 dark:bg-primary-400 group-hover:w-full transition-all duration-300"
               ></span>
             </router-link>
-
           </div>
         </div>
 
@@ -90,6 +88,27 @@
           </div>
 
           <div v-else class="flex items-center gap-3">
+            <!-- Profile avatar button -->
+            <router-link
+              to="/profile"
+              class="w-9 h-9 rounded-xl bg-emerald-600 hover:bg-emerald-700 flex items-center justify-center transition-colors shadow-md shadow-emerald-500/20"
+              title="Мой профиль"
+            >
+              <svg
+                class="w-5 h-5 text-white"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                />
+              </svg>
+            </router-link>
+
             <button
               @click="logout"
               class="px-4 py-2 text-gray-700 dark:text-gray-300 hover:text-red-600 dark:hover:text-red-500 font-medium transition-colors"
@@ -158,6 +177,7 @@
           >
             Главная
           </router-link>
+
           <router-link
             to="/cars"
             active-class="bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400"
@@ -177,7 +197,6 @@
             Подать заявку
           </router-link>
 
-          <!-- Мои бронирования - только для авторизованных -->
           <router-link
             v-if="isAuthenticated"
             to="/bookings"
@@ -188,6 +207,16 @@
             Мои бронирования
           </router-link>
 
+          <!-- Profile link in mobile menu -->
+          <router-link
+            v-if="isAuthenticated"
+            to="/profile"
+            active-class="bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400"
+            class="block px-4 py-3 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 font-medium transition-colors"
+            @click="mobileMenuOpen = false"
+          >
+            Мой профиль
+          </router-link>
         </div>
       </div>
     </transition>
@@ -202,7 +231,6 @@ import ThemeToggle from "./ThemeToggle.vue";
 
 const router = useRouter();
 const isAuthenticated = computed(() => {
-  // Проверяем валидность токена
   if (auth.token) {
     return auth.checkTokenValidity();
   }
@@ -216,15 +244,12 @@ function logout() {
   router.push("/login");
 }
 
-// Track scroll position
 const handleScroll = () => {
   scrolled.value = window.scrollY > 20;
 };
 
 onMounted(() => {
   window.addEventListener("scroll", handleScroll);
-
-  // Проверяем токен при монтировании компонента
   auth.checkTokenValidity();
 });
 

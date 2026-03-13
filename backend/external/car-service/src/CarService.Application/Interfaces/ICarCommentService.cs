@@ -9,17 +9,26 @@ namespace CarService.Application.Interfaces
             int partnerCarId,
             PaginationParams paginationParams,
             CancellationToken cancellationToken = default);
+
+        Task<PagedResult<CarCommentResponseDto>> GetByUserIdPaginatedAsync(
+            string userId,
+            PaginationParams paginationParams,
+            CancellationToken cancellationToken = default);
+
         Task<CarCommentResponseDto?> GetByIdAsync(int id, CancellationToken cancellationToken = default);
+
         Task<CarCommentResponseDto> CreateAsync(
             string userId,
             string userName,
             CarCommentCreateDto dto,
             CancellationToken cancellationToken = default);
+
         Task<CarCommentResponseDto?> UpdateAsync(
             string userId,
             int commentId,
             CarCommentUpdateDto dto,
             CancellationToken cancellationToken = default);
+
         Task<bool> DeleteAsync(string userId, int commentId, CancellationToken cancellationToken = default);
     }
 }

@@ -29,6 +29,21 @@ namespace CarService.Api.Controllers
             return Ok(payload);
         }
 
+        /// <summary>
+        /// Returns paginated list of comments left by the currently authenticated user.
+        /// Used by the profile page "My Reviews" section.
+        /// </summary>
+        [HttpGet("my")]
+        [Authorize]
+        public async Task<IActionResult> GetMyComments(
+            [FromQuery] PaginationParams paginationParams,
+            CancellationToken cancellationToken)
+        {
+            var userId = User.GetRequiredUserId();
+            var payload = await _carCommentService.GetByUserIdPaginatedAsync(userId, paginationParams, cancellationToken);
+            return Ok(payload);
+        }
+
         [HttpGet("{id:int}")]
         [AllowAnonymous]
         public async Task<IActionResult> GetById(int id, CancellationToken cancellationToken)
