@@ -417,6 +417,37 @@ namespace BookingService.Infrastructure.Services
             return true;
         }
 
+        
+    public async Task<BookingStatsDto> GetUserBookingStats(Guid userId, CancellationToken cancellationToken = default)
+    {
+        EnsureValidUserId(userId);
+
+        var bookings = await _db.Bookings
+            .AsNoTracking()
+            .Where(b => b.UserId == userId)
+            .Select(b => new { b.Status, b.TotalPrice })
+            .ToListAsync(cancellationToken);
+
+        var totalCount = bookings.Count;
+        var activeCount = bookings.Count(b =>
+            b.Status == BookingStatus.Confirmed ||
+            b.Status == BookingStatus.Active ||
+            b.Status == BookingStatus.Pending);
+        var completedCount = bookings.Count(b => b.Status == BookingStatus.Completed);
+        var totalSpent = bookings
+            .Where(b => b.Status == BookingStatus.Completed)
+            .Sum(b => b.TotalPrice ?? 0m);
+
+        return new BookingStatsDto
+        {
+            TotalCount = totalCount,
+            ActiveCount = activeCount,
+            CompletedCount = completedCount,
+            TotalSpent = totalSpent
+        };
+    }
+
+
         private async Task<BookingResponseDto> CreateBookingInMemory(
             Guid userId,
             int partnerCarId,

@@ -13,6 +13,8 @@ import PartnerProfileView from "../views/PartnerProfileView.vue";
 import PartnerCarsView from "../views/PartnerCarsView.vue";
 import PartnerCarDetailView from "../views/PartnerCarDetailView.vue";
 import PartnerBookingsView from "../views/PartnerBookingsView.vue";
+import ProfileView from "../views/ProfileView.vue";
+import ProfileRouterView from "../views/ProfileRouterView.vue";
 import { auth } from "../store/auth";
 
 const routes = [
@@ -44,23 +46,44 @@ const routes = [
   {
     path: "/cars",
     component: CarsView,
-    meta: { requiresAuth: false }, // Доступно для всех
+    meta: { requiresAuth: false },
   },
   {
     path: "/bookings",
     component: MyBookingsView,
-    meta: { requiresAuth: true }, // Только для авторизованных
+    meta: { requiresAuth: true },
   },
   {
     path: "/bookings/:id/payment",
     component: BookingPaymentView,
     meta: { requiresAuth: true },
   },
+
+  // /profile — определяет роль через API и редиректит
   {
-    path: "/partner/me",
+    path: "/profile",
+    component: ProfileRouterView,
+    meta: { requiresAuth: true },
+  },
+
+  // Конкретные профили
+  {
+    path: "/profile/user",
+    component: ProfileView,
+    meta: { requiresAuth: true },
+  },
+  {
+    path: "/profile/partner",
     component: PartnerProfileView,
     meta: { requiresAuth: true },
   },
+
+  // Старый маршрут — редирект для совместимости
+  {
+    path: "/partner/me",
+    redirect: "/profile",
+  },
+
   {
     path: "/partner/cars",
     component: PartnerCarsView,
@@ -80,7 +103,7 @@ const routes = [
     path: "/cars/:id",
     name: "CarDetail",
     component: CarDetailView,
-    meta: { requiresAuth: false }, // Доступно для всех
+    meta: { requiresAuth: false },
   },
   {
     path: "/:pathMatch(.*)*",
@@ -103,21 +126,18 @@ export const router = createRouter({
 router.beforeEach((to, from, next) => {
   const token = localStorage.getItem("token");
 
-  // Проверяем валидность токена перед каждым переходом
   if (token) {
     const isValid = auth.checkTokenValidity();
-
     if (!isValid && to.meta.requiresAuth) {
-      // Токен истек и требуется авторизация - редирект на логин
       next("/login");
       return;
     }
   }
 
-  // Стандартная проверка авторизации
   if (to.meta.requiresAuth && !token) {
     next("/login");
-  } else {
-    next();
+    return;
   }
+
+  next();
 });

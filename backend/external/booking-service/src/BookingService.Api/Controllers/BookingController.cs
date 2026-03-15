@@ -48,6 +48,20 @@ namespace BookingService.Api.Controllers
             return Ok(bookings);
         }
 
+
+        /// <summary>
+        /// Returns aggregate stats for the current user's bookings:
+        /// totalCount, activeCount, completedCount, totalSpent (KZT).
+        /// Used by the profile page.
+        /// </summary>
+        [HttpGet("my/stats")]
+        public async Task<IActionResult> MyStats(CancellationToken cancellationToken)
+        {
+            var stats = await _bookingService.GetUserBookingStats(GetUserId(), cancellationToken);
+            return Ok(stats);
+        }
+
+
         [HttpGet("{id:int}")]
         public async Task<IActionResult> Get(int id)
         {
@@ -134,7 +148,7 @@ namespace BookingService.Api.Controllers
                 startTime,
                 endTime);
 
-            return Ok(new { available });
+            return Ok(new { available }); // profileCommentsDTO + get-set 2 api
         }
     }
 }
