@@ -9,8 +9,10 @@ public class User
     public string Email { get; private set; } = string.Empty;
     public string PasswordHash { get; private set; } = string.Empty;
     public bool IsActive { get; private set; } = true;
-    public string SubjectType { get; private set; } = SubjectTypeConstants.User;
-    public string ActorType { get; private set; } = ActorTypeConstants.Client;
+    public Guid SubjectTypeId { get; private set; } = SubjectTypeConstants.UserId;
+    public Guid ActorTypeId { get; private set; } = ActorTypeConstants.ClientId;
+    public string SubjectType => SubjectTypeConstants.GetName(SubjectTypeId);
+    public string ActorType => ActorTypeConstants.GetName(ActorTypeId);
 
     public ICollection<Role> Roles { get; private set; } = new List<Role>();
     public ICollection<RefreshToken> RefreshTokens { get; private set; } = new List<RefreshToken>();
@@ -67,20 +69,12 @@ public class User
 
     public void SetSubjectType(string subjectType)
     {
-        SubjectType = NormalizeKnownType(
-            subjectType,
-            nameof(subjectType),
-            "Subject type",
-            SubjectTypeConstants.All);
+        SubjectTypeId = SubjectTypeConstants.GetId(subjectType);
     }
 
     public void SetActorType(string actorType)
     {
-        ActorType = NormalizeKnownType(
-            actorType,
-            nameof(actorType),
-            "Actor type",
-            ActorTypeConstants.All);
+        ActorTypeId = ActorTypeConstants.GetId(actorType);
     }
 
     public void AssignRole(Role role)
@@ -149,27 +143,5 @@ public class User
         }
 
         return string.Equals(ActorType, actorType.Trim(), StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static string NormalizeKnownType(
-        string value,
-        string parameterName,
-        string label,
-        HashSet<string> allowedValues)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            throw new ArgumentException($"{label} cannot be empty.", parameterName);
-        }
-
-        var normalizedValue = value.Trim().ToLowerInvariant();
-        if (!allowedValues.Contains(normalizedValue))
-        {
-            throw new ArgumentException(
-                $"{label} '{normalizedValue}' is not supported.",
-                parameterName);
-        }
-
-        return normalizedValue;
     }
 }
