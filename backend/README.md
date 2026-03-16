@@ -31,6 +31,8 @@
 - внешний вызов `POST /identity/auth/login`
 - внутри gateway -> `POST {IDENTITY_SERVICE_URL}/auth/login`
 
+В корневом `docker-compose.yml` наружу опубликован только gateway. Остальные backend-сервисы и БД находятся во внутренних Docker networks.
+
 ## Главные service-to-service взаимодействия
 Основная внутренняя оркестрация сосредоточена в `ticket-service`.
 
@@ -114,10 +116,16 @@
 - `booking-service`: `/internal/bookings/*`
 - `car-service`: `/internal/partner-cars/provision`
 
-В локальной конфигурации общего compose сейчас используется одинаковое значение:
-- `local-internal-api-key`
+В общем compose ключи разведены по целевым сервисам:
+- `local-identity-service-key`
+- `local-client-service-key`
+- `local-partner-service-key`
+- `local-car-service-key`
+- `local-booking-service-key`
+- `local-payment-service-key`
+- `local-file-service-key`
 
-Но это не жесткое ограничение архитектуры: ключи можно разделять по сервисам.
+Это уменьшает blast radius по сравнению с одним общим `X-Internal-Api-Key`.
 
 ## Границы данных
 - `identity-service` -> `identity-db`

@@ -36,21 +36,14 @@ AutoRent - микросервисная платформа каршеринга.
 docker compose up --build
 ```
 
-Основные порты по умолчанию:
-- API Gateway: `9186`
+Публичные порты по умолчанию:
+- API Gateway (HTTP): `9186`
+- API Gateway (HTTPS, self-signed dev cert): `9443`
 - External Frontend: `5173`
 - Internal Frontend: `5174`
 - Superadmin Frontend: `5175`
-- Identity Service: `1244`
-- Car Service: `1298`
-- Booking Service: `1821`
-- Client Service: `1831`
-- Partner Service: `1832`
-- Payment Service: `1834`
-- Ticket Service: `1248`
-- Image Service: `9181`
-- Email Service: `9182`
-- File Service: `9183`
+
+В корневом `docker-compose.yml` backend-сервисы и БД больше не публикуются наружу. Внешняя точка входа одна: `api-gateway`.
 
 ## Предсозданные пользователи (seed)
 После применения миграций `identity-service` доступны следующие логины:
@@ -73,7 +66,7 @@ docker compose up --build
 | Image Service | `backend/shared/image-service` | Загрузка/удаление изображений |
 | File Service | `backend/internal/file-service` | Хранение приватных файлов и выдача временных ссылок |
 | Email Service | `backend/shared/email-service` | SMTP-уведомления (client/partner/partner-car) |
-| API Gateway | `backend/external/reverse-proxy-service` | Проксирование `/identity`, `/cars`, `/bookings`, `/clients`, `/partners`, `/tickets`, `/files`, `/internal` |
+| API Gateway | `backend/external/reverse-proxy-service` | Единственная внешняя точка входа: route rewrite, security headers, rate limiting, health checks, HTTP/HTTPS edge |
 | Client Service | `backend/external/client-service` | Профили клиентов (CRUD + `/me`) |
 | Partner Service | `backend/internal/partner-service` | Профили партнеров (CRUD + `/me`) |
 | External Frontend | `frontend/external` | Пользовательский UI + автоподбор и бронирование по модели |

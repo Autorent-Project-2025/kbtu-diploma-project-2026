@@ -11,6 +11,17 @@ import { buildStoredFileName, normalizeFileName } from "../utils/fileName";
 
 const UPLOADS_DIR = path.resolve(process.cwd(), "uploads");
 
+const buildPublicUrl = (relativePath: string): string => {
+  const publicBaseUrl = process.env.PUBLIC_BASE_URL?.trim();
+  if (!publicBaseUrl) {
+    return relativePath;
+  }
+
+  const normalizedBaseUrl = publicBaseUrl.replace(/\/+$/, "");
+  const normalizedRelativePath = relativePath.replace(/^\/+/, "");
+  return new URL(normalizedRelativePath, `${normalizedBaseUrl}/`).toString();
+};
+
 class LocalStorageFileService implements IFileService {
   async saveFile(payload: UploadFilePayload): Promise<UploadFileResult> {
     await mkdir(UPLOADS_DIR, { recursive: true });
@@ -27,7 +38,7 @@ class LocalStorageFileService implements IFileService {
 
     return {
       fileName,
-      url: `/public/${encodeURIComponent(fileName)}`,
+      url: buildPublicUrl(`/public/${encodeURIComponent(fileName)}`),
       expiresAtUtc: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
     };
   }

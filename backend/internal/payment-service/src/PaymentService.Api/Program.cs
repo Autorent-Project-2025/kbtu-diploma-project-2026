@@ -49,6 +49,7 @@ var app = builder.Build();
 app.UseMiddleware<ApiExceptionMiddleware>();
 app.UseHttpsRedirection();
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
+app.MapGet("/healthz", () => Results.Ok(new { status = "ok" }));
 app.MapControllers();
 
 app.Run();

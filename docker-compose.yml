@@ -6,8 +6,8 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: postgres_db
-    ports:
-      - "${IDENTITY_DB_PORT:-5434}:5432"
+    expose:
+      - "5432"
     volumes:
       - identity_pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -16,6 +16,8 @@ services:
       timeout: 3s
       retries: 20
       start_period: 5s
+    networks:
+      - data
 
   identity-flyway:
     image: flyway/flyway:12
@@ -31,6 +33,8 @@ services:
       FLYWAY_USER: postgres
       FLYWAY_PASSWORD: postgres
       FLYWAY_CONNECT_RETRIES: 30
+    networks:
+      - data
 
   identity-service:
     build:
@@ -45,13 +49,23 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ConnectionStrings__DbConnection: Host=identity-db;Port=5432;Database=postgres_db;Username=postgres;Password=postgres
-    ports:
-      - "${IDENTITY_SERVICE_PORT:-1244}:8080"
+      InternalAuth__ApiKey: local-identity-service-key
+    expose:
+      - "8080"
     depends_on:
       identity-db:
         condition: service_healthy
       identity-flyway:
         condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - backend
+      - data
 
   car-db:
     image: postgres:16
@@ -60,8 +74,8 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: postgres_db
-    ports:
-      - "${CAR_DB_PORT:-1299}:5432"
+    expose:
+      - "5432"
     volumes:
       - car_pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -70,6 +84,8 @@ services:
       timeout: 3s
       retries: 20
       start_period: 5s
+    networks:
+      - data
 
   car-flyway:
     image: flyway/flyway:12
@@ -85,6 +101,8 @@ services:
       FLYWAY_USER: postgres
       FLYWAY_PASSWORD: postgres
       FLYWAY_CONNECT_RETRIES: 30
+    networks:
+      - data
 
   car-service:
     build:
@@ -101,16 +119,25 @@ services:
       ConnectionStrings__DbConnection: Host=car-db;Port=5432;Database=postgres_db;Username=postgres;Password=postgres
       PartnerService__BaseUrl: http://partner-service:8080
       BookingService__BaseUrl: http://booking-service:8080
-      BookingService__InternalApiKey: local-internal-api-key
+      BookingService__InternalApiKey: local-booking-service-key
       ImageService__BaseUrl: http://image-service:8080
-      InternalAuth__ApiKey: local-internal-api-key
-    ports:
-      - "${CAR_SERVICE_PORT:-1298}:8080"
+      InternalAuth__ApiKey: local-car-service-key
+    expose:
+      - "8080"
     depends_on:
       car-db:
         condition: service_healthy
       car-flyway:
         condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - backend
+      - data
 
   booking-db:
     image: postgres:16
@@ -119,8 +146,8 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: postgres_db
-    ports:
-      - "${BOOKING_DB_PORT:-1292}:5432"
+    expose:
+      - "5432"
     volumes:
       - booking_pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -129,6 +156,8 @@ services:
       timeout: 3s
       retries: 20
       start_period: 5s
+    networks:
+      - data
 
   booking-flyway:
     image: flyway/flyway:12
@@ -144,6 +173,8 @@ services:
       FLYWAY_USER: postgres
       FLYWAY_PASSWORD: postgres
       FLYWAY_CONNECT_RETRIES: 30
+    networks:
+      - data
 
   booking-service:
     build:
@@ -158,19 +189,28 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ConnectionStrings__DbConnection: Host=booking-db;Port=5432;Database=postgres_db;Username=postgres;Password=postgres
-      InternalAuth__ApiKey: local-internal-api-key
+      InternalAuth__ApiKey: local-booking-service-key
       CarService__BaseUrl: http://car-service:8080
       PaymentService__BaseUrl: http://payment-service:8080
-      PaymentService__InternalApiKey: local-internal-api-key
-    ports:
-      - "${BOOKING_SERVICE_PORT:-1821}:8080"
+      PaymentService__InternalApiKey: local-payment-service-key
+    expose:
+      - "8080"
     depends_on:
       booking-db:
         condition: service_healthy
       booking-flyway:
         condition: service_completed_successfully
       payment-service:
-        condition: service_started
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - backend
+      - data
 
   client-db:
     image: postgres:16
@@ -179,8 +219,8 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: postgres_db
-    ports:
-      - "${CLIENT_DB_PORT:-1291}:5432"
+    expose:
+      - "5432"
     volumes:
       - client_pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -189,6 +229,8 @@ services:
       timeout: 3s
       retries: 20
       start_period: 5s
+    networks:
+      - data
 
   client-flyway:
     image: flyway/flyway:12
@@ -204,6 +246,8 @@ services:
       FLYWAY_USER: postgres
       FLYWAY_PASSWORD: postgres
       FLYWAY_CONNECT_RETRIES: 30
+    networks:
+      - data
 
   client-service:
     build:
@@ -218,13 +262,23 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ConnectionStrings__DbConnection: Host=client-db;Port=5432;Database=postgres_db;Username=postgres;Password=postgres
-    ports:
-      - "${CLIENT_SERVICE_PORT:-1831}:8080"
+      InternalAuth__ApiKey: local-client-service-key
+    expose:
+      - "8080"
     depends_on:
       client-db:
         condition: service_healthy
       client-flyway:
         condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - backend
+      - data
 
   partner-db:
     image: postgres:16
@@ -233,8 +287,8 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: postgres_db
-    ports:
-      - "${PARTNER_DB_PORT:-1289}:5432"
+    expose:
+      - "5432"
     volumes:
       - partner_pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -243,6 +297,8 @@ services:
       timeout: 3s
       retries: 20
       start_period: 5s
+    networks:
+      - data
 
   partner-flyway:
     image: flyway/flyway:12
@@ -258,6 +314,8 @@ services:
       FLYWAY_USER: postgres
       FLYWAY_PASSWORD: postgres
       FLYWAY_CONNECT_RETRIES: 30
+    networks:
+      - data
 
   partner-service:
     build:
@@ -272,19 +330,33 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ConnectionStrings__DbConnection: Host=partner-db;Port=5432;Database=postgres_db;Username=postgres;Password=postgres
+      InternalAuth__ApiKey: local-partner-service-key
+      FileService__BaseUrl: http://file-service:8080
+      FileService__InternalApiKey: local-file-service-key
       PaymentService__BaseUrl: http://payment-service:8080
-      PaymentService__InternalApiKey: local-internal-api-key
+      PaymentService__InternalApiKey: local-payment-service-key
       BookingService__BaseUrl: http://booking-service:8080
-      BookingService__InternalApiKey: local-internal-api-key
-    ports:
-      - "${PARTNER_SERVICE_PORT:-1832}:8080"
+      BookingService__InternalApiKey: local-booking-service-key
+    expose:
+      - "8080"
     depends_on:
       partner-db:
         condition: service_healthy
       partner-flyway:
         condition: service_completed_successfully
       payment-service:
-        condition: service_started
+        condition: service_healthy
+      file-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - backend
+      - data
 
   payment-db:
     image: postgres:16
@@ -293,8 +365,8 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: postgres_db
-    ports:
-      - "${PAYMENT_DB_PORT:-1288}:5432"
+    expose:
+      - "5432"
     volumes:
       - payment_pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -303,6 +375,8 @@ services:
       timeout: 3s
       retries: 20
       start_period: 5s
+    networks:
+      - data
 
   payment-flyway:
     image: flyway/flyway:12
@@ -318,6 +392,8 @@ services:
       FLYWAY_USER: postgres
       FLYWAY_PASSWORD: postgres
       FLYWAY_CONNECT_RETRIES: 30
+    networks:
+      - data
 
   payment-service:
     build:
@@ -332,16 +408,25 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ConnectionStrings__DbConnection: Host=payment-db;Port=5432;Database=postgres_db;Username=postgres;Password=postgres
-      InternalAuth__ApiKey: local-internal-api-key
+      InternalAuth__ApiKey: local-payment-service-key
       Payment__Currency: KZT
       Payment__PlatformCommissionRate: 0.10
-    ports:
-      - "${PAYMENT_SERVICE_PORT:-1834}:8080"
+    expose:
+      - "8080"
     depends_on:
       payment-db:
         condition: service_healthy
       payment-flyway:
         condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - backend
+      - data
 
   ticket-db:
     image: postgres:16
@@ -350,8 +435,8 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: postgres_db
-    ports:
-      - "${TICKET_DB_PORT:-1290}:5432"
+    expose:
+      - "5432"
     volumes:
       - ticket_pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -360,6 +445,8 @@ services:
       timeout: 3s
       retries: 20
       start_period: 5s
+    networks:
+      - data
 
   ticket-flyway:
     image: flyway/flyway:12
@@ -375,6 +462,8 @@ services:
       FLYWAY_USER: postgres
       FLYWAY_PASSWORD: postgres
       FLYWAY_CONNECT_RETRIES: 30
+    networks:
+      - data
 
   email-service:
     build:
@@ -388,8 +477,22 @@ services:
         required: false
     environment:
       PORT: 8080
-    ports:
-      - "${EMAIL_SERVICE_PORT:-9182}:8080"
+    expose:
+      - "8080"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:8080/healthz').then((res)=>process.exit(res.ok?0:1)).catch(()=>process.exit(1))"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    networks:
+      - backend
 
   ticket-service:
     build:
@@ -405,37 +508,47 @@ services:
       ASPNETCORE_ENVIRONMENT: Development
       ConnectionStrings__DbConnection: Host=ticket-db;Port=5432;Database=postgres_db;Username=postgres;Password=postgres
       IdentityService__BaseUrl: http://identity-service:8080
+      IdentityService__InternalApiKey: local-identity-service-key
       EmailService__BaseUrl: http://email-service:8080
       ClientService__BaseUrl: http://client-service:8080
-      ClientService__InternalApiKey: local-internal-api-key
+      ClientService__InternalApiKey: local-client-service-key
       PartnerService__BaseUrl: http://partner-service:8080
-      PartnerService__InternalApiKey: local-internal-api-key
+      PartnerService__InternalApiKey: local-partner-service-key
       FileService__BaseUrl: http://file-service:8080
-      FileService__InternalApiKey: local-internal-api-key
+      FileService__InternalApiKey: local-file-service-key
       ImageService__BaseUrl: http://image-service:8080
       CarService__BaseUrl: http://car-service:8080
-      CarService__InternalApiKey: local-internal-api-key
-    ports:
-      - "${TICKET_SERVICE_PORT:-1248}:8080"
+      CarService__InternalApiKey: local-car-service-key
+    expose:
+      - "8080"
     depends_on:
       ticket-db:
         condition: service_healthy
       ticket-flyway:
         condition: service_completed_successfully
       identity-service:
-        condition: service_started
+        condition: service_healthy
       email-service:
-        condition: service_started
+        condition: service_healthy
       client-service:
-        condition: service_started
+        condition: service_healthy
       partner-service:
-        condition: service_started
+        condition: service_healthy
       file-service:
-        condition: service_started
+        condition: service_healthy
       image-service:
-        condition: service_started
+        condition: service_healthy
       car-service:
-        condition: service_started
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - backend
+      - data
 
   image-service:
     build:
@@ -449,10 +562,25 @@ services:
         required: false
     environment:
       PORT: 8080
-    ports:
-      - "${IMAGE_SERVICE_PORT:-9181}:8080"
+      PUBLIC_BASE_URL: ${IMAGE_SERVICE_PUBLIC_BASE_URL:-http://localhost:9186/internal}
+    expose:
+      - "8080"
     volumes:
       - image_uploads:/app/uploads
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:8080/healthz').then((res)=>process.exit(res.ok?0:1)).catch(()=>process.exit(1))"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    networks:
+      - backend
 
   file-service:
     build:
@@ -466,11 +594,26 @@ services:
         required: false
     environment:
       PORT: 8080
-      INTERNAL_API_KEY: local-internal-api-key
-    ports:
-      - "${FILE_SERVICE_PORT:-9183}:8080"
+      INTERNAL_API_KEY: local-file-service-key
+      PUBLIC_BASE_URL: ${FILE_SERVICE_PUBLIC_BASE_URL:-http://localhost:9186/files}
+    expose:
+      - "8080"
     volumes:
       - file_uploads:/app/uploads
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:8080/healthz').then((res)=>process.exit(res.ok?0:1)).catch(()=>process.exit(1))"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    networks:
+      - backend
 
   api-gateway:
     build:
@@ -486,26 +629,55 @@ services:
       TICKET_SERVICE_URL: http://ticket-service:8080
       FILE_SERVICE_URL: http://file-service:8080
       INTERNAL_SERVICE_URL: http://image-service:8080
+      ALLOWED_ORIGINS: http://localhost:5173,http://localhost:5174,http://localhost:5175
+      RATE_LIMIT_WINDOW_MS: 60000
+      RATE_LIMIT_MAX_REQUESTS: 300
+      PROXY_TIMEOUT_MS: 30000
+      REQUEST_TIMEOUT_MS: 30000
       PORT: 8080
+      HTTPS_PORT: 8443
+      TLS_ENABLED: "true"
+      HTTP_TO_HTTPS_REDIRECT: "false"
+      TLS_CERT_PATH: /tmp/autorent-edge.crt
+      TLS_KEY_PATH: /tmp/autorent-edge.key
+      TLS_CERT_CN: localhost
+      TLS_CERT_DAYS: 30
+      TRUST_PROXY: loopback, linklocal, uniquelocal
     ports:
       - "${API_GATEWAY_PORT:-9186}:8080"
+      - "${API_GATEWAY_TLS_PORT:-9443}:8443"
     depends_on:
       identity-service:
-        condition: service_started
+        condition: service_healthy
       car-service:
-        condition: service_started
+        condition: service_healthy
       booking-service:
-        condition: service_started
+        condition: service_healthy
       client-service:
-        condition: service_started
+        condition: service_healthy
       partner-service:
-        condition: service_started
+        condition: service_healthy
       ticket-service:
-        condition: service_started
+        condition: service_healthy
       file-service:
-        condition: service_started
+        condition: service_healthy
       image-service:
-        condition: service_started
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:8080/healthz').then((res)=>process.exit(res.ok?0:1)).catch(()=>process.exit(1))"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    networks:
+      - frontend
+      - backend
 
   frontend:
     build:
@@ -522,7 +694,21 @@ services:
       - "${FRONTEND_PORT:-5173}:5173"
     depends_on:
       api-gateway:
-        condition: service_started
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:5173').then((res)=>process.exit(res.ok?0:1)).catch(()=>process.exit(1))"
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - frontend
 
   internal-frontend:
     build:
@@ -539,7 +725,21 @@ services:
       - "${INTERNAL_FRONTEND_PORT:-5174}:5173"
     depends_on:
       api-gateway:
-        condition: service_started
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:5173').then((res)=>process.exit(res.ok?0:1)).catch(()=>process.exit(1))"
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - frontend
 
   superadmin-frontend:
     build:
@@ -556,7 +756,21 @@ services:
       - "${SUPERADMIN_FRONTEND_PORT:-5175}:5173"
     depends_on:
       api-gateway:
-        condition: service_started
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:5173').then((res)=>process.exit(res.ok?0:1)).catch(()=>process.exit(1))"
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - frontend
 
 volumes:
   identity_pgdata:
@@ -568,3 +782,9 @@ volumes:
   ticket_pgdata:
   image_uploads:
   file_uploads:
+
+networks:
+  frontend:
+  backend:
+  data:
+    internal: true

@@ -100,7 +100,7 @@ async function main() {
     const url = new URL(req.url ?? "/", "http://localhost");
 
     try {
-      if (req.method === "GET" && url.pathname === "/health") {
+      if (req.method === "GET" && (url.pathname === "/health" || url.pathname === "/healthz")) {
         sendJson(res, 200, { status: "ok" });
         return;
       }
