@@ -52,12 +52,16 @@
   <div v-else class="min-h-screen bg-gray-50 dark:bg-gray-950">
     <router-view />
   </div>
+
+  <!-- Toast уведомления — всегда поверх -->
+  <ToastContainer />
 </template>
 
 <script setup lang="ts">
 import { computed } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { auth } from "./store/auth";
+import ToastContainer from "./components/ToastContainer.vue";
 
 const route = useRoute();
 const router = useRouter();

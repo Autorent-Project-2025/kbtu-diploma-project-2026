@@ -22,6 +22,7 @@ namespace BookingService.Application.Interfaces
         Task<BookingPaymentStatusResponseDto> GetPaymentStatus(int id, Guid userId);
         Task<BookingPaymentStatusResponseDto> SubmitPayment(int id, Guid userId, BookingPaymentSubmitRequestDto dto);
         Task<bool> CancelBooking(int id, Guid userId);
+        Task<bool> CancelBookingByPartner(int id, Guid partnerUserId);
         Task<bool> ConfirmBooking(int id, Guid userId);
         Task<bool> CompleteBooking(int id, Guid userId);
 

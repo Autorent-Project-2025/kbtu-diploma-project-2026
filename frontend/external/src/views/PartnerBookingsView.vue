@@ -295,6 +295,7 @@
                   <th class="pb-3 pr-4 font-semibold">Сумма</th>
                   <th class="pb-3 pr-4 font-semibold">Статус</th>
                   <th class="pb-3 font-semibold">Создано</th>
+                  <th class="pb-3 font-semibold"></th>
                 </tr>
               </thead>
               <tbody>
@@ -338,6 +339,16 @@
                   <td class="py-4 align-top">
                     <p class="font-medium text-gray-900 dark:text-white">{{ formatDateTime(booking.createdAt) }}</p>
                   </td>
+                  <td class="py-4 align-top">
+                    <button
+                      v-if="booking.status === 'pending' || booking.status === 'confirmed'"
+                      @click="handlePartnerCancel(booking.id)"
+                      :disabled="cancelingId === booking.id"
+                      class="px-3 py-1.5 rounded-xl border border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 text-xs font-bold hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50 transition-colors"
+                    >
+                      {{ cancelingId === booking.id ? 'Отмена...' : 'Отменить' }}
+                    </button>
+                  </td>
                 </tr>
               </tbody>
             </table>
@@ -352,8 +363,9 @@
 import axios from "axios";
 import { computed, onMounted, ref } from "vue";
 import { getMyPartnerCars, type PartnerCarSummary } from "../api/partnerCars";
-import { getMyPartnerBookings, getMyPartnerLedger, getMyPartnerWallet } from "../api/partners";
+import { getMyPartnerBookings, getMyPartnerLedger, getMyPartnerWallet, cancelPartnerBooking } from "../api/partners";
 import { useToast } from "../composables/useToast";
+
 import type { BookingStatus } from "../types/Booking";
 import type { PartnerBooking, PartnerLedgerEntry, PartnerWallet } from "../types/Partner";
 
@@ -370,7 +382,8 @@ interface ChartPoint {
 }
 
 const periodOptions: AnalyticsPeriod[] = [7, 14, 30];
-const { error } = useToast();
+const { error, success } = useToast();
+const cancelingId = ref<number | null>(null);
 
 const loading = ref(true);
 const errorMessage = ref("");
@@ -798,5 +811,19 @@ function resolveErrorMessage(value: unknown, fallback: string) {
   }
 
   return fallback;
+}
+
+async function handlePartnerCancel(bookingId: number) {
+  if (cancelingId.value !== null) return;
+  cancelingId.value = bookingId;
+  try {
+    await cancelPartnerBooking(bookingId);
+    success("Бронирование отменено");
+    await loadBookings();
+  } catch (e: any) {
+    error(e?.response?.data?.error ?? "Не удалось отменить бронирование");
+  } finally {
+    cancelingId.value = null;
+  }
 }
 </script>

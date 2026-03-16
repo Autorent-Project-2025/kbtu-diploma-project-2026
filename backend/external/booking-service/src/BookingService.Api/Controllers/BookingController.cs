@@ -86,6 +86,15 @@ namespace BookingService.Api.Controllers
             return Ok(new CommonResponseDto { Message = "Booking canceled" });
         }
 
+        [HttpPost("{id:int}/partner-cancel")]
+        public async Task<IActionResult> PartnerCancel(int id)
+        {
+            var result = await _bookingService.CancelBookingByPartner(id, GetUserId());
+            if (!result)
+                return NotFound(new { error = "Booking not found or cannot be canceled." });
+            return Ok(new CommonResponseDto { Message = "Booking canceled by partner" });
+        }
+
         [HttpPost("{id:int}/confirm")]
         public async Task<IActionResult> Confirm(int id)
         {

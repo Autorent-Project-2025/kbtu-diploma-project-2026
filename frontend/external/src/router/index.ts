@@ -15,6 +15,7 @@ import PartnerCarDetailView from "../views/PartnerCarDetailView.vue";
 import PartnerBookingsView from "../views/PartnerBookingsView.vue";
 import ProfileView from "../views/ProfileView.vue";
 import ProfileRouterView from "../views/ProfileRouterView.vue";
+import ForbiddenView from "../views/ForbiddenView.vue";
 import { auth } from "../store/auth";
 
 const routes = [
@@ -104,6 +105,10 @@ const routes = [
     name: "CarDetail",
     component: CarDetailView,
     meta: { requiresAuth: false },
+  },
+  {
+    path: "/403",
+    component: ForbiddenView,
   },
   {
     path: "/:pathMatch(.*)*",
