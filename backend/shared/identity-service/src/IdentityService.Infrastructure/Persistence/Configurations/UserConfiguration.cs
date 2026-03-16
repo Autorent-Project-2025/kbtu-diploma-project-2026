@@ -1,3 +1,4 @@
+using IdentityService.Domain.Constants;
 using IdentityService.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -16,6 +17,16 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(user => user.Email).HasColumnName("email").HasMaxLength(255).IsRequired();
         builder.Property(user => user.PasswordHash).HasColumnName("password_hash").HasMaxLength(255).IsRequired();
         builder.Property(user => user.IsActive).HasColumnName("is_active").IsRequired();
+        builder.Property(user => user.SubjectType)
+            .HasColumnName("subject_type")
+            .HasMaxLength(50)
+            .HasDefaultValue(SubjectTypeConstants.User)
+            .IsRequired();
+        builder.Property(user => user.ActorType)
+            .HasColumnName("actor_type")
+            .HasMaxLength(50)
+            .HasDefaultValue(ActorTypeConstants.Client)
+            .IsRequired();
 
         builder.HasIndex(user => user.Username).IsUnique();
         builder.HasIndex(user => user.Email).IsUnique();

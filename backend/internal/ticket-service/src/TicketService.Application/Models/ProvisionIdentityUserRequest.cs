@@ -1,3 +1,8 @@
 namespace TicketService.Application.Models;
 
-public sealed record ProvisionIdentityUserRequest(string FullName, string Email, DateOnly BirthDate);
+public sealed record ProvisionIdentityUserRequest(
+    string FullName,
+    string Email,
+    DateOnly BirthDate,
+    string SubjectType = "user",
+    string ActorType = "client");

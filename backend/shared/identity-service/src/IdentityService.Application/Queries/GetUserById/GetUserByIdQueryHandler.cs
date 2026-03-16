@@ -51,6 +51,8 @@ public sealed class GetUserByIdQueryHandler
             user.Username,
             user.Email,
             user.IsActive,
+            user.SubjectType,
+            user.ActorType,
             roleNames,
             permissionNames);
 

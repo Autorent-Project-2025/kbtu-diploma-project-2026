@@ -81,11 +81,14 @@ public sealed class TicketEventPublisher : ITicketEventPublisher
             return;
         }
 
+        var actorType = ticketApprovedEvent.TicketType == TicketType.Partner ? "partner" : "client";
         var provisionResult = await _identityProvisioningClient.ProvisionUserAsync(
             new ProvisionIdentityUserRequest(
                 ticketApprovedEvent.FullName,
                 ticketApprovedEvent.Email,
-                ticketApprovedEvent.BirthDate ?? DateOnly.FromDateTime(ticketApprovedEvent.ReviewedAtUtc)),
+                ticketApprovedEvent.BirthDate ?? DateOnly.FromDateTime(ticketApprovedEvent.ReviewedAtUtc),
+                SubjectType: "user",
+                ActorType: actorType),
             cancellationToken);
 
         if (ticketApprovedEvent.TicketType == TicketType.Client)

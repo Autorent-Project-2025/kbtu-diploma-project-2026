@@ -7,6 +7,8 @@ public interface IJwtProvider
     AccessTokenResult GenerateAccessToken(
         Guid userId,
         string username,
+        string subjectType,
+        string actorType,
         IReadOnlyCollection<string> permissions);
 
     RefreshTokenResult GenerateRefreshToken();

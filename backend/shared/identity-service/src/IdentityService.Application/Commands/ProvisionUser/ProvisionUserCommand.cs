@@ -1,3 +1,8 @@
 namespace IdentityService.Application.Commands.ProvisionUser;
 
-public sealed record ProvisionUserCommand(string FullName, string Email, DateOnly BirthDate);
+public sealed record ProvisionUserCommand(
+    string FullName,
+    string Email,
+    DateOnly BirthDate,
+    string SubjectType,
+    string ActorType);
