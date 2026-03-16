@@ -1,5 +1,8 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
+using OpenTelemetry.Exporter;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 using System.Security.Cryptography;
 using TicketService.Api.Middleware;
 using TicketService.Application.Commands.ApproveTicket;
@@ -9,12 +12,67 @@ using TicketService.Application.Constants;
 using TicketService.Application.Queries.GetPendingTickets;
 using TicketService.Application.Queries.GetTicketById;
 using TicketService.Infrastructure;
+using TicketService.Infrastructure.Observability;
 
 var builder = WebApplication.CreateBuilder(args);
+
+static Uri BuildOtlpTracesEndpoint(string endpoint)
+{
+    var uri = new Uri(endpoint, UriKind.Absolute);
+    if (uri.AbsolutePath.EndsWith("/v1/traces", StringComparison.OrdinalIgnoreCase))
+    {
+        return uri;
+    }
+
+    var builder = new UriBuilder(uri);
+    var normalizedPath = builder.Path.TrimEnd('/');
+    builder.Path = string.IsNullOrEmpty(normalizedPath)
+        ? "/v1/traces"
+        : $"{normalizedPath}/v1/traces";
+
+    return builder.Uri;
+}
+
+builder.Logging.Configure(options =>
+{
+    options.ActivityTrackingOptions =
+        ActivityTrackingOptions.SpanId |
+        ActivityTrackingOptions.TraceId |
+        ActivityTrackingOptions.ParentId;
+});
+builder.Logging.ClearProviders();
+builder.Logging.AddJsonConsole(options =>
+{
+    options.IncludeScopes = true;
+    options.TimestampFormat = "yyyy-MM-ddTHH:mm:ss.fffZ ";
+});
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddInfrastructure(builder.Configuration);
+
+var otlpEndpoint = builder.Configuration["OpenTelemetry:Endpoint"]
+    ?? Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT");
+if (!string.IsNullOrWhiteSpace(otlpEndpoint))
+{
+    builder.Services
+        .AddOpenTelemetry()
+        .ConfigureResource(resource => resource
+            .AddService("ticket-service")
+            .AddAttributes(new Dictionary<string, object>
+            {
+                ["deployment.environment"] = builder.Environment.EnvironmentName
+            }))
+        .WithTracing(tracing => tracing
+            .AddAspNetCoreInstrumentation(options => options.RecordException = true)
+            .AddSource("AutoRent.TicketService")
+            .AddHttpClientInstrumentation(options => options.RecordException = true)
+            .AddOtlpExporter(options =>
+            {
+                options.Endpoint = BuildOtlpTracesEndpoint(otlpEndpoint);
+                options.Protocol = OtlpExportProtocol.HttpProtobuf;
+            }));
+}
 
 builder.Services.AddScoped<CreateTicketCommandHandler>();
 builder.Services.AddScoped<GetPendingTicketsQueryHandler>();
@@ -86,6 +144,7 @@ builder.Services.AddAuthorization(options =>
 
 var app = builder.Build();
 
+app.UseMiddleware<RequestObservabilityMiddleware>();
 app.UseMiddleware<ApiExceptionMiddleware>();
 app.UseHttpsRedirection();
 app.UseCors("app-cors");
@@ -93,5 +152,8 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 app.MapGet("/healthz", () => Results.Ok(new { status = "ok" }));
+app.MapGet(
+    "/metrics",
+    (ObservabilityMetrics metrics) => Results.Text(metrics.RenderPrometheus(), "text/plain; version=0.0.4; charset=utf-8"));
 
 app.Run();

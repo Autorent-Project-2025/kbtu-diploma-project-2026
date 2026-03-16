@@ -33,6 +33,22 @@
 
 В корневом `docker-compose.yml` наружу опубликован только gateway. Остальные backend-сервисы и БД находятся во внутренних Docker networks.
 
+## Наблюдаемость backend-цепочек
+- Gateway проставляет и пробрасывает `X-Request-Id` и `traceparent`.
+- `ticket-service` принимает эти заголовки, пишет их в логи, экспортирует входящие HTTP spans и прокидывает контекст дальше в исходящие `HttpClient` вызовы.
+- `identity-service` принимает тот же контекст из gateway/`ticket-service`, пишет структурированные request-логи и экспортирует входящие HTTP spans.
+- Для `ticket-service` доступны метрики входящих запросов и исходящих S2S вызовов на `GET /metrics`.
+- Для `identity-service` доступны метрики входящих запросов на `GET /metrics`.
+- Для `api-gateway` доступны метрики edge-трафика на `GET /metrics`.
+- В `docker compose --profile observability` поднимаются `Prometheus`, `Grafana`, `Loki`, `Tempo`, `Promtail` и `OpenTelemetry Collector`.
+
+Это покрывает основной синхронный сценарий `gateway -> ticket-service -> internal services` и позволяет видеть:
+- rate/error ratio по входящим endpoint-ам;
+- среднюю длительность запросов;
+- rate/error ratio по upstream-вызовам `ticket-service`;
+- distributed traces между сервисами;
+- корреляцию `log -> trace` и `requestId -> traceId`.
+
 ## Главные service-to-service взаимодействия
 Основная внутренняя оркестрация сосредоточена в `ticket-service`.
 

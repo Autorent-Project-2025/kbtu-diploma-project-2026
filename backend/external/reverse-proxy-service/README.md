@@ -12,9 +12,13 @@ Edge-сервис, который является единственной вн
 ## Что умеет
 - route rewrite для backend-сервисов;
 - `GET /healthz` для compose/liveness;
+- `GET /metrics` в формате Prometheus;
 - rate limiting по IP;
 - базовые security headers;
 - CORS по allowlist;
+- генерацию и проброс `X-Request-Id`/`traceparent`;
+- JSON-логи с `requestId`/`traceId` для корреляции в `Loki`;
+- экспорт edge spans в `OpenTelemetry Collector`/`Tempo`;
 - HTTP (`PORT`) и HTTPS (`HTTPS_PORT`) listeners;
 - self-signed TLS-сертификат в dev, если `TLS_ENABLED=true` и не переданы готовые `TLS_CERT_PATH`/`TLS_KEY_PATH`.
 

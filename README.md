@@ -45,6 +45,37 @@ docker compose up --build
 
 В корневом `docker-compose.yml` backend-сервисы и БД больше не публикуются наружу. Внешняя точка входа одна: `api-gateway`.
 
+## Наблюдаемость
+Базовая наблюдаемость добавлена для `api-gateway`, `ticket-service` и `identity-service`:
+- сквозные `X-Request-Id` и `traceparent`;
+- JSON-логи с `requestId`/`traceId`, сбор в `Loki` через `Promtail`;
+- `Prometheus`-совместимые endpoints `GET /metrics`;
+- distributed traces в `Tempo` через `OpenTelemetry Collector`;
+- готовый профиль compose `observability` с `Prometheus`, `Grafana`, `Loki`, `Tempo`, `Promtail` и `OpenTelemetry Collector`.
+
+Запуск observability-стека:
+
+```bash
+docker compose --profile observability up -d --build
+```
+
+Порты по умолчанию:
+- Prometheus: `9090`
+- Grafana: `3000`
+- Loki: `3100`
+- Tempo: `3200`
+
+Основные endpoints:
+- Gateway metrics: `http://localhost:9186/metrics`
+- Ticket Service metrics: `http://ticket-service:8080/metrics` внутри compose; с хоста смотреть лучше через `Prometheus`/`Grafana`
+- Identity Service metrics: `http://identity-service:8080/metrics` внутри compose; с хоста смотреть лучше через `Prometheus`/`Grafana`
+- Tempo ready: `http://localhost:3200/ready`
+- Loki API: `http://localhost:3100/loki/api/v1/query`
+- Grafana dashboard: `AutoRent Observability`
+
+В Grafana доступны datasource-ы `Prometheus`, `Loki` и `Tempo`.
+Для gateway-логов настроена корреляция `log -> trace` по полю `traceId`.
+
 ## Предсозданные пользователи (seed)
 После применения миграций `identity-service` доступны следующие логины:
 

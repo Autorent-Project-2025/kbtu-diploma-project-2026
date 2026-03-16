@@ -36,6 +36,7 @@
 - `POST /{id:guid}/approve` (policy `tickets:approve`)
 - `POST /{id:guid}/reject` (policy `tickets:reject`)
 - `GET /healthz`
+- `GET /metrics`
 
 ## Контракты
 ### Создание тикета (`POST /`)
@@ -146,6 +147,13 @@ Body необязателен.
 - `POSTGRES_PASSWORD`
 - `POSTGRES_DB`
 - `POSTGRES_PORT`
+
+## Наблюдаемость
+- сервис принимает и возвращает `X-Request-Id`;
+- принимает и продолжает `traceparent`;
+- пишет JSON-логи с `requestId`/`traceId` для входящих запросов и исходящих S2S вызовов;
+- публикует `Prometheus`-совместимые метрики на `GET /metrics`;
+- экспортирует входящие HTTP spans и исходящие `HttpClient` spans в `OpenTelemetry Collector` и дальше в `Tempo`, если задан `OTEL_EXPORTER_OTLP_ENDPOINT`.
 
 ## Запуск
 В папке сервиса отдельного `docker-compose` нет. Рекомендуемый запуск - из корня репозитория:

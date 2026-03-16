@@ -6,6 +6,7 @@ using TicketService.Application.Interfaces;
 using TicketService.Infrastructure.Events;
 using TicketService.Infrastructure.Integrations;
 using TicketService.Infrastructure.Options;
+using TicketService.Infrastructure.Observability;
 using TicketService.Infrastructure.Persistence;
 using TicketService.Infrastructure.Persistence.Repositories;
 using TicketService.Infrastructure.Utils;
@@ -18,6 +19,11 @@ public static class DependencyInjection
         this IServiceCollection services,
         IConfiguration configuration)
     {
+        services.AddHttpContextAccessor();
+        services.AddSingleton<ObservabilityMetrics>();
+        services.AddSingleton<ObservabilityLogWriter>();
+        services.AddTransient<ObservabilityHttpClientHandler>();
+
         services.Configure<IdentityServiceOptions>(configuration.GetSection(IdentityServiceOptions.SectionName));
         services.Configure<EmailServiceOptions>(configuration.GetSection(EmailServiceOptions.SectionName));
         services.Configure<ClientServiceOptions>(configuration.GetSection(ClientServiceOptions.SectionName));
@@ -56,7 +62,8 @@ public static class DependencyInjection
             }
 
             client.BaseAddress = new Uri(NormalizeBaseUrl(options.BaseUrl));
-        });
+        })
+        .AddHttpMessageHandler<ObservabilityHttpClientHandler>();
 
         services.AddHttpClient<IEmailNotificationClient, EmailNotificationClient>((serviceProvider, client) =>
         {
@@ -67,7 +74,8 @@ public static class DependencyInjection
             }
 
             client.BaseAddress = new Uri(NormalizeBaseUrl(options.BaseUrl));
-        });
+        })
+        .AddHttpMessageHandler<ObservabilityHttpClientHandler>();
 
         services.AddHttpClient<IClientProvisioningClient, ClientProvisioningClient>((serviceProvider, client) =>
         {
@@ -78,7 +86,8 @@ public static class DependencyInjection
             }
 
             client.BaseAddress = new Uri(NormalizeBaseUrl(options.BaseUrl));
-        });
+        })
+        .AddHttpMessageHandler<ObservabilityHttpClientHandler>();
 
         services.AddHttpClient<IPartnerProvisioningClient, PartnerProvisioningClient>((serviceProvider, client) =>
         {
@@ -89,7 +98,8 @@ public static class DependencyInjection
             }
 
             client.BaseAddress = new Uri(NormalizeBaseUrl(options.BaseUrl));
-        });
+        })
+        .AddHttpMessageHandler<ObservabilityHttpClientHandler>();
 
         services.AddHttpClient<IPartnerContextClient, PartnerContextClient>((serviceProvider, client) =>
         {
@@ -100,7 +110,8 @@ public static class DependencyInjection
             }
 
             client.BaseAddress = new Uri(NormalizeBaseUrl(options.BaseUrl));
-        });
+        })
+        .AddHttpMessageHandler<ObservabilityHttpClientHandler>();
 
         services.AddHttpClient<IPartnerCarProvisioningClient, PartnerCarProvisioningClient>((serviceProvider, client) =>
         {
@@ -111,7 +122,8 @@ public static class DependencyInjection
             }
 
             client.BaseAddress = new Uri(NormalizeBaseUrl(options.BaseUrl));
-        });
+        })
+        .AddHttpMessageHandler<ObservabilityHttpClientHandler>();
 
         services.AddHttpClient<IFileStorageClient, FileStorageClient>((serviceProvider, client) =>
         {
@@ -122,7 +134,8 @@ public static class DependencyInjection
             }
 
             client.BaseAddress = new Uri(NormalizeBaseUrl(options.BaseUrl));
-        });
+        })
+        .AddHttpMessageHandler<ObservabilityHttpClientHandler>();
 
         services.AddHttpClient<IImageStorageClient, ImageStorageClient>((serviceProvider, client) =>
         {
@@ -133,7 +146,8 @@ public static class DependencyInjection
             }
 
             client.BaseAddress = new Uri(NormalizeBaseUrl(options.BaseUrl));
-        });
+        })
+        .AddHttpMessageHandler<ObservabilityHttpClientHandler>();
 
         return services;
     }

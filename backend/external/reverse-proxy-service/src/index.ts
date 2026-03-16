@@ -1,8 +1,10 @@
 import { randomUUID } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { createWriteStream, mkdirSync, readFileSync } from "node:fs";
 import { createServer as createHttpServer } from "node:http";
 import { createServer as createHttpsServer } from "node:https";
+import { dirname } from "node:path";
 
+import { trace } from "@opentelemetry/api";
 import cors from "cors";
 import express from "express";
 import { createProxyMiddleware } from "http-proxy-middleware";
@@ -25,6 +27,11 @@ type RateLimitBucket = {
   resetAt: number;
 };
 
+type GatewayHttpMetric = {
+  count: number;
+  sumSeconds: number;
+};
+
 const services: ServiceConfig[] = [
   { route: "/identity", envKey: "IDENTITY_SERVICE_URL" },
   { route: "/cars", envKey: "CAR_SERVICE_URL" },
@@ -41,6 +48,104 @@ const defaultAllowedOrigins = [
   "http://localhost:5174",
   "http://localhost:5175",
 ];
+
+const observabilityLogPath = process.env.OBSERVABILITY_LOG_PATH?.trim();
+const observabilityLogStream = observabilityLogPath
+  ? (() => {
+      mkdirSync(dirname(observabilityLogPath), { recursive: true });
+      return createWriteStream(observabilityLogPath, { flags: "a" });
+    })()
+  : null;
+
+const gatewayHttpMetrics = new Map<string, GatewayHttpMetric>();
+let gatewayHttpRequestsInFlight = 0;
+
+const buildHttpMetricKey = (method: string, route: string, statusCode: number): string => {
+  return `${method.toUpperCase()}|${route}|${statusCode}`;
+};
+
+const recordGatewayHttpMetric = (method: string, route: string, statusCode: number, durationSeconds: number) => {
+  const key = buildHttpMetricKey(method, route, statusCode);
+  const current = gatewayHttpMetrics.get(key);
+
+  if (current) {
+    current.count += 1;
+    current.sumSeconds += durationSeconds;
+    return;
+  }
+
+  gatewayHttpMetrics.set(key, {
+    count: 1,
+    sumSeconds: durationSeconds,
+  });
+};
+
+const escapeLabelValue = (value: string): string => {
+  return value.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n");
+};
+
+const appendLabels = (labels: Array<[string, string]>): string => {
+  return `{${labels.map(([name, value]) => `${name}="${escapeLabelValue(value)}"`).join(",")}}`;
+};
+
+const extractGatewayRoute = (rawPath: string | undefined): string => {
+  const trimmedPath = (rawPath || "/").trim();
+  if (!trimmedPath || trimmedPath === "/") {
+    return "/";
+  }
+
+  const [firstSegment] = trimmedPath.split("/", 3).filter(Boolean);
+  if (!firstSegment) {
+    return "/";
+  }
+
+  return `/${firstSegment.toLowerCase()}`;
+};
+
+const renderGatewayMetrics = (): string => {
+  const lines: string[] = [
+    "# HELP autorent_api_gateway_http_requests_in_flight Current number of HTTP requests being processed by the API gateway.",
+    "# TYPE autorent_api_gateway_http_requests_in_flight gauge",
+    `autorent_api_gateway_http_requests_in_flight ${gatewayHttpRequestsInFlight}`,
+    "# HELP autorent_api_gateway_http_requests_total Total HTTP requests processed by the API gateway.",
+    "# TYPE autorent_api_gateway_http_requests_total counter",
+  ];
+
+  const metrics = [...gatewayHttpMetrics.entries()]
+    .map(([key, aggregate]) => {
+      const [method, route, status] = key.split("|");
+      return { method, route, status, aggregate };
+    })
+    .sort((left, right) => left.method.localeCompare(right.method) || left.route.localeCompare(right.route) || left.status.localeCompare(right.status));
+
+  for (const metric of metrics) {
+    const labels = appendLabels([
+      ["method", metric.method],
+      ["route", metric.route],
+      ["status", metric.status],
+    ]);
+
+    lines.push(`autorent_api_gateway_http_requests_total${labels} ${metric.aggregate.count}`);
+  }
+
+  lines.push("# HELP autorent_api_gateway_http_request_duration_seconds Request duration observed at the API gateway.");
+  lines.push("# TYPE autorent_api_gateway_http_request_duration_seconds summary");
+
+  for (const metric of metrics) {
+    const labels = appendLabels([
+      ["method", metric.method],
+      ["route", metric.route],
+      ["status", metric.status],
+    ]);
+
+    lines.push(`autorent_api_gateway_http_request_duration_seconds_count${labels} ${metric.aggregate.count}`);
+    lines.push(
+      `autorent_api_gateway_http_request_duration_seconds_sum${labels} ${metric.aggregate.sumSeconds.toFixed(6)}`
+    );
+  }
+
+  return `${lines.join("\n")}\n`;
+};
 
 const parsePort = (rawValue: string | undefined, fallback: number): number => {
   if (!rawValue) {
@@ -120,6 +225,20 @@ const normalizeRequestId = (requestId: string | undefined): string => {
   return trimmed && trimmed.length <= 128 ? trimmed : randomUUID();
 };
 
+const formatTraceParent = (traceId: string, spanId: string, traceFlags: number): string => {
+  return `00-${traceId}-${spanId}-${traceFlags.toString(16).padStart(2, "0")}`;
+};
+
+const writeStructuredLog = (entry: Record<string, unknown>): void => {
+  const line = JSON.stringify(entry);
+  console.log(line);
+  observabilityLogStream?.write(`${line}\n`);
+};
+
+process.once("exit", () => {
+  observabilityLogStream?.end();
+});
+
 const app = express();
 app.disable("x-powered-by");
 app.set("trust proxy", parseTrustProxy(process.env.TRUST_PROXY));
@@ -147,9 +266,19 @@ setInterval(() => {
 
 app.use((req, res, next) => {
   const requestId = normalizeRequestId(req.header("x-request-id"));
+  const routeLabel = extractGatewayRoute(req.path);
+  const startedAt = process.hrtime.bigint();
+  const activeSpanContext = trace.getActiveSpan()?.spanContext();
+  const generatedTraceParent = activeSpanContext
+    ? formatTraceParent(activeSpanContext.traceId, activeSpanContext.spanId, activeSpanContext.traceFlags)
+    : null;
+  const traceParent = typeof req.headers["traceparent"] === "string" ? req.headers["traceparent"] : generatedTraceParent;
 
   req.headers["x-request-id"] = requestId;
   res.setHeader("x-request-id", requestId);
+  if (generatedTraceParent) {
+    res.setHeader("traceparent", generatedTraceParent);
+  }
   res.setHeader("x-content-type-options", "nosniff");
   res.setHeader("x-frame-options", "DENY");
   res.setHeader("referrer-policy", "strict-origin-when-cross-origin");
@@ -160,6 +289,42 @@ app.use((req, res, next) => {
     res.setHeader("strict-transport-security", "max-age=31536000; includeSubDomains");
   }
 
+  gatewayHttpRequestsInFlight += 1;
+  let finalized = false;
+  const finalize = () => {
+    if (finalized) {
+      return;
+    }
+
+    finalized = true;
+    gatewayHttpRequestsInFlight = Math.max(0, gatewayHttpRequestsInFlight - 1);
+
+    if (routeLabel === "/healthz" || routeLabel === "/metrics") {
+      return;
+    }
+
+    const durationSeconds = Number(process.hrtime.bigint() - startedAt) / 1_000_000_000;
+    recordGatewayHttpMetric(req.method, routeLabel, res.statusCode, durationSeconds);
+
+    writeStructuredLog({
+      timestamp: new Date().toISOString(),
+      service: "api-gateway",
+      event: "http_request_completed",
+      requestId,
+      traceId: activeSpanContext?.traceId ?? null,
+      spanId: activeSpanContext?.spanId ?? null,
+      traceParent,
+      method: req.method,
+      route: routeLabel,
+      path: req.originalUrl,
+      statusCode: res.statusCode,
+      durationMs: Math.round(durationSeconds * 1000 * 100) / 100,
+      ip: req.ip || null,
+    });
+  };
+
+  res.once("finish", finalize);
+  res.once("close", finalize);
   next();
 });
 
@@ -175,8 +340,8 @@ app.use(
     },
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Authorization", "Content-Type", "X-Request-Id", "X-Requested-With"],
-    exposedHeaders: ["X-Request-Id"],
+    allowedHeaders: ["Authorization", "Content-Type", "X-Request-Id", "X-Requested-With", "traceparent", "tracestate"],
+    exposedHeaders: ["X-Request-Id", "traceparent"],
   })
 );
 
@@ -193,8 +358,13 @@ app.get("/healthz", (_req, res) => {
   res.status(200).json({ status: "ok" });
 });
 
+app.get("/metrics", (_req, res) => {
+  res.type("text/plain; version=0.0.4; charset=utf-8");
+  res.status(200).send(renderGatewayMetrics());
+});
+
 app.use((req, res, next) => {
-  if (req.path === "/healthz") {
+  if (req.path === "/healthz" || req.path === "/metrics") {
     next();
     return;
   }
@@ -259,6 +429,18 @@ for (const service of services) {
         },
         error(_error, req, res) {
           const response = res as any;
+          const traceParentHeader = typeof req.headers["traceparent"] === "string" ? req.headers["traceparent"] : null;
+          writeStructuredLog({
+            timestamp: new Date().toISOString(),
+            service: "api-gateway",
+            event: "upstream_proxy_error",
+            requestId: typeof req.headers["x-request-id"] === "string" ? req.headers["x-request-id"] : null,
+            traceId: traceParentHeader ? traceParentHeader.split("-")[1] ?? null : null,
+            traceParent: traceParentHeader,
+            route: service.route,
+            path: req.url,
+            statusCode: 502,
+          });
           response.status(502).json({
             message: `Upstream service for route "${req.url}" is unavailable.`,
           });

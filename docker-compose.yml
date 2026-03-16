@@ -50,6 +50,8 @@ services:
       ASPNETCORE_ENVIRONMENT: Development
       ConnectionStrings__DbConnection: Host=identity-db;Port=5432;Database=postgres_db;Username=postgres;Password=postgres
       InternalAuth__ApiKey: local-identity-service-key
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      Observability__LogPath: /tmp/autorent/identity-service/identity-service.jsonl
     expose:
       - "8080"
     depends_on:
@@ -66,6 +68,8 @@ services:
     networks:
       - backend
       - data
+    volumes:
+      - identity_logs:/tmp/autorent/identity-service
 
   car-db:
     image: postgres:16
@@ -519,6 +523,8 @@ services:
       ImageService__BaseUrl: http://image-service:8080
       CarService__BaseUrl: http://car-service:8080
       CarService__InternalApiKey: local-car-service-key
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      Observability__LogPath: /tmp/autorent/ticket-service/ticket-service.jsonl
     expose:
       - "8080"
     depends_on:
@@ -549,6 +555,8 @@ services:
     networks:
       - backend
       - data
+    volumes:
+      - ticket_logs:/tmp/autorent/ticket-service
 
   image-service:
     build:
@@ -643,6 +651,9 @@ services:
       TLS_CERT_CN: localhost
       TLS_CERT_DAYS: 30
       TRUST_PROXY: loopback, linklocal, uniquelocal
+      OTEL_SERVICE_NAME: api-gateway
+      OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: http://otel-collector:4318/v1/traces
+      OBSERVABILITY_LOG_PATH: /tmp/autorent/api-gateway/api-gateway.jsonl
     ports:
       - "${API_GATEWAY_PORT:-9186}:8080"
       - "${API_GATEWAY_TLS_PORT:-9443}:8443"
@@ -678,6 +689,8 @@ services:
     networks:
       - frontend
       - backend
+    volumes:
+      - gateway_logs:/tmp/autorent/api-gateway
 
   frontend:
     build:
@@ -772,6 +785,109 @@ services:
     networks:
       - frontend
 
+  prometheus:
+    image: prom/prometheus:latest
+    restart: unless-stopped
+    profiles:
+      - observability
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --web.enable-lifecycle
+    volumes:
+      - ./ops/observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    networks:
+      - backend
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    restart: unless-stopped
+    profiles:
+      - observability
+    command:
+      - --config=/etc/otelcol-contrib/config.yml
+    volumes:
+      - ./ops/observability/otel-collector/config.yml:/etc/otelcol-contrib/config.yml:ro
+    expose:
+      - "4317"
+      - "4318"
+      - "13133"
+    networks:
+      - backend
+
+  tempo:
+    image: grafana/tempo:2.3.1
+    restart: unless-stopped
+    profiles:
+      - observability
+    user: "0"
+    command:
+      - -config.file=/etc/tempo/tempo.yml
+    volumes:
+      - ./ops/observability/tempo/tempo.yml:/etc/tempo/tempo.yml:ro
+      - tempo_data:/tmp/tempo
+    ports:
+      - "${TEMPO_PORT:-3200}:3200"
+    networks:
+      - backend
+
+  loki:
+    image: grafana/loki:latest
+    restart: unless-stopped
+    profiles:
+      - observability
+    command:
+      - -config.file=/etc/loki/config.yml
+    volumes:
+      - ./ops/observability/loki/config.yml:/etc/loki/config.yml:ro
+      - loki_data:/loki
+    ports:
+      - "${LOKI_PORT:-3100}:3100"
+    networks:
+      - backend
+
+  promtail:
+    image: grafana/promtail:latest
+    restart: unless-stopped
+    profiles:
+      - observability
+    command:
+      - -config.file=/etc/promtail/promtail.yml
+    depends_on:
+      - loki
+    volumes:
+      - ./ops/observability/promtail/promtail.yml:/etc/promtail/promtail.yml:ro
+      - gateway_logs:/tmp/autorent/api-gateway:ro
+      - ticket_logs:/tmp/autorent/ticket-service:ro
+      - identity_logs:/tmp/autorent/identity-service:ro
+    networks:
+      - backend
+
+  grafana:
+    image: grafana/grafana:latest
+    restart: unless-stopped
+    profiles:
+      - observability
+    depends_on:
+      - prometheus
+      - loki
+      - tempo
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/autorent-observability.json
+    volumes:
+      - ./ops/observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./ops/observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "${GRAFANA_PORT:-3000}:3000"
+    networks:
+      - backend
+
 volumes:
   identity_pgdata:
   car_pgdata:
@@ -782,6 +898,12 @@ volumes:
   ticket_pgdata:
   image_uploads:
   file_uploads:
+  grafana_data:
+  tempo_data:
+  loki_data:
+  gateway_logs:
+  ticket_logs:
+  identity_logs:
 
 networks:
   frontend:
