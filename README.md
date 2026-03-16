@@ -58,7 +58,7 @@ docker compose up --build
 | Роль/назначение | Email | Пароль | Примечание |
 |---|---|---|---|
 | Superadmin | `superadmin@local` | `SuperAdmin123!` | Полный доступ (роль `superadmin`) |
-| Обычный пользователь | `user@autorent.local` | `DemoUser123!` | Роль `user` |
+| Обычный пользователь | `user@autorent.local` | `DemoUser123!` | Роль `user`, плюс seed-профиль в `client-service` |
 | Партнер (demo) | `partner@autorent.local` | `DemoPartner123!` | Роль `user`, плюс seed-профиль в `partner-service` |
 | Менеджер | `manager@autorent.local` | `DemoManager123!` | Роль `manager`, доступ в internal panel |
 
