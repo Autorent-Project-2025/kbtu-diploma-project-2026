@@ -70,7 +70,12 @@ public sealed class RefreshTokenCommandHandler
             user.Roles.Select(role => role.Id),
             roleGraph);
 
-        var accessToken = _jwtProvider.GenerateAccessToken(user.Id, user.Username, permissions);
+        var accessToken = _jwtProvider.GenerateAccessToken(
+            user.Id,
+            user.Username,
+            user.SubjectType,
+            user.ActorType,
+            permissions);
         var rotatedRefreshToken = _jwtProvider.GenerateRefreshToken();
 
         var newRefreshToken = new RefreshTokenEntity(

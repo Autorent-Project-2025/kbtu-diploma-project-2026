@@ -59,3 +59,30 @@ FROM users user_entity
 JOIN roles role_entity ON role_entity.name = 'superadmin'
 WHERE user_entity.email = 'superadmin@local'
 ON CONFLICT DO NOTHING;
+
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'users'
+          AND column_name = 'subject_type')
+        AND EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'users'
+          AND column_name = 'actor_type')
+    THEN
+        UPDATE users
+        SET subject_type = 'user'
+        WHERE (email = 'superadmin@local' OR username = 'superadmin')
+          AND (subject_type IS NULL OR btrim(subject_type) = '');
+
+        UPDATE users
+        SET actor_type = 'client'
+        WHERE (email = 'superadmin@local' OR username = 'superadmin')
+          AND (actor_type IS NULL OR btrim(actor_type) = '');
+    END IF;
+END $$;

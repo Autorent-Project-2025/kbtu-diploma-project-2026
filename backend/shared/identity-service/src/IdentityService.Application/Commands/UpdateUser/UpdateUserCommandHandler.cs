@@ -1,6 +1,7 @@
 using IdentityService.Application.Exceptions;
 using IdentityService.Application.Interfaces;
 using IdentityService.Application.Models;
+using IdentityService.Application.Utils;
 
 namespace IdentityService.Application.Commands.UpdateUser;
 
@@ -57,6 +58,16 @@ public sealed class UpdateUserCommandHandler
         user.SetUsername(normalizedUsername);
         user.SetEmail(normalizedEmail);
 
+        if (command.SubjectType is not null)
+        {
+            user.SetSubjectType(UserTypeValidator.ValidateSubjectType(command.SubjectType));
+        }
+
+        if (command.ActorType is not null)
+        {
+            user.SetActorType(UserTypeValidator.ValidateActorType(command.ActorType));
+        }
+
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         var roleNames = user.Roles
@@ -77,6 +88,8 @@ public sealed class UpdateUserCommandHandler
             user.Username,
             user.Email,
             user.IsActive,
+            user.SubjectType,
+            user.ActorType,
             roleNames,
             permissionNames);
 

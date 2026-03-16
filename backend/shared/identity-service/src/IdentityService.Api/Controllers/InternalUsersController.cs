@@ -38,7 +38,12 @@ public sealed class InternalUsersController : ControllerBase
         }
 
         var result = await _provisionUserCommandHandler.Handle(
-            new ProvisionUserCommand(request.FullName, request.Email, request.BirthDate),
+            new ProvisionUserCommand(
+                request.FullName,
+                request.Email,
+                request.BirthDate,
+                request.SubjectType,
+                request.ActorType),
             cancellationToken);
 
         return Ok(result);

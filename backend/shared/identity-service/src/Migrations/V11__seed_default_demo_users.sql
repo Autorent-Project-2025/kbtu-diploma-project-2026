@@ -72,3 +72,30 @@ WHERE user_entity.id = '33333333-3333-3333-3333-333333333333'::uuid
    OR user_entity.email = 'manager@autorent.local'
    OR user_entity.username = 'demo_manager'
 ON CONFLICT DO NOTHING;
+
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'users'
+          AND column_name = 'subject_type')
+        AND EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'users'
+          AND column_name = 'actor_type')
+    THEN
+        UPDATE users
+        SET subject_type = 'user'
+        WHERE subject_type IS NULL
+           OR btrim(subject_type) = '';
+
+        UPDATE users
+        SET actor_type = 'client'
+        WHERE actor_type IS NULL
+           OR btrim(actor_type) = '';
+    END IF;
+END $$;

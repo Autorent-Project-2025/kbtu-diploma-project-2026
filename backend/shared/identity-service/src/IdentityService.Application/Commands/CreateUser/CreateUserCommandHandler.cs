@@ -1,6 +1,7 @@
 using IdentityService.Application.Constants;
 using IdentityService.Application.Exceptions;
 using IdentityService.Application.Interfaces;
+using IdentityService.Application.Utils;
 using IdentityService.Domain.Entities;
 
 namespace IdentityService.Application.Commands.CreateUser;
@@ -71,7 +72,9 @@ public sealed class CreateUserCommandHandler
             Guid.NewGuid(),
             normalizedUsername,
             normalizedEmail,
-            _passwordHasher.Hash(command.Password));
+            _passwordHasher.Hash(command.Password),
+            subjectType: UserTypeValidator.ResolveSubjectTypeOrDefault(command.SubjectType),
+            actorType: UserTypeValidator.ResolveActorTypeOrDefault(command.ActorType));
 
         foreach (var role in roles)
         {
@@ -86,7 +89,13 @@ public sealed class CreateUserCommandHandler
             .Order(StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
-        return new CreateUserResult(user.Id, user.Username, user.Email, assignedRoleNames);
+        return new CreateUserResult(
+            user.Id,
+            user.Username,
+            user.Email,
+            user.SubjectType,
+            user.ActorType,
+            assignedRoleNames);
     }
 
     private static void Validate(CreateUserCommand command)

@@ -27,18 +27,11 @@
 <script setup lang="ts">
 import { onMounted } from "vue";
 import { useRouter } from "vue-router";
-import { getMyPartner } from "../api/partners";
+import { auth } from "../store/auth";
 
 const router = useRouter();
 
-onMounted(async () => {
-  try {
-    await getMyPartner();
-    // Если запрос прошёл — это партнёр
-    router.replace("/profile/partner");
-  } catch (e: any) {
-    // 404 или любая ошибка → обычный пользователь
-    router.replace("/profile/user");
-  }
+onMounted(() => {
+  router.replace(auth.isActorType("partner") ? "/profile/partner" : "/profile/user");
 });
 </script>

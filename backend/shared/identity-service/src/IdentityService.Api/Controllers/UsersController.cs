@@ -77,7 +77,13 @@ public sealed class UsersController : ControllerBase
         CancellationToken cancellationToken)
     {
         var result = await _createUserCommandHandler.Handle(
-            new CreateUserCommand(request.Username, request.Email, request.Password, request.Roles),
+            new CreateUserCommand(
+                request.Username,
+                request.Email,
+                request.Password,
+                request.Roles,
+                request.SubjectType,
+                request.ActorType),
             cancellationToken);
 
         return Created($"/users/{result.UserId}", result);
@@ -91,7 +97,12 @@ public sealed class UsersController : ControllerBase
         CancellationToken cancellationToken)
     {
         var result = await _updateUserCommandHandler.Handle(
-            new UpdateUserCommand(id, request.Username, request.Email),
+            new UpdateUserCommand(
+                id,
+                request.Username,
+                request.Email,
+                request.SubjectType,
+                request.ActorType),
             cancellationToken);
 
         return Ok(result.User);

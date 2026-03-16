@@ -59,7 +59,7 @@ const routes = [
     meta: { requiresAuth: true },
   },
 
-  // /profile — определяет роль через API и редиректит
+  // /profile — определяет профиль по actor_type в JWT
   {
     path: "/profile",
     component: ProfileRouterView,
@@ -75,7 +75,7 @@ const routes = [
   {
     path: "/profile/partner",
     component: PartnerProfileView,
-    meta: { requiresAuth: true },
+    meta: { requiresAuth: true, actorType: "partner" },
   },
 
   // Старый маршрут — редирект для совместимости
@@ -87,17 +87,17 @@ const routes = [
   {
     path: "/partner/cars",
     component: PartnerCarsView,
-    meta: { requiresAuth: true },
+    meta: { requiresAuth: true, actorType: "partner" },
   },
   {
     path: "/partner/bookings",
     component: PartnerBookingsView,
-    meta: { requiresAuth: true },
+    meta: { requiresAuth: true, actorType: "partner" },
   },
   {
     path: "/partner/cars/:id",
     component: PartnerCarDetailView,
-    meta: { requiresAuth: true },
+    meta: { requiresAuth: true, actorType: "partner" },
   },
   {
     path: "/cars/:id",
@@ -124,18 +124,24 @@ export const router = createRouter({
 });
 
 router.beforeEach((to, from, next) => {
-  const token = localStorage.getItem("token");
+  const token = auth.token || localStorage.getItem("token");
+  const isAuthenticated = token ? auth.checkTokenValidity() : false;
 
-  if (token) {
-    const isValid = auth.checkTokenValidity();
-    if (!isValid && to.meta.requiresAuth) {
-      next("/login");
-      return;
-    }
+  if (to.meta.requiresAuth && !isAuthenticated) {
+    next("/login");
+    return;
   }
 
-  if (to.meta.requiresAuth && !token) {
-    next("/login");
+  const requiredActorType =
+    typeof to.meta.actorType === "string" ? to.meta.actorType : null;
+
+  if (requiredActorType && !auth.isActorType(requiredActorType)) {
+    next("/profile/user");
+    return;
+  }
+
+  if (to.path === "/profile/user" && auth.isActorType("partner")) {
+    next("/profile/partner");
     return;
   }
 
