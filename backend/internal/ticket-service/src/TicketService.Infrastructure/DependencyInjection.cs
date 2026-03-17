@@ -32,6 +32,7 @@ public static class DependencyInjection
         services.Configure<ImageServiceOptions>(configuration.GetSection(ImageServiceOptions.SectionName));
         services.Configure<CarServiceOptions>(configuration.GetSection(CarServiceOptions.SectionName));
         services.Configure<ActivationOptions>(configuration.GetSection(ActivationOptions.SectionName));
+        var httpClientResilienceOptions = configuration.GetHttpClientResilienceOptions();
 
         var connectionString = configuration.GetConnectionString("DbConnection");
         if (string.IsNullOrWhiteSpace(connectionString))
@@ -62,8 +63,10 @@ public static class DependencyInjection
             }
 
             client.BaseAddress = new Uri(NormalizeBaseUrl(options.BaseUrl));
+            client.Timeout = Timeout.InfiniteTimeSpan;
         })
-        .AddHttpMessageHandler<ObservabilityHttpClientHandler>();
+        .AddHttpMessageHandler<ObservabilityHttpClientHandler>()
+        .AddConfiguredResilience(httpClientResilienceOptions);
 
         services.AddHttpClient<IEmailNotificationClient, EmailNotificationClient>((serviceProvider, client) =>
         {
@@ -74,8 +77,10 @@ public static class DependencyInjection
             }
 
             client.BaseAddress = new Uri(NormalizeBaseUrl(options.BaseUrl));
+            client.Timeout = Timeout.InfiniteTimeSpan;
         })
-        .AddHttpMessageHandler<ObservabilityHttpClientHandler>();
+        .AddHttpMessageHandler<ObservabilityHttpClientHandler>()
+        .AddConfiguredResilience(httpClientResilienceOptions);
 
         services.AddHttpClient<IClientProvisioningClient, ClientProvisioningClient>((serviceProvider, client) =>
         {
@@ -86,8 +91,10 @@ public static class DependencyInjection
             }
 
             client.BaseAddress = new Uri(NormalizeBaseUrl(options.BaseUrl));
+            client.Timeout = Timeout.InfiniteTimeSpan;
         })
-        .AddHttpMessageHandler<ObservabilityHttpClientHandler>();
+        .AddHttpMessageHandler<ObservabilityHttpClientHandler>()
+        .AddConfiguredResilience(httpClientResilienceOptions);
 
         services.AddHttpClient<IPartnerProvisioningClient, PartnerProvisioningClient>((serviceProvider, client) =>
         {
@@ -98,8 +105,10 @@ public static class DependencyInjection
             }
 
             client.BaseAddress = new Uri(NormalizeBaseUrl(options.BaseUrl));
+            client.Timeout = Timeout.InfiniteTimeSpan;
         })
-        .AddHttpMessageHandler<ObservabilityHttpClientHandler>();
+        .AddHttpMessageHandler<ObservabilityHttpClientHandler>()
+        .AddConfiguredResilience(httpClientResilienceOptions);
 
         services.AddHttpClient<IPartnerContextClient, PartnerContextClient>((serviceProvider, client) =>
         {
@@ -110,8 +119,10 @@ public static class DependencyInjection
             }
 
             client.BaseAddress = new Uri(NormalizeBaseUrl(options.BaseUrl));
+            client.Timeout = Timeout.InfiniteTimeSpan;
         })
-        .AddHttpMessageHandler<ObservabilityHttpClientHandler>();
+        .AddHttpMessageHandler<ObservabilityHttpClientHandler>()
+        .AddConfiguredResilience(httpClientResilienceOptions);
 
         services.AddHttpClient<IPartnerCarProvisioningClient, PartnerCarProvisioningClient>((serviceProvider, client) =>
         {
@@ -122,8 +133,10 @@ public static class DependencyInjection
             }
 
             client.BaseAddress = new Uri(NormalizeBaseUrl(options.BaseUrl));
+            client.Timeout = Timeout.InfiniteTimeSpan;
         })
-        .AddHttpMessageHandler<ObservabilityHttpClientHandler>();
+        .AddHttpMessageHandler<ObservabilityHttpClientHandler>()
+        .AddConfiguredResilience(httpClientResilienceOptions);
 
         services.AddHttpClient<IFileStorageClient, FileStorageClient>((serviceProvider, client) =>
         {
@@ -134,8 +147,10 @@ public static class DependencyInjection
             }
 
             client.BaseAddress = new Uri(NormalizeBaseUrl(options.BaseUrl));
+            client.Timeout = Timeout.InfiniteTimeSpan;
         })
-        .AddHttpMessageHandler<ObservabilityHttpClientHandler>();
+        .AddHttpMessageHandler<ObservabilityHttpClientHandler>()
+        .AddConfiguredResilience(httpClientResilienceOptions);
 
         services.AddHttpClient<IImageStorageClient, ImageStorageClient>((serviceProvider, client) =>
         {
@@ -146,8 +161,10 @@ public static class DependencyInjection
             }
 
             client.BaseAddress = new Uri(NormalizeBaseUrl(options.BaseUrl));
+            client.Timeout = Timeout.InfiniteTimeSpan;
         })
-        .AddHttpMessageHandler<ObservabilityHttpClientHandler>();
+        .AddHttpMessageHandler<ObservabilityHttpClientHandler>()
+        .AddConfiguredResilience(httpClientResilienceOptions);
 
         return services;
     }

@@ -16,6 +16,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
+var httpClientResilienceOptions = builder.Configuration.GetHttpClientResilienceOptions();
 builder.Services.Configure<InternalAuthOptions>(builder.Configuration.GetSection(InternalAuthOptions.SectionName));
 builder.Services.Configure<FileServiceOptions>(builder.Configuration.GetSection(FileServiceOptions.SectionName));
 builder.Services.Configure<PaymentServiceOptions>(builder.Configuration.GetSection(PaymentServiceOptions.SectionName));
@@ -116,7 +117,9 @@ builder.Services.AddHttpClient<IFileStorageClient, FileStorageClient>((servicePr
     }
 
     client.BaseAddress = new Uri(NormalizeBaseUrl(options.BaseUrl));
-});
+    client.Timeout = Timeout.InfiniteTimeSpan;
+})
+.AddConfiguredResilience(httpClientResilienceOptions);
 builder.Services.AddHttpClient<IPartnerPaymentClient, PartnerPaymentClient>((serviceProvider, client) =>
 {
     var options = serviceProvider.GetRequiredService<IOptions<PaymentServiceOptions>>().Value;
@@ -131,7 +134,9 @@ builder.Services.AddHttpClient<IPartnerPaymentClient, PartnerPaymentClient>((ser
     }
 
     client.BaseAddress = new Uri(NormalizeBaseUrl(options.BaseUrl));
-});
+    client.Timeout = Timeout.InfiniteTimeSpan;
+})
+.AddConfiguredResilience(httpClientResilienceOptions);
 builder.Services.AddHttpClient<IPartnerBookingClient, PartnerBookingClient>((serviceProvider, client) =>
 {
     var options = serviceProvider.GetRequiredService<IOptions<BookingServiceOptions>>().Value;
@@ -146,7 +151,9 @@ builder.Services.AddHttpClient<IPartnerBookingClient, PartnerBookingClient>((ser
     }
 
     client.BaseAddress = new Uri(NormalizeBaseUrl(options.BaseUrl));
-});
+    client.Timeout = Timeout.InfiniteTimeSpan;
+})
+.AddConfiguredResilience(httpClientResilienceOptions);
 
 var app = builder.Build();
 

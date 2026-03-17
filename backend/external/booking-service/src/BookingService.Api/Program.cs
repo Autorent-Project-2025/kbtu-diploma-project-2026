@@ -17,6 +17,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
+var httpClientResilienceOptions = builder.Configuration.GetHttpClientResilienceOptions();
 builder.Services.Configure<InternalAuthOptions>(builder.Configuration.GetSection(InternalAuthOptions.SectionName));
 builder.Services.Configure<CarServiceOptions>(builder.Configuration.GetSection(CarServiceOptions.SectionName));
 builder.Services.Configure<PaymentServiceOptions>(builder.Configuration.GetSection(PaymentServiceOptions.SectionName));
@@ -119,7 +120,9 @@ builder.Services.AddHttpClient<IPartnerCarReadClient, PartnerCarReadClient>((ser
     }
 
     client.BaseAddress = new Uri(options.BaseUrl, UriKind.Absolute);
-});
+    client.Timeout = Timeout.InfiniteTimeSpan;
+})
+.AddConfiguredResilience(httpClientResilienceOptions);
 builder.Services.AddHttpClient<IPaymentSyncClient, PaymentSyncClient>((serviceProvider, client) =>
 {
     var options = serviceProvider
@@ -132,7 +135,9 @@ builder.Services.AddHttpClient<IPaymentSyncClient, PaymentSyncClient>((servicePr
     }
 
     client.BaseAddress = new Uri(options.BaseUrl, UriKind.Absolute);
-});
+    client.Timeout = Timeout.InfiniteTimeSpan;
+})
+.AddConfiguredResilience(httpClientResilienceOptions);
 builder.Services.AddScoped<IBookingService, BookingService.Infrastructure.Services.BookingService>();
 builder.Services.AddHostedService<PaymentSyncOutboxDispatcher>();
 builder.Services.AddHostedService<PendingBookingExpirationDispatcher>();

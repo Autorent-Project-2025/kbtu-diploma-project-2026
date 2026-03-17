@@ -17,6 +17,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
+var httpClientResilienceOptions = builder.Configuration.GetHttpClientResilienceOptions();
 
 builder.Services.Configure<PartnerServiceOptions>(builder.Configuration.GetSection(PartnerServiceOptions.SectionName));
 builder.Services.Configure<BookingServiceOptions>(builder.Configuration.GetSection(BookingServiceOptions.SectionName));
@@ -135,7 +136,9 @@ builder.Services.AddHttpClient<IPartnerContextClient, PartnerContextClient>((ser
     }
 
     client.BaseAddress = new Uri(NormalizeBaseUrl(options.BaseUrl));
-});
+    client.Timeout = Timeout.InfiniteTimeSpan;
+})
+.AddConfiguredResilience(httpClientResilienceOptions);
 
 builder.Services.AddHttpClient<IBookingReadClient, BookingReadClient>((serviceProvider, client) =>
 {
@@ -151,7 +154,9 @@ builder.Services.AddHttpClient<IBookingReadClient, BookingReadClient>((servicePr
     }
 
     client.BaseAddress = new Uri(NormalizeBaseUrl(options.BaseUrl));
-});
+    client.Timeout = Timeout.InfiniteTimeSpan;
+})
+.AddConfiguredResilience(httpClientResilienceOptions);
 
 builder.Services.AddHttpClient<IImageStorageClient, ImageStorageClient>((serviceProvider, client) =>
 {
@@ -162,7 +167,9 @@ builder.Services.AddHttpClient<IImageStorageClient, ImageStorageClient>((service
     }
 
     client.BaseAddress = new Uri(NormalizeBaseUrl(options.BaseUrl));
-});
+    client.Timeout = Timeout.InfiniteTimeSpan;
+})
+.AddConfiguredResilience(httpClientResilienceOptions);
 
 var app = builder.Build();
 
