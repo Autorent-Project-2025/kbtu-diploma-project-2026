@@ -51,12 +51,12 @@ docker compose up --build
 - JSON-логи с `requestId`/`traceId`, сбор в `Loki` через `Promtail`;
 - `Prometheus`-совместимые endpoints `GET /metrics`;
 - distributed traces в `Tempo` через `OpenTelemetry Collector`;
-- готовый профиль compose `observability` с `Prometheus`, `Grafana`, `Loki`, `Tempo`, `Promtail` и `OpenTelemetry Collector`.
+- в основной `docker compose up --build` сразу входят `Prometheus`, `Grafana`, `Loki`, `Tempo`, `Promtail` и `OpenTelemetry Collector`.
 
 Запуск observability-стека:
 
 ```bash
-docker compose --profile observability up -d --build
+docker compose up -d --build
 ```
 
 Порты по умолчанию:

@@ -844,8 +844,6 @@ services:
   prometheus:
     image: prom/prometheus:latest
     restart: unless-stopped
-    profiles:
-      - observability
     command:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.path=/prometheus
@@ -860,8 +858,6 @@ services:
   otel-collector:
     image: otel/opentelemetry-collector-contrib:latest
     restart: unless-stopped
-    profiles:
-      - observability
     command:
       - --config=/etc/otelcol-contrib/config.yml
     volumes:
@@ -876,8 +872,6 @@ services:
   tempo:
     image: grafana/tempo:2.3.1
     restart: unless-stopped
-    profiles:
-      - observability
     user: "0"
     command:
       - -config.file=/etc/tempo/tempo.yml
@@ -892,8 +886,6 @@ services:
   loki:
     image: grafana/loki:latest
     restart: unless-stopped
-    profiles:
-      - observability
     command:
       - -config.file=/etc/loki/config.yml
     volumes:
@@ -907,8 +899,6 @@ services:
   promtail:
     image: grafana/promtail:latest
     restart: unless-stopped
-    profiles:
-      - observability
     command:
       - -config.file=/etc/promtail/promtail.yml
     depends_on:
@@ -924,8 +914,6 @@ services:
   grafana:
     image: grafana/grafana:latest
     restart: unless-stopped
-    profiles:
-      - observability
     depends_on:
       - prometheus
       - loki

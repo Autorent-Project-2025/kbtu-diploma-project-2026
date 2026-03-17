@@ -41,7 +41,7 @@
 - Для `ticket-service` доступны метрики входящих запросов и исходящих S2S вызовов на `GET /metrics`.
 - Для `identity-service` доступны метрики входящих запросов на `GET /metrics`.
 - Для `api-gateway` доступны метрики edge-трафика на `GET /metrics`.
-- В `docker compose --profile observability` поднимаются `Prometheus`, `Grafana`, `Loki`, `Tempo`, `Promtail` и `OpenTelemetry Collector`.
+- В обычном `docker compose up --build` поднимаются `Prometheus`, `Grafana`, `Loki`, `Tempo`, `Promtail` и `OpenTelemetry Collector`.
 
 Это покрывает основной синхронный сценарий `gateway -> ticket-service -> internal services` и позволяет видеть:
 - rate/error ratio по входящим endpoint-ам;
