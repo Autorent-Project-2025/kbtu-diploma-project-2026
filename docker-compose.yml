@@ -133,8 +133,8 @@ services:
 
   car-service:
     build:
-      context: ./backend/external/car-service/src
-      dockerfile: ./CarService.Api/Dockerfile
+      context: ./backend
+      dockerfile: ./external/car-service/src/CarService.Api/Dockerfile
     restart: unless-stopped
     env_file:
       - path: ./backend/external/car-service/.env.example
@@ -212,8 +212,8 @@ services:
 
   booking-service:
     build:
-      context: ./backend/external/booking-service/src
-      dockerfile: ./BookingService.Api/Dockerfile
+      context: ./backend
+      dockerfile: ./external/booking-service/src/BookingService.Api/Dockerfile
     restart: unless-stopped
     env_file:
       - path: ./backend/external/booking-service/.env.example
@@ -438,8 +438,8 @@ services:
 
   payment-service:
     build:
-      context: ./backend/internal/payment-service/src
-      dockerfile: ./PaymentService.Api/Dockerfile
+      context: ./backend
+      dockerfile: ./internal/payment-service/src/PaymentService.Api/Dockerfile
     restart: unless-stopped
     env_file:
       - path: ./backend/internal/payment-service/.env.example
@@ -549,8 +549,8 @@ services:
 
   ticket-service:
     build:
-      context: ./backend/internal/ticket-service/src
-      dockerfile: ./TicketService.Api/Dockerfile
+      context: ./backend
+      dockerfile: ./internal/ticket-service/src/TicketService.Api/Dockerfile
     restart: unless-stopped
     env_file:
       - path: ./backend/internal/ticket-service/.env.example
