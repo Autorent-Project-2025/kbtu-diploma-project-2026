@@ -60,7 +60,21 @@ public class PartnerService : IPartnerService
             dto.RegistrationDate,
             dto.PartnershipEndDate,
             dto.RelatedUserId,
-            dto.PhoneNumber);
+            dto.PhoneNumber,
+            dto.ProvisionRequestKey);
+
+        if (normalized.ProvisionRequestKey is not null)
+        {
+            var existingByRequestKey = await _db.Partners
+                .AsNoTracking()
+                .FirstOrDefaultAsync(partner => partner.ProvisionRequestKey == normalized.ProvisionRequestKey, cancellationToken);
+
+            if (existingByRequestKey is not null)
+            {
+                EnsureMatchingProvision(existingByRequestKey, normalized);
+                return existingByRequestKey.ToPartnerResponseDto();
+            }
+        }
 
         if (await _db.Partners.AnyAsync(partner => partner.RelatedUserId == normalized.RelatedUserId, cancellationToken))
         {
@@ -77,7 +91,8 @@ public class PartnerService : IPartnerService
             RegistrationDate = normalized.RegistrationDate,
             PartnershipEndDate = normalized.PartnershipEndDate,
             RelatedUserId = normalized.RelatedUserId,
-            PhoneNumber = normalized.PhoneNumber
+            PhoneNumber = normalized.PhoneNumber,
+            ProvisionRequestKey = normalized.ProvisionRequestKey
         };
 
         _db.Partners.Add(entity);
@@ -99,7 +114,8 @@ public class PartnerService : IPartnerService
             dto.RegistrationDate,
             dto.PartnershipEndDate,
             dto.RelatedUserId,
-            dto.PhoneNumber);
+            dto.PhoneNumber,
+            null);
 
         var entity = await _db.Partners.FirstOrDefaultAsync(partner => partner.Id == id, cancellationToken);
         if (entity is null)
@@ -154,7 +170,8 @@ public class PartnerService : IPartnerService
         DateOnly registrationDate,
         DateOnly partnershipEndDate,
         string? relatedUserId,
-        string? phoneNumber)
+        string? phoneNumber,
+        string? provisionRequestKey)
     {
         if (registrationDate == default)
         {
@@ -179,7 +196,8 @@ public class PartnerService : IPartnerService
             registrationDate,
             partnershipEndDate,
             NormalizeRequired(relatedUserId, nameof(relatedUserId), 64),
-            NormalizeRequired(phoneNumber, nameof(phoneNumber), 32));
+            NormalizeRequired(phoneNumber, nameof(phoneNumber), 32),
+            NormalizeOptional(provisionRequestKey, nameof(provisionRequestKey), 128));
     }
 
     private static string NormalizeRequired(string? value, string paramName, int maxLength)
@@ -230,5 +248,21 @@ public class PartnerService : IPartnerService
         DateOnly RegistrationDate,
         DateOnly PartnershipEndDate,
         string RelatedUserId,
-        string PhoneNumber);
+        string PhoneNumber,
+        string? ProvisionRequestKey);
+
+    private static void EnsureMatchingProvision(Partner existingPartner, NormalizedPartnerData normalized)
+    {
+        if (!string.Equals(existingPartner.OwnerFirstName, normalized.OwnerFirstName, StringComparison.Ordinal) ||
+            !string.Equals(existingPartner.OwnerLastName, normalized.OwnerLastName, StringComparison.Ordinal) ||
+            !string.Equals(existingPartner.ContractFileName, normalized.ContractFileName, StringComparison.Ordinal) ||
+            !string.Equals(existingPartner.OwnerIdentityFileName, normalized.OwnerIdentityFileName, StringComparison.Ordinal) ||
+            existingPartner.RegistrationDate != normalized.RegistrationDate ||
+            existingPartner.PartnershipEndDate != normalized.PartnershipEndDate ||
+            !string.Equals(existingPartner.RelatedUserId, normalized.RelatedUserId, StringComparison.Ordinal) ||
+            !string.Equals(existingPartner.PhoneNumber, normalized.PhoneNumber, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("Provision request key is already used for another partner payload.");
+        }
+    }
 }

@@ -8,4 +8,5 @@ public sealed record ProvisionClientProfileRequest(
     string? DriverLicenseFileName,
     Guid RelatedUserId,
     string PhoneNumber,
-    string? AvatarUrl);
+    string? AvatarUrl,
+    string? ProvisionRequestKey = null);

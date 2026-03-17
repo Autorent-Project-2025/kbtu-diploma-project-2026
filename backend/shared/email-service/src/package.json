@@ -9,9 +9,11 @@
     "dev": "node --watch --env-file-if-exists=../.env --experimental-strip-types index.ts"
   },
   "dependencies": {
+    "amqplib": "^0.10.9",
     "nodemailer": "^8.0.1"
   },
   "devDependencies": {
+    "@types/amqplib": "^0.10.7",
     "@types/nodemailer": "^7.0.11"
   }
 }

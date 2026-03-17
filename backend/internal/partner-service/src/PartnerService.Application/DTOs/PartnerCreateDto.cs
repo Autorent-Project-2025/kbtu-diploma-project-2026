@@ -10,4 +10,5 @@ public sealed class PartnerCreateDto
     public DateOnly PartnershipEndDate { get; set; }
     public string RelatedUserId { get; set; } = string.Empty;
     public string PhoneNumber { get; set; } = string.Empty;
+    public string? ProvisionRequestKey { get; set; }
 }

@@ -10,4 +10,5 @@ public sealed class ClientCreateDto
     public string RelatedUserId { get; set; } = string.Empty;
     public string PhoneNumber { get; set; } = string.Empty;
     public string? AvatarUrl { get; set; }
+    public string? ProvisionRequestKey { get; set; }
 }

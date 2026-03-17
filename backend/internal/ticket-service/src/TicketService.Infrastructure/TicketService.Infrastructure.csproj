@@ -20,6 +20,7 @@
   <ItemGroup>
     <ProjectReference Include="..\TicketService.Application\TicketService.Application.csproj" />
     <ProjectReference Include="..\TicketService.Domain\TicketService.Domain.csproj" />
+    <ProjectReference Include="..\..\..\..\libraries\messaging-dotnet\src\AutoRent.Messaging\AutoRent.Messaging.csproj" />
   </ItemGroup>
 
 </Project>

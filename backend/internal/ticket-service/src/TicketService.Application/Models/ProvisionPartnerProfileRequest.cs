@@ -8,4 +8,5 @@ public sealed record ProvisionPartnerProfileRequest(
     DateOnly RegistrationDate,
     DateOnly PartnershipEndDate,
     Guid RelatedUserId,
-    string PhoneNumber);
+    string PhoneNumber,
+    string? ProvisionRequestKey = null);

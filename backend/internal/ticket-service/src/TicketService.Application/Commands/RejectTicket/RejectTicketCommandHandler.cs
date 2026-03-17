@@ -49,7 +49,6 @@ public sealed class RejectTicketCommandHandler
         ApplyPartnerCarReviewDataIfNeeded(ticket, command.PartnerCarData);
 
         ticket.Reject(command.ManagerId, command.DecisionReason, DateTime.UtcNow);
-        await _ticketUnitOfWork.SaveChangesAsync(cancellationToken);
 
         await _ticketEventPublisher.PublishRejectedAsync(
             new TicketRejectedEvent(
@@ -63,6 +62,7 @@ public sealed class RejectTicketCommandHandler
                 command.DecisionReason.Trim(),
                 command.ManagerId),
             cancellationToken);
+        await _ticketUnitOfWork.SaveChangesAsync(cancellationToken);
 
         return new RejectTicketResult(ticket.ToDto());
     }

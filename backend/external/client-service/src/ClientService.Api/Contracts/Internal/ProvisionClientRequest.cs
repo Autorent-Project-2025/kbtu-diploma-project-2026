@@ -10,4 +10,5 @@ public sealed class ProvisionClientRequest
     public Guid RelatedUserId { get; init; }
     public string PhoneNumber { get; init; } = string.Empty;
     public string? AvatarUrl { get; init; }
+    public string? ProvisionRequestKey { get; init; }
 }

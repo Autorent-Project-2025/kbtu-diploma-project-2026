@@ -1,5 +1,6 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { createMailer } from "./mailer/mailer.ts";
+import { startRabbitConsumer } from "./rabbitmq/consumer.ts";
 import {
   approvedTemplate,
   partnerCarApprovedTemplate,
@@ -85,6 +86,8 @@ async function main() {
     await mailer.verify();
     console.log("SMTP connection verified");
   }
+
+  await startRabbitConsumer(mailer);
 
   const server = createServer(async (req, res) => {
     res.setHeader("Access-Control-Allow-Origin", "*");

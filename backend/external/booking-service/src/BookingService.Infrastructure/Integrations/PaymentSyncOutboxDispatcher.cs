@@ -1,5 +1,6 @@
 using System.Text.Json;
-using BookingService.Application.Interfaces.Integrations;
+using AutoRent.Messaging.Contracts;
+using AutoRent.Messaging.RabbitMq;
 using BookingService.Domain.Entities;
 using BookingService.Infrastructure.Options;
 using BookingService.Infrastructure.Persistence;
@@ -50,7 +51,7 @@ namespace BookingService.Infrastructure.Integrations
             {
                 using var scope = _scopeFactory.CreateScope();
                 var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-                var paymentSyncClient = scope.ServiceProvider.GetRequiredService<IPaymentSyncClient>();
+                var rabbitMqPublisher = scope.ServiceProvider.GetRequiredService<IRabbitMqPublisher>();
 
                 var batch = await ClaimBatchAsync(db, cancellationToken);
                 if (batch.Count == 0)
@@ -60,7 +61,7 @@ namespace BookingService.Infrastructure.Integrations
 
                 foreach (var message in batch)
                 {
-                    await DispatchMessageAsync(db, paymentSyncClient, message, cancellationToken);
+                    await DispatchMessageAsync(db, rabbitMqPublisher, message, cancellationToken);
                 }
             }
         }
@@ -95,7 +96,7 @@ namespace BookingService.Infrastructure.Integrations
 
         private async Task DispatchMessageAsync(
             ApplicationDbContext db,
-            IPaymentSyncClient paymentSyncClient,
+            IRabbitMqPublisher rabbitMqPublisher,
             PaymentSyncOutboxMessage message,
             CancellationToken cancellationToken)
         {
@@ -104,7 +105,7 @@ namespace BookingService.Infrastructure.Integrations
             try
             {
                 var payload = DeserializePayload(message.Payload);
-                await SendAsync(paymentSyncClient, message.EventType, payload, cancellationToken);
+                await SendAsync(rabbitMqPublisher, message.EventKey, message.EventType, payload, cancellationToken);
 
                 message.AttemptCount += 1;
                 message.ProcessedAt = now;
@@ -143,7 +144,8 @@ namespace BookingService.Infrastructure.Integrations
         }
 
         private static async Task SendAsync(
-            IPaymentSyncClient paymentSyncClient,
+            IRabbitMqPublisher rabbitMqPublisher,
+            string eventId,
             string eventType,
             PaymentSyncOutboxPayload payload,
             CancellationToken cancellationToken)
@@ -156,22 +158,33 @@ namespace BookingService.Infrastructure.Integrations
                         throw new InvalidOperationException("Booking confirmed outbox payload is incomplete.");
                     }
 
-                    await paymentSyncClient.RecordBookingConfirmedAsync(
-                        payload.BookingId,
-                        payload.UserId.Value,
-                        payload.PartnerUserId.Value,
-                        payload.PartnerCarId.Value,
-                        payload.PriceHour,
-                        payload.TotalPrice,
+                    await rabbitMqPublisher.PublishAsync(
+                        eventId,
+                        RabbitMqTopology.RoutingKeys.BookingPaymentConfirmed,
+                        new BookingPaymentConfirmed(
+                            payload.BookingId,
+                            payload.UserId.Value,
+                            payload.PartnerUserId.Value,
+                            payload.PartnerCarId.Value,
+                            payload.PriceHour,
+                            payload.TotalPrice),
                         cancellationToken);
                     return;
 
                 case PaymentSyncOutboxEventTypes.BookingCanceled:
-                    await paymentSyncClient.RecordBookingCanceledAsync(payload.BookingId, cancellationToken);
+                    await rabbitMqPublisher.PublishAsync(
+                        eventId,
+                        RabbitMqTopology.RoutingKeys.BookingPaymentCanceled,
+                        new BookingPaymentCanceled(payload.BookingId),
+                        cancellationToken);
                     return;
 
                 case PaymentSyncOutboxEventTypes.BookingCompleted:
-                    await paymentSyncClient.RecordBookingCompletedAsync(payload.BookingId, cancellationToken);
+                    await rabbitMqPublisher.PublishAsync(
+                        eventId,
+                        RabbitMqTopology.RoutingKeys.BookingPaymentCompleted,
+                        new BookingPaymentCompleted(payload.BookingId),
+                        cancellationToken);
                     return;
 
                 default:

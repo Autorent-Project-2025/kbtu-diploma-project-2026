@@ -4,7 +4,7 @@
 AutoRent - микросервисная платформа каршеринга.
 
 В репозитории находятся:
-- 11 backend-сервисов (external/internal/shared);
+- 11 backend-сервисов (external/internal/shared) и инфраструктурные backend-библиотеки (`backend/libraries`);
 - 3 frontend-приложения (external/internal/superadmin);
 - общая оркестрация через `docker-compose.yml` в корне.
 
@@ -64,6 +64,7 @@ docker compose --profile observability up -d --build
 - Grafana: `3000`
 - Loki: `3100`
 - Tempo: `3200`
+- RabbitMq: `15672`
 
 Основные endpoints:
 - Gateway metrics: `http://localhost:9186/metrics`

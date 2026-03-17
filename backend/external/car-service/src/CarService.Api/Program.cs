@@ -1,3 +1,5 @@
+using AutoRent.Messaging.RabbitMq;
+using CarService.Api.Messaging;
 using CarService.Application.Constants;
 using CarService.Api.Options;
 using CarService.Api.Middleware;
@@ -23,6 +25,15 @@ builder.Services.Configure<PartnerServiceOptions>(builder.Configuration.GetSecti
 builder.Services.Configure<BookingServiceOptions>(builder.Configuration.GetSection(BookingServiceOptions.SectionName));
 builder.Services.Configure<ImageServiceOptions>(builder.Configuration.GetSection(ImageServiceOptions.SectionName));
 builder.Services.Configure<InternalAuthOptions>(builder.Configuration.GetSection(InternalAuthOptions.SectionName));
+builder.Services.AddOptions<RabbitMqOptions>()
+    .Bind(builder.Configuration.GetSection(RabbitMqOptions.SectionName))
+    .Validate(options =>
+        !string.IsNullOrWhiteSpace(options.HostName) &&
+        options.Port > 0 &&
+        !string.IsNullOrWhiteSpace(options.UserName) &&
+        !string.IsNullOrWhiteSpace(options.Password),
+        "RabbitMQ configuration is invalid.")
+    .ValidateOnStart();
 
 var connectionString = builder.Configuration.GetConnectionString("DbConnection");
 
@@ -126,6 +137,7 @@ builder.Services.AddScoped<ICarCommentService, CarCommentService>();
 builder.Services.AddScoped<ICarImageService, CarImageService>();
 builder.Services.AddScoped<ICarFeatureService, CarFeatureService>();
 builder.Services.AddScoped<CarCatalogResolver>();
+builder.Services.AddHostedService<PartnerCarProvisionConsumer>();
 
 builder.Services.AddHttpClient<IPartnerContextClient, PartnerContextClient>((serviceProvider, client) =>
 {

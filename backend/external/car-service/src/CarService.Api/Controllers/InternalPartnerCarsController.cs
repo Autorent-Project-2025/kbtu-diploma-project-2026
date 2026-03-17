@@ -63,6 +63,7 @@ namespace CarService.Api.Controllers
                 new PartnerCarProvisionDto
                 {
                     RelatedUserId = request.RelatedUserId,
+                    ProvisionRequestKey = request.ProvisionRequestKey,
                     CarBrand = request.CarBrand,
                     CarModel = request.CarModel,
                     CarYear = request.CarYear,

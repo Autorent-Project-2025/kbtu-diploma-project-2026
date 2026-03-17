@@ -2,6 +2,7 @@ namespace TicketService.Application.Models;
 
 public sealed record ProvisionPartnerCarRequest(
     Guid RelatedUserId,
+    string? ProvisionRequestKey,
     string CarBrand,
     string CarModel,
     int CarYear,

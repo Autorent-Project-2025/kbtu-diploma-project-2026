@@ -18,6 +18,7 @@
 	<ItemGroup>
     <ProjectReference Include="..\BookingService.Application\BookingService.Application.csproj" />
     <ProjectReference Include="..\BookingService.Domain\BookingService.Domain.csproj" />
+    <ProjectReference Include="..\..\..\..\libraries\messaging-dotnet\src\AutoRent.Messaging\AutoRent.Messaging.csproj" />
   </ItemGroup>
 
 </Project>

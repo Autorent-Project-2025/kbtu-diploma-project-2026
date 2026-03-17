@@ -1,3 +1,4 @@
+using AutoRent.Messaging.RabbitMq;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -32,6 +33,26 @@ public static class DependencyInjection
         services.Configure<ImageServiceOptions>(configuration.GetSection(ImageServiceOptions.SectionName));
         services.Configure<CarServiceOptions>(configuration.GetSection(CarServiceOptions.SectionName));
         services.Configure<ActivationOptions>(configuration.GetSection(ActivationOptions.SectionName));
+        services.AddOptions<RabbitMqOptions>()
+            .Bind(configuration.GetSection(RabbitMqOptions.SectionName))
+            .Validate(options =>
+                !string.IsNullOrWhiteSpace(options.HostName) &&
+                options.Port > 0 &&
+                !string.IsNullOrWhiteSpace(options.UserName) &&
+                !string.IsNullOrWhiteSpace(options.Password),
+                "RabbitMQ configuration is invalid.")
+            .ValidateOnStart();
+        services.AddOptions<TicketWorkflowOutboxOptions>()
+            .Bind(configuration.GetSection(TicketWorkflowOutboxOptions.SectionName))
+            .Validate(options =>
+                options.BatchSize > 0 &&
+                options.BatchSize <= 200 &&
+                options.PollIntervalSeconds > 0 &&
+                options.LockTimeoutSeconds > 0 &&
+                options.InitialRetryDelaySeconds > 0 &&
+                options.MaxRetryDelaySeconds >= options.InitialRetryDelaySeconds,
+                "Ticket workflow outbox configuration is invalid.")
+            .ValidateOnStart();
         var httpClientResilienceOptions = configuration.GetHttpClientResilienceOptions();
 
         var connectionString = configuration.GetConnectionString("DbConnection");
@@ -53,6 +74,8 @@ public static class DependencyInjection
         services.AddScoped<ITicketUnitOfWork>(serviceProvider => serviceProvider.GetRequiredService<TicketDbContext>());
         services.AddScoped<ITicketRepository, TicketRepository>();
         services.AddScoped<ITicketEventPublisher, TicketEventPublisher>();
+        services.AddSingleton<IRabbitMqPublisher, RabbitMqPublisher>();
+        services.AddHostedService<TicketWorkflowOutboxDispatcher>();
 
         services.AddHttpClient<IIdentityProvisioningClient, IdentityProvisioningClient>((serviceProvider, client) =>
         {

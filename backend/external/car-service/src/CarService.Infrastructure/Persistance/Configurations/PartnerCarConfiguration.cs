@@ -10,6 +10,9 @@ namespace CarService.Infrastructure.Persistence.Configurations
         {
             builder.ToTable("partner_cars");
 
+            builder.Property(partnerCar => partnerCar.ProvisionRequestKey)
+                .HasMaxLength(128);
+
             builder.HasOne(partnerCar => partnerCar.CarModel)
                 .WithMany(model => model.PartnerCars)
                 .HasForeignKey(partnerCar => partnerCar.CarModelId)
@@ -24,6 +27,9 @@ namespace CarService.Infrastructure.Persistence.Configurations
                 .WithOne(comment => comment.PartnerCar)
                 .HasForeignKey(comment => comment.PartnerCarId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            builder.HasIndex(partnerCar => partnerCar.ProvisionRequestKey)
+                .IsUnique();
         }
     }
 }

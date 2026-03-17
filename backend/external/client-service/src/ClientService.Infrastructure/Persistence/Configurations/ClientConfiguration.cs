@@ -45,7 +45,13 @@ public class ClientConfiguration : IEntityTypeConfiguration<Client>
         builder.Property(client => client.AvatarUrl)
             .HasMaxLength(1024);
 
+        builder.Property(client => client.ProvisionRequestKey)
+            .HasMaxLength(128);
+
         builder.HasIndex(client => client.RelatedUserId)
+            .IsUnique();
+
+        builder.HasIndex(client => client.ProvisionRequestKey)
             .IsUnique();
     }
 }

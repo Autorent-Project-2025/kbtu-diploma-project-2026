@@ -41,6 +41,9 @@ namespace CarService.Domain.Entities
         [Column("ratings_count")]
         public int RatingsCount { get; set; }
 
+        [Column("provision_request_key")]
+        public string? ProvisionRequestKey { get; set; }
+
         public Car CarModel { get; set; } = null!;
         public List<PartnerCarImage> Images { get; set; } = [];
         public List<CarComment> Comments { get; set; } = [];

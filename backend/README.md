@@ -4,6 +4,7 @@
 Этот документ описывает, как backend-сервисы в AutoRent взаимодействуют друг с другом в общем `docker-compose`.
 
 ## Состав backend
+- `libraries/messaging-dotnet` - общая .NET-библиотека для RabbitMQ topology, publisher и контрактов интеграционных событий.
 - `shared/identity-service` - аутентификация, роли, permissions, выдача JWT, lookup-справочники `subject_type`/`actor_type`, внутренний provisioning пользователя.
 - `shared/email-service` - отправка email-уведомлений.
 - `shared/image-service` - загрузка/удаление изображений.

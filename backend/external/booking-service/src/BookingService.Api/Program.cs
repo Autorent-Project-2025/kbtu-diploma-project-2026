@@ -1,3 +1,4 @@
+using AutoRent.Messaging.RabbitMq;
 using BookingService.Api.Middleware;
 using BookingService.Api.Options;
 using BookingService.Application.Constants;
@@ -21,6 +22,15 @@ var httpClientResilienceOptions = builder.Configuration.GetHttpClientResilienceO
 builder.Services.Configure<InternalAuthOptions>(builder.Configuration.GetSection(InternalAuthOptions.SectionName));
 builder.Services.Configure<CarServiceOptions>(builder.Configuration.GetSection(CarServiceOptions.SectionName));
 builder.Services.Configure<PaymentServiceOptions>(builder.Configuration.GetSection(PaymentServiceOptions.SectionName));
+builder.Services.AddOptions<RabbitMqOptions>()
+    .Bind(builder.Configuration.GetSection(RabbitMqOptions.SectionName))
+    .Validate(options =>
+        !string.IsNullOrWhiteSpace(options.HostName) &&
+        options.Port > 0 &&
+        !string.IsNullOrWhiteSpace(options.UserName) &&
+        !string.IsNullOrWhiteSpace(options.Password),
+        "RabbitMQ configuration is invalid.")
+    .ValidateOnStart();
 builder.Services.AddOptions<PaymentSyncOutboxOptions>()
     .Bind(builder.Configuration.GetSection(PaymentSyncOutboxOptions.SectionName))
     .Validate(options =>
@@ -139,6 +149,7 @@ builder.Services.AddHttpClient<IPaymentSyncClient, PaymentSyncClient>((servicePr
 })
 .AddConfiguredResilience(httpClientResilienceOptions);
 builder.Services.AddScoped<IBookingService, BookingService.Infrastructure.Services.BookingService>();
+builder.Services.AddSingleton<IRabbitMqPublisher, RabbitMqPublisher>();
 builder.Services.AddHostedService<PaymentSyncOutboxDispatcher>();
 builder.Services.AddHostedService<PendingBookingExpirationDispatcher>();
 

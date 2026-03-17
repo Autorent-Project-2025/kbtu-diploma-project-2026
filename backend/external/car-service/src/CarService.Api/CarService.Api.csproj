@@ -21,6 +21,7 @@
     <ProjectReference Include="..\CarService.Application\CarService.Application.csproj" />
     <ProjectReference Include="..\CarService.Domain\CarService.Domain.csproj" />
     <ProjectReference Include="..\CarService.Infrastructure\CarService.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\..\..\libraries\messaging-dotnet\src\AutoRent.Messaging\AutoRent.Messaging.csproj" />
   </ItemGroup>
 
 </Project>

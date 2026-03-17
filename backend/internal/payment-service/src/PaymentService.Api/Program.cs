@@ -1,5 +1,7 @@
+using AutoRent.Messaging.RabbitMq;
 using Microsoft.EntityFrameworkCore;
 using PaymentService.Api.Middleware;
+using PaymentService.Api.Messaging;
 using PaymentService.Api.Options;
 using PaymentService.Application.Interfaces;
 using PaymentService.Infrastructure.Options;
@@ -14,6 +16,15 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddOptions<InternalAuthOptions>()
     .Bind(builder.Configuration.GetSection(InternalAuthOptions.SectionName))
     .Validate(options => !string.IsNullOrWhiteSpace(options.ApiKey), "Internal auth API key is required.")
+    .ValidateOnStart();
+builder.Services.AddOptions<RabbitMqOptions>()
+    .Bind(builder.Configuration.GetSection(RabbitMqOptions.SectionName))
+    .Validate(options =>
+        !string.IsNullOrWhiteSpace(options.HostName) &&
+        options.Port > 0 &&
+        !string.IsNullOrWhiteSpace(options.UserName) &&
+        !string.IsNullOrWhiteSpace(options.Password),
+        "RabbitMQ configuration is invalid.")
     .ValidateOnStart();
 
 var connectionString = builder.Configuration.GetConnectionString("DbConnection");
@@ -43,6 +54,7 @@ builder.Services.AddOptions<PaymentOptions>()
 
 builder.Services.AddScoped<IPaymentLedgerService, PaymentLedgerService>();
 builder.Services.AddScoped<IMockPaymentService, MockPaymentService>();
+builder.Services.AddHostedService<BookingPaymentConsumer>();
 
 var app = builder.Build();
 

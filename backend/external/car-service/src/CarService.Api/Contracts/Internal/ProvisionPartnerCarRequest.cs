@@ -3,6 +3,7 @@ namespace CarService.Api.Contracts.Internal
     public sealed class ProvisionPartnerCarRequest
     {
         public Guid RelatedUserId { get; init; }
+        public string? ProvisionRequestKey { get; init; }
         public string CarBrand { get; init; } = string.Empty;
         public string CarModel { get; init; } = string.Empty;
         public int CarYear { get; init; }

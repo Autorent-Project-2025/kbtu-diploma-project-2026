@@ -53,7 +53,8 @@ public sealed class InternalClientsController : ControllerBase
                 DriverLicenseFileName = request.DriverLicenseFileName,
                 RelatedUserId = request.RelatedUserId.ToString(),
                 PhoneNumber = request.PhoneNumber,
-                AvatarUrl = request.AvatarUrl
+                AvatarUrl = request.AvatarUrl,
+                ProvisionRequestKey = request.ProvisionRequestKey
             },
             cancellationToken);
 

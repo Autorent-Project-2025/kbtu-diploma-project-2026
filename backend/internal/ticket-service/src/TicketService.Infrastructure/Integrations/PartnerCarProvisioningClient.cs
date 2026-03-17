@@ -33,6 +33,7 @@ public sealed class PartnerCarProvisioningClient : IPartnerCarProvisioningClient
             Content = JsonContent.Create(new
             {
                 request.RelatedUserId,
+                request.ProvisionRequestKey,
                 request.CarBrand,
                 request.CarModel,
                 request.CarYear,

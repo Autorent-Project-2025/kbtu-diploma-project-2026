@@ -1,4 +1,27 @@
 services:
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-autorent}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-autorent}
+      RABBITMQ_DEFAULT_VHOST: ${RABBITMQ_DEFAULT_VHOST:-/}
+    expose:
+      - "5672"
+      - "15672"
+    ports:
+      - "${RABBITMQ_MANAGEMENT_PORT:-15672}:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 15s
+    networks:
+      - backend
+
   identity-db:
     image: postgres:16
     restart: unless-stopped
@@ -126,9 +149,16 @@ services:
       BookingService__InternalApiKey: local-booking-service-key
       ImageService__BaseUrl: http://image-service:8080
       InternalAuth__ApiKey: local-car-service-key
+      RabbitMq__HostName: rabbitmq
+      RabbitMq__Port: 5672
+      RabbitMq__UserName: ${RABBITMQ_DEFAULT_USER:-autorent}
+      RabbitMq__Password: ${RABBITMQ_DEFAULT_PASS:-autorent}
+      RabbitMq__ExchangeName: ${RABBITMQ_EXCHANGE_NAME:-autorent.events}
     expose:
       - "8080"
     depends_on:
+      rabbitmq:
+        condition: service_healthy
       car-db:
         condition: service_healthy
       car-flyway:
@@ -197,9 +227,16 @@ services:
       CarService__BaseUrl: http://car-service:8080
       PaymentService__BaseUrl: http://payment-service:8080
       PaymentService__InternalApiKey: local-payment-service-key
+      RabbitMq__HostName: rabbitmq
+      RabbitMq__Port: 5672
+      RabbitMq__UserName: ${RABBITMQ_DEFAULT_USER:-autorent}
+      RabbitMq__Password: ${RABBITMQ_DEFAULT_PASS:-autorent}
+      RabbitMq__ExchangeName: ${RABBITMQ_EXCHANGE_NAME:-autorent.events}
     expose:
       - "8080"
     depends_on:
+      rabbitmq:
+        condition: service_healthy
       booking-db:
         condition: service_healthy
       booking-flyway:
@@ -415,9 +452,16 @@ services:
       InternalAuth__ApiKey: local-payment-service-key
       Payment__Currency: KZT
       Payment__PlatformCommissionRate: 0.10
+      RabbitMq__HostName: rabbitmq
+      RabbitMq__Port: 5672
+      RabbitMq__UserName: ${RABBITMQ_DEFAULT_USER:-autorent}
+      RabbitMq__Password: ${RABBITMQ_DEFAULT_PASS:-autorent}
+      RabbitMq__ExchangeName: ${RABBITMQ_EXCHANGE_NAME:-autorent.events}
     expose:
       - "8080"
     depends_on:
+      rabbitmq:
+        condition: service_healthy
       payment-db:
         condition: service_healthy
       payment-flyway:
@@ -481,8 +525,13 @@ services:
         required: false
     environment:
       PORT: 8080
+      RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER:-autorent}:${RABBITMQ_DEFAULT_PASS:-autorent}@rabbitmq:5672
+      RABBITMQ_EXCHANGE: ${RABBITMQ_EXCHANGE_NAME:-autorent.events}
     expose:
       - "8080"
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
     healthcheck:
       test:
         [
@@ -523,11 +572,18 @@ services:
       ImageService__BaseUrl: http://image-service:8080
       CarService__BaseUrl: http://car-service:8080
       CarService__InternalApiKey: local-car-service-key
+      RabbitMq__HostName: rabbitmq
+      RabbitMq__Port: 5672
+      RabbitMq__UserName: ${RABBITMQ_DEFAULT_USER:-autorent}
+      RabbitMq__Password: ${RABBITMQ_DEFAULT_PASS:-autorent}
+      RabbitMq__ExchangeName: ${RABBITMQ_EXCHANGE_NAME:-autorent.events}
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
       Observability__LogPath: /tmp/autorent/ticket-service/ticket-service.jsonl
     expose:
       - "8080"
     depends_on:
+      rabbitmq:
+        condition: service_healthy
       ticket-db:
         condition: service_healthy
       ticket-flyway:
@@ -889,6 +945,7 @@ services:
       - backend
 
 volumes:
+  rabbitmq_data:
   identity_pgdata:
   car_pgdata:
   booking_pgdata:
