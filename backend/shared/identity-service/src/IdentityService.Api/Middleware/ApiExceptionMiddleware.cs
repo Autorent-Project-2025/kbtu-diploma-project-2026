@@ -23,7 +23,12 @@ public sealed class ApiExceptionMiddleware
         }
         catch (Exception exception)
         {
-            _logger.LogError(exception, "Unhandled exception while processing request {Method} {Path}", context.Request.Method, context.Request.Path);
+            _logger.LogError(
+                exception,
+                "Unhandled exception while processing request {Method} {Path} (requestId: {RequestId})",
+                context.Request.Method,
+                context.Request.Path,
+                context.TraceIdentifier);
             await WriteErrorResponseAsync(context, exception);
         }
     }

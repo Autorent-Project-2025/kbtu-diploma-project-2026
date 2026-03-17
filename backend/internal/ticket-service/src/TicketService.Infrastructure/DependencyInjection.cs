@@ -1,3 +1,4 @@
+using AutoRent.Messaging.RabbitMq;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -6,6 +7,7 @@ using TicketService.Application.Interfaces;
 using TicketService.Infrastructure.Events;
 using TicketService.Infrastructure.Integrations;
 using TicketService.Infrastructure.Options;
+using TicketService.Infrastructure.Observability;
 using TicketService.Infrastructure.Persistence;
 using TicketService.Infrastructure.Persistence.Repositories;
 using TicketService.Infrastructure.Utils;
@@ -18,6 +20,11 @@ public static class DependencyInjection
         this IServiceCollection services,
         IConfiguration configuration)
     {
+        services.AddHttpContextAccessor();
+        services.AddSingleton<ObservabilityMetrics>();
+        services.AddSingleton<ObservabilityLogWriter>();
+        services.AddTransient<ObservabilityHttpClientHandler>();
+
         services.Configure<IdentityServiceOptions>(configuration.GetSection(IdentityServiceOptions.SectionName));
         services.Configure<EmailServiceOptions>(configuration.GetSection(EmailServiceOptions.SectionName));
         services.Configure<ClientServiceOptions>(configuration.GetSection(ClientServiceOptions.SectionName));
@@ -26,6 +33,27 @@ public static class DependencyInjection
         services.Configure<ImageServiceOptions>(configuration.GetSection(ImageServiceOptions.SectionName));
         services.Configure<CarServiceOptions>(configuration.GetSection(CarServiceOptions.SectionName));
         services.Configure<ActivationOptions>(configuration.GetSection(ActivationOptions.SectionName));
+        services.AddOptions<RabbitMqOptions>()
+            .Bind(configuration.GetSection(RabbitMqOptions.SectionName))
+            .Validate(options =>
+                !string.IsNullOrWhiteSpace(options.HostName) &&
+                options.Port > 0 &&
+                !string.IsNullOrWhiteSpace(options.UserName) &&
+                !string.IsNullOrWhiteSpace(options.Password),
+                "RabbitMQ configuration is invalid.")
+            .ValidateOnStart();
+        services.AddOptions<TicketWorkflowOutboxOptions>()
+            .Bind(configuration.GetSection(TicketWorkflowOutboxOptions.SectionName))
+            .Validate(options =>
+                options.BatchSize > 0 &&
+                options.BatchSize <= 200 &&
+                options.PollIntervalSeconds > 0 &&
+                options.LockTimeoutSeconds > 0 &&
+                options.InitialRetryDelaySeconds > 0 &&
+                options.MaxRetryDelaySeconds >= options.InitialRetryDelaySeconds,
+                "Ticket workflow outbox configuration is invalid.")
+            .ValidateOnStart();
+        var httpClientResilienceOptions = configuration.GetHttpClientResilienceOptions();
 
         var connectionString = configuration.GetConnectionString("DbConnection");
         if (string.IsNullOrWhiteSpace(connectionString))
@@ -46,6 +74,8 @@ public static class DependencyInjection
         services.AddScoped<ITicketUnitOfWork>(serviceProvider => serviceProvider.GetRequiredService<TicketDbContext>());
         services.AddScoped<ITicketRepository, TicketRepository>();
         services.AddScoped<ITicketEventPublisher, TicketEventPublisher>();
+        services.AddSingleton<IRabbitMqPublisher, RabbitMqPublisher>();
+        services.AddHostedService<TicketWorkflowOutboxDispatcher>();
 
         services.AddHttpClient<IIdentityProvisioningClient, IdentityProvisioningClient>((serviceProvider, client) =>
         {
@@ -56,7 +86,10 @@ public static class DependencyInjection
             }
 
             client.BaseAddress = new Uri(NormalizeBaseUrl(options.BaseUrl));
-        });
+            client.Timeout = Timeout.InfiniteTimeSpan;
+        })
+        .AddHttpMessageHandler<ObservabilityHttpClientHandler>()
+        .AddConfiguredResilience(httpClientResilienceOptions);
 
         services.AddHttpClient<IEmailNotificationClient, EmailNotificationClient>((serviceProvider, client) =>
         {
@@ -67,7 +100,10 @@ public static class DependencyInjection
             }
 
             client.BaseAddress = new Uri(NormalizeBaseUrl(options.BaseUrl));
-        });
+            client.Timeout = Timeout.InfiniteTimeSpan;
+        })
+        .AddHttpMessageHandler<ObservabilityHttpClientHandler>()
+        .AddConfiguredResilience(httpClientResilienceOptions);
 
         services.AddHttpClient<IClientProvisioningClient, ClientProvisioningClient>((serviceProvider, client) =>
         {
@@ -78,7 +114,10 @@ public static class DependencyInjection
             }
 
             client.BaseAddress = new Uri(NormalizeBaseUrl(options.BaseUrl));
-        });
+            client.Timeout = Timeout.InfiniteTimeSpan;
+        })
+        .AddHttpMessageHandler<ObservabilityHttpClientHandler>()
+        .AddConfiguredResilience(httpClientResilienceOptions);
 
         services.AddHttpClient<IPartnerProvisioningClient, PartnerProvisioningClient>((serviceProvider, client) =>
         {
@@ -89,7 +128,10 @@ public static class DependencyInjection
             }
 
             client.BaseAddress = new Uri(NormalizeBaseUrl(options.BaseUrl));
-        });
+            client.Timeout = Timeout.InfiniteTimeSpan;
+        })
+        .AddHttpMessageHandler<ObservabilityHttpClientHandler>()
+        .AddConfiguredResilience(httpClientResilienceOptions);
 
         services.AddHttpClient<IPartnerContextClient, PartnerContextClient>((serviceProvider, client) =>
         {
@@ -100,7 +142,10 @@ public static class DependencyInjection
             }
 
             client.BaseAddress = new Uri(NormalizeBaseUrl(options.BaseUrl));
-        });
+            client.Timeout = Timeout.InfiniteTimeSpan;
+        })
+        .AddHttpMessageHandler<ObservabilityHttpClientHandler>()
+        .AddConfiguredResilience(httpClientResilienceOptions);
 
         services.AddHttpClient<IPartnerCarProvisioningClient, PartnerCarProvisioningClient>((serviceProvider, client) =>
         {
@@ -111,7 +156,10 @@ public static class DependencyInjection
             }
 
             client.BaseAddress = new Uri(NormalizeBaseUrl(options.BaseUrl));
-        });
+            client.Timeout = Timeout.InfiniteTimeSpan;
+        })
+        .AddHttpMessageHandler<ObservabilityHttpClientHandler>()
+        .AddConfiguredResilience(httpClientResilienceOptions);
 
         services.AddHttpClient<IFileStorageClient, FileStorageClient>((serviceProvider, client) =>
         {
@@ -122,7 +170,10 @@ public static class DependencyInjection
             }
 
             client.BaseAddress = new Uri(NormalizeBaseUrl(options.BaseUrl));
-        });
+            client.Timeout = Timeout.InfiniteTimeSpan;
+        })
+        .AddHttpMessageHandler<ObservabilityHttpClientHandler>()
+        .AddConfiguredResilience(httpClientResilienceOptions);
 
         services.AddHttpClient<IImageStorageClient, ImageStorageClient>((serviceProvider, client) =>
         {
@@ -133,7 +184,10 @@ public static class DependencyInjection
             }
 
             client.BaseAddress = new Uri(NormalizeBaseUrl(options.BaseUrl));
-        });
+            client.Timeout = Timeout.InfiniteTimeSpan;
+        })
+        .AddHttpMessageHandler<ObservabilityHttpClientHandler>()
+        .AddConfiguredResilience(httpClientResilienceOptions);
 
         return services;
     }

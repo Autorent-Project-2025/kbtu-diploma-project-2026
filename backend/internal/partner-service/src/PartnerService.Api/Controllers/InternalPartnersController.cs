@@ -53,7 +53,8 @@ public sealed class InternalPartnersController : ControllerBase
                 RegistrationDate = request.RegistrationDate,
                 PartnershipEndDate = request.PartnershipEndDate,
                 RelatedUserId = request.RelatedUserId.ToString(),
-                PhoneNumber = request.PhoneNumber
+                PhoneNumber = request.PhoneNumber,
+                ProvisionRequestKey = request.ProvisionRequestKey
             },
             cancellationToken);
 

@@ -7,9 +7,13 @@
   "scripts": {
     "dev": "npm run build && npm run start",
     "build": "tsc --project tsconfig.json",
-    "start": "node dist/index.js"
+    "start": "node -r ./dist/instrumentation.js dist/index.js"
   },
   "dependencies": {
+    "@opentelemetry/api": "^1.9.0",
+    "@opentelemetry/auto-instrumentations-node": "^0.71.0",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.213.0",
+    "@opentelemetry/sdk-node": "^0.213.0",
     "cors": "^2.8.6",
     "express": "^5.2.1",
     "http-proxy-middleware": "^3.0.5",

@@ -3,6 +3,7 @@ namespace CarService.Application.DTOs.PartnerCars
     public class PartnerCarProvisionDto
     {
         public Guid RelatedUserId { get; set; }
+        public string? ProvisionRequestKey { get; set; }
         public string CarBrand { get; set; } = string.Empty;
         public string CarModel { get; set; } = string.Empty;
         public int CarYear { get; set; }

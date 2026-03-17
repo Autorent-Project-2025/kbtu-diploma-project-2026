@@ -1,3 +1,5 @@
+using AutoRent.Messaging.RabbitMq;
+using CarService.Api.Messaging;
 using CarService.Application.Constants;
 using CarService.Api.Options;
 using CarService.Api.Middleware;
@@ -17,11 +19,21 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
+var httpClientResilienceOptions = builder.Configuration.GetHttpClientResilienceOptions();
 
 builder.Services.Configure<PartnerServiceOptions>(builder.Configuration.GetSection(PartnerServiceOptions.SectionName));
 builder.Services.Configure<BookingServiceOptions>(builder.Configuration.GetSection(BookingServiceOptions.SectionName));
 builder.Services.Configure<ImageServiceOptions>(builder.Configuration.GetSection(ImageServiceOptions.SectionName));
 builder.Services.Configure<InternalAuthOptions>(builder.Configuration.GetSection(InternalAuthOptions.SectionName));
+builder.Services.AddOptions<RabbitMqOptions>()
+    .Bind(builder.Configuration.GetSection(RabbitMqOptions.SectionName))
+    .Validate(options =>
+        !string.IsNullOrWhiteSpace(options.HostName) &&
+        options.Port > 0 &&
+        !string.IsNullOrWhiteSpace(options.UserName) &&
+        !string.IsNullOrWhiteSpace(options.Password),
+        "RabbitMQ configuration is invalid.")
+    .ValidateOnStart();
 
 var connectionString = builder.Configuration.GetConnectionString("DbConnection");
 
@@ -63,7 +75,7 @@ builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
-        options.RequireHttpsMetadata = true;
+        options.RequireHttpsMetadata = !builder.Environment.IsDevelopment();
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuerSigningKey = true,
@@ -125,6 +137,7 @@ builder.Services.AddScoped<ICarCommentService, CarCommentService>();
 builder.Services.AddScoped<ICarImageService, CarImageService>();
 builder.Services.AddScoped<ICarFeatureService, CarFeatureService>();
 builder.Services.AddScoped<CarCatalogResolver>();
+builder.Services.AddHostedService<PartnerCarProvisionConsumer>();
 
 builder.Services.AddHttpClient<IPartnerContextClient, PartnerContextClient>((serviceProvider, client) =>
 {
@@ -135,7 +148,9 @@ builder.Services.AddHttpClient<IPartnerContextClient, PartnerContextClient>((ser
     }
 
     client.BaseAddress = new Uri(NormalizeBaseUrl(options.BaseUrl));
-});
+    client.Timeout = Timeout.InfiniteTimeSpan;
+})
+.AddConfiguredResilience(httpClientResilienceOptions);
 
 builder.Services.AddHttpClient<IBookingReadClient, BookingReadClient>((serviceProvider, client) =>
 {
@@ -151,7 +166,9 @@ builder.Services.AddHttpClient<IBookingReadClient, BookingReadClient>((servicePr
     }
 
     client.BaseAddress = new Uri(NormalizeBaseUrl(options.BaseUrl));
-});
+    client.Timeout = Timeout.InfiniteTimeSpan;
+})
+.AddConfiguredResilience(httpClientResilienceOptions);
 
 builder.Services.AddHttpClient<IImageStorageClient, ImageStorageClient>((serviceProvider, client) =>
 {
@@ -162,7 +179,9 @@ builder.Services.AddHttpClient<IImageStorageClient, ImageStorageClient>((service
     }
 
     client.BaseAddress = new Uri(NormalizeBaseUrl(options.BaseUrl));
-});
+    client.Timeout = Timeout.InfiniteTimeSpan;
+})
+.AddConfiguredResilience(httpClientResilienceOptions);
 
 var app = builder.Build();
 
@@ -172,6 +191,7 @@ app.UseCors("app-cors");
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+app.MapGet("/healthz", () => Results.Ok(new { status = "ok" }));
 
 app.Run();
 

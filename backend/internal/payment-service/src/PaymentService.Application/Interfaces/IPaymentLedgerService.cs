@@ -6,8 +6,11 @@ namespace PaymentService.Application.Interfaces;
 public interface IPaymentLedgerService
 {
     Task RecordBookingConfirmedAsync(BookingPaymentSnapshot snapshot, CancellationToken cancellationToken = default);
+    Task RecordBookingConfirmedAsync(BookingPaymentSnapshot snapshot, string eventId, string routingKey, CancellationToken cancellationToken = default);
     Task RecordBookingCanceledAsync(int bookingId, CancellationToken cancellationToken = default);
+    Task RecordBookingCanceledAsync(int bookingId, string eventId, string routingKey, CancellationToken cancellationToken = default);
     Task RecordBookingCompletedAsync(int bookingId, CancellationToken cancellationToken = default);
+    Task RecordBookingCompletedAsync(int bookingId, string eventId, string routingKey, CancellationToken cancellationToken = default);
     Task<PartnerPayoutResponseDto> RequestPayoutAsync(Guid partnerUserId, decimal amount, string requestKey, CancellationToken cancellationToken = default);
     Task<PartnerPayoutResponseDto> MarkPayoutProcessingAsync(long payoutId, CancellationToken cancellationToken = default);
     Task<PartnerPayoutResponseDto> MarkPayoutPaidAsync(long payoutId, CancellationToken cancellationToken = default);

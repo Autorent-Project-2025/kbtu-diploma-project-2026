@@ -9,6 +9,17 @@ import type IImageService from "../interfaces/IImageService";
 
 const UPLOADS_DIR = path.resolve(process.cwd(), "uploads");
 
+const buildPublicUrl = (relativePath: string): string => {
+  const publicBaseUrl = process.env.PUBLIC_BASE_URL?.trim();
+  if (!publicBaseUrl) {
+    return relativePath;
+  }
+
+  const normalizedBaseUrl = publicBaseUrl.replace(/\/+$/, "");
+  const normalizedRelativePath = relativePath.replace(/^\/+/, "");
+  return new URL(normalizedRelativePath, `${normalizedBaseUrl}/`).toString();
+};
+
 class LocalStorageService implements IImageService {
   async saveImage(file: ImageFile): Promise<ImageSaveResponse> {
     await mkdir(UPLOADS_DIR, { recursive: true });
@@ -20,7 +31,7 @@ class LocalStorageService implements IImageService {
 
     return {
       imageId,
-      imageUrl: `/public/${imageId}`
+      imageUrl: buildPublicUrl(`/public/${imageId}`)
     };
   }
 

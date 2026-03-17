@@ -12,6 +12,7 @@ public class IdentityDbContext : DbContext, IIdentityUnitOfWork
     }
 
     public DbSet<User> Users => Set<User>();
+    public DbSet<UserProvisionRequest> UserProvisionRequests => Set<UserProvisionRequest>();
     public DbSet<Role> Roles => Set<Role>();
     public DbSet<Permission> Permissions => Set<Permission>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();

@@ -49,7 +49,21 @@ public class ClientService : IClientService
             dto.DriverLicenseFileName,
             dto.RelatedUserId,
             dto.PhoneNumber,
-            dto.AvatarUrl);
+            dto.AvatarUrl,
+            dto.ProvisionRequestKey);
+
+        if (normalized.ProvisionRequestKey is not null)
+        {
+            var existingByRequestKey = await _db.Clients
+                .AsNoTracking()
+                .FirstOrDefaultAsync(client => client.ProvisionRequestKey == normalized.ProvisionRequestKey, cancellationToken);
+
+            if (existingByRequestKey is not null)
+            {
+                EnsureMatchingProvision(existingByRequestKey, normalized);
+                return existingByRequestKey.ToClientResponseDto();
+            }
+        }
 
         if (await _db.Clients.AnyAsync(client => client.RelatedUserId == normalized.RelatedUserId, cancellationToken))
         {
@@ -66,7 +80,8 @@ public class ClientService : IClientService
             DriverLicenseFileName = normalized.DriverLicenseFileName,
             RelatedUserId = normalized.RelatedUserId,
             PhoneNumber = normalized.PhoneNumber,
-            AvatarUrl = normalized.AvatarUrl
+            AvatarUrl = normalized.AvatarUrl,
+            ProvisionRequestKey = normalized.ProvisionRequestKey
         };
 
         _db.Clients.Add(entity);
@@ -88,7 +103,8 @@ public class ClientService : IClientService
             dto.DriverLicenseFileName,
             dto.RelatedUserId,
             dto.PhoneNumber,
-            dto.AvatarUrl);
+            dto.AvatarUrl,
+            null);
 
         var entity = await _db.Clients.FirstOrDefaultAsync(client => client.Id == id, cancellationToken);
         if (entity is null)
@@ -143,7 +159,8 @@ public class ClientService : IClientService
         string? driverLicenseFileName,
         string? relatedUserId,
         string? phoneNumber,
-        string? avatarUrl)
+        string? avatarUrl,
+        string? provisionRequestKey)
     {
         if (birthDate == default)
         {
@@ -170,7 +187,8 @@ public class ClientService : IClientService
             NormalizeOptional(driverLicenseFileName, nameof(driverLicenseFileName), 255),
             NormalizeRequired(relatedUserId, nameof(relatedUserId), 64),
             NormalizeRequired(phoneNumber, nameof(phoneNumber), 32),
-            normalizedAvatarUrl);
+            normalizedAvatarUrl,
+            NormalizeOptional(provisionRequestKey, nameof(provisionRequestKey), 128));
     }
 
     private static string NormalizeRequired(string? value, string paramName, int maxLength)
@@ -221,7 +239,23 @@ public class ClientService : IClientService
         string? DriverLicenseFileName,
         string RelatedUserId,
         string PhoneNumber,
-        string? AvatarUrl);
+        string? AvatarUrl,
+        string? ProvisionRequestKey);
+
+    private static void EnsureMatchingProvision(Client existingClient, NormalizedClientData normalized)
+    {
+        if (!string.Equals(existingClient.FirstName, normalized.FirstName, StringComparison.Ordinal) ||
+            !string.Equals(existingClient.LastName, normalized.LastName, StringComparison.Ordinal) ||
+            existingClient.BirthDate != normalized.BirthDate ||
+            !string.Equals(existingClient.IdentityDocumentFileName, normalized.IdentityDocumentFileName, StringComparison.Ordinal) ||
+            !string.Equals(existingClient.DriverLicenseFileName, normalized.DriverLicenseFileName, StringComparison.Ordinal) ||
+            !string.Equals(existingClient.RelatedUserId, normalized.RelatedUserId, StringComparison.Ordinal) ||
+            !string.Equals(existingClient.PhoneNumber, normalized.PhoneNumber, StringComparison.Ordinal) ||
+            !string.Equals(existingClient.AvatarUrl, normalized.AvatarUrl, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("Provision request key is already used for another client payload.");
+        }
+    }
 
         
     public async Task<ClientResponseDto?> GetByRelatedUserIdAsync(

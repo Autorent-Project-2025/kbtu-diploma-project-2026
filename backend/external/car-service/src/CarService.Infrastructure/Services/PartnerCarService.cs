@@ -169,6 +169,7 @@ namespace CarService.Infrastructure.Services
                 throw new ArgumentException($"{nameof(dto.RelatedUserId)} is required.", nameof(dto.RelatedUserId));
             }
 
+            var normalizedProvisionRequestKey = NormalizeOptional(dto.ProvisionRequestKey, 128);
             var normalizedBrand = NormalizeRequired(dto.CarBrand, nameof(dto.CarBrand), 255);
             var normalizedModel = NormalizeRequired(dto.CarModel, nameof(dto.CarModel), 255);
             var normalizedYear = NormalizeCarYear(dto.CarYear, nameof(dto.CarYear));
@@ -176,6 +177,44 @@ namespace CarService.Infrastructure.Services
             var normalizedPriceHour = NormalizePrice(dto.PriceHour, nameof(dto.PriceHour));
             var normalizedPriceDay = NormalizePrice(dto.PriceDay, nameof(dto.PriceDay));
             var normalizedOwnershipFileName = NormalizeRequired(dto.OwnershipFileName, nameof(dto.OwnershipFileName), 255);
+            var normalizedImages = (dto.Images ?? [])
+                .Select((image, index) => new NormalizedProvisionImage(
+                    NormalizeRequired(image.ImageId, nameof(image.ImageId), 255),
+                    NormalizeImageUrl(image.ImageUrl, nameof(image.ImageUrl)),
+                    index + 1))
+                .ToList();
+
+            if (normalizedImages.Count == 0)
+            {
+                throw new ArgumentException("At least one image is required.", nameof(dto.Images));
+            }
+
+            if (normalizedProvisionRequestKey is not null)
+            {
+                var existingByRequestKey = await _db.PartnerCars
+                    .AsNoTracking()
+                    .IncludeModelCatalog()
+                    .Include(partnerCar => partnerCar.Images)
+                    .FirstOrDefaultAsync(partnerCar => partnerCar.ProvisionRequestKey == normalizedProvisionRequestKey, cancellationToken);
+
+                if (existingByRequestKey is not null)
+                {
+                    EnsureMatchingProvision(
+                        existingByRequestKey,
+                        dto.RelatedUserId,
+                        normalizedBrand,
+                        normalizedModel,
+                        normalizedYear,
+                        normalizedLicensePlate,
+                        normalizedPriceHour,
+                        normalizedPriceDay,
+                        normalizedOwnershipFileName,
+                        normalizedImages);
+
+                    return MapToResponse(existingByRequestKey);
+                }
+            }
+
             var (brand, modelLookup) = await _catalogResolver.ResolveAsync(
                 normalizedBrand,
                 normalizedModel,
@@ -190,20 +229,15 @@ namespace CarService.Infrastructure.Services
                 .OrderByDescending(carModel => carModel.Id)
                 .FirstOrDefaultAsync(cancellationToken);
 
-            var images = (dto.Images ?? [])
-                .Select((image, index) => new PartnerCarImage
+            var images = normalizedImages
+                .Select(image => new PartnerCarImage
                 {
-                    ImageId = NormalizeRequired(image.ImageId, nameof(image.ImageId), 255),
-                    ImageUrl = NormalizeImageUrl(image.ImageUrl, nameof(image.ImageUrl)),
+                    ImageId = image.ImageId,
+                    ImageUrl = image.ImageUrl,
                     ImageType = CarImageType.General,
-                    DisplayOrder = index + 1
+                    DisplayOrder = image.DisplayOrder
                 })
                 .ToList();
-
-            if (images.Count == 0)
-            {
-                throw new ArgumentException("At least one image is required.", nameof(dto.Images));
-            }
 
             if (model is null)
             {
@@ -241,11 +275,42 @@ namespace CarService.Infrastructure.Services
                 PriceDay = normalizedPriceDay,
                 Status = PartnerCarStatus.Available,
                 CreatedAt = DateTimeOffset.UtcNow,
-                RatingsCount = 0
+                RatingsCount = 0,
+                ProvisionRequestKey = normalizedProvisionRequestKey
             };
 
             _db.PartnerCars.Add(entity);
-            await _db.SaveChangesAsync(cancellationToken);
+            try
+            {
+                await _db.SaveChangesAsync(cancellationToken);
+            }
+            catch (DbUpdateException) when (normalizedProvisionRequestKey is not null)
+            {
+                var existingByRequestKey = await _db.PartnerCars
+                    .AsNoTracking()
+                    .IncludeModelCatalog()
+                    .Include(partnerCar => partnerCar.Images)
+                    .FirstOrDefaultAsync(partnerCar => partnerCar.ProvisionRequestKey == normalizedProvisionRequestKey, cancellationToken);
+
+                if (existingByRequestKey is not null)
+                {
+                    EnsureMatchingProvision(
+                        existingByRequestKey,
+                        dto.RelatedUserId,
+                        normalizedBrand,
+                        normalizedModel,
+                        normalizedYear,
+                        normalizedLicensePlate,
+                        normalizedPriceHour,
+                        normalizedPriceDay,
+                        normalizedOwnershipFileName,
+                        normalizedImages);
+
+                    return MapToResponse(existingByRequestKey);
+                }
+
+                throw;
+            }
 
             foreach (var image in images)
             {
@@ -687,6 +752,64 @@ namespace CarService.Infrastructure.Services
 
             return normalized;
         }
+
+        private static void EnsureMatchingProvision(
+            PartnerCar existingCar,
+            Guid relatedUserId,
+            string brand,
+            string model,
+            int year,
+            string licensePlate,
+            decimal priceHour,
+            decimal priceDay,
+            string ownershipFileName,
+            IReadOnlyCollection<NormalizedProvisionImage> images)
+        {
+            if (existingCar.PartnerUserId != relatedUserId ||
+                !string.Equals(existingCar.CarModel.Brand.Name, brand, StringComparison.Ordinal) ||
+                !string.Equals(existingCar.CarModel.ModelLookup.Name, model, StringComparison.Ordinal) ||
+                existingCar.CarModel.Year != year ||
+                !string.Equals(existingCar.LicensePlate, licensePlate, StringComparison.Ordinal) ||
+                existingCar.PriceHour != priceHour ||
+                existingCar.PriceDay != priceDay ||
+                !string.Equals(existingCar.OwnershipFileName, ownershipFileName, StringComparison.Ordinal) ||
+                !HaveMatchingImages(existingCar.Images, images))
+            {
+                throw new InvalidOperationException("Provision request key is already used for another partner car payload.");
+            }
+        }
+
+        private static bool HaveMatchingImages(
+            IReadOnlyCollection<PartnerCarImage> existingImages,
+            IReadOnlyCollection<NormalizedProvisionImage> requestedImages)
+        {
+            if (existingImages.Count != requestedImages.Count)
+            {
+                return false;
+            }
+
+            var existing = existingImages
+                .OrderBy(image => image.DisplayOrder)
+                .ThenBy(image => image.Id)
+                .ToArray();
+            var requested = requestedImages
+                .OrderBy(image => image.DisplayOrder)
+                .ToArray();
+
+            for (var index = 0; index < existing.Length; index++)
+            {
+                if (!string.Equals(existing[index].ImageId, requested[index].ImageId, StringComparison.Ordinal) ||
+                    !string.Equals(existing[index].ImageUrl, requested[index].ImageUrl, StringComparison.Ordinal) ||
+                    existing[index].DisplayOrder != requested[index].DisplayOrder)
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private sealed record NormalizedProvisionImage(string ImageId, string ImageUrl, int DisplayOrder);
 
         private static string NormalizeImageUrl(string? value, string paramName)
         {

@@ -29,6 +29,9 @@ const filesController = new FilesController(fileService);
 
 app.use(cors());
 app.use(express.json());
+app.get("/healthz", (_req, res) => {
+  res.status(200).json({ status: "ok" });
+});
 app.use("/api", createApiRouter({ filesController, rawFileBodyParser }));
 
 if (!useWebStorage) {

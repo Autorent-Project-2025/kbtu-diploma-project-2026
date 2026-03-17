@@ -46,6 +46,7 @@
 - `POST /permissions` (policy `permissions:create`)
 - `POST /internal/users/provision` (внутренний endpoint, header `X-Internal-Api-Key`)
 - `GET /healthz`
+- `GET /metrics`
 
 Пример логина:
 
@@ -107,6 +108,13 @@ JWT, выдаваемый через `POST /auth/login` и `POST /auth/refresh`,
 Дополнительно из `appsettings*.json` при необходимости:
 - `Jwt__Issuer`
 - `Jwt__Audience`
+
+## Наблюдаемость
+- сервис принимает и возвращает `X-Request-Id`;
+- принимает и продолжает `traceparent`;
+- пишет JSON-логи с `requestId`/`traceId`;
+- публикует `Prometheus`-совместимые метрики на `GET /metrics`.
+- экспортирует входящие HTTP spans в `OpenTelemetry Collector` и дальше в `Tempo`, если задан `OTEL_EXPORTER_OTLP_ENDPOINT`.
 
 ## Запуск
 ### В составе всего проекта (рекомендуется)

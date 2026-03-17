@@ -45,7 +45,6 @@ public sealed class ApproveTicketCommandHandler
 
         var reviewedAtUtc = DateTime.UtcNow;
         ticket.Approve(command.ManagerId, reviewedAtUtc);
-        await _ticketUnitOfWork.SaveChangesAsync(cancellationToken);
 
         await _ticketEventPublisher.PublishApprovedAsync(
             new TicketApprovedEvent(
@@ -72,6 +71,7 @@ public sealed class ApproveTicketCommandHandler
                 command.ManagerId,
                 reviewedAtUtc),
             cancellationToken);
+        await _ticketUnitOfWork.SaveChangesAsync(cancellationToken);
 
         return new ApproveTicketResult(ticket.ToDto());
     }

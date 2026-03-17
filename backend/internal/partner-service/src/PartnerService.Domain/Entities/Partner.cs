@@ -33,4 +33,7 @@ public class Partner
 
     [Column("phone_number")]
     public string PhoneNumber { get; set; } = string.Empty;
+
+    [Column("provision_request_key")]
+    public string? ProvisionRequestKey { get; set; }
 }

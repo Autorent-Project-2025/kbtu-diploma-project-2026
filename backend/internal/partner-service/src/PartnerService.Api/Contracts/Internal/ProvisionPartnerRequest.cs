@@ -10,4 +10,5 @@ public sealed class ProvisionPartnerRequest
     public DateOnly PartnershipEndDate { get; init; }
     public Guid RelatedUserId { get; init; }
     public string PhoneNumber { get; init; } = string.Empty;
+    public string? ProvisionRequestKey { get; init; }
 }

@@ -12,6 +12,7 @@ public sealed class TicketDbContext : DbContext, ITicketUnitOfWork
     }
 
     public DbSet<Ticket> Tickets => Set<Ticket>();
+    public DbSet<TicketWorkflowOutboxMessage> TicketWorkflowOutboxMessages => Set<TicketWorkflowOutboxMessage>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

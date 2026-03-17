@@ -33,4 +33,7 @@ public class Client
 
     [Column("avatar_url")]
     public string? AvatarUrl { get; set; }
+
+    [Column("provision_request_key")]
+    public string? ProvisionRequestKey { get; set; }
 }

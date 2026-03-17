@@ -42,6 +42,7 @@ public sealed class InternalUsersController : ControllerBase
                 request.FullName,
                 request.Email,
                 request.BirthDate,
+                request.RequestKey,
                 request.SubjectType,
                 request.ActorType),
             cancellationToken);

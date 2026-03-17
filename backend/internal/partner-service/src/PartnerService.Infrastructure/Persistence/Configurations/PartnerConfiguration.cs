@@ -47,7 +47,13 @@ public class PartnerConfiguration : IEntityTypeConfiguration<Partner>
             .HasMaxLength(32)
             .IsRequired();
 
+        builder.Property(partner => partner.ProvisionRequestKey)
+            .HasMaxLength(128);
+
         builder.HasIndex(partner => partner.RelatedUserId)
+            .IsUnique();
+
+        builder.HasIndex(partner => partner.ProvisionRequestKey)
             .IsUnique();
     }
 }

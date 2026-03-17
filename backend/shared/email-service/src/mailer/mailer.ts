@@ -1,4 +1,5 @@
 import nodemailer from "nodemailer";
+import { observabilityLogger } from "../observability/logger.ts";
 
 type SmtpConfig = {
   host: string;
@@ -68,20 +69,41 @@ export function createMailer(cfg?: Partial<SmtpConfig>) {
     html?: string;
     replyTo?: string;
   }) {
-    const info = await transporter.sendMail({
-      from: config.from,
-      to: params.to,
-      subject: params.subject,
-      text: params.text,
-      html: params.html,
-      replyTo: params.replyTo,
-    });
+    const recipients = Array.isArray(params.to) ? params.to.join(",") : params.to;
 
-    return {
-      messageId: info.messageId,
-      accepted: info.accepted,
-      rejected: info.rejected,
-    };
+    try {
+      const info = await transporter.sendMail({
+        from: config.from,
+        to: params.to,
+        subject: params.subject,
+        text: params.text,
+        html: params.html,
+        replyTo: params.replyTo,
+      });
+
+      observabilityLogger.info("email_sent", {
+        transport: "smtp",
+        to: recipients,
+        subject: params.subject,
+        messageId: info.messageId,
+        acceptedCount: info.accepted.length,
+        rejectedCount: info.rejected.length,
+      });
+
+      return {
+        messageId: info.messageId,
+        accepted: info.accepted,
+        rejected: info.rejected,
+      };
+    } catch (error) {
+      observabilityLogger.error("email_send_failed", error, {
+        transport: "smtp",
+        to: recipients,
+        subject: params.subject,
+      });
+
+      throw error;
+    }
   }
 
   return { verify, sendMail };

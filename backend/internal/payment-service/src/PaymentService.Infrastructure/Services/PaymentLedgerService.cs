@@ -24,9 +24,35 @@ public sealed class PaymentLedgerService : IPaymentLedgerService
 
     public async Task RecordBookingConfirmedAsync(BookingPaymentSnapshot snapshot, CancellationToken cancellationToken = default)
     {
+        await RecordBookingConfirmedCoreAsync(snapshot, null, null, cancellationToken);
+    }
+
+    public async Task RecordBookingConfirmedAsync(
+        BookingPaymentSnapshot snapshot,
+        string eventId,
+        string routingKey,
+        CancellationToken cancellationToken = default)
+    {
+        await RecordBookingConfirmedCoreAsync(snapshot, eventId, routingKey, cancellationToken);
+    }
+
+    private async Task RecordBookingConfirmedCoreAsync(
+        BookingPaymentSnapshot snapshot,
+        string? eventId,
+        string? routingKey,
+        CancellationToken cancellationToken)
+    {
         ValidateSnapshot(snapshot);
+        var normalizedEventId = NormalizeOptionalEventId(eventId);
+        var normalizedRoutingKey = NormalizeOptionalRoutingKey(routingKey);
 
         await using var transaction = await _db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+
+        if (await IsEventAlreadyProcessedAsync(normalizedEventId, cancellationToken))
+        {
+            await transaction.CommitAsync(cancellationToken);
+            return;
+        }
 
         var existingPayment = await _db.CustomerPayments
             .FirstOrDefaultAsync(payment => payment.BookingId == snapshot.BookingId, cancellationToken);
@@ -35,6 +61,8 @@ public sealed class PaymentLedgerService : IPaymentLedgerService
         {
             if (existingPayment.Status is CustomerPaymentStatus.Pending or CustomerPaymentStatus.Available)
             {
+                AddProcessedEvent(normalizedEventId, normalizedRoutingKey);
+                await _db.SaveChangesAsync(cancellationToken);
                 await transaction.CommitAsync(cancellationToken);
                 return;
             }
@@ -85,24 +113,54 @@ public sealed class PaymentLedgerService : IPaymentLedgerService
             CreatedAt = now
         });
 
+        AddProcessedEvent(normalizedEventId, normalizedRoutingKey);
         await _db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
     }
 
     public async Task RecordBookingCanceledAsync(int bookingId, CancellationToken cancellationToken = default)
     {
+        await RecordBookingCanceledCoreAsync(bookingId, null, null, cancellationToken);
+    }
+
+    public async Task RecordBookingCanceledAsync(
+        int bookingId,
+        string eventId,
+        string routingKey,
+        CancellationToken cancellationToken = default)
+    {
+        await RecordBookingCanceledCoreAsync(bookingId, eventId, routingKey, cancellationToken);
+    }
+
+    private async Task RecordBookingCanceledCoreAsync(
+        int bookingId,
+        string? eventId,
+        string? routingKey,
+        CancellationToken cancellationToken)
+    {
         if (bookingId <= 0)
         {
             throw new ArgumentException("Booking id must be greater than zero.", nameof(bookingId));
         }
 
+        var normalizedEventId = NormalizeOptionalEventId(eventId);
+        var normalizedRoutingKey = NormalizeOptionalRoutingKey(routingKey);
+
         await using var transaction = await _db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+
+        if (await IsEventAlreadyProcessedAsync(normalizedEventId, cancellationToken))
+        {
+            await transaction.CommitAsync(cancellationToken);
+            return;
+        }
 
         var payment = await _db.CustomerPayments
             .FirstOrDefaultAsync(item => item.BookingId == bookingId, cancellationToken);
 
         if (payment is null || payment.Status == CustomerPaymentStatus.Canceled)
         {
+            AddProcessedEvent(normalizedEventId, normalizedRoutingKey);
+            await _db.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
             return;
         }
@@ -135,18 +193,46 @@ public sealed class PaymentLedgerService : IPaymentLedgerService
             CreatedAt = now
         });
 
+        AddProcessedEvent(normalizedEventId, normalizedRoutingKey);
         await _db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
     }
 
     public async Task RecordBookingCompletedAsync(int bookingId, CancellationToken cancellationToken = default)
     {
+        await RecordBookingCompletedCoreAsync(bookingId, null, null, cancellationToken);
+    }
+
+    public async Task RecordBookingCompletedAsync(
+        int bookingId,
+        string eventId,
+        string routingKey,
+        CancellationToken cancellationToken = default)
+    {
+        await RecordBookingCompletedCoreAsync(bookingId, eventId, routingKey, cancellationToken);
+    }
+
+    private async Task RecordBookingCompletedCoreAsync(
+        int bookingId,
+        string? eventId,
+        string? routingKey,
+        CancellationToken cancellationToken)
+    {
         if (bookingId <= 0)
         {
             throw new ArgumentException("Booking id must be greater than zero.", nameof(bookingId));
         }
 
+        var normalizedEventId = NormalizeOptionalEventId(eventId);
+        var normalizedRoutingKey = NormalizeOptionalRoutingKey(routingKey);
+
         await using var transaction = await _db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+
+        if (await IsEventAlreadyProcessedAsync(normalizedEventId, cancellationToken))
+        {
+            await transaction.CommitAsync(cancellationToken);
+            return;
+        }
 
         var payment = await _db.CustomerPayments
             .FirstOrDefaultAsync(item => item.BookingId == bookingId, cancellationToken);
@@ -158,6 +244,8 @@ public sealed class PaymentLedgerService : IPaymentLedgerService
 
         if (payment.Status == CustomerPaymentStatus.Available)
         {
+            AddProcessedEvent(normalizedEventId, normalizedRoutingKey);
+            await _db.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
             return;
         }
@@ -204,6 +292,7 @@ public sealed class PaymentLedgerService : IPaymentLedgerService
                 CreatedAt = now
             });
 
+        AddProcessedEvent(normalizedEventId, normalizedRoutingKey);
         await _db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
     }
@@ -711,6 +800,64 @@ public sealed class PaymentLedgerService : IPaymentLedgerService
         }
 
         return decimal.Round(rate, 4, MidpointRounding.AwayFromZero);
+    }
+
+    private async Task<bool> IsEventAlreadyProcessedAsync(string? eventId, CancellationToken cancellationToken)
+    {
+        if (eventId is null)
+        {
+            return false;
+        }
+
+        return await _db.ProcessedIntegrationEvents
+            .AnyAsync(item => item.EventId == eventId, cancellationToken);
+    }
+
+    private void AddProcessedEvent(string? eventId, string? routingKey)
+    {
+        if (eventId is null || routingKey is null)
+        {
+            return;
+        }
+
+        _db.ProcessedIntegrationEvents.Add(new ProcessedIntegrationEvent
+        {
+            EventId = eventId,
+            RoutingKey = routingKey,
+            ProcessedAt = DateTimeOffset.UtcNow
+        });
+    }
+
+    private static string? NormalizeOptionalEventId(string? eventId)
+    {
+        if (string.IsNullOrWhiteSpace(eventId))
+        {
+            return null;
+        }
+
+        var normalized = eventId.Trim();
+        if (normalized.Length > 200)
+        {
+            throw new ArgumentException("Event id length must not exceed 200 characters.", nameof(eventId));
+        }
+
+        return normalized;
+    }
+
+    private static string? NormalizeOptionalRoutingKey(string? routingKey)
+    {
+        if (string.IsNullOrWhiteSpace(routingKey))
+        {
+            return null;
+        }
+
+        var normalized = routingKey.Trim();
+        if (normalized.Length > 200)
+        {
+            throw new ArgumentException("Routing key length must not exceed 200 characters.", nameof(routingKey));
+        }
+
+        return normalized;
     }
 
     private static string NormalizeRequestKey(string requestKey)

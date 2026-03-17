@@ -4,6 +4,7 @@
 Этот документ описывает, как backend-сервисы в AutoRent взаимодействуют друг с другом в общем `docker-compose`.
 
 ## Состав backend
+- `libraries/messaging-dotnet` - общая .NET-библиотека для RabbitMQ topology, publisher и контрактов интеграционных событий.
 - `shared/identity-service` - аутентификация, роли, permissions, выдача JWT, lookup-справочники `subject_type`/`actor_type`, внутренний provisioning пользователя.
 - `shared/email-service` - отправка email-уведомлений.
 - `shared/image-service` - загрузка/удаление изображений.
@@ -30,6 +31,24 @@
 Пример:
 - внешний вызов `POST /identity/auth/login`
 - внутри gateway -> `POST {IDENTITY_SERVICE_URL}/auth/login`
+
+В корневом `docker-compose.yml` наружу опубликован только gateway. Остальные backend-сервисы и БД находятся во внутренних Docker networks.
+
+## Наблюдаемость backend-цепочек
+- Gateway проставляет и пробрасывает `X-Request-Id` и `traceparent`.
+- `ticket-service` принимает эти заголовки, пишет их в логи, экспортирует входящие HTTP spans и прокидывает контекст дальше в исходящие `HttpClient` вызовы.
+- `identity-service` принимает тот же контекст из gateway/`ticket-service`, пишет структурированные request-логи и экспортирует входящие HTTP spans.
+- Для `ticket-service` доступны метрики входящих запросов и исходящих S2S вызовов на `GET /metrics`.
+- Для `identity-service` доступны метрики входящих запросов на `GET /metrics`.
+- Для `api-gateway` доступны метрики edge-трафика на `GET /metrics`.
+- В обычном `docker compose up --build` поднимаются `Prometheus`, `Grafana`, `Loki`, `Tempo`, `Promtail` и `OpenTelemetry Collector`.
+
+Это покрывает основной синхронный сценарий `gateway -> ticket-service -> internal services` и позволяет видеть:
+- rate/error ratio по входящим endpoint-ам;
+- среднюю длительность запросов;
+- rate/error ratio по upstream-вызовам `ticket-service`;
+- distributed traces между сервисами;
+- корреляцию `log -> trace` и `requestId -> traceId`.
 
 ## Главные service-to-service взаимодействия
 Основная внутренняя оркестрация сосредоточена в `ticket-service`.
@@ -114,10 +133,16 @@
 - `booking-service`: `/internal/bookings/*`
 - `car-service`: `/internal/partner-cars/provision`
 
-В локальной конфигурации общего compose сейчас используется одинаковое значение:
-- `local-internal-api-key`
+В общем compose ключи разведены по целевым сервисам:
+- `local-identity-service-key`
+- `local-client-service-key`
+- `local-partner-service-key`
+- `local-car-service-key`
+- `local-booking-service-key`
+- `local-payment-service-key`
+- `local-file-service-key`
 
-Но это не жесткое ограничение архитектуры: ключи можно разделять по сервисам.
+Это уменьшает blast radius по сравнению с одним общим `X-Internal-Api-Key`.
 
 ## Границы данных
 - `identity-service` -> `identity-db`
