@@ -5,7 +5,16 @@ interface JwtPayload {
   sub?: string;
   exp?: number;
   permissions?: string[] | string;
+  actor_type?: string;
+  subject_type?: string;
   [key: string]: unknown;
+}
+
+function readStringClaim(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+
+  const normalized = value.trim().toLowerCase();
+  return normalized || null;
 }
 
 function decodeJwtPayload(token: string): JwtPayload | null {
@@ -112,6 +121,30 @@ export const auth = reactive({
       (claimPermission) =>
         claimPermission.toLowerCase() === permission.toLowerCase(),
     );
+  },
+
+  getActorType(): string | null {
+    const token = this.token || localStorage.getItem("token") || "";
+    const payload = decodeJwtPayload(token);
+    return readStringClaim(payload?.actor_type);
+  },
+
+  getSubjectType(): string | null {
+    const token = this.token || localStorage.getItem("token") || "";
+    const payload = decodeJwtPayload(token);
+    return readStringClaim(payload?.subject_type);
+  },
+
+  isActorType(type: string): boolean {
+    const actorType = this.getActorType();
+    const normalizedType = readStringClaim(type);
+    return !!actorType && !!normalizedType && actorType === normalizedType;
+  },
+
+  isSubjectType(type: string): boolean {
+    const subjectType = this.getSubjectType();
+    const normalizedType = readStringClaim(type);
+    return !!subjectType && !!normalizedType && subjectType === normalizedType;
   },
 
   getUserId(): string | null {

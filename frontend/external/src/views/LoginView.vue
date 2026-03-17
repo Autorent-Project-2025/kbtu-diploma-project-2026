@@ -183,7 +183,6 @@
 import { ref } from "vue";
 import { useRouter } from "vue-router";
 import { auth } from "../store/auth";
-import { getMyPartner } from "../api/partners";
 import { useToast } from "../composables/useToast";
 
 const router = useRouter();
@@ -199,17 +198,7 @@ async function onLogin() {
   try {
     await auth.login(email.value, password.value);
     success("Добро пожаловать!");
-
-    try {
-      await getMyPartner();
-      await router.push("/partner/me");
-    } catch (partnerError: any) {
-      if (partnerError?.response?.status === 404) {
-        await router.push("/cars");
-      } else {
-        await router.push("/cars");
-      }
-    }
+    await router.push(auth.isActorType("partner") ? "/profile/partner" : "/cars");
   } catch (err) {
     error("Ошибка входа! Проверьте email и пароль.");
   } finally {

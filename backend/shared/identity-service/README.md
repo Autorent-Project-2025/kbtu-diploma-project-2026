@@ -5,6 +5,7 @@
 - выдачу JWT и refresh token;
 - активацию учетной записи;
 - управление пользователями, ролями и permissions;
+- хранение типа субъекта (`subject_type`) и доменного типа актора (`actor_type`);
 - внутренний provisioning пользователя для `ticket-service`;
 - публикацию JWKS (`/.well-known/jwks.json`).
 
@@ -61,8 +62,35 @@
 - Эффективные permissions используются в:
   - выдаче JWT (`/auth/login`, `/auth/refresh`);
   - ответах `/users` и `/users/{id}`;
-  - ответе `/roles` (возвращаются прямые и эффективные permissions).
+- ответе `/roles` (возвращаются прямые и эффективные permissions).
 - Кольцевое наследование ролей запрещено.
+
+## Subject Type и Actor Type
+- `subject_type` описывает технический тип аутентифицированного субъекта: `user`, `service`, `api_key`, `system`.
+- `actor_type` описывает бизнес-роль в домене: `client`, `partner`, `admin`, `internal`.
+- Значения нормализованы через lookup-таблицы `subject_types` и `actor_types`.
+- Пользователь в `users` хранит ссылки на lookup-записи, а не свободные строковые значения.
+- Для обычных пользовательских аккаунтов по умолчанию используются `subject_type=user` и `actor_type=client`.
+- RBAC-модель не меняется: роли по-прежнему нужны только для агрегации permissions, а сервисы не должны принимать решения по имени роли.
+
+JWT, выдаваемый через `POST /auth/login` и `POST /auth/refresh`, содержит:
+- `sub`
+- `username`
+- `subject_type`
+- `actor_type`
+- `permissions`
+
+Пример payload:
+
+```json
+{
+  "sub": "123",
+  "username": "ivan",
+  "subject_type": "user",
+  "actor_type": "partner",
+  "permissions": ["orders.read", "orders.write"]
+}
+```
 
 ## Переменные окружения
 См. `./.env.example`:
@@ -120,4 +148,3 @@ docker compose -f docker-compose.yaml up --build
 - `POST /auth/login`, `POST /auth/refresh`, `POST /auth/activate`
 - `GET /.well-known/jwks.json`
 - `POST /internal/users/provision` (защищается `X-Internal-Api-Key`)
-

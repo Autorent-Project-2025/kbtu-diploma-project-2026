@@ -44,6 +44,8 @@ public sealed class JwtProvider : IJwtProvider, IDisposable
     public AccessTokenResult GenerateAccessToken(
         Guid userId,
         string username,
+        string subjectType,
+        string actorType,
         IReadOnlyCollection<string> permissions)
     {
         var issuedAtUtc = DateTime.UtcNow;
@@ -52,7 +54,9 @@ public sealed class JwtProvider : IJwtProvider, IDisposable
         var claims = new List<Claim>
         {
             new(JwtRegisteredClaimNames.Sub, userId.ToString()),
-            new("username", username)
+            new("username", username),
+            new("subject_type", subjectType),
+            new("actor_type", actorType)
         };
 
         foreach (var permission in permissions.Distinct(StringComparer.OrdinalIgnoreCase))

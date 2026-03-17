@@ -89,5 +89,6 @@ docker compose -f docker-compose.yaml up --build
 - `Partner.Delete` - удаление партнера (`DELETE /{id}`)
 
 Маршрут `GET /me` требует валидный JWT и возвращает карточку партнера, связанную с `relatedUserId` текущего пользователя.
+Этот маршрут нужен для загрузки partner-данных, а не для определения actor type пользователя: доменной классификацией теперь служит claim `actor_type` в JWT.
 
 Внутренний маршрут `POST /internal/partners/provision` не требует JWT, но требует валидный `X-Internal-Api-Key`.

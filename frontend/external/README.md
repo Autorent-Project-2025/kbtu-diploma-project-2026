@@ -26,9 +26,20 @@
 - `/cars`
 - `/cars/:id`
 - `/bookings`
-- `/partner/me`
+- `/profile`
+- `/profile/user`
+- `/profile/partner`
+- `/partner/me` (`redirect -> /profile`, legacy compatibility route)
 - `/partner/cars`
+- `/partner/bookings`
 - `/partner/cars/:id`
+
+## Разделение client / partner
+- После логина и при переходе на `/profile` приложение читает `actor_type` из JWT.
+- `actor_type=partner` направляет пользователя в partner UI (`/profile/partner`, `/partner/*`).
+- Любой другой `actor_type` направляет пользователя в клиентский профиль (`/profile/user`).
+- Для определения типа пользователя frontend больше не использует пробный вызов `GET /partners/me`.
+- `partner-service` остается источником данных партнерского кабинета, но не источником факта "этот пользователь партнер".
 
 ## Интеграция с API Gateway
 Приложение использует `VITE_API_URL` (обычно `http://localhost:9186`).
@@ -52,6 +63,8 @@
 - `GET /cars/my/{id}`
 
 Дополнительно для партнерского flow:
+- JWT должен содержать `actor_type=partner`, иначе router не пустит пользователя в `/profile/partner` и `/partner/*`.
+- После actor-based route guard партнерские страницы загружают данные из partner API (`/partners/me` и связанные partner endpoints).
 - `POST /tickets` с `ticketType=PartnerCar` (multipart, ownership + фото машины).
 - На странице `/partner/cars` партнер может вручную ввести `марку` и `модель` (с подсказками из текущего каталога), а не только выбирать готовую модель.
 
@@ -94,5 +107,6 @@ UI не проверяет permissions явно для большинства с
 Фактические требования:
 - без прав: `/`, `/cars`, `/cars/:id`, `/apply`, `/activate`, создание тикета `POST /tickets`
 - валидный JWT: раздел `/bookings`, автоподбор/бронирование, партнерский кабинет (`/partner/*`)
+- валидный JWT + `actor_type=partner`: `/profile/partner`, `/partner/*`
 - `Booking.Create`: создание брони (`POST /bookings`)
 

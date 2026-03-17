@@ -1,6 +1,7 @@
 using IdentityService.Application.Constants;
 using IdentityService.Application.Exceptions;
 using IdentityService.Application.Interfaces;
+using IdentityService.Application.Utils;
 using IdentityService.Domain.Entities;
 using System.Security.Cryptography;
 using System.Text;
@@ -51,7 +52,13 @@ public sealed class ProvisionUserCommandHandler
         }
 
         var temporaryPassword = $"temp-{Guid.NewGuid():N}";
-        var user = new User(Guid.NewGuid(), username, normalizedEmail, _passwordHasher.Hash(temporaryPassword));
+        var user = new User(
+            Guid.NewGuid(),
+            username,
+            normalizedEmail,
+            _passwordHasher.Hash(temporaryPassword),
+            subjectType: UserTypeValidator.ValidateSubjectType(command.SubjectType),
+            actorType: UserTypeValidator.ValidateActorType(command.ActorType));
         user.AssignRole(userRole);
 
         var nowUtc = DateTime.UtcNow;

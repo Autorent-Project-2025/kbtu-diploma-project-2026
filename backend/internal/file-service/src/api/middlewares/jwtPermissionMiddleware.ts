@@ -7,12 +7,19 @@ interface JwtPayload {
   nbf?: unknown;
   iss?: unknown;
   aud?: unknown;
+  subject_type?: unknown;
+  actor_type?: unknown;
   permissions?: unknown;
 }
 
 interface AuthenticatedUser {
   subject: string | null;
+  subjectType: string | null;
+  actorType: string | null;
   permissions: Set<string>;
+  HasPermission(permission: string): boolean;
+  IsActorType(type: string): boolean;
+  IsSubjectType(type: string): boolean;
 }
 
 const parseBearerToken = (authorizationHeader: string | undefined): string | null => {
@@ -114,13 +121,13 @@ const extractPermissions = (payload: JwtPayload): Set<string> => {
     return new Set(
       payload.permissions
         .filter((permission): permission is string => typeof permission === "string")
-        .map((permission) => permission.trim())
+        .map((permission) => permission.trim().toLowerCase())
         .filter(Boolean)
     );
   }
 
   if (typeof payload.permissions === "string") {
-    const singlePermission = payload.permissions.trim();
+    const singlePermission = payload.permissions.trim().toLowerCase();
 
     if (singlePermission) {
       return new Set([singlePermission]);
@@ -128,6 +135,30 @@ const extractPermissions = (payload: JwtPayload): Set<string> => {
   }
 
   return new Set<string>();
+};
+
+const extractNormalizedClaim = (value: unknown): string | null => {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const normalizedValue = value.trim().toLowerCase();
+  return normalizedValue || null;
+};
+
+export const HasPermission = (authenticatedUser: AuthenticatedUser, permission: string): boolean => {
+  const normalizedPermission = permission.trim().toLowerCase();
+  return normalizedPermission.length > 0 && authenticatedUser.permissions.has(normalizedPermission);
+};
+
+export const IsActorType = (authenticatedUser: AuthenticatedUser, type: string): boolean => {
+  const normalizedType = type.trim().toLowerCase();
+  return normalizedType.length > 0 && authenticatedUser.actorType === normalizedType;
+};
+
+export const IsSubjectType = (authenticatedUser: AuthenticatedUser, type: string): boolean => {
+  const normalizedType = type.trim().toLowerCase();
+  return normalizedType.length > 0 && authenticatedUser.subjectType === normalizedType;
 };
 
 export const authenticateJwt: RequestHandler = (req, res, next) => {
@@ -140,11 +171,24 @@ export const authenticateJwt: RequestHandler = (req, res, next) => {
   try {
     const payload = extractPayload(token);
     const subject = typeof payload.sub === "string" ? payload.sub : null;
+    const subjectType = extractNormalizedClaim(payload.subject_type);
+    const actorType = extractNormalizedClaim(payload.actor_type);
     const permissions = extractPermissions(payload);
 
     const authenticatedUser: AuthenticatedUser = {
       subject,
-      permissions
+      subjectType,
+      actorType,
+      permissions,
+      HasPermission(permission: string) {
+        return HasPermission(this, permission);
+      },
+      IsActorType(type: string) {
+        return IsActorType(this, type);
+      },
+      IsSubjectType(type: string) {
+        return IsSubjectType(this, type);
+      }
     };
 
     res.locals.authenticatedUser = authenticatedUser;
@@ -162,7 +206,7 @@ export const requirePermission = (permission: string): RequestHandler => {
       return res.status(401).json({ message: "Unauthorized" });
     }
 
-    if (!authenticatedUser.permissions.has(permission)) {
+    if (!authenticatedUser.HasPermission(permission)) {
       return res.status(403).json({ message: "Forbidden" });
     }
 
