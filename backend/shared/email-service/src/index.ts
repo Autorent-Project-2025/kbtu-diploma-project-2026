@@ -1,5 +1,6 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { createMailer } from "./mailer/mailer.ts";
+import { observabilityLogger } from "./observability/logger.ts";
 import { startRabbitConsumer } from "./rabbitmq/consumer.ts";
 import {
   approvedTemplate,
@@ -84,7 +85,10 @@ async function main() {
 
   if (process.env.SMTP_VERIFY_ON_STARTUP === "true") {
     await mailer.verify();
-    console.log("SMTP connection verified");
+    observabilityLogger.info("smtp_connection_verified", {
+      host: process.env.SMTP_HOST ?? null,
+      port: process.env.SMTP_PORT ?? null,
+    });
   }
 
   await startRabbitConsumer(mailer);
@@ -259,16 +263,20 @@ async function main() {
       }
 
       console.error(error);
+      observabilityLogger.error("http_request_failed", error, {
+        method: req.method ?? null,
+        path: url.pathname,
+      });
       sendJson(res, 500, { message: "Internal server error" });
     }
   });
 
   server.listen(port, () => {
-    console.log(`Email service is running on port ${port}`);
+    observabilityLogger.info("server_started", { port });
   });
 }
 
 main().catch((error) => {
-  console.error(error);
+  observabilityLogger.error("service_startup_failed", error);
   process.exit(1);
 });

@@ -527,6 +527,7 @@ services:
       PORT: 8080
       RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER:-autorent}:${RABBITMQ_DEFAULT_PASS:-autorent}@rabbitmq:5672
       RABBITMQ_EXCHANGE: ${RABBITMQ_EXCHANGE_NAME:-autorent.events}
+      OBSERVABILITY_LOG_PATH: /tmp/autorent/email-service/email-service.jsonl
     expose:
       - "8080"
     depends_on:
@@ -546,6 +547,8 @@ services:
       start_period: 15s
     networks:
       - backend
+    volumes:
+      - email_logs:/tmp/autorent/email-service
 
   ticket-service:
     build:
@@ -908,6 +911,7 @@ services:
       - gateway_logs:/tmp/autorent/api-gateway:ro
       - ticket_logs:/tmp/autorent/ticket-service:ro
       - identity_logs:/tmp/autorent/identity-service:ro
+      - email_logs:/tmp/autorent/email-service:ro
     networks:
       - backend
 
@@ -949,6 +953,7 @@ volumes:
   gateway_logs:
   ticket_logs:
   identity_logs:
+  email_logs:
 
 networks:
   frontend:

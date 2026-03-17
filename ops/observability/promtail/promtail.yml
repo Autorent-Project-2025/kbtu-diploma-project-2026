@@ -93,3 +93,30 @@ scrape_configs:
           method:
           route:
           statusCode:
+
+  - job_name: email-service
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: email-service
+          service_name: email-service
+          __path__: /tmp/autorent/email-service/*.jsonl
+    pipeline_stages:
+      - json:
+          expressions:
+            timestamp: timestamp
+            service: service
+            level: level
+            event: event
+            routingKey: routingKey
+            transport: transport
+      - timestamp:
+          source: timestamp
+          format: RFC3339
+      - labels:
+          service:
+          level:
+          event:
+          routingKey:
+          transport:

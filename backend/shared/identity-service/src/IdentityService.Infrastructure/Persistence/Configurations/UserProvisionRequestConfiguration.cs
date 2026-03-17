@@ -24,5 +24,10 @@ public sealed class UserProvisionRequestConfiguration : IEntityTypeConfiguration
 
         builder.HasIndex(item => item.RequestKey).IsUnique();
         builder.HasIndex(item => item.UserId);
+
+        builder.HasOne<User>()
+            .WithMany()
+            .HasForeignKey(item => item.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }

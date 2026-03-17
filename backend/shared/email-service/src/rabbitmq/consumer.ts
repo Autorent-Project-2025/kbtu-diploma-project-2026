@@ -1,5 +1,6 @@
 import amqplib from "amqplib";
 import { createMailer } from "../mailer/mailer.ts";
+import { observabilityLogger } from "../observability/logger.ts";
 import {
   approvedTemplate,
   partnerCarApprovedTemplate,
@@ -257,7 +258,10 @@ export async function startRabbitConsumer(mailer: Mailer): Promise<void> {
 
         await channel.prefetch(1);
 
-        console.log("RabbitMQ email consumer is connected");
+        observabilityLogger.info("rabbitmq_consumer_connected", {
+          exchange: EXCHANGE_NAME,
+          queue: QUEUE_NAME,
+        });
 
         await channel.consume(
           QUEUE_NAME,
@@ -272,15 +276,31 @@ export async function startRabbitConsumer(mailer: Mailer): Promise<void> {
               const duplicateExpiresAt = processedEvents.get(integrationMessage.eventId);
 
               if (duplicateExpiresAt && duplicateExpiresAt > Date.now()) {
+                observabilityLogger.warn("rabbitmq_message_duplicate_skipped", {
+                  eventId: integrationMessage.eventId,
+                  routingKey: integrationMessage.routingKey,
+                });
                 channel.ack(message);
                 return;
               }
 
+              observabilityLogger.info("rabbitmq_message_received", {
+                eventId: integrationMessage.eventId,
+                routingKey: integrationMessage.routingKey,
+              });
+
               await sendTemplateEmail(mailer, integrationMessage.routingKey, integrationMessage.payload);
               processedEvents.set(integrationMessage.eventId, Date.now() + DEDUP_TTL_MS);
+              observabilityLogger.info("rabbitmq_message_processed", {
+                eventId: integrationMessage.eventId,
+                routingKey: integrationMessage.routingKey,
+              });
               channel.ack(message);
             } catch (error) {
-              console.error("RabbitMQ email consumer failed to process message", error);
+              observabilityLogger.error("rabbitmq_message_processing_failed", error, {
+                routingKey: message.fields.routingKey || null,
+                deliveryTag: message.fields.deliveryTag,
+              });
               channel.nack(message, false, true);
               await new Promise((resolve) => setTimeout(resolve, RECONNECT_DELAY_MS));
             }
@@ -293,7 +313,10 @@ export async function startRabbitConsumer(mailer: Mailer): Promise<void> {
           connection.once("error", (error) => reject(error));
         });
       } catch (error) {
-        console.error("RabbitMQ email consumer disconnected", error);
+        observabilityLogger.error("rabbitmq_consumer_disconnected", error, {
+          exchange: EXCHANGE_NAME,
+          queue: QUEUE_NAME,
+        });
         await new Promise((resolve) => setTimeout(resolve, RECONNECT_DELAY_MS));
       }
     }
