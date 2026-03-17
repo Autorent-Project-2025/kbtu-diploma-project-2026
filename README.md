@@ -9,7 +9,7 @@ AutoRent - микросервисная платформа каршеринга.
 - общая оркестрация через `docker-compose.yml` в корне.
 
 ## Диаграмма общей структуры проекта
-![Диаграмма проекта](./docs/images/project-architecture.png)
+Актуальная runtime-диаграмма проекта находится в [docs/project-architecture.md](./docs/project-architecture.md).
 
 ## Новое в админке
 - Superadmin UI обновлен до формата control center: отдельные секции `Role Management` и `User Management`, метрики и улучшенная адаптивность.
