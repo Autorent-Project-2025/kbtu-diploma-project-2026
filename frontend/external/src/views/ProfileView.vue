@@ -170,6 +170,37 @@
           </article>
         </section>
 
+
+        <!-- ── Onboarding banner (shown when profile is incomplete) ────── -->
+        <section
+          v-if="showOnboardingBanner"
+          class="rounded-3xl border border-amber-200/70 dark:border-amber-700/40 bg-amber-50 dark:bg-amber-900/10 shadow-xl p-6 flex flex-col sm:flex-row sm:items-center gap-5"
+        >
+          <div class="w-11 h-11 shrink-0 rounded-2xl bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center text-2xl">
+            👋
+          </div>
+          <div class="flex-1 space-y-1">
+            <p class="font-bold text-amber-800 dark:text-amber-300">Заполните профиль для бронирования</p>
+            <p class="text-sm text-amber-700 dark:text-amber-400">
+              Загрузите удостоверение личности и водительские права — без этого бронирование невозможно.
+            </p>
+          </div>
+          <div class="flex gap-2 shrink-0">
+            <button
+              @click="editMode = true"
+              class="px-4 py-2.5 rounded-2xl bg-amber-600 hover:bg-amber-700 text-white text-sm font-bold transition-colors"
+            >
+              Заполнить
+            </button>
+            <button
+              @click="dismissOnboarding"
+              class="px-3 py-2.5 rounded-2xl border border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-400 text-sm font-semibold hover:bg-amber-100 dark:hover:bg-amber-900/20 transition-colors"
+            >
+              ✕
+            </button>
+          </div>
+        </section>
+
         <!-- ── Edit Form ────────────────────────────────────────────────── -->
         <section
           v-if="editMode"
@@ -383,9 +414,17 @@
 
           <div
             v-else-if="recentBookings.length === 0"
-            class="p-8 text-center text-gray-400 dark:text-gray-500 border-2 border-dashed border-gray-200 dark:border-gray-800 m-6 rounded-2xl"
+            class="p-8 text-center border-2 border-dashed border-gray-200 dark:border-gray-800 m-6 rounded-2xl space-y-4"
           >
-            Броней пока нет
+            <p class="text-3xl">🚗</p>
+            <p class="font-semibold text-gray-700 dark:text-gray-300">Броней пока нет</p>
+            <p class="text-sm text-gray-400 dark:text-gray-500">Выберите автомобиль и сделайте первое бронирование</p>
+            <router-link
+              to="/cars"
+              class="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold shadow-lg shadow-emerald-500/20 transition-colors"
+            >
+              Выбрать автомобиль →
+            </router-link>
           </div>
 
           <table v-else class="w-full text-sm">
@@ -463,9 +502,17 @@
 
           <div
             v-else-if="comments.length === 0"
-            class="py-10 text-center text-gray-400 dark:text-gray-500 border-2 border-dashed border-gray-200 dark:border-gray-800 rounded-2xl"
+            class="py-10 text-center border-2 border-dashed border-gray-200 dark:border-gray-800 rounded-2xl space-y-3"
           >
-            Вы ещё не оставляли отзывов
+            <p class="text-3xl">⭐</p>
+            <p class="font-semibold text-gray-700 dark:text-gray-300">Отзывов пока нет</p>
+            <p class="text-sm text-gray-400 dark:text-gray-500">После поездки вы можете оставить отзыв на странице автомобиля</p>
+            <router-link
+              to="/cars"
+              class="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 text-sm font-semibold hover:border-emerald-500 transition-colors"
+            >
+              Перейти к автомобилям
+            </router-link>
           </div>
 
           <div v-else class="space-y-4">
@@ -571,6 +618,7 @@ const loading = ref(true);
 const loadError = ref<string | null>(null);
 const saving = ref(false);
 const editMode = ref(false);
+const onboardingDismissed = ref(localStorage.getItem("profile_onboarding_dismissed") === "1");
 const bookingsLoading = ref(true);
 const commentsLoading = ref(true);
 
@@ -598,6 +646,17 @@ const initials = computed(() => {
     (profile.value.firstName[0] ?? "") + (profile.value.lastName[0] ?? "")
   ).toUpperCase();
 });
+
+const showOnboardingBanner = computed(() => {
+  if (onboardingDismissed.value) return false;
+  if (!profile.value) return false;
+  return !profile.value.identityDocumentFileName || !profile.value.driverLicenseFileName;
+});
+
+function dismissOnboarding() {
+  onboardingDismissed.value = true;
+  localStorage.setItem("profile_onboarding_dismissed", "1");
+}
 
 // ─── Lifecycle ────────────────────────────────────────────────────────────────
 onMounted(async () => {

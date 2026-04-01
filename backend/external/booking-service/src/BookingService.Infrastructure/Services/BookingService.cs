@@ -393,6 +393,24 @@ namespace BookingService.Infrastructure.Services
             return true;
         }
 
+        public async Task<bool> CancelBookingByPartner(int id, Guid partnerUserId)
+        {
+            EnsureValidUserId(partnerUserId);
+
+            var booking = await _db.Bookings
+                .FirstOrDefaultAsync(b => b.Id == id && b.PartnerUserId == partnerUserId);
+
+            if (booking == null)
+                return false;
+
+            if (booking.Status == BookingStatus.Completed ||
+                booking.Status == BookingStatus.Canceled)
+                return false;
+
+            await PersistStatusTransitionWithPaymentOutbox(booking, BookingStatus.Canceled);
+            return true;
+        }
+
         public async Task<bool> ConfirmBooking(int id, Guid userId)
         {
             var booking = await GetUserBookingEntity(id, userId);

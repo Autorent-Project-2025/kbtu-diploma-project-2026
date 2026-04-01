@@ -56,19 +56,7 @@
       </div>
     </header>
 
-    <!-- Error / success banners -->
-    <div
-      v-if="errorMessage"
-      class="rounded-2xl border border-red-300/70 dark:border-red-500/30 bg-red-50 dark:bg-red-900/20 px-5 py-4 text-red-700 dark:text-red-300 font-medium"
-    >
-      {{ errorMessage }}
-    </div>
-    <div
-      v-if="successMessage"
-      class="rounded-2xl border border-emerald-300/70 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-900/20 px-5 py-4 text-emerald-700 dark:text-emerald-300 font-medium"
-    >
-      {{ successMessage }}
-    </div>
+    <!-- Уведомления через toast-систему -->
 
     <!-- Loading -->
     <div
@@ -511,6 +499,7 @@ import {
   rejectTicket,
   type PartnerCarReviewPayload,
 } from "../api/tickets";
+import { useToast } from "../composables/useToast";
 import type {
   PartnerCarTicketData,
   PartnerCarTicketImageData,
@@ -523,8 +512,7 @@ const selectedTicketId = ref<string>("");
 const rejectReason = ref("");
 const loading = ref(false);
 const actionLoading = ref(false);
-const errorMessage = ref("");
-const successMessage = ref("");
+const { success: toastSuccess, error: toastError } = useToast();
 const lastUpdatedAt = ref<string>("");
 const maxAllowedCarYear = new Date().getUTCFullYear() + 1;
 
@@ -741,11 +729,13 @@ function buildPartnerCarPayload(): PartnerCarReviewPayload | null | undefined {
     !email ||
     !Number.isInteger(carYear)
   ) {
-    errorMessage.value = "Заполните марку, модель, год, госномер и email.";
+    toastError("Заполните марку, модель, год, госномер и email.");
+    return null;
     return null;
   }
   if (carYear < 1886 || carYear > maxAllowedCarYear) {
-    errorMessage.value = `Год машины должен быть в диапазоне 1886-${maxAllowedCarYear}.`;
+    toastError(`Год машины должен быть в диапазоне 1886-${maxAllowedCarYear}.`);
+    return null;
     return null;
   }
   if (
@@ -754,7 +744,7 @@ function buildPartnerCarPayload(): PartnerCarReviewPayload | null | undefined {
     priceHour <= 0 ||
     priceDay <= 0
   ) {
-    errorMessage.value = "Укажите корректные значения цен за час и за день.";
+    toastError("Укажите корректные значения цен за час и за день.");
     return null;
   }
   return {
@@ -770,8 +760,6 @@ function buildPartnerCarPayload(): PartnerCarReviewPayload | null | undefined {
 
 async function loadPending() {
   loading.value = true;
-  errorMessage.value = "";
-  successMessage.value = "";
   try {
     const data = await getPendingTickets();
     tickets.value = data;
@@ -794,8 +782,7 @@ async function loadPending() {
       : fallback.id;
     await selectTicket(nextId);
   } catch (e: any) {
-    errorMessage.value =
-      e?.response?.data?.error || "Не удалось получить список заявок.";
+    toastError(e?.response?.data?.error || "Не удалось получить список заявок.");
   } finally {
     loading.value = false;
   }
@@ -804,31 +791,25 @@ async function loadPending() {
 async function selectTicket(ticketId: string) {
   selectedTicketId.value = ticketId;
   rejectReason.value = "";
-  errorMessage.value = "";
-  successMessage.value = "";
   try {
     selectedTicket.value = await getTicketById(ticketId);
     syncPartnerCarForm(selectedTicket.value);
   } catch (e: any) {
-    errorMessage.value =
-      e?.response?.data?.error || "Не удалось загрузить заявку.";
+    toastError(e?.response?.data?.error || "Не удалось загрузить заявку.");
   }
 }
 
 async function approveSelected() {
   if (!selectedTicket.value || actionLoading.value) return;
   actionLoading.value = true;
-  errorMessage.value = "";
-  successMessage.value = "";
   try {
     const payload = buildPartnerCarPayload();
     if (payload === null) return;
     await approveTicket(selectedTicket.value.id, payload);
-    successMessage.value = "Заявка одобрена.";
+    toastSuccess("✓ Заявка одобрена");
     await loadPending();
   } catch (e: any) {
-    errorMessage.value =
-      e?.response?.data?.error || "Не удалось одобрить заявку.";
+    toastError(e?.response?.data?.error || "Не удалось одобрить заявку.");
   } finally {
     actionLoading.value = false;
   }
@@ -837,12 +818,10 @@ async function approveSelected() {
 async function rejectSelected() {
   if (!selectedTicket.value || actionLoading.value) return;
   if (!rejectReason.value.trim()) {
-    errorMessage.value = "Укажите причину отказа.";
+    toastError("Укажите причину отказа.");
     return;
   }
   actionLoading.value = true;
-  errorMessage.value = "";
-  successMessage.value = "";
   try {
     const payload = buildPartnerCarPayload();
     if (payload === null) return;
@@ -851,11 +830,10 @@ async function rejectSelected() {
       rejectReason.value.trim(),
       payload,
     );
-    successMessage.value = "Заявка отклонена.";
+    toastSuccess("✕ Заявка отклонена", 4000);
     await loadPending();
   } catch (e: any) {
-    errorMessage.value =
-      e?.response?.data?.error || "Не удалось отклонить заявку.";
+    toastError(e?.response?.data?.error || "Не удалось отклонить заявку.");
   } finally {
     actionLoading.value = false;
   }
@@ -871,7 +849,6 @@ async function openDocument(
 ) {
   if (!selectedTicket.value || actionLoading.value) return;
   actionLoading.value = true;
-  errorMessage.value = "";
   try {
     const link = await getTicketDocumentTemporaryLink(
       selectedTicket.value.id,
@@ -879,8 +856,7 @@ async function openDocument(
     );
     window.open(link.url, "_blank", "noopener,noreferrer");
   } catch (e: any) {
-    errorMessage.value =
-      e?.response?.data?.error || "Не удалось получить ссылку на документ.";
+    toastError(e?.response?.data?.error || "Не удалось получить ссылку на документ.");
   } finally {
     actionLoading.value = false;
   }

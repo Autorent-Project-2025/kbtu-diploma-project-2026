@@ -145,3 +145,7 @@ export async function getPartnerPublicProfileByRelatedUserId(
   const response = await api.get(`/partners/public/by-related-user/${encodeURIComponent(relatedUserId)}`);
   return response.data as PartnerPublicProfile;
 }
+
+export async function cancelPartnerBooking(bookingId: number): Promise<void> {
+  await api.post(`/bookings/${bookingId}/partner-cancel`);
+}
