@@ -137,6 +137,7 @@ builder.Services.AddScoped<ICarCommentService, CarCommentService>();
 builder.Services.AddScoped<ICarImageService, CarImageService>();
 builder.Services.AddScoped<ICarFeatureService, CarFeatureService>();
 builder.Services.AddScoped<CarCatalogResolver>();
+builder.Services.AddScoped<ICarRecommendationService, CarRecommendationService>(); //
 builder.Services.AddHostedService<PartnerCarProvisionConsumer>();
 
 builder.Services.AddHttpClient<IPartnerContextClient, PartnerContextClient>((serviceProvider, client) =>

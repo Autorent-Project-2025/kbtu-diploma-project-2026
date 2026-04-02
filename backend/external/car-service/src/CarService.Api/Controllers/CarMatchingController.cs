@@ -1,4 +1,5 @@
 using CarService.Application.DTOs.Matching;
+using CarService.Application.DTOs.Recommendation;
 using CarService.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -10,10 +11,14 @@ namespace CarService.Api.Controllers
     public sealed class CarMatchingController : ControllerBase
     {
         private readonly IPartnerCarService _partnerCarService;
+        private readonly ICarRecommendationService _carRecommendationService;
 
-        public CarMatchingController(IPartnerCarService partnerCarService)
+        public CarMatchingController(
+            IPartnerCarService partnerCarService,
+            ICarRecommendationService carRecommendationService)
         {
             _partnerCarService = partnerCarService;
+            _carRecommendationService = carRecommendationService;
         }
 
         [HttpGet("available-models")]
@@ -26,9 +31,21 @@ namespace CarService.Api.Controllers
 
         [HttpPost("match")]
         [AllowAnonymous]
-        public async Task<IActionResult> Match([FromBody] MatchPartnerCarRequestDto request, CancellationToken cancellationToken)
+        public async Task<IActionResult> Match(
+            [FromBody] MatchPartnerCarRequestDto request,
+            CancellationToken cancellationToken)
         {
             var payload = await _partnerCarService.MatchPartnerCarAsync(request, cancellationToken);
+            return Ok(payload);
+        }
+
+        [HttpGet("recommendations")]
+        [AllowAnonymous]
+        public async Task<IActionResult> GetRecommendations(
+            [FromQuery] RecommendationQueryDto query,
+            CancellationToken cancellationToken)
+        {
+            var payload = await _carRecommendationService.GetRecommendationsAsync(query, cancellationToken);
             return Ok(payload);
         }
     }

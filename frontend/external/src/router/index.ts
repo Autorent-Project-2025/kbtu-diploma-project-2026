@@ -107,6 +107,11 @@ const routes = [
     meta: { requiresAuth: true, actorType: "partner" },
   },
   {
+    path: "/car-recommendations",
+    name: "car-recommendations",
+    component: () => import("../views/CarRecommendationView.vue"),
+  },
+  {
     path: "/cars/:id",
     name: "CarDetail",
     component: CarDetailView,
