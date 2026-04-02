@@ -210,7 +210,7 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
-import axios from "/@axios";
+import axios from "axios";
 
 type SubscriptionPlan = {
   id: number;

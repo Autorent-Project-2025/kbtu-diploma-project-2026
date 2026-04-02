@@ -112,7 +112,7 @@
 
 <script setup lang="ts">
 import { ref } from "vue";
-import axios from "/@axios";
+import axios from "axios";
 
 type RecommendedCar = {
   id: number;

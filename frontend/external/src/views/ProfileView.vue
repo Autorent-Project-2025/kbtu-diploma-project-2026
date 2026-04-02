@@ -712,7 +712,7 @@ import { getMyBookings } from "../api/booking";
 import { useToast } from "../composables/useToast";
 import type { Booking } from "../types/Booking";
 
-import axios from "/@axios";
+import axios from "axios";
 
 const mySubscription = ref<any | null>(null);
 

@@ -234,7 +234,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
-import axios from "/@axios";
+import axios from "axios";
 import type { Car } from "../types/Car";
 
 interface Props {
