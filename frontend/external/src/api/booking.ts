@@ -108,7 +108,7 @@ function mapBooking(dto: BookingApiDto): Booking {
 }
 
 function normalizePaymentStatus(
-  value: string | null | undefined
+  value: string | null | undefined,
 ): BookingPaymentState {
   const normalized = (value ?? "").trim().toLowerCase();
   if (normalized === "started") return "started";
@@ -120,7 +120,7 @@ function normalizePaymentStatus(
 }
 
 function mapBookingPaymentStatus(
-  dto: BookingPaymentStatusApiDto
+  dto: BookingPaymentStatusApiDto,
 ): BookingPaymentStatus {
   return {
     bookingId: dto.bookingId,
@@ -162,7 +162,7 @@ function mapBookingCharge(dto: BookingChargeApiDto): BookingCharge {
 }
 
 function mapBookingCompletionSubmission(
-  dto: BookingCompletionSubmissionApiDto
+  dto: BookingCompletionSubmissionApiDto,
 ): BookingCompletionSubmissionResult {
   return {
     booking: mapBooking(dto.booking),
@@ -175,11 +175,12 @@ function mapBookingCompletionSubmission(
  * Получить бронирования текущего пользователя с пагинацией.
  */
 export async function getMyBookings(
-  params?: GetMyBookingsParams
+  params?: GetMyBookingsParams,
 ): Promise<PaginatedResponse<Booking> | Booking[]> {
   const queryParams = new URLSearchParams();
   if (params?.page) queryParams.append("page", params.page.toString());
-  if (params?.pageSize) queryParams.append("pageSize", params.pageSize.toString());
+  if (params?.pageSize)
+    queryParams.append("pageSize", params.pageSize.toString());
 
   const url = `/bookings/my${queryParams.toString() ? `?${queryParams.toString()}` : ""}`;
   const response = await api.get(url);
@@ -211,11 +212,15 @@ export async function getMyBookings(
       pageSize: payload.pageSize ?? params?.pageSize ?? mappedItems.length,
       totalPages:
         payload.totalPages ??
-        Math.ceil((payload.totalCount ?? mappedItems.length) / (payload.pageSize ?? 1)),
+        Math.ceil(
+          (payload.totalCount ?? mappedItems.length) / (payload.pageSize ?? 1),
+        ),
     };
   }
 
-  const list = (Array.isArray(response.data) ? response.data : []) as BookingApiDto[];
+  const list = (
+    Array.isArray(response.data) ? response.data : []
+  ) as BookingApiDto[];
   const mapped = list.map(mapBooking);
   return {
     items: mapped,
@@ -233,12 +238,14 @@ export async function getMyBookings(
 export async function createBooking(
   partnerCarId: number,
   start: string,
-  end: string
+  end: string,
+  useSubscription = false,
 ): Promise<Booking> {
   const response = await api.post("/bookings", {
     partnerCarId,
     startTime: start,
     endTime: end,
+    useSubscription,
   });
 
   return mapBooking(response.data as BookingApiDto);
@@ -265,27 +272,42 @@ export async function submitBookingCompletionReview(
     completionSideLeftPhotoFile: File;
     completionSideRightPhotoFile: File;
     completionInteriorPhotoFile: File;
-  }
+  },
 ): Promise<BookingCompletionSubmissionResult> {
   const formData = new FormData();
   formData.append("completionFrontPhotoFile", files.completionFrontPhotoFile);
   formData.append("completionBackPhotoFile", files.completionBackPhotoFile);
-  formData.append("completionSideLeftPhotoFile", files.completionSideLeftPhotoFile);
-  formData.append("completionSideRightPhotoFile", files.completionSideRightPhotoFile);
-  formData.append("completionInteriorPhotoFile", files.completionInteriorPhotoFile);
+  formData.append(
+    "completionSideLeftPhotoFile",
+    files.completionSideLeftPhotoFile,
+  );
+  formData.append(
+    "completionSideRightPhotoFile",
+    files.completionSideRightPhotoFile,
+  );
+  formData.append(
+    "completionInteriorPhotoFile",
+    files.completionInteriorPhotoFile,
+  );
 
-  const response = await api.post(`/bookings/${bookingId}/complete-review`, formData, {
-    headers: {
-      "Content-Type": "multipart/form-data",
+  const response = await api.post(
+    `/bookings/${bookingId}/complete-review`,
+    formData,
+    {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
     },
-  });
+  );
 
   return mapBookingCompletionSubmission(
-    response.data as BookingCompletionSubmissionApiDto
+    response.data as BookingCompletionSubmissionApiDto,
   );
 }
 
-export async function getBookingCharges(bookingId: number): Promise<BookingCharge[]> {
+export async function getBookingCharges(
+  bookingId: number,
+): Promise<BookingCharge[]> {
   const response = await api.get(`/bookings/${bookingId}/charges`);
   const payload = Array.isArray(response.data) ? response.data : [];
   return payload.map((item) => mapBookingCharge(item as BookingChargeApiDto));
@@ -293,21 +315,23 @@ export async function getBookingCharges(bookingId: number): Promise<BookingCharg
 
 export async function payBookingCharge(
   bookingId: number,
-  chargeId: number
+  chargeId: number,
 ): Promise<BookingCharge> {
-  const response = await api.post(`/bookings/${bookingId}/charges/${chargeId}/pay`);
+  const response = await api.post(
+    `/bookings/${bookingId}/charges/${chargeId}/pay`,
+  );
   return mapBookingCharge(response.data as BookingChargeApiDto);
 }
 
 export async function startBookingPayment(
-  bookingId: number
+  bookingId: number,
 ): Promise<BookingPaymentStatus> {
   const response = await api.post(`/bookings/${bookingId}/payment/start`);
   return mapBookingPaymentStatus(response.data as BookingPaymentStatusApiDto);
 }
 
 export async function getBookingPaymentStatus(
-  bookingId: number
+  bookingId: number,
 ): Promise<BookingPaymentStatus> {
   const response = await api.get(`/bookings/${bookingId}/payment/status`);
   return mapBookingPaymentStatus(response.data as BookingPaymentStatusApiDto);
@@ -315,9 +339,12 @@ export async function getBookingPaymentStatus(
 
 export async function submitBookingPayment(
   bookingId: number,
-  payload: SubmitBookingPaymentPayload
+  payload: SubmitBookingPaymentPayload,
 ): Promise<BookingPaymentStatus> {
-  const response = await api.post(`/bookings/${bookingId}/payment/submit`, payload);
+  const response = await api.post(
+    `/bookings/${bookingId}/payment/submit`,
+    payload,
+  );
   return mapBookingPaymentStatus(response.data as BookingPaymentStatusApiDto);
 }
 

@@ -109,21 +109,92 @@
           v-if="profile.bookingActionsBlocked"
           class="rounded-3xl border border-red-300/70 dark:border-red-500/30 bg-red-50 dark:bg-red-900/20 shadow-xl p-6 space-y-2"
         >
-          <p class="text-sm font-bold uppercase tracking-[0.18em] text-red-700 dark:text-red-300">
+          <p
+            class="text-sm font-bold uppercase tracking-[0.18em] text-red-700 dark:text-red-300"
+          >
             Бронирования временно заблокированы
           </p>
           <p class="text-base font-semibold text-red-900 dark:text-red-100">
-            {{ profile.bookingBlockReason || "Погасите начисленный штраф, чтобы снова создавать и начинать брони." }}
+            {{
+              profile.bookingBlockReason ||
+              "Погасите начисленный штраф, чтобы снова создавать и начинать брони."
+            }}
           </p>
           <p
             v-if="profile.bookingBlockedAt"
             class="text-sm text-red-700 dark:text-red-300"
           >
-            Блокировка действует с {{ formatDateTime(profile.bookingBlockedAt) }}
+            Блокировка действует с
+            {{ formatDateTime(profile.bookingBlockedAt) }}
           </p>
         </section>
 
         <!-- ── Stats strip ──────────────────────────────────────────────── -->
+
+        <section
+          v-if="mySubscription"
+          class="rounded-3xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/30 shadow-xl p-6"
+        >
+          <div
+            class="flex flex-col md:flex-row md:items-center md:justify-between gap-6"
+          >
+            <div>
+              <p
+                class="text-xs uppercase tracking-[0.3em] text-emerald-600 dark:text-emerald-400 font-bold"
+              >
+                Active subscription
+              </p>
+
+              <h2
+                class="mt-2 text-2xl font-extrabold text-gray-900 dark:text-white"
+              >
+                {{ mySubscription.planName }}
+              </h2>
+
+              <p class="text-sm text-gray-600 dark:text-gray-300 mt-1">
+                {{ formatDate(mySubscription.startDate) }} —
+                {{ formatDate(mySubscription.endDate) }}
+              </p>
+            </div>
+
+            <div class="grid grid-cols-3 gap-4">
+              <div
+                class="bg-white dark:bg-gray-900 rounded-xl p-4 shadow text-center"
+              >
+                <p class="text-xs text-gray-400">Included</p>
+                <p class="text-xl font-bold">
+                  {{ mySubscription.includedBookings }}
+                </p>
+              </div>
+
+              <div
+                class="bg-white dark:bg-gray-900 rounded-xl p-4 shadow text-center"
+              >
+                <p class="text-xs text-gray-400">Used</p>
+                <p class="text-xl font-bold">
+                  {{ mySubscription.usedBookings }}
+                </p>
+              </div>
+
+              <div
+                class="bg-white dark:bg-gray-900 rounded-xl p-4 shadow text-center"
+              >
+                <p class="text-xs text-gray-400">Remaining</p>
+                <p class="text-xl font-bold text-emerald-600">
+                  {{ mySubscription.remainingBookings }}
+                </p>
+              </div>
+            </div>
+
+            <router-link
+              to="/subscriptions"
+              class="px-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
+            >
+              Manage
+            </router-link>
+          </div>
+        </section>
+
         <section class="grid sm:grid-cols-2 xl:grid-cols-4 gap-4">
           <article
             class="rounded-3xl border border-emerald-200/70 dark:border-emerald-700/40 bg-white dark:bg-gray-900 shadow-xl p-6 space-y-3"
@@ -188,19 +259,23 @@
           </article>
         </section>
 
-
         <!-- ── Onboarding banner (shown when profile is incomplete) ────── -->
         <section
           v-if="showOnboardingBanner"
           class="rounded-3xl border border-amber-200/70 dark:border-amber-700/40 bg-amber-50 dark:bg-amber-900/10 shadow-xl p-6 flex flex-col sm:flex-row sm:items-center gap-5"
         >
-          <div class="w-11 h-11 shrink-0 rounded-2xl bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center text-2xl">
+          <div
+            class="w-11 h-11 shrink-0 rounded-2xl bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center text-2xl"
+          >
             👋
           </div>
           <div class="flex-1 space-y-1">
-            <p class="font-bold text-amber-800 dark:text-amber-300">Заполните профиль для бронирования</p>
+            <p class="font-bold text-amber-800 dark:text-amber-300">
+              Заполните профиль для бронирования
+            </p>
             <p class="text-sm text-amber-700 dark:text-amber-400">
-              Загрузите удостоверение личности и водительские права — без этого бронирование невозможно.
+              Загрузите удостоверение личности и водительские права — без этого
+              бронирование невозможно.
             </p>
           </div>
           <div class="flex gap-2 shrink-0">
@@ -435,8 +510,12 @@
             class="p-8 text-center border-2 border-dashed border-gray-200 dark:border-gray-800 m-6 rounded-2xl space-y-4"
           >
             <p class="text-3xl">🚗</p>
-            <p class="font-semibold text-gray-700 dark:text-gray-300">Броней пока нет</p>
-            <p class="text-sm text-gray-400 dark:text-gray-500">Выберите автомобиль и сделайте первое бронирование</p>
+            <p class="font-semibold text-gray-700 dark:text-gray-300">
+              Броней пока нет
+            </p>
+            <p class="text-sm text-gray-400 dark:text-gray-500">
+              Выберите автомобиль и сделайте первое бронирование
+            </p>
             <router-link
               to="/cars"
               class="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold shadow-lg shadow-emerald-500/20 transition-colors"
@@ -523,8 +602,12 @@
             class="py-10 text-center border-2 border-dashed border-gray-200 dark:border-gray-800 rounded-2xl space-y-3"
           >
             <p class="text-3xl">⭐</p>
-            <p class="font-semibold text-gray-700 dark:text-gray-300">Отзывов пока нет</p>
-            <p class="text-sm text-gray-400 dark:text-gray-500">После поездки вы можете оставить отзыв на странице автомобиля</p>
+            <p class="font-semibold text-gray-700 dark:text-gray-300">
+              Отзывов пока нет
+            </p>
+            <p class="text-sm text-gray-400 dark:text-gray-500">
+              После поездки вы можете оставить отзыв на странице автомобиля
+            </p>
             <router-link
               to="/cars"
               class="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 text-sm font-semibold hover:border-emerald-500 transition-colors"
@@ -629,6 +712,19 @@ import { getMyBookings } from "../api/booking";
 import { useToast } from "../composables/useToast";
 import type { Booking } from "../types/Booking";
 
+import axios from "/@axios";
+
+const mySubscription = ref<any | null>(null);
+
+async function loadSubsription() {
+  try {
+    const { data } = await axios.get("/subscriptions/my");
+    mySubscription.value = data;
+  } catch {
+    mySubscription.value = null;
+  }
+}
+
 const { success, error } = useToast();
 
 // ─── State ────────────────────────────────────────────────────────────────────
@@ -636,7 +732,9 @@ const loading = ref(true);
 const loadError = ref<string | null>(null);
 const saving = ref(false);
 const editMode = ref(false);
-const onboardingDismissed = ref(localStorage.getItem("profile_onboarding_dismissed") === "1");
+const onboardingDismissed = ref(
+  localStorage.getItem("profile_onboarding_dismissed") === "1",
+);
 const bookingsLoading = ref(true);
 const commentsLoading = ref(true);
 
@@ -668,7 +766,10 @@ const initials = computed(() => {
 const showOnboardingBanner = computed(() => {
   if (onboardingDismissed.value) return false;
   if (!profile.value) return false;
-  return !profile.value.identityDocumentFileName || !profile.value.driverLicenseFileName;
+  return (
+    !profile.value.identityDocumentFileName ||
+    !profile.value.driverLicenseFileName
+  );
 });
 
 function dismissOnboarding() {
@@ -678,6 +779,7 @@ function dismissOnboarding() {
 
 // ─── Lifecycle ────────────────────────────────────────────────────────────────
 onMounted(async () => {
+  await loadSubscription();
   await Promise.all([
     loadProfile(),
     loadStats(),

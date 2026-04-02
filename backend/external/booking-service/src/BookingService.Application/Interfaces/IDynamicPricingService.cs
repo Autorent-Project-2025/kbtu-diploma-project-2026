@@ -6,6 +6,7 @@ public interface IDynamicPricingService
 {
     Task<PricePreviewDto> GetPricePreviewAsync(
         int partnerCarId,
-        DateTimeOffset startDate,
-        DateTimeOffset endDate);
+        DateTimeOffset startTime,
+        DateTimeOffset endTime,
+        CancellationToken cancellationToken = default);
 }

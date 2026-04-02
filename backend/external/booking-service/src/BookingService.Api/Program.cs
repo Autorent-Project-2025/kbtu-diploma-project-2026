@@ -221,6 +221,7 @@ builder.Services.AddHttpClient<IBookingEmailClient, BookingEmailClient>((service
 .AddConfiguredResilience(httpClientResilienceOptions);
 builder.Services.AddScoped<IBookingService, BookingService.Infrastructure.Services.BookingService>();
 builder.Services.AddScoped<IDynamicPricingService, DynamicPricingService>(); // dynamic pricing
+builder.Services.AddScoped<ISubscriptionService, SubscriptionService>();
 builder.Services.AddSingleton<IRabbitMqPublisher, RabbitMqPublisher>();
 builder.Services.AddHostedService<PaymentSyncOutboxDispatcher>();
 builder.Services.AddHostedService<PendingBookingExpirationDispatcher>();

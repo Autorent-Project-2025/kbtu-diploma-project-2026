@@ -28,6 +28,7 @@ namespace BookingService.Infrastructure.Services
         private readonly IIdentityUserReadClient _identityUserReadClient;
         private readonly IBookingCompletionTicketClient _bookingCompletionTicketClient;
         private readonly IBookingEmailClient _bookingEmailClient;
+        private readonly ISubscriptionService _subscriptionService;
         private readonly PaymentServiceOptions _paymentServiceOptions;
         private readonly PendingBookingExpirationOptions _pendingBookingExpirationOptions;
 
@@ -39,6 +40,7 @@ namespace BookingService.Infrastructure.Services
             IIdentityUserReadClient identityUserReadClient,
             IBookingCompletionTicketClient bookingCompletionTicketClient,
             IBookingEmailClient bookingEmailClient,
+            ISubscriptionService subscriptionService,
             IOptions<PaymentServiceOptions> paymentServiceOptions,
             IOptions<PendingBookingExpirationOptions> pendingBookingExpirationOptions)
         {
@@ -49,6 +51,7 @@ namespace BookingService.Infrastructure.Services
             _identityUserReadClient = identityUserReadClient;
             _bookingCompletionTicketClient = bookingCompletionTicketClient;
             _bookingEmailClient = bookingEmailClient;
+            _subscriptionService = subscriptionService;
             _paymentServiceOptions = paymentServiceOptions.Value;
             _pendingBookingExpirationOptions = pendingBookingExpirationOptions.Value;
         }
@@ -101,7 +104,8 @@ namespace BookingService.Infrastructure.Services
                     partnerCarSnapshot.PartnerUserId,
                     partnerCarSnapshot.PriceHour,
                     startTime,
-                    endTime);
+                    endTime,
+                    dto.UseSubscription);
             }
 
             for (var attempt = 1; attempt <= MaxSerializableRetries; attempt++)
@@ -115,7 +119,9 @@ namespace BookingService.Infrastructure.Services
                         partnerCarSnapshot.PartnerUserId,
                         partnerCarSnapshot.PriceHour,
                         startTime,
-                        endTime);
+                        endTime,
+                        dto.UseSubscription);
+
                     await transaction.CommitAsync();
                     return booking.ToBookingResponseDto();
                 }
@@ -332,6 +338,17 @@ namespace BookingService.Infrastructure.Services
         public async Task<BookingPaymentStatusResponseDto> StartPayment(int id, Guid userId)
         {
             var booking = await GetRequiredUserBookingEntity(id, userId);
+
+            if (booking.UsedSubscription)
+            {
+                if (booking.Status == BookingStatus.Pending)
+                {
+                    await PersistStatusTransitionWithPaymentOutbox(booking, BookingStatus.Confirmed);
+                }
+
+                return MapBookingPaymentStatus(booking, null);
+            }
+
             if (await ExpirePendingBookingIfNeededAsync(booking))
             {
                 var latestExpiredAttempt = await _paymentSyncClient.GetLatestMockPaymentAsync(booking.Id, userId);
@@ -359,6 +376,17 @@ namespace BookingService.Infrastructure.Services
         public async Task<BookingPaymentStatusResponseDto> GetPaymentStatus(int id, Guid userId)
         {
             var booking = await GetRequiredUserBookingEntity(id, userId);
+
+            if (booking.UsedSubscription)
+            {
+                if (booking.Status == BookingStatus.Pending)
+                {
+                    await PersistStatusTransitionWithPaymentOutbox(booking, BookingStatus.Confirmed);
+                }
+
+                return MapBookingPaymentStatus(booking, null);
+            }
+
             await ExpirePendingBookingIfNeededAsync(booking);
             var latestAttempt = await _paymentSyncClient.GetLatestMockPaymentAsync(booking.Id, userId);
             return MapBookingPaymentStatus(booking, latestAttempt);
@@ -369,6 +397,12 @@ namespace BookingService.Infrastructure.Services
             ArgumentNullException.ThrowIfNull(dto);
 
             var booking = await GetRequiredUserBookingEntity(id, userId);
+
+            if (booking.UsedSubscription)
+            {
+                throw new InvalidOperationException("Subscription booking does not require payment submission.");
+            }
+
             if (await ExpirePendingBookingIfNeededAsync(booking))
             {
                 var latestExpiredAttempt = await _paymentSyncClient.GetLatestMockPaymentAsync(booking.Id, userId);
@@ -739,14 +773,14 @@ namespace BookingService.Infrastructure.Services
             };
         }
 
-
         private async Task<BookingResponseDto> CreateBookingInMemory(
             Guid userId,
             int partnerCarId,
             Guid partnerUserId,
             decimal? priceHour,
             DateTimeOffset startTime,
-            DateTimeOffset endTime)
+            DateTimeOffset endTime,
+            bool useSubscription)
         {
             await InMemoryCreateLock.WaitAsync();
             try
@@ -757,7 +791,9 @@ namespace BookingService.Infrastructure.Services
                     partnerUserId,
                     priceHour,
                     startTime,
-                    endTime);
+                    endTime,
+                    useSubscription);
+
                 return booking.ToBookingResponseDto();
             }
             finally
@@ -772,7 +808,8 @@ namespace BookingService.Infrastructure.Services
             Guid partnerUserId,
             decimal? priceHour,
             DateTimeOffset startTime,
-            DateTimeOffset endTime)
+            DateTimeOffset endTime,
+            bool useSubscription)
         {
             if (await HasOverlappingActiveBookings(partnerCarId, startTime, endTime))
             {
@@ -781,10 +818,29 @@ namespace BookingService.Infrastructure.Services
 
             var totalHours = (decimal)(endTime - startTime).TotalHours;
             decimal? totalPrice = null;
+            int? subscriptionId = null;
+            var usedSubscription = false;
 
-            if (priceHour.HasValue)
+            if (useSubscription)
             {
-                totalPrice = decimal.Round(priceHour.Value * totalHours, 2, MidpointRounding.AwayFromZero);
+                var activeSubscription = await GetRequiredActiveSubscription(userId);
+
+                if (activeSubscription.UsedBookings >= activeSubscription.IncludedBookings)
+                {
+                    throw new InvalidOperationException("No remaining bookings in active subscription.");
+                }
+
+                activeSubscription.UsedBookings += 1;
+                subscriptionId = activeSubscription.Id;
+                usedSubscription = true;
+                totalPrice = 0m;
+            }
+            else
+            {
+                if (priceHour.HasValue)
+                {
+                    totalPrice = decimal.Round(priceHour.Value * totalHours, 2, MidpointRounding.AwayFromZero);
+                }
             }
 
             var booking = new Booking
@@ -797,6 +853,8 @@ namespace BookingService.Infrastructure.Services
                 Status = BookingStatus.Pending,
                 PriceHour = priceHour,
                 TotalPrice = totalPrice,
+                SubscriptionId = subscriptionId,
+                UsedSubscription = usedSubscription,
                 CreatedAt = DateTimeOffset.UtcNow,
                 TripStartedAt = null,
                 TripCompletedAt = null,
@@ -817,6 +875,22 @@ namespace BookingService.Infrastructure.Services
                     (b.Status == BookingStatus.Pending || b.Status == BookingStatus.Confirmed || b.Status == BookingStatus.Active) &&
                     startTime < b.EndTime &&
                     endTime > b.StartTime);
+        }
+
+        private async Task<Subscription> GetRequiredActiveSubscription(Guid userId)
+        {
+            var subscription = await _db.Subscriptions
+                .FirstOrDefaultAsync(x =>
+                    x.UserId == userId &&
+                    x.Status == "active" &&
+                    x.EndDate > DateTimeOffset.UtcNow);
+
+            if (subscription == null)
+            {
+                throw new InvalidOperationException("No active subscription found.");
+            }
+
+            return subscription;
         }
 
         private async Task<Booking?> GetUserBookingEntity(int id, Guid userId)

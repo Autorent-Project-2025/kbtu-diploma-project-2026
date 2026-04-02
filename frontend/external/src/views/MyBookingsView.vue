@@ -177,14 +177,26 @@
                     </div>
 
                     <!-- Price (if available) -->
-                    <div v-if="b.price" class="flex items-baseline gap-2">
+                    <div
+                      v-if="b.usedSubscription"
+                      class="flex items-baseline gap-2"
+                    >
+                      <span
+                        class="text-lg font-bold text-emerald-600 dark:text-emerald-400"
+                      >
+                        Covered by subscription
+                      </span>
+                    </div>
+
+                    <div v-else-if="b.price" class="flex items-baseline gap-2">
                       <span
                         class="text-3xl font-bold text-gray-900 dark:text-white"
-                        >${{ b.price }}</span
                       >
-                      <span class="text-sm text-gray-500 dark:text-gray-400"
-                        >общая стоимость</span
-                      >
+                        ${{ b.price }}
+                      </span>
+                      <span class="text-sm text-gray-500 dark:text-gray-400">
+                        общая стоимость
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -192,6 +204,13 @@
 
               <!-- Right: Status Badge & Actions -->
               <div class="flex flex-col gap-3 flex-shrink-0">
+                <span
+                  v-if="b.usedSubscription"
+                  class="inline-flex items-center justify-center px-4 py-2 rounded-xl text-xs font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
+                >
+                  SUBSCRIPTION
+                </span>
+
                 <span
                   :class="getStatusClass(b.computedStatus)"
                   class="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-2xl text-sm font-extrabold uppercase tracking-wider shadow-lg"
@@ -250,7 +269,9 @@
                       d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                     />
                   </svg>
-                  <span>{{ startingId === b.id ? "Запускаем..." : "Начать поездку" }}</span>
+                  <span>{{
+                    startingId === b.id ? "Запускаем..." : "Начать поездку"
+                  }}</span>
                 </button>
 
                 <router-link
@@ -292,7 +313,11 @@
                       d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                     />
                   </svg>
-                  <span>{{ b.status === "completed" ? "Детали завершения" : "Статус завершения" }}</span>
+                  <span>{{
+                    b.status === "completed"
+                      ? "Детали завершения"
+                      : "Статус завершения"
+                  }}</span>
                 </router-link>
 
                 <!-- Cancel Button -->
@@ -433,22 +458,22 @@ const { success, error } = useToast();
 const filters = computed(() => {
   const all = bookings.value.length;
   const paymentPending = bookings.value.filter(
-    (b) => b.computedStatus === "paymentPending"
+    (b) => b.computedStatus === "paymentPending",
   ).length;
   const upcoming = bookings.value.filter(
-    (b) => b.computedStatus === "upcoming"
+    (b) => b.computedStatus === "upcoming",
   ).length;
   const active = bookings.value.filter(
-    (b) => b.computedStatus === "active"
+    (b) => b.computedStatus === "active",
   ).length;
   const awaitingReview = bookings.value.filter(
-    (b) => b.computedStatus === "awaitingReview"
+    (b) => b.computedStatus === "awaitingReview",
   ).length;
   const completed = bookings.value.filter(
-    (b) => b.computedStatus === "completed"
+    (b) => b.computedStatus === "completed",
   ).length;
   const canceled = bookings.value.filter(
-    (b) => b.computedStatus === "canceled"
+    (b) => b.computedStatus === "canceled",
   ).length;
 
   return [
@@ -572,7 +597,7 @@ async function handleCancelConfirm() {
     error(
       (e as any)?.response?.data?.detail ||
         (e as any)?.response?.data?.error ||
-        "Не удалось отменить бронирование"
+        "Не удалось отменить бронирование",
     );
   } finally {
     cancelingId.value = null;
@@ -591,7 +616,7 @@ async function handleStartTrip(booking: BookingWithComputedStatus) {
     error(
       (e as any)?.response?.data?.detail ||
         (e as any)?.response?.data?.error ||
-        "Не удалось начать поездку"
+        "Не удалось начать поездку",
     );
   } finally {
     startingId.value = null;
@@ -618,7 +643,7 @@ function getStatusClass(status: ReturnType<typeof computeBookingStatus>) {
 }
 
 function getStatusIndicatorClass(
-  status: ReturnType<typeof computeBookingStatus>
+  status: ReturnType<typeof computeBookingStatus>,
 ) {
   switch (status) {
     case "paymentPending":

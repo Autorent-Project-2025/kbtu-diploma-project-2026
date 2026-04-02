@@ -10,7 +10,6 @@
           class="relative w-full max-w-md bg-white dark:bg-gray-900 rounded-3xl shadow-2xl overflow-hidden transform transition-all"
           @click.stop
         >
-          <!-- Header -->
           <div
             class="relative bg-gradient-to-br from-primary-600 to-primary-700 px-6 py-8 text-white"
           >
@@ -42,9 +41,7 @@
             </div>
           </div>
 
-          <!-- Content -->
           <div class="p-6 space-y-6">
-            <!-- Date Start -->
             <div class="space-y-2">
               <label
                 for="start-date"
@@ -61,27 +58,9 @@
                   class="w-full px-4 py-3 pr-12 bg-gray-50 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
                   required
                 />
-                <div
-                  class="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"
-                >
-                  <svg
-                    class="w-5 h-5 text-gray-400"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                    />
-                  </svg>
-                </div>
               </div>
             </div>
 
-            <!-- Date End -->
             <div class="space-y-2">
               <label
                 for="end-date"
@@ -98,58 +77,66 @@
                   class="w-full px-4 py-3 pr-12 bg-gray-50 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
                   required
                 />
-                <div
-                  class="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"
-                >
-                  <svg
-                    class="w-5 h-5 text-gray-400"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                    />
-                  </svg>
-                </div>
               </div>
             </div>
 
-            <!-- Duration Info -->
             <div
               v-if="duration"
               class="flex items-center gap-3 p-4 bg-primary-50 dark:bg-primary-900/20 rounded-xl"
             >
-              <div
-                class="flex-shrink-0 w-10 h-10 bg-primary-100 dark:bg-primary-900/40 rounded-full flex items-center justify-center"
-              >
-                <svg
-                  class="w-5 h-5 text-primary-600 dark:text-primary-400"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                </svg>
-              </div>
               <div class="flex-1">
                 <p class="text-sm font-semibold text-gray-900 dark:text-white">
                   Продолжительность аренды
                 </p>
                 <p class="text-sm text-gray-600 dark:text-gray-400">
-                  {{ duration.days > 0 ? `${duration.days} дн. ` : ""
-                  }}{{ duration.hours }} ч.
+                  {{ duration.days > 0 ? `${duration.days} дн. ` : "" }}
+                  {{ duration.hours }} ч.
                   {{ duration.minutes > 0 ? `${duration.minutes} мин.` : "" }}
                 </p>
               </div>
+            </div>
+
+            <div
+              v-if="mySubscription"
+              class="rounded-2xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/30 p-4"
+            >
+              <div class="flex items-start justify-between gap-4">
+                <div>
+                  <p
+                    class="text-xs uppercase tracking-[0.2em] text-emerald-600 dark:text-emerald-400 font-semibold"
+                  >
+                    Active subscription
+                  </p>
+                  <p
+                    class="mt-1 text-lg font-bold text-gray-900 dark:text-white"
+                  >
+                    {{ mySubscription.planName }}
+                  </p>
+                  <p class="text-sm text-gray-600 dark:text-gray-300">
+                    Remaining bookings: {{ mySubscription.remainingBookings }}
+                  </p>
+                </div>
+              </div>
+
+              <label
+                class="mt-4 flex items-center gap-3 cursor-pointer"
+                :class="{
+                  'opacity-50 cursor-not-allowed':
+                    mySubscription.remainingBookings <= 0,
+                }"
+              >
+                <input
+                  v-model="useSubscription"
+                  type="checkbox"
+                  :disabled="mySubscription.remainingBookings <= 0"
+                  class="rounded"
+                />
+                <span
+                  class="text-sm font-medium text-gray-700 dark:text-gray-200"
+                >
+                  Use subscription for this booking
+                </span>
+              </label>
             </div>
 
             <div
@@ -172,11 +159,15 @@
                 <span
                   class="text-xl font-bold text-blue-600 dark:text-blue-400"
                 >
-                  {{ pricePreview.finalPrice }} {{ pricePreview.currency }}
+                  {{ useSubscription ? 0 : pricePreview.finalPrice }}
+                  {{ pricePreview.currency }}
                 </span>
               </div>
 
-              <div class="text-sm text-gray-600 dark:text-gray-400 space-y-1">
+              <div
+                v-if="!useSubscription"
+                class="text-sm text-gray-600 dark:text-gray-400 space-y-1"
+              >
                 <p>
                   Base price/hour: {{ pricePreview.basePricePerHour }}
                   {{ pricePreview.currency }}
@@ -198,55 +189,25 @@
                   {{ pricePreview.explanation }}
                 </p>
               </div>
+
+              <div
+                v-else
+                class="text-sm text-emerald-700 dark:text-emerald-300 font-medium"
+              >
+                This booking will use your active subscription.
+              </div>
             </div>
 
-            <!-- Error Message -->
             <div
               v-if="displayError"
               class="flex items-center gap-3 p-4 bg-red-50 dark:bg-red-900/20 rounded-xl"
             >
-              <svg
-                class="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
               <p class="text-sm text-red-600 dark:text-red-400">
                 {{ displayError }}
               </p>
             </div>
-
-            <div
-              v-if="(suggestedDates ?? []).length > 0"
-              class="space-y-3 p-4 rounded-xl border border-amber-300/80 bg-amber-50 dark:border-amber-500/40 dark:bg-amber-900/20"
-            >
-              <p
-                class="text-sm font-semibold text-amber-800 dark:text-amber-200"
-              >
-                На выбранные даты все машины заняты. Ближайшие доступные:
-              </p>
-              <div class="flex flex-wrap gap-2">
-                <button
-                  v-for="date in suggestedDates"
-                  :key="date"
-                  type="button"
-                  @click="applySuggestedDate(date)"
-                  class="px-3 py-2 rounded-lg border border-amber-300/80 dark:border-amber-500/40 bg-white dark:bg-gray-900 text-xs font-semibold text-amber-800 dark:text-amber-200"
-                >
-                  {{ formatSuggestionDate(date) }}
-                </button>
-              </div>
-            </div>
           </div>
 
-          <!-- Footer -->
           <div
             class="flex gap-3 px-6 py-4 bg-gray-50 dark:bg-gray-800/50 border-t border-gray-200 dark:border-gray-700"
           >
@@ -259,24 +220,10 @@
             <button
               @click="confirmBooking"
               :disabled="!isValid || isLoading"
-              class="flex-1 px-6 py-3 bg-primary-600 hover:bg-primary-700 disabled:bg-gray-400 text-white font-semibold rounded-xl transition-all hover:shadow-lg active:scale-95 disabled:cursor-not-allowed disabled:hover:shadow-none flex items-center justify-center gap-2"
+              class="flex-1 px-6 py-3 bg-primary-600 hover:bg-primary-700 disabled:bg-gray-400 text-white font-semibold rounded-xl transition-all hover:shadow-lg active:scale-95 disabled:cursor-not-allowed disabled:hover:shadow-none"
             >
               <span v-if="!isLoading">Забронировать</span>
               <span v-else>Загрузка...</span>
-              <svg
-                v-if="!isLoading"
-                class="w-5 h-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M5 13l4 4L19 7"
-                />
-              </svg>
             </button>
           </div>
         </div>
@@ -299,17 +246,12 @@ interface Props {
 
 interface Emits {
   (e: "close"): void;
-  (e: "confirm", startDate: string, endDate: string): void;
-  (e: "suggestion-click", value: string): void;
+  (
+    e: "confirm",
+    payload: { startDate: string; endDate: string; useSubscription: boolean },
+  ): void;
 }
 
-const props = defineProps<Props>();
-const emit = defineEmits<Emits>();
-
-const isLoading = ref(false);
-const startDate = ref("");
-const endDate = ref("");
-const validationError = ref("");
 type PricePreview = {
   partnerCarId: number;
   basePricePerHour: number;
@@ -324,8 +266,30 @@ type PricePreview = {
   explanation: string;
 };
 
+type MySubscription = {
+  id: number;
+  subscriptionPlanId: number;
+  planName: string;
+  status: string;
+  startDate: string;
+  endDate: string;
+  autoRenew: boolean;
+  includedBookings: number;
+  usedBookings: number;
+  remainingBookings: number;
+};
+
+const props = defineProps<Props>();
+const emit = defineEmits<Emits>();
+
+const isLoading = ref(false);
+const startDate = ref("");
+const endDate = ref("");
+const validationError = ref("");
 const pricePreview = ref<PricePreview | null>(null);
 const loadingPrice = ref(false);
+const mySubscription = ref<MySubscription | null>(null);
+const useSubscription = ref(false);
 
 const minDate = computed(() => {
   const now = new Date();
@@ -335,7 +299,7 @@ const minDate = computed(() => {
 
 watch(
   () => props.isOpen,
-  (isOpen) => {
+  async (isOpen) => {
     if (isOpen) {
       const now = new Date();
       now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
@@ -345,10 +309,14 @@ watch(
       endDate.value = tomorrow.toISOString().slice(0, 16);
 
       validationError.value = "";
-      fetchPricePreview();
+      useSubscription.value = false;
+
+      await Promise.all([fetchPricePreview(), loadMySubscription()]);
     } else {
       pricePreview.value = null;
       loadingPrice.value = false;
+      mySubscription.value = null;
+      useSubscription.value = false;
     }
   },
 );
@@ -365,6 +333,15 @@ watch([startDate, endDate], () => {
 const displayError = computed(() => {
   return props.bookingError?.trim() || validationError.value;
 });
+
+async function loadMySubscription() {
+  try {
+    const { data } = await axios.get("/subscriptions/my");
+    mySubscription.value = data;
+  } catch {
+    mySubscription.value = null;
+  }
+}
 
 async function fetchPricePreview() {
   if (!startDate.value || !endDate.value || !props.car?.id) {
@@ -453,35 +430,6 @@ const isValid = computed(() => {
   return true;
 });
 
-function formatSuggestionDate(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  return new Intl.DateTimeFormat("ru-RU", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(date);
-}
-
-function applySuggestedDate(value: string) {
-  const start = new Date(value);
-  if (Number.isNaN(start.getTime())) {
-    return;
-  }
-
-  const end = new Date(start.getTime() + 3 * 60 * 60 * 1000);
-  const localStart = new Date(
-    start.getTime() - start.getTimezoneOffset() * 60000,
-  );
-  const localEnd = new Date(end.getTime() - end.getTimezoneOffset() * 60000);
-
-  startDate.value = localStart.toISOString().slice(0, 16);
-  endDate.value = localEnd.toISOString().slice(0, 16);
-  emit("suggestion-click", value);
-}
-
 function closeModal() {
   emit("close");
 }
@@ -489,43 +437,10 @@ function closeModal() {
 function confirmBooking() {
   if (!isValid.value) return;
 
-  const start = new Date(startDate.value).toISOString();
-  const end = new Date(endDate.value).toISOString();
-
-  emit("confirm", start, end);
+  emit("confirm", {
+    startDate: new Date(startDate.value).toISOString(),
+    endDate: new Date(endDate.value).toISOString(),
+    useSubscription: useSubscription.value,
+  });
 }
 </script>
-
-<style scoped>
-.modal-enter-active,
-.modal-leave-active {
-  transition: opacity 0.3s ease;
-}
-
-.modal-enter-active > div,
-.modal-leave-active > div {
-  transition:
-    transform 0.3s ease,
-    opacity 0.3s ease;
-}
-
-.modal-enter-from,
-.modal-leave-to {
-  opacity: 0;
-}
-
-.modal-enter-from > div,
-.modal-leave-to > div {
-  transform: scale(0.9);
-  opacity: 0;
-}
-
-input[type="datetime-local"]::-webkit-calendar-picker-indicator {
-  opacity: 0;
-  position: absolute;
-  right: 0;
-  width: 100%;
-  height: 100%;
-  cursor: pointer;
-}
-</style>

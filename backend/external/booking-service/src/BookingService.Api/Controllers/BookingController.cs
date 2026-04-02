@@ -197,12 +197,18 @@ namespace BookingService.Api.Controllers
         [AllowAnonymous]
         public async Task<IActionResult> GetPricePreview(
             [FromQuery] int partnerCarId,
-            [FromQuery] DateTimeOffset startDate,
-            [FromQuery] DateTimeOffset endDate)
+            [FromQuery] DateTimeOffset startTime,
+            [FromQuery] DateTimeOffset endTime,
+            CancellationToken cancellationToken)
         {
-            var result = await _dynamicPricingService.GetPricePreviewAsync(partnerCarId, startDate, endDate);
+            var result = await _dynamicPricingService.GetPricePreviewAsync(
+                partnerCarId,
+                startTime,
+                endTime,
+                cancellationToken);
+
             return Ok(result);
-        }   
+        }
 
         [HttpGet("available")]
         [AllowAnonymous]

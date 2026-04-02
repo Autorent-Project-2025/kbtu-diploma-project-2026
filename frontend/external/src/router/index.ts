@@ -18,12 +18,18 @@ import ProfileView from "../views/ProfileView.vue";
 import ProfileRouterView from "../views/ProfileRouterView.vue";
 import ForbiddenView from "../views/ForbiddenView.vue";
 import { auth } from "../store/auth";
+import SubscriptionPlansView from "../views/SubscriptionPlansView.vue";
 
 const routes = [
   {
     path: "/",
     component: HomeView,
     meta: { requiresAuth: false },
+  },
+  {
+    path: "/subscriptions",
+    component: SubscriptionPlansView,
+    meta: { requiresAuth: true },
   },
   {
     path: "/login",

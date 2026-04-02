@@ -4,8 +4,7 @@ public class PricePreviewDto
 {
     public int PartnerCarId { get; set; }
     public decimal BasePricePerHour { get; set; }
-    public int TotalHours { get; set; }
-    public int Days { get; set; }
+    public int Hours { get; set; }
     public decimal DemandCoefficient { get; set; }
     public decimal WeekendCoefficient { get; set; }
     public decimal DurationCoefficient { get; set; }
