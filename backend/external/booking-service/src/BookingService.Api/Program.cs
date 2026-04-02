@@ -13,6 +13,9 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Security.Cryptography;
+// dynamic pricing
+using BookingService.Application.Interfaces;
+using BookingService.Infrastructure.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -217,6 +220,7 @@ builder.Services.AddHttpClient<IBookingEmailClient, BookingEmailClient>((service
 })
 .AddConfiguredResilience(httpClientResilienceOptions);
 builder.Services.AddScoped<IBookingService, BookingService.Infrastructure.Services.BookingService>();
+builder.Services.AddScoped<IDynamicPricingService, DynamicPricingService>(); // dynamic pricing
 builder.Services.AddSingleton<IRabbitMqPublisher, RabbitMqPublisher>();
 builder.Services.AddHostedService<PaymentSyncOutboxDispatcher>();
 builder.Services.AddHostedService<PendingBookingExpirationDispatcher>();

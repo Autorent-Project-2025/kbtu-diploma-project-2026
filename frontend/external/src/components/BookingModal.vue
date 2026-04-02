@@ -152,19 +152,52 @@
               </div>
             </div>
 
-            <!-- Price Estimation -->
             <div
-              v-if="estimatedPrice"
-              class="flex items-center justify-between p-4 bg-green-50 dark:bg-green-900/20 rounded-xl"
+              v-if="loadingPrice"
+              class="mt-4 text-sm text-gray-500 dark:text-gray-400"
             >
-              <span
-                class="text-sm font-semibold text-gray-700 dark:text-gray-300"
-                >Примерная стоимость:</span
-              >
-              <span
-                class="text-2xl font-bold text-green-600 dark:text-green-400"
-                >${{ estimatedPrice }}</span
-              >
+              Calculating price...
+            </div>
+
+            <div
+              v-if="pricePreview"
+              class="mt-4 rounded-2xl border border-blue-200 dark:border-blue-800 p-4 bg-blue-50 dark:bg-slate-900"
+            >
+              <div class="flex items-center justify-between mb-2">
+                <span
+                  class="text-sm font-medium text-gray-600 dark:text-gray-300"
+                >
+                  Estimated total
+                </span>
+                <span
+                  class="text-xl font-bold text-blue-600 dark:text-blue-400"
+                >
+                  {{ pricePreview.finalPrice }} {{ pricePreview.currency }}
+                </span>
+              </div>
+
+              <div class="text-sm text-gray-600 dark:text-gray-400 space-y-1">
+                <p>
+                  Base price/hour: {{ pricePreview.basePricePerHour }}
+                  {{ pricePreview.currency }}
+                </p>
+                <p>Total hours: {{ pricePreview.totalHours }}</p>
+                <p>Days (display): {{ pricePreview.days }}</p>
+                <p>
+                  Demand: {{ pricePreview.demandLevel }} (x{{
+                    pricePreview.demandCoefficient
+                  }})
+                </p>
+                <p>
+                  Weekend coefficient: x{{ pricePreview.weekendCoefficient }}
+                </p>
+                <p>
+                  Duration coefficient: x{{ pricePreview.durationCoefficient }}
+                </p>
+                <p class="pt-1 font-medium text-blue-700 dark:text-blue-300">
+                  {{ pricePreview.explanation }}
+                </p>
+              </div>
             </div>
 
             <!-- Error Message -->
@@ -194,7 +227,9 @@
               v-if="(suggestedDates ?? []).length > 0"
               class="space-y-3 p-4 rounded-xl border border-amber-300/80 bg-amber-50 dark:border-amber-500/40 dark:bg-amber-900/20"
             >
-              <p class="text-sm font-semibold text-amber-800 dark:text-amber-200">
+              <p
+                class="text-sm font-semibold text-amber-800 dark:text-amber-200"
+              >
                 На выбранные даты все машины заняты. Ближайшие доступные:
               </p>
               <div class="flex flex-wrap gap-2">
@@ -252,6 +287,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
+import axios from "/@axios";
 import type { Car } from "../types/Car";
 
 interface Props {
@@ -274,15 +310,29 @@ const isLoading = ref(false);
 const startDate = ref("");
 const endDate = ref("");
 const validationError = ref("");
+type PricePreview = {
+  partnerCarId: number;
+  basePricePerHour: number;
+  totalHours: number;
+  days: number;
+  demandCoefficient: number;
+  weekendCoefficient: number;
+  durationCoefficient: number;
+  finalPrice: number;
+  currency: string;
+  demandLevel: string;
+  explanation: string;
+};
 
-// Минимальная дата - текущий момент
+const pricePreview = ref<PricePreview | null>(null);
+const loadingPrice = ref(false);
+
 const minDate = computed(() => {
   const now = new Date();
   now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
   return now.toISOString().slice(0, 16);
 });
 
-// Инициализация дат по умолчанию
 watch(
   () => props.isOpen,
   (isOpen) => {
@@ -295,15 +345,65 @@ watch(
       endDate.value = tomorrow.toISOString().slice(0, 16);
 
       validationError.value = "";
+      fetchPricePreview();
+    } else {
+      pricePreview.value = null;
+      loadingPrice.value = false;
     }
-  }
+  },
 );
+
+watch([startDate, endDate], () => {
+  if (!isValid.value) {
+    pricePreview.value = null;
+    return;
+  }
+
+  fetchPricePreview();
+});
 
 const displayError = computed(() => {
   return props.bookingError?.trim() || validationError.value;
 });
 
-// Вычисление продолжительности
+async function fetchPricePreview() {
+  if (!startDate.value || !endDate.value || !props.car?.id) {
+    pricePreview.value = null;
+    return;
+  }
+
+  const start = new Date(startDate.value);
+  const end = new Date(endDate.value);
+
+  if (
+    Number.isNaN(start.getTime()) ||
+    Number.isNaN(end.getTime()) ||
+    end <= start
+  ) {
+    pricePreview.value = null;
+    return;
+  }
+
+  try {
+    loadingPrice.value = true;
+
+    const { data } = await axios.get("/bookings/price-preview", {
+      params: {
+        partnerCarId: props.car.id,
+        startDate: start.toISOString(),
+        endDate: end.toISOString(),
+      },
+    });
+
+    pricePreview.value = data;
+  } catch (error) {
+    console.error("Failed to fetch price preview:", error);
+    pricePreview.value = null;
+  } finally {
+    loadingPrice.value = false;
+  }
+}
+
 const duration = computed(() => {
   if (!startDate.value || !endDate.value) return null;
 
@@ -321,15 +421,6 @@ const duration = computed(() => {
   return { days, hours, minutes, totalMinutes };
 });
 
-// Примерная цена
-const estimatedPrice = computed(() => {
-  if (!duration.value || !props.car.priceHour) return null;
-
-  const totalHours = duration.value.totalMinutes / 60;
-  return Math.round(totalHours * props.car.priceHour);
-});
-
-// Валидация
 const isValid = computed(() => {
   if (!startDate.value || !endDate.value) {
     validationError.value = "Заполните обе даты";
@@ -351,7 +442,7 @@ const isValid = computed(() => {
   }
 
   const diffMs = end.getTime() - start.getTime();
-  const minDuration = 60 * 60 * 1000; // 1 час
+  const minDuration = 60 * 60 * 1000;
 
   if (diffMs < minDuration) {
     validationError.value = "Минимальная продолжительность аренды - 1 час";
@@ -381,7 +472,9 @@ function applySuggestedDate(value: string) {
   }
 
   const end = new Date(start.getTime() + 3 * 60 * 60 * 1000);
-  const localStart = new Date(start.getTime() - start.getTimezoneOffset() * 60000);
+  const localStart = new Date(
+    start.getTime() - start.getTimezoneOffset() * 60000,
+  );
   const localEnd = new Date(end.getTime() - end.getTimezoneOffset() * 60000);
 
   startDate.value = localStart.toISOString().slice(0, 16);
@@ -404,7 +497,6 @@ function confirmBooking() {
 </script>
 
 <style scoped>
-/* Modal transitions */
 .modal-enter-active,
 .modal-leave-active {
   transition: opacity 0.3s ease;
@@ -412,7 +504,9 @@ function confirmBooking() {
 
 .modal-enter-active > div,
 .modal-leave-active > div {
-  transition: transform 0.3s ease, opacity 0.3s ease;
+  transition:
+    transform 0.3s ease,
+    opacity 0.3s ease;
 }
 
 .modal-enter-from,
@@ -426,7 +520,6 @@ function confirmBooking() {
   opacity: 0;
 }
 
-/* Custom datetime input styling */
 input[type="datetime-local"]::-webkit-calendar-picker-indicator {
   opacity: 0;
   position: absolute;

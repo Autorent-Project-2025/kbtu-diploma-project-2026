@@ -16,10 +16,14 @@ namespace BookingService.Api.Controllers
     public class BookingController : ControllerBase
     {
         private readonly IBookingService _bookingService;
+        private readonly IDynamicPricingService _dynamicPricingService;
 
-        public BookingController(IBookingService bookingService)
+        public BookingController(
+            IBookingService bookingService,
+            IDynamicPricingService dynamicPricingService)
         {
             _bookingService = bookingService;
+            _dynamicPricingService = dynamicPricingService;
         }
 
         private Guid GetUserId()
@@ -188,6 +192,17 @@ namespace BookingService.Api.Controllers
             var charge = await _bookingService.PayBookingCharge(id, chargeId, GetUserId(), cancellationToken);
             return Ok(charge);
         }
+
+        [HttpGet("price-preview")]
+        [AllowAnonymous]
+        public async Task<IActionResult> GetPricePreview(
+            [FromQuery] int partnerCarId,
+            [FromQuery] DateTimeOffset startDate,
+            [FromQuery] DateTimeOffset endDate)
+        {
+            var result = await _dynamicPricingService.GetPricePreviewAsync(partnerCarId, startDate, endDate);
+            return Ok(result);
+        }   
 
         [HttpGet("available")]
         [AllowAnonymous]
