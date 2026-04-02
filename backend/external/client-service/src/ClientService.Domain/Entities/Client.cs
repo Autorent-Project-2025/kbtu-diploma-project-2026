@@ -34,6 +34,15 @@ public class Client
     [Column("avatar_url")]
     public string? AvatarUrl { get; set; }
 
+    [Column("booking_actions_blocked")]
+    public bool BookingActionsBlocked { get; set; }
+
+    [Column("booking_block_reason")]
+    public string? BookingBlockReason { get; set; }
+
+    [Column("booking_blocked_at")]
+    public DateTimeOffset? BookingBlockedAt { get; set; }
+
     [Column("provision_request_key")]
     public string? ProvisionRequestKey { get; set; }
 }

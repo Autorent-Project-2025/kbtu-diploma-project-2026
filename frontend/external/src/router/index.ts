@@ -7,6 +7,7 @@ import ActivateAccountView from "../views/ActivateAccountView.vue";
 import CarsView from "../views/CarsView.vue";
 import MyBookingsView from "../views/MyBookingsView.vue";
 import BookingPaymentView from "../views/BookingPaymentView.vue";
+import BookingCompletionView from "../views/BookingCompletionView.vue";
 import NotFoundView from "../views/NotFoundView.vue";
 import CarDetailView from "@/views/CarDetailView.vue";
 import PartnerProfileView from "../views/PartnerProfileView.vue";
@@ -57,6 +58,11 @@ const routes = [
   {
     path: "/bookings/:id/payment",
     component: BookingPaymentView,
+    meta: { requiresAuth: true },
+  },
+  {
+    path: "/bookings/:id/complete",
+    component: BookingCompletionView,
     meta: { requiresAuth: true },
   },
 

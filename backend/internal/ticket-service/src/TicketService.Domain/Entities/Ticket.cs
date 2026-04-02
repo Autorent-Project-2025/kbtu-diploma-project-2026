@@ -32,6 +32,16 @@ public sealed class Ticket
     public IReadOnlyCollection<PartnerCarTicketImageData> CarImages => Data is PartnerCarTicketData partnerCarData
         ? partnerCarData.CarImages
         : [];
+    public int? BookingId => Data is BookingCompletionTicketData bookingCompletionData ? bookingCompletionData.BookingId : null;
+    public DateTimeOffset? PlannedStartTime => Data is BookingCompletionTicketData bookingCompletionData ? bookingCompletionData.PlannedStartTime : null;
+    public DateTimeOffset? PlannedEndTime => Data is BookingCompletionTicketData bookingCompletionData ? bookingCompletionData.PlannedEndTime : null;
+    public DateTimeOffset? TripStartedAt => Data is BookingCompletionTicketData bookingCompletionData ? bookingCompletionData.TripStartedAt : null;
+    public DateTimeOffset? TripCompletedAt => Data is BookingCompletionTicketData bookingCompletionData ? bookingCompletionData.TripCompletedAt : null;
+    public decimal? LatePenaltyAmount => Data is BookingCompletionTicketData bookingCompletionData ? bookingCompletionData.LatePenaltyAmount : null;
+    public decimal? DamageFineAmount => Data is BookingCompletionTicketData bookingCompletionData ? bookingCompletionData.DamageFineAmount : null;
+    public IReadOnlyCollection<BookingCompletionTicketPhotoData> CompletionPhotos => Data is BookingCompletionTicketData bookingCompletionData
+        ? bookingCompletionData.CompletionPhotos
+        : [];
     public string? DecisionReason => Data.DecisionReason;
     public Guid? ReviewedByManagerId => Data.ReviewedByManagerId;
     public DateTime? ReviewedAt => Data.ReviewedAt;
@@ -90,6 +100,52 @@ public sealed class Ticket
             Email);
         Status = TicketStatus.Pending;
         CreatedAt = createdAt;
+    }
+
+    public static Ticket CreateBookingCompletion(
+        Guid id,
+        string firstName,
+        string lastName,
+        string email,
+        string phoneNumber,
+        int bookingId,
+        DateTimeOffset plannedStartTime,
+        DateTimeOffset plannedEndTime,
+        DateTimeOffset tripStartedAt,
+        DateTimeOffset tripCompletedAt,
+        decimal? latePenaltyAmount,
+        IReadOnlyCollection<BookingCompletionTicketPhotoData> completionPhotos,
+        DateTime createdAt)
+    {
+        var ticket = new Ticket
+        {
+            Id = id == Guid.Empty ? Guid.NewGuid() : id,
+            TicketType = TicketType.BookingCompletion,
+            CreatedAt = createdAt
+        };
+
+        ticket.SetEmail(email);
+        var normalizedName = NormalizeName(firstName, lastName);
+        ticket.Data = new BookingCompletionTicketData
+        {
+            FirstName = normalizedName.FirstName,
+            LastName = normalizedName.LastName,
+            FullName = normalizedName.FullName,
+            PhoneNumber = NormalizePhoneNumber(phoneNumber),
+            BookingId = NormalizeBookingId(bookingId),
+            PlannedStartTime = plannedStartTime,
+            PlannedEndTime = NormalizeTripWindow(plannedStartTime, plannedEndTime, nameof(plannedEndTime)),
+            TripStartedAt = NormalizeTripStartedAt(plannedStartTime, tripStartedAt),
+            TripCompletedAt = NormalizeTripWindow(tripStartedAt, tripCompletedAt, nameof(tripCompletedAt)),
+            LatePenaltyAmount = NormalizeOptionalFineAmount(latePenaltyAmount, nameof(latePenaltyAmount)),
+            DamageFineAmount = null,
+            CompletionPhotos = NormalizeCompletionPhotos(completionPhotos),
+            DecisionReason = null,
+            ReviewedByManagerId = null,
+            ReviewedAt = null
+        };
+        ticket.Status = TicketStatus.Pending;
+        return ticket;
     }
 
     public void UpdatePartnerCarDetailsForReview(
@@ -168,6 +224,26 @@ public sealed class Ticket
         Data = Data with
         {
             DecisionReason = normalizedReason,
+            ReviewedByManagerId = managerId,
+            ReviewedAt = reviewedAt
+        };
+    }
+
+    public void IssueFine(Guid managerId, decimal amount, DateTime reviewedAt)
+    {
+        EnsurePendingStatus();
+        EnsureManagerId(managerId);
+
+        if (TicketType != TicketType.BookingCompletion || Data is not BookingCompletionTicketData bookingCompletionData)
+        {
+            throw new InvalidOperationException("Fine can be issued only for booking completion tickets.");
+        }
+
+        Status = TicketStatus.FineIssued;
+        Data = bookingCompletionData with
+        {
+            DamageFineAmount = NormalizeRequiredFineAmount(amount, nameof(amount)),
+            DecisionReason = null,
             ReviewedByManagerId = managerId,
             ReviewedAt = reviewedAt
         };
@@ -484,6 +560,122 @@ public sealed class Ticket
         if (normalized is not null && !Uri.TryCreate(normalized, UriKind.Absolute, out _))
         {
             throw new ArgumentException("Avatar url must be a valid absolute URL.", nameof(avatarUrl));
+        }
+
+        return normalized;
+    }
+
+    private static int NormalizeBookingId(int bookingId)
+    {
+        if (bookingId <= 0)
+        {
+            throw new ArgumentException("bookingId must be greater than zero.", nameof(bookingId));
+        }
+
+        return bookingId;
+    }
+
+    private static DateTimeOffset NormalizeTripWindow(DateTimeOffset start, DateTimeOffset end, string paramName)
+    {
+        if (start == default)
+        {
+            throw new ArgumentException("Trip window start is required.", nameof(start));
+        }
+
+        if (end == default)
+        {
+            throw new ArgumentException($"{paramName} is required.", paramName);
+        }
+
+        if (end < start)
+        {
+            throw new ArgumentException($"{paramName} must be greater than or equal to the previous trip timestamp.", paramName);
+        }
+
+        return end;
+    }
+
+    private static DateTimeOffset NormalizeTripStartedAt(DateTimeOffset plannedStartTime, DateTimeOffset tripStartedAt)
+    {
+        if (plannedStartTime == default)
+        {
+            throw new ArgumentException("plannedStartTime is required.", nameof(plannedStartTime));
+        }
+
+        if (tripStartedAt == default)
+        {
+            throw new ArgumentException("tripStartedAt is required.", nameof(tripStartedAt));
+        }
+
+        if (tripStartedAt < plannedStartTime.AddMinutes(-15))
+        {
+            throw new ArgumentException("tripStartedAt cannot be earlier than 15 minutes before plannedStartTime.", nameof(tripStartedAt));
+        }
+
+        return tripStartedAt;
+    }
+
+    private static decimal? NormalizeOptionalFineAmount(decimal? amount, string paramName)
+    {
+        if (!amount.HasValue)
+        {
+            return null;
+        }
+
+        return NormalizeRequiredFineAmount(amount.Value, paramName);
+    }
+
+    private static decimal NormalizeRequiredFineAmount(decimal amount, string paramName)
+    {
+        if (amount <= 0m)
+        {
+            throw new ArgumentException($"{paramName} must be greater than 0.", paramName);
+        }
+
+        if (amount > 10_000_000m)
+        {
+            throw new ArgumentException($"{paramName} must not exceed 10000000.", paramName);
+        }
+
+        return decimal.Round(amount, 2, MidpointRounding.AwayFromZero);
+    }
+
+    private static IReadOnlyCollection<BookingCompletionTicketPhotoData> NormalizeCompletionPhotos(
+        IReadOnlyCollection<BookingCompletionTicketPhotoData>? completionPhotos)
+    {
+        if (completionPhotos is null || completionPhotos.Count != 5)
+        {
+            throw new ArgumentException("Exactly 5 completion photos are required.", nameof(completionPhotos));
+        }
+
+        var normalized = completionPhotos
+            .Select(photo => new BookingCompletionTicketPhotoData
+            {
+                Slot = NormalizeRequired(photo.Slot, nameof(photo.Slot), 64),
+                FileName = NormalizeRequired(photo.FileName, nameof(photo.FileName), 255)
+            })
+            .ToArray();
+
+        var requiredSlots = new[]
+        {
+            "front",
+            "back",
+            "side_left",
+            "side_right",
+            "interior"
+        };
+
+        var slotSet = normalized
+            .Select(photo => photo.Slot.Trim().ToLowerInvariant())
+            .ToHashSet(StringComparer.Ordinal);
+        if (!requiredSlots.All(slotSet.Contains))
+        {
+            throw new ArgumentException("Completion photos must include front, back, side_left, side_right and interior slots.", nameof(completionPhotos));
+        }
+
+        if (slotSet.Count != requiredSlots.Length)
+        {
+            throw new ArgumentException("Completion photo slots must be unique.", nameof(completionPhotos));
         }
 
         return normalized;

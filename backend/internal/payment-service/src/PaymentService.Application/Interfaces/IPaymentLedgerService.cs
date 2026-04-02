@@ -11,6 +11,22 @@ public interface IPaymentLedgerService
     Task RecordBookingCanceledAsync(int bookingId, string eventId, string routingKey, CancellationToken cancellationToken = default);
     Task RecordBookingCompletedAsync(int bookingId, CancellationToken cancellationToken = default);
     Task RecordBookingCompletedAsync(int bookingId, string eventId, string routingKey, CancellationToken cancellationToken = default);
+    Task<BookingChargeResponseDto> CreateBookingChargeAsync(
+        int bookingId,
+        Guid userId,
+        Guid partnerUserId,
+        string chargeType,
+        decimal amount,
+        string? currency = null,
+        string? description = null,
+        CancellationToken cancellationToken = default);
+    Task<BookingChargeResponseDto> MarkBookingChargePaidAsync(long chargeId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyCollection<BookingChargeResponseDto>> GetBookingChargesAsync(int bookingId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyCollection<BookingChargeResponseDto>> GetUserBookingChargesAsync(
+        Guid userId,
+        string? chargeType = null,
+        string? status = null,
+        CancellationToken cancellationToken = default);
     Task<PartnerPayoutResponseDto> RequestPayoutAsync(Guid partnerUserId, decimal amount, string requestKey, CancellationToken cancellationToken = default);
     Task<PartnerPayoutResponseDto> MarkPayoutProcessingAsync(long payoutId, CancellationToken cancellationToken = default);
     Task<PartnerPayoutResponseDto> MarkPayoutPaidAsync(long payoutId, CancellationToken cancellationToken = default);

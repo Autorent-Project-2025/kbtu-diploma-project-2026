@@ -17,7 +17,10 @@ public static class ClientMappers
         DriverLicenseFileName = entity.DriverLicenseFileName,
         RelatedUserId = entity.RelatedUserId,
         PhoneNumber = entity.PhoneNumber,
-        AvatarUrl = entity.AvatarUrl
+        AvatarUrl = entity.AvatarUrl,
+        BookingActionsBlocked = entity.BookingActionsBlocked,
+        BookingBlockReason = entity.BookingBlockReason,
+        BookingBlockedAt = entity.BookingBlockedAt
     };
 
     public static IQueryable<ClientResponseDto> SelectToClientResponseDto(this IQueryable<Client> query)
@@ -38,7 +41,10 @@ public static class ClientMappers
             DriverLicenseFileName = entity.DriverLicenseFileName,
             RelatedUserId = entity.RelatedUserId,
             PhoneNumber = entity.PhoneNumber,
-            AvatarUrl = entity.AvatarUrl
+            AvatarUrl = entity.AvatarUrl,
+            BookingActionsBlocked = entity.BookingActionsBlocked,
+            BookingBlockReason = entity.BookingBlockReason,
+            BookingBlockedAt = entity.BookingBlockedAt
         };
     }
 }

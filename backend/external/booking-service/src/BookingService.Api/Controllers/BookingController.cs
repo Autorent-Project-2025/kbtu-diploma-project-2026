@@ -2,6 +2,8 @@ using BookingService.Application.Constants;
 using BookingService.Application.DTOs.Booking;
 using BookingService.Application.DTOs.Common;
 using BookingService.Application.Interfaces;
+using BookingService.Application.Interfaces.Integrations;
+using BookingService.Api.Contracts.Booking;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
@@ -107,6 +109,18 @@ namespace BookingService.Api.Controllers
             return Ok(new CommonResponseDto { Message = "Booking confirmed" });
         }
 
+        [HttpPost("{id:int}/start")]
+        public async Task<IActionResult> StartTrip(int id)
+        {
+            var result = await _bookingService.StartTrip(id, GetUserId());
+            if (!result)
+            {
+                return NotFound(new { error = "Booking not found" });
+            }
+
+            return Ok(new CommonResponseDto { Message = "Trip started" });
+        }
+
         [HttpPost("{id:int}/payment/start")]
         public async Task<IActionResult> StartPayment(int id)
         {
@@ -140,6 +154,41 @@ namespace BookingService.Api.Controllers
             return Ok(new CommonResponseDto { Message = "Booking completed" });
         }
 
+        [HttpPost("{id:int}/complete-review")]
+        public async Task<IActionResult> SubmitCompletionReview(
+            int id,
+            [FromForm] CompleteBookingReviewRequest request,
+            CancellationToken cancellationToken)
+        {
+            var result = await _bookingService.SubmitCompletionReview(
+                id,
+                GetUserId(),
+                new BookingCompletionSubmissionDto
+                {
+                    CompletionFrontPhotoFile = await MapToFileUploadPayloadAsync(request.CompletionFrontPhotoFile, cancellationToken),
+                    CompletionBackPhotoFile = await MapToFileUploadPayloadAsync(request.CompletionBackPhotoFile, cancellationToken),
+                    CompletionSideLeftPhotoFile = await MapToFileUploadPayloadAsync(request.CompletionSideLeftPhotoFile, cancellationToken),
+                    CompletionSideRightPhotoFile = await MapToFileUploadPayloadAsync(request.CompletionSideRightPhotoFile, cancellationToken),
+                    CompletionInteriorPhotoFile = await MapToFileUploadPayloadAsync(request.CompletionInteriorPhotoFile, cancellationToken)
+                });
+
+            return Ok(result);
+        }
+
+        [HttpGet("{id:int}/charges")]
+        public async Task<IActionResult> GetCharges(int id, CancellationToken cancellationToken)
+        {
+            var charges = await _bookingService.GetBookingCharges(id, GetUserId(), cancellationToken);
+            return Ok(charges);
+        }
+
+        [HttpPost("{id:int}/charges/{chargeId:long}/pay")]
+        public async Task<IActionResult> PayCharge(int id, long chargeId, CancellationToken cancellationToken)
+        {
+            var charge = await _bookingService.PayBookingCharge(id, chargeId, GetUserId(), cancellationToken);
+            return Ok(charge);
+        }
+
         [HttpGet("available")]
         [AllowAnonymous]
         public async Task<IActionResult> CheckAvailable(
@@ -158,6 +207,29 @@ namespace BookingService.Api.Controllers
                 endTime);
 
             return Ok(new { available }); // profileCommentsDTO + get-set 2 api
+        }
+
+        private static async Task<FileUploadPayload> MapToFileUploadPayloadAsync(
+            IFormFile? file,
+            CancellationToken cancellationToken)
+        {
+            if (file is null)
+            {
+                return new FileUploadPayload();
+            }
+
+            await using var stream = file.OpenReadStream();
+            using var memoryStream = new MemoryStream();
+            await stream.CopyToAsync(memoryStream, cancellationToken);
+
+            return new FileUploadPayload
+            {
+                FileName = file.FileName,
+                ContentType = string.IsNullOrWhiteSpace(file.ContentType)
+                    ? "application/octet-stream"
+                    : file.ContentType,
+                Content = memoryStream.ToArray()
+            };
         }
     }
 }

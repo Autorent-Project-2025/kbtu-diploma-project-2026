@@ -6,6 +6,7 @@ namespace TicketService.Domain.Entities;
 [JsonDerivedType(typeof(ClientTicketData), typeDiscriminator: "client")]
 [JsonDerivedType(typeof(PartnerTicketData), typeDiscriminator: "partner")]
 [JsonDerivedType(typeof(PartnerCarTicketData), typeDiscriminator: "partner-car")]
+[JsonDerivedType(typeof(BookingCompletionTicketData), typeDiscriminator: "booking-completion")]
 public abstract record TicketData
 {
     public string FirstName { get; init; } = string.Empty;
@@ -48,4 +49,22 @@ public sealed record PartnerCarTicketImageData
 {
     public string ImageId { get; init; } = string.Empty;
     public string ImageUrl { get; init; } = string.Empty;
+}
+
+public sealed record BookingCompletionTicketData : TicketData
+{
+    public int BookingId { get; init; }
+    public DateTimeOffset PlannedStartTime { get; init; }
+    public DateTimeOffset PlannedEndTime { get; init; }
+    public DateTimeOffset TripStartedAt { get; init; }
+    public DateTimeOffset TripCompletedAt { get; init; }
+    public decimal? LatePenaltyAmount { get; init; }
+    public decimal? DamageFineAmount { get; init; }
+    public IReadOnlyCollection<BookingCompletionTicketPhotoData> CompletionPhotos { get; init; } = [];
+}
+
+public sealed record BookingCompletionTicketPhotoData
+{
+    public string Slot { get; init; } = string.Empty;
+    public string FileName { get; init; } = string.Empty;
 }

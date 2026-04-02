@@ -13,6 +13,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<PartnerWallet> PartnerWallets => Set<PartnerWallet>();
     public DbSet<PartnerLedgerEntry> PartnerLedgerEntries => Set<PartnerLedgerEntry>();
     public DbSet<CustomerPayment> CustomerPayments => Set<CustomerPayment>();
+    public DbSet<BookingCharge> BookingCharges => Set<BookingCharge>();
     public DbSet<PartnerPayout> PartnerPayouts => Set<PartnerPayout>();
     public DbSet<MockPaymentAttempt> MockPaymentAttempts => Set<MockPaymentAttempt>();
     public DbSet<ProcessedIntegrationEvent> ProcessedIntegrationEvents => Set<ProcessedIntegrationEvent>();

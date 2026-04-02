@@ -23,4 +23,15 @@ public sealed record CreateTicketCommand(
     decimal? PriceHour,
     decimal? PriceDay,
     TicketDocumentFilePayload? OwnershipDocumentFile,
-    IReadOnlyCollection<TicketDocumentFilePayload>? CarImageFiles);
+    IReadOnlyCollection<TicketDocumentFilePayload>? CarImageFiles,
+    int? BookingId,
+    DateTimeOffset? PlannedStartTime,
+    DateTimeOffset? PlannedEndTime,
+    DateTimeOffset? TripStartedAt,
+    DateTimeOffset? TripCompletedAt,
+    decimal? LatePenaltyAmount,
+    TicketDocumentFilePayload? CompletionFrontPhotoFile,
+    TicketDocumentFilePayload? CompletionBackPhotoFile,
+    TicketDocumentFilePayload? CompletionSideLeftPhotoFile,
+    TicketDocumentFilePayload? CompletionSideRightPhotoFile,
+    TicketDocumentFilePayload? CompletionInteriorPhotoFile);

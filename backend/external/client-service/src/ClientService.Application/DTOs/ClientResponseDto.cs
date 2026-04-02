@@ -12,4 +12,7 @@ public sealed class ClientResponseDto
     public string RelatedUserId { get; set; } = string.Empty;
     public string PhoneNumber { get; set; } = string.Empty;
     public string? AvatarUrl { get; set; }
+    public bool BookingActionsBlocked { get; set; }
+    public string? BookingBlockReason { get; set; }
+    public DateTimeOffset? BookingBlockedAt { get; set; }
 }

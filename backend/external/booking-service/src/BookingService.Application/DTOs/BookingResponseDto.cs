@@ -13,6 +13,9 @@ namespace BookingService.Application.DTOs.Booking
         public decimal? PriceHour { get; set; }
         public decimal? TotalPrice { get; set; }
         public DateTimeOffset CreatedAt { get; set; }
+        public DateTimeOffset? TripStartedAt { get; set; }
+        public DateTimeOffset? TripCompletedAt { get; set; }
+        public Guid? CompletionReviewTicketId { get; set; }
         public string? Status { get; set; }
     }
 }

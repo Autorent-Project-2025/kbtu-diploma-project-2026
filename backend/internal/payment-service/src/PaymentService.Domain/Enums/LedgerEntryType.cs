@@ -6,6 +6,7 @@ public enum LedgerEntryType
     BookingPendingReversal,
     BookingPendingRelease,
     BookingAvailableCredit,
+    BookingChargeAvailableCredit,
     PayoutAvailableDebit,
     PayoutReservedCredit,
     PayoutReservedRelease,

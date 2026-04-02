@@ -7,6 +7,7 @@ using System.Security.Cryptography;
 using TicketService.Api.Middleware;
 using TicketService.Application.Commands.ApproveTicket;
 using TicketService.Application.Commands.CreateTicket;
+using TicketService.Application.Commands.IssueTicketFine;
 using TicketService.Application.Commands.RejectTicket;
 using TicketService.Application.Constants;
 using TicketService.Application.Queries.GetPendingTickets;
@@ -78,6 +79,7 @@ builder.Services.AddScoped<CreateTicketCommandHandler>();
 builder.Services.AddScoped<GetPendingTicketsQueryHandler>();
 builder.Services.AddScoped<GetTicketByIdQueryHandler>();
 builder.Services.AddScoped<ApproveTicketCommandHandler>();
+builder.Services.AddScoped<IssueTicketFineCommandHandler>();
 builder.Services.AddScoped<RejectTicketCommandHandler>();
 
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];

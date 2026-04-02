@@ -405,6 +405,7 @@ const statusFilters = computed(() => {
     pending: bookingsInSelectedPeriod.value.filter((booking) => booking.status === "pending").length,
     confirmed: bookingsInSelectedPeriod.value.filter((booking) => booking.status === "confirmed").length,
     active: bookingsInSelectedPeriod.value.filter((booking) => booking.status === "active").length,
+    awaitingReview: bookingsInSelectedPeriod.value.filter((booking) => booking.status === "awaitingReview").length,
     completed: bookingsInSelectedPeriod.value.filter((booking) => booking.status === "completed").length,
     canceled: bookingsInSelectedPeriod.value.filter((booking) => booking.status === "canceled").length,
   };
@@ -414,6 +415,11 @@ const statusFilters = computed(() => {
     { label: "Pending", value: "pending" as const, count: counts.pending },
     { label: "Confirmed", value: "confirmed" as const, count: counts.confirmed },
     { label: "Active", value: "active" as const, count: counts.active },
+    {
+      label: "Awaiting Review",
+      value: "awaitingReview" as const,
+      count: counts.awaitingReview,
+    },
     { label: "Completed", value: "completed" as const, count: counts.completed },
     { label: "Canceled", value: "canceled" as const, count: counts.canceled },
   ];
@@ -768,6 +774,8 @@ function getBookingStatusLabel(status: BookingStatus) {
       return "Confirmed";
     case "active":
       return "Active";
+    case "awaitingReview":
+      return "Awaiting Review";
     case "completed":
       return "Completed";
     case "canceled":
@@ -785,6 +793,8 @@ function getBookingStatusClass(status: BookingStatus) {
       return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300";
     case "active":
       return "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300";
+    case "awaitingReview":
+      return "bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-300";
     case "completed":
       return "bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-300";
     case "canceled":
@@ -819,7 +829,7 @@ async function handlePartnerCancel(bookingId: number) {
   try {
     await cancelPartnerBooking(bookingId);
     success("Бронирование отменено");
-    await loadBookings();
+    await loadDashboard();
   } catch (e: any) {
     error(e?.response?.data?.error ?? "Не удалось отменить бронирование");
   } finally {

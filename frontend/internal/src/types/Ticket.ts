@@ -1,6 +1,18 @@
+export type BookingCompletionPhotoSlot =
+  | "front"
+  | "back"
+  | "side_left"
+  | "side_right"
+  | "interior";
+
 export interface PartnerCarTicketImageData {
   imageId: string;
   imageUrl: string;
+}
+
+export interface BookingCompletionTicketPhotoData {
+  slot: BookingCompletionPhotoSlot;
+  fileName: string;
 }
 
 export interface TicketDataBase {
@@ -41,7 +53,24 @@ export interface PartnerCarTicketData extends TicketDataBase {
   carImages: PartnerCarTicketImageData[];
 }
 
-export type TicketData = ClientTicketData | PartnerTicketData | PartnerCarTicketData | TicketDataBase;
+export interface BookingCompletionTicketData extends TicketDataBase {
+  $type: "booking-completion";
+  bookingId: number;
+  plannedStartTime: string;
+  plannedEndTime: string;
+  tripStartedAt: string;
+  tripCompletedAt: string;
+  latePenaltyAmount?: number | null;
+  damageFineAmount?: number | null;
+  completionPhotos: BookingCompletionTicketPhotoData[];
+}
+
+export type TicketData =
+  | ClientTicketData
+  | PartnerTicketData
+  | PartnerCarTicketData
+  | BookingCompletionTicketData
+  | TicketDataBase;
 
 export interface Ticket {
   id: string;
@@ -58,6 +87,14 @@ export interface Ticket {
   ownershipDocumentFileName?: string | null;
   avatarUrl?: string | null;
   relatedPartnerUserId?: string | null;
+  bookingId?: number | null;
+  plannedStartTime?: string | null;
+  plannedEndTime?: string | null;
+  tripStartedAt?: string | null;
+  tripCompletedAt?: string | null;
+  latePenaltyAmount?: number | null;
+  damageFineAmount?: number | null;
+  completionPhotos?: BookingCompletionTicketPhotoData[];
   carBrand?: string | null;
   carModel?: string | null;
   carYear?: number | null;

@@ -32,6 +32,15 @@ namespace BookingService.Domain.Entities
         [Column("created_at")]
         public DateTimeOffset CreatedAt { get; set; }
 
+        [Column("trip_started_at")]
+        public DateTimeOffset? TripStartedAt { get; set; }
+
+        [Column("trip_completed_at")]
+        public DateTimeOffset? TripCompletedAt { get; set; }
+
+        [Column("completion_review_ticket_id")]
+        public Guid? CompletionReviewTicketId { get; set; }
+
         [Column("status")]
         public BookingStatus Status { get; set; } = BookingStatus.Pending;
     }

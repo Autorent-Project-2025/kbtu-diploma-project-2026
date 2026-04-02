@@ -5,6 +5,7 @@ using System.Security.Claims;
 using TicketService.Api.Contracts.Tickets;
 using TicketService.Application.Commands.ApproveTicket;
 using TicketService.Application.Commands.CreateTicket;
+using TicketService.Application.Commands.IssueTicketFine;
 using TicketService.Application.Commands.RejectTicket;
 using TicketService.Application.Exceptions;
 using TicketService.Application.Interfaces;
@@ -23,6 +24,7 @@ public sealed class TicketsController : ControllerBase
     private readonly GetPendingTicketsQueryHandler _getPendingTicketsQueryHandler;
     private readonly GetTicketByIdQueryHandler _getTicketByIdQueryHandler;
     private readonly ApproveTicketCommandHandler _approveTicketCommandHandler;
+    private readonly IssueTicketFineCommandHandler _issueTicketFineCommandHandler;
     private readonly RejectTicketCommandHandler _rejectTicketCommandHandler;
     private readonly IFileStorageClient _fileStorageClient;
 
@@ -31,6 +33,7 @@ public sealed class TicketsController : ControllerBase
         GetPendingTicketsQueryHandler getPendingTicketsQueryHandler,
         GetTicketByIdQueryHandler getTicketByIdQueryHandler,
         ApproveTicketCommandHandler approveTicketCommandHandler,
+        IssueTicketFineCommandHandler issueTicketFineCommandHandler,
         RejectTicketCommandHandler rejectTicketCommandHandler,
         IFileStorageClient fileStorageClient)
     {
@@ -38,6 +41,7 @@ public sealed class TicketsController : ControllerBase
         _getPendingTicketsQueryHandler = getPendingTicketsQueryHandler;
         _getTicketByIdQueryHandler = getTicketByIdQueryHandler;
         _approveTicketCommandHandler = approveTicketCommandHandler;
+        _issueTicketFineCommandHandler = issueTicketFineCommandHandler;
         _rejectTicketCommandHandler = rejectTicketCommandHandler;
         _fileStorageClient = fileStorageClient;
     }
@@ -71,7 +75,18 @@ public sealed class TicketsController : ControllerBase
                 request.PriceHour,
                 request.PriceDay,
                 await MapToOptionalFilePayloadAsync(request.OwnershipDocumentFile, cancellationToken),
-                await MapToFilePayloadCollectionAsync(request.CarImageFiles, cancellationToken)),
+                await MapToFilePayloadCollectionAsync(request.CarImageFiles, cancellationToken),
+                request.BookingId,
+                request.PlannedStartTime,
+                request.PlannedEndTime,
+                request.TripStartedAt,
+                request.TripCompletedAt,
+                request.LatePenaltyAmount,
+                await MapToOptionalFilePayloadAsync(request.CompletionFrontPhotoFile, cancellationToken),
+                await MapToOptionalFilePayloadAsync(request.CompletionBackPhotoFile, cancellationToken),
+                await MapToOptionalFilePayloadAsync(request.CompletionSideLeftPhotoFile, cancellationToken),
+                await MapToOptionalFilePayloadAsync(request.CompletionSideRightPhotoFile, cancellationToken),
+                await MapToOptionalFilePayloadAsync(request.CompletionInteriorPhotoFile, cancellationToken)),
             cancellationToken);
 
         return Created($"/{result.Ticket.Id}", result.Ticket);
@@ -146,6 +161,21 @@ public sealed class TicketsController : ControllerBase
         return Ok(result.Ticket);
     }
 
+    [Authorize(Policy = "tickets:approve")]
+    [HttpPost("{id:guid}/issue-fine")]
+    public async Task<IActionResult> IssueFine(
+        [FromRoute] Guid id,
+        [FromBody] IssueTicketFineRequest request,
+        CancellationToken cancellationToken)
+    {
+        var managerId = ResolveManagerId();
+        var result = await _issueTicketFineCommandHandler.Handle(
+            new IssueTicketFineCommand(id, managerId, request.Amount),
+            cancellationToken);
+
+        return Ok(result.Ticket);
+    }
+
     private Guid ResolveManagerId()
     {
         var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
@@ -213,7 +243,8 @@ public sealed class TicketsController : ControllerBase
             "client" => TicketType.Client,
             "partner" => TicketType.Partner,
             "partnercar" or "partner-car" or "partner_car" => TicketType.PartnerCar,
-            _ => throw new ValidationException("ticketType must be 'Client', 'Partner' or 'PartnerCar'.")
+            "bookingcompletion" or "booking-completion" or "booking_completion" => TicketType.BookingCompletion,
+            _ => throw new ValidationException("ticketType must be 'Client', 'Partner', 'PartnerCar' or 'BookingCompletion'.")
         };
     }
 
@@ -225,8 +256,20 @@ public sealed class TicketsController : ControllerBase
             "identity" or "identity-document" or "id" => ticket.IdentityDocumentFileName,
             "license" or "driver-license" => ticket.DriverLicenseFileName,
             "ownership" or "ownership-document" => ticket.OwnershipDocumentFileName,
-            _ => throw new ValidationException("documentType must be 'identity', 'license' or 'ownership'.")
+            "front" or "completion-front" => ResolveCompletionPhotoFileName(ticket, "front"),
+            "back" or "completion-back" => ResolveCompletionPhotoFileName(ticket, "back"),
+            "side-left" or "side_left" or "completion-side-left" => ResolveCompletionPhotoFileName(ticket, "side_left"),
+            "side-right" or "side_right" or "completion-side-right" => ResolveCompletionPhotoFileName(ticket, "side_right"),
+            "interior" or "completion-interior" => ResolveCompletionPhotoFileName(ticket, "interior"),
+            _ => throw new ValidationException("documentType must be 'identity', 'license', 'ownership', 'front', 'back', 'side_left', 'side_right' or 'interior'.")
         };
+    }
+
+    private static string? ResolveCompletionPhotoFileName(TicketDto ticket, string slot)
+    {
+        var photo = ticket.CompletionPhotos.FirstOrDefault(item =>
+            string.Equals(item.Slot, slot, StringComparison.OrdinalIgnoreCase));
+        return photo?.FileName;
     }
 
     private static PartnerCarTicketReviewData? MapPartnerCarReviewData(PartnerCarTicketReviewDataRequest? request)

@@ -6,5 +6,7 @@ public interface ITicketEventPublisher
 {
     Task PublishApprovedAsync(TicketApprovedEvent ticketApprovedEvent, CancellationToken cancellationToken = default);
 
+    Task PublishFineIssuedAsync(TicketFineIssuedEvent ticketFineIssuedEvent, CancellationToken cancellationToken = default);
+
     Task PublishRejectedAsync(TicketRejectedEvent ticketRejectedEvent, CancellationToken cancellationToken = default);
 }

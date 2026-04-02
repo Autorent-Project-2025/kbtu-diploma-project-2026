@@ -37,5 +37,28 @@ namespace BookingService.Application.Interfaces.Integrations
         Task RecordBookingCanceledAsync(int bookingId, CancellationToken cancellationToken = default);
 
         Task RecordBookingCompletedAsync(int bookingId, CancellationToken cancellationToken = default);
+
+        Task<BookingChargePayload> CreateBookingChargeAsync(
+            int bookingId,
+            Guid userId,
+            Guid partnerUserId,
+            string chargeType,
+            decimal amount,
+            string? description = null,
+            CancellationToken cancellationToken = default);
+
+        Task<IReadOnlyCollection<BookingChargePayload>> GetBookingChargesAsync(
+            int bookingId,
+            CancellationToken cancellationToken = default);
+
+        Task<IReadOnlyCollection<BookingChargePayload>> GetUserBookingChargesAsync(
+            Guid userId,
+            string? chargeType = null,
+            string? status = null,
+            CancellationToken cancellationToken = default);
+
+        Task<BookingChargePayload> MarkBookingChargePaidAsync(
+            long chargeId,
+            CancellationToken cancellationToken = default);
     }
 }

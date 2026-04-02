@@ -40,6 +40,14 @@ export async function rejectTicket(
   return res.data as Ticket;
 }
 
+export async function issueTicketFine(
+  ticketId: string,
+  amount: number
+): Promise<Ticket> {
+  const res = await api.post(`/tickets/${ticketId}/issue-fine`, { amount });
+  return res.data as Ticket;
+}
+
 export interface TicketDocumentTemporaryLink {
   fileName: string;
   url: string;
@@ -48,7 +56,15 @@ export interface TicketDocumentTemporaryLink {
 
 export async function getTicketDocumentTemporaryLink(
   ticketId: string,
-  documentType: "identity" | "license" | "ownership"
+  documentType:
+    | "identity"
+    | "license"
+    | "ownership"
+    | "front"
+    | "back"
+    | "side_left"
+    | "side_right"
+    | "interior"
 ): Promise<TicketDocumentTemporaryLink> {
   const res = await api.get(`/tickets/${ticketId}/documents/${documentType}/temporary-link`);
   return res.data as TicketDocumentTemporaryLink;

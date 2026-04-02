@@ -13,4 +13,10 @@ public interface IClientService
     // Profile endpoints — operate by relatedUserId from JWT
     Task<ClientResponseDto?> GetByRelatedUserIdAsync(string relatedUserId, CancellationToken cancellationToken = default);
     Task<ClientResponseDto?> UpdateByRelatedUserIdAsync(string relatedUserId, ProfileUpdateDto dto, CancellationToken cancellationToken = default);
+    Task<ClientBookingAccessDto?> GetBookingAccessByRelatedUserIdAsync(string relatedUserId, CancellationToken cancellationToken = default);
+    Task<ClientResponseDto?> SetBookingActionsBlockedByRelatedUserIdAsync(
+        string relatedUserId,
+        bool isBlocked,
+        string? reason,
+        CancellationToken cancellationToken = default);
 }

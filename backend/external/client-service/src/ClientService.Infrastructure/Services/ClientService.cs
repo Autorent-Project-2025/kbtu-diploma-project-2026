@@ -151,6 +151,50 @@ public class ClientService : IClientService
         return true;
     }
 
+    public async Task<ClientBookingAccessDto?> GetBookingAccessByRelatedUserIdAsync(
+        string relatedUserId,
+        CancellationToken cancellationToken = default)
+    {
+        var normalizedRelatedUserId = NormalizeRequired(relatedUserId, nameof(relatedUserId), 64);
+
+        return await _db.Clients
+            .AsNoTracking()
+            .Where(client => client.RelatedUserId == normalizedRelatedUserId)
+            .Select(client => new ClientBookingAccessDto
+            {
+                RelatedUserId = client.RelatedUserId,
+                BookingActionsBlocked = client.BookingActionsBlocked,
+                BookingBlockReason = client.BookingBlockReason,
+                BookingBlockedAt = client.BookingBlockedAt
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    public async Task<ClientResponseDto?> SetBookingActionsBlockedByRelatedUserIdAsync(
+        string relatedUserId,
+        bool isBlocked,
+        string? reason,
+        CancellationToken cancellationToken = default)
+    {
+        var normalizedRelatedUserId = NormalizeRequired(relatedUserId, nameof(relatedUserId), 64);
+        var normalizedReason = NormalizeOptional(reason, nameof(reason), 512);
+
+        var entity = await _db.Clients.FirstOrDefaultAsync(
+            client => client.RelatedUserId == normalizedRelatedUserId,
+            cancellationToken);
+        if (entity is null)
+        {
+            return null;
+        }
+
+        entity.BookingActionsBlocked = isBlocked;
+        entity.BookingBlockReason = isBlocked ? normalizedReason : null;
+        entity.BookingBlockedAt = isBlocked ? DateTimeOffset.UtcNow : null;
+
+        await _db.SaveChangesAsync(cancellationToken);
+        return entity.ToClientResponseDto();
+    }
+
     private static NormalizedClientData NormalizeAndValidate(
         string? firstName,
         string? lastName,
