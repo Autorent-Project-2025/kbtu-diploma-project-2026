@@ -105,6 +105,24 @@
       </div>
 
       <template v-else-if="profile">
+        <section
+          v-if="profile.bookingActionsBlocked"
+          class="rounded-3xl border border-red-300/70 dark:border-red-500/30 bg-red-50 dark:bg-red-900/20 shadow-xl p-6 space-y-2"
+        >
+          <p class="text-sm font-bold uppercase tracking-[0.18em] text-red-700 dark:text-red-300">
+            Бронирования временно заблокированы
+          </p>
+          <p class="text-base font-semibold text-red-900 dark:text-red-100">
+            {{ profile.bookingBlockReason || "Погасите начисленный штраф, чтобы снова создавать и начинать брони." }}
+          </p>
+          <p
+            v-if="profile.bookingBlockedAt"
+            class="text-sm text-red-700 dark:text-red-300"
+          >
+            Блокировка действует с {{ formatDateTime(profile.bookingBlockedAt) }}
+          </p>
+        </section>
+
         <!-- ── Stats strip ──────────────────────────────────────────────── -->
         <section class="grid sm:grid-cols-2 xl:grid-cols-4 gap-4">
           <article
@@ -611,7 +629,7 @@ import { getMyBookings } from "../api/booking";
 import { useToast } from "../composables/useToast";
 import type { Booking } from "../types/Booking";
 
-const { showToast } = useToast();
+const { success, error } = useToast();
 
 // ─── State ────────────────────────────────────────────────────────────────────
 const loading = ref(true);
@@ -744,9 +762,9 @@ async function saveProfile() {
       avatarUrl: form.value.avatarUrl.trim() || null,
     });
     editMode.value = false;
-    showToast("Профиль обновлён", "success");
+    success("Профиль обновлён");
   } catch {
-    showToast("Не удалось сохранить", "error");
+    error("Не удалось сохранить");
   } finally {
     saving.value = false;
   }
@@ -790,6 +808,20 @@ function formatDateShort(iso: string): string {
   }
 }
 
+function formatDateTime(iso: string): string {
+  try {
+    return new Date(iso).toLocaleString("ru-RU", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return iso;
+  }
+}
+
 function formatMoney(amount: number): string {
   return new Intl.NumberFormat("ru-RU", {
     style: "currency",
@@ -803,6 +835,7 @@ function statusLabel(status: string): string {
     pending: "Ожидает",
     confirmed: "Подтверждён",
     active: "Активен",
+    awaitingReview: "На проверке",
     completed: "Завершён",
     canceled: "Отменён",
   };
@@ -817,6 +850,8 @@ function statusClass(status: string): string {
       "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400",
     active:
       "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400",
+    awaitingReview:
+      "bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-400",
     completed: "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400",
     canceled: "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400",
   };

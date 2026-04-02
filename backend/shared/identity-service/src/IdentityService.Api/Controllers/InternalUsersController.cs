@@ -1,5 +1,6 @@
 using IdentityService.Api.Contracts.Internal;
 using IdentityService.Application.Commands.ProvisionUser;
+using IdentityService.Application.Queries.GetUserById;
 using IdentityService.Infrastructure.Options;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -16,14 +17,30 @@ public sealed class InternalUsersController : ControllerBase
     private const string InternalApiKeyHeader = "X-Internal-Api-Key";
 
     private readonly ProvisionUserCommandHandler _provisionUserCommandHandler;
+    private readonly GetUserByIdQueryHandler _getUserByIdQueryHandler;
     private readonly InternalAuthOptions _internalAuthOptions;
 
     public InternalUsersController(
         ProvisionUserCommandHandler provisionUserCommandHandler,
+        GetUserByIdQueryHandler getUserByIdQueryHandler,
         IOptions<InternalAuthOptions> internalAuthOptions)
     {
         _provisionUserCommandHandler = provisionUserCommandHandler;
+        _getUserByIdQueryHandler = getUserByIdQueryHandler;
         _internalAuthOptions = internalAuthOptions.Value;
+    }
+
+    [AllowAnonymous]
+    [HttpGet("{id:guid}")]
+    public async Task<IActionResult> GetById(Guid id, CancellationToken cancellationToken)
+    {
+        if (!IsAuthorizedInternalRequest())
+        {
+            return Unauthorized(new { error = "Internal API key is invalid." });
+        }
+
+        var result = await _getUserByIdQueryHandler.Handle(new GetUserByIdQuery(id), cancellationToken);
+        return Ok(result.User);
     }
 
     [AllowAnonymous]

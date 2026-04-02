@@ -77,6 +77,73 @@ public sealed class InternalPaymentsController : ControllerBase
         return Ok(new { message = "Booking payment completed." });
     }
 
+    [HttpPost("booking-charges")]
+    public async Task<IActionResult> CreateBookingCharge(
+        [FromBody] CreateBookingChargeRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!IsAuthorizedInternalRequest())
+        {
+            return Unauthorized(new { error = "Internal API key is invalid." });
+        }
+
+        var charge = await _paymentLedgerService.CreateBookingChargeAsync(
+            request.BookingId,
+            request.UserId,
+            request.PartnerUserId,
+            request.ChargeType,
+            request.Amount,
+            request.Currency,
+            request.Description,
+            cancellationToken);
+
+        return Ok(charge);
+    }
+
+    [HttpPost("booking-charges/{chargeId:long}/paid")]
+    public async Task<IActionResult> MarkBookingChargePaid(long chargeId, CancellationToken cancellationToken)
+    {
+        if (!IsAuthorizedInternalRequest())
+        {
+            return Unauthorized(new { error = "Internal API key is invalid." });
+        }
+
+        var charge = await _paymentLedgerService.MarkBookingChargePaidAsync(chargeId, cancellationToken);
+        return Ok(charge);
+    }
+
+    [HttpGet("bookings/{bookingId:int}/charges")]
+    public async Task<IActionResult> GetBookingCharges(int bookingId, CancellationToken cancellationToken)
+    {
+        if (!IsAuthorizedInternalRequest())
+        {
+            return Unauthorized(new { error = "Internal API key is invalid." });
+        }
+
+        var charges = await _paymentLedgerService.GetBookingChargesAsync(bookingId, cancellationToken);
+        return Ok(charges);
+    }
+
+    [HttpGet("users/{userId:guid}/booking-charges")]
+    public async Task<IActionResult> GetUserBookingCharges(
+        Guid userId,
+        [FromQuery] string? chargeType,
+        [FromQuery] string? status,
+        CancellationToken cancellationToken)
+    {
+        if (!IsAuthorizedInternalRequest())
+        {
+            return Unauthorized(new { error = "Internal API key is invalid." });
+        }
+
+        var charges = await _paymentLedgerService.GetUserBookingChargesAsync(
+            userId,
+            chargeType,
+            status,
+            cancellationToken);
+        return Ok(charges);
+    }
+
     [HttpPost("payouts/request")]
     public async Task<IActionResult> RequestPayout(
         [FromBody] RequestPartnerPayoutRequest request,

@@ -23,4 +23,15 @@ public sealed class CreateTicketRequest
     public decimal? PriceDay { get; init; }
     public IFormFile? OwnershipDocumentFile { get; init; }
     public List<IFormFile>? CarImageFiles { get; init; }
+    public int? BookingId { get; init; }
+    public DateTimeOffset? PlannedStartTime { get; init; }
+    public DateTimeOffset? PlannedEndTime { get; init; }
+    public DateTimeOffset? TripStartedAt { get; init; }
+    public DateTimeOffset? TripCompletedAt { get; init; }
+    public decimal? LatePenaltyAmount { get; init; }
+    public IFormFile? CompletionFrontPhotoFile { get; init; }
+    public IFormFile? CompletionBackPhotoFile { get; init; }
+    public IFormFile? CompletionSideLeftPhotoFile { get; init; }
+    public IFormFile? CompletionSideRightPhotoFile { get; init; }
+    public IFormFile? CompletionInteriorPhotoFile { get; init; }
 }

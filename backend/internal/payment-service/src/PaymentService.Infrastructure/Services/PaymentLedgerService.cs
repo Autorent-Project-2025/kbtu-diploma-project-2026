@@ -212,6 +212,169 @@ public sealed class PaymentLedgerService : IPaymentLedgerService
         await RecordBookingCompletedCoreAsync(bookingId, eventId, routingKey, cancellationToken);
     }
 
+    public async Task<BookingChargeResponseDto> CreateBookingChargeAsync(
+        int bookingId,
+        Guid userId,
+        Guid partnerUserId,
+        string chargeType,
+        decimal amount,
+        string? currency = null,
+        string? description = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (bookingId <= 0)
+        {
+            throw new ArgumentException("Booking id must be greater than zero.", nameof(bookingId));
+        }
+
+        if (userId == Guid.Empty)
+        {
+            throw new ArgumentException("User id is required.", nameof(userId));
+        }
+
+        if (partnerUserId == Guid.Empty)
+        {
+            throw new ArgumentException("Partner user id is required.", nameof(partnerUserId));
+        }
+
+        var normalizedAmount = NormalizeAmount(amount);
+        var normalizedCurrency = NormalizeCurrency(string.IsNullOrWhiteSpace(currency) ? _options.Currency : currency);
+        var normalizedDescription = NormalizeOptionalDescription(description);
+        var normalizedType = ParseChargeType(chargeType);
+        var partnerShareAmount = ResolvePartnerShareAmount(normalizedType, normalizedAmount);
+        var now = DateTimeOffset.UtcNow;
+
+        var charge = new BookingCharge
+        {
+            BookingId = bookingId,
+            UserId = userId,
+            PartnerUserId = partnerUserId,
+            ChargeType = normalizedType,
+            Amount = normalizedAmount,
+            PartnerShareAmount = partnerShareAmount,
+            Currency = normalizedCurrency,
+            Status = BookingChargeStatus.Pending,
+            Description = normalizedDescription,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+
+        _db.BookingCharges.Add(charge);
+        await _db.SaveChangesAsync(cancellationToken);
+        return MapToBookingChargeResponseDto(charge);
+    }
+
+    public async Task<BookingChargeResponseDto> MarkBookingChargePaidAsync(
+        long chargeId,
+        CancellationToken cancellationToken = default)
+    {
+        if (chargeId <= 0)
+        {
+            throw new ArgumentException("Charge id must be greater than zero.", nameof(chargeId));
+        }
+
+        var charge = await _db.BookingCharges.FirstOrDefaultAsync(item => item.Id == chargeId, cancellationToken);
+        if (charge is null)
+        {
+            throw new KeyNotFoundException($"Booking charge {chargeId} was not found.");
+        }
+
+        if (charge.Status == BookingChargeStatus.Canceled)
+        {
+            throw new InvalidOperationException("Canceled booking charge cannot be paid.");
+        }
+
+        if (charge.Status != BookingChargeStatus.Paid)
+        {
+            charge.Status = BookingChargeStatus.Paid;
+            charge.PaidAt = DateTimeOffset.UtcNow;
+            charge.UpdatedAt = charge.PaidAt.Value;
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+
+        return MapToBookingChargeResponseDto(charge);
+    }
+
+    public async Task<IReadOnlyCollection<BookingChargeResponseDto>> GetBookingChargesAsync(
+        int bookingId,
+        CancellationToken cancellationToken = default)
+    {
+        if (bookingId <= 0)
+        {
+            throw new ArgumentException("Booking id must be greater than zero.", nameof(bookingId));
+        }
+
+        return await _db.BookingCharges
+            .AsNoTracking()
+            .Where(charge => charge.BookingId == bookingId)
+            .OrderByDescending(charge => charge.CreatedAt)
+            .ThenByDescending(charge => charge.Id)
+            .Select(charge => new BookingChargeResponseDto
+            {
+                Id = charge.Id,
+                BookingId = charge.BookingId,
+                UserId = charge.UserId,
+                PartnerUserId = charge.PartnerUserId,
+                ChargeType = charge.ChargeType.ToString(),
+                Amount = charge.Amount,
+                PartnerShareAmount = charge.PartnerShareAmount,
+                Currency = charge.Currency,
+                Status = charge.Status.ToString(),
+                Description = charge.Description,
+                CreatedAt = charge.CreatedAt,
+                UpdatedAt = charge.UpdatedAt,
+                PaidAt = charge.PaidAt,
+                CanceledAt = charge.CanceledAt
+            })
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyCollection<BookingChargeResponseDto>> GetUserBookingChargesAsync(
+        Guid userId,
+        string? chargeType = null,
+        string? status = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (userId == Guid.Empty)
+        {
+            throw new ArgumentException("User id is required.", nameof(userId));
+        }
+
+        BookingChargeType? normalizedChargeType = string.IsNullOrWhiteSpace(chargeType)
+            ? null
+            : ParseChargeType(chargeType);
+        BookingChargeStatus? normalizedStatus = string.IsNullOrWhiteSpace(status)
+            ? null
+            : ParseChargeStatus(status);
+
+        return await _db.BookingCharges
+            .AsNoTracking()
+            .Where(charge =>
+                charge.UserId == userId &&
+                (!normalizedChargeType.HasValue || charge.ChargeType == normalizedChargeType.Value) &&
+                (!normalizedStatus.HasValue || charge.Status == normalizedStatus.Value))
+            .OrderByDescending(charge => charge.CreatedAt)
+            .ThenByDescending(charge => charge.Id)
+            .Select(charge => new BookingChargeResponseDto
+            {
+                Id = charge.Id,
+                BookingId = charge.BookingId,
+                UserId = charge.UserId,
+                PartnerUserId = charge.PartnerUserId,
+                ChargeType = charge.ChargeType.ToString(),
+                Amount = charge.Amount,
+                PartnerShareAmount = charge.PartnerShareAmount,
+                Currency = charge.Currency,
+                Status = charge.Status.ToString(),
+                Description = charge.Description,
+                CreatedAt = charge.CreatedAt,
+                UpdatedAt = charge.UpdatedAt,
+                PaidAt = charge.PaidAt,
+                CanceledAt = charge.CanceledAt
+            })
+            .ToListAsync(cancellationToken);
+    }
+
     private async Task RecordBookingCompletedCoreAsync(
         int bookingId,
         string? eventId,
@@ -257,9 +420,18 @@ public sealed class PaymentLedgerService : IPaymentLedgerService
 
         var wallet = await GetRequiredWalletAsync(payment.PartnerUserId, cancellationToken);
         var now = DateTimeOffset.UtcNow;
+        var paidChargeShareAmount = await _db.BookingCharges
+            .Where(charge =>
+                charge.BookingId == bookingId &&
+                charge.Status == BookingChargeStatus.Paid &&
+                charge.PartnerUserId == payment.PartnerUserId)
+            .SumAsync(charge => (decimal?)charge.PartnerShareAmount, cancellationToken) ?? 0m;
 
         wallet.PendingAmount = EnsureNonNegative(wallet.PendingAmount - payment.PartnerAmount, "pending amount");
-        wallet.AvailableAmount = decimal.Round(wallet.AvailableAmount + payment.PartnerAmount, 2, MidpointRounding.AwayFromZero);
+        wallet.AvailableAmount = decimal.Round(
+            wallet.AvailableAmount + payment.PartnerAmount + paidChargeShareAmount,
+            2,
+            MidpointRounding.AwayFromZero);
         wallet.UpdatedAt = now;
 
         payment.Status = CustomerPaymentStatus.Available;
@@ -291,6 +463,22 @@ public sealed class PaymentLedgerService : IPaymentLedgerService
                 Description = $"Booking {payment.BookingId} completed: available credit.",
                 CreatedAt = now
             });
+
+        if (paidChargeShareAmount > 0m)
+        {
+            _db.PartnerLedgerEntries.Add(new PartnerLedgerEntry
+            {
+                PartnerWalletId = wallet.Id,
+                CustomerPaymentId = payment.Id,
+                BookingId = payment.BookingId,
+                EntryType = LedgerEntryType.BookingChargeAvailableCredit,
+                Bucket = LedgerBucket.Available,
+                AmountDelta = paidChargeShareAmount,
+                Currency = payment.Currency,
+                Description = $"Booking {payment.BookingId} completed: paid charge share credit.",
+                CreatedAt = now
+            });
+        }
 
         AddProcessedEvent(normalizedEventId, normalizedRoutingKey);
         await _db.SaveChangesAsync(cancellationToken);
@@ -593,6 +781,27 @@ public sealed class PaymentLedgerService : IPaymentLedgerService
             .ToListAsync(cancellationToken);
     }
 
+    private static BookingChargeResponseDto MapToBookingChargeResponseDto(BookingCharge charge)
+    {
+        return new BookingChargeResponseDto
+        {
+            Id = charge.Id,
+            BookingId = charge.BookingId,
+            UserId = charge.UserId,
+            PartnerUserId = charge.PartnerUserId,
+            ChargeType = charge.ChargeType.ToString(),
+            Amount = charge.Amount,
+            PartnerShareAmount = charge.PartnerShareAmount,
+            Currency = charge.Currency,
+            Status = charge.Status.ToString(),
+            Description = charge.Description,
+            CreatedAt = charge.CreatedAt,
+            UpdatedAt = charge.UpdatedAt,
+            PaidAt = charge.PaidAt,
+            CanceledAt = charge.CanceledAt
+        };
+    }
+
     private async Task<PartnerWallet> GetOrCreateWalletAsync(Guid partnerUserId, string currency, DateTimeOffset now, CancellationToken cancellationToken)
     {
         var wallet = await _db.PartnerWallets
@@ -776,6 +985,22 @@ public sealed class PaymentLedgerService : IPaymentLedgerService
         return decimal.Round(amount, 2, MidpointRounding.AwayFromZero);
     }
 
+    private static string? NormalizeOptionalDescription(string? description)
+    {
+        if (string.IsNullOrWhiteSpace(description))
+        {
+            return null;
+        }
+
+        var normalized = description.Trim();
+        if (normalized.Length > 255)
+        {
+            throw new ArgumentException("Description length must not exceed 255 characters.", nameof(description));
+        }
+
+        return normalized;
+    }
+
     private static string NormalizeCurrency(string? currency)
     {
         if (string.IsNullOrWhiteSpace(currency))
@@ -800,6 +1025,43 @@ public sealed class PaymentLedgerService : IPaymentLedgerService
         }
 
         return decimal.Round(rate, 4, MidpointRounding.AwayFromZero);
+    }
+
+    private static BookingChargeType ParseChargeType(string? chargeType)
+    {
+        if (string.IsNullOrWhiteSpace(chargeType))
+        {
+            throw new ArgumentException("Charge type is required.", nameof(chargeType));
+        }
+
+        return Enum.TryParse<BookingChargeType>(chargeType.Trim(), true, out var parsed)
+            ? parsed
+            : throw new ArgumentException($"Unsupported booking charge type '{chargeType}'.", nameof(chargeType));
+    }
+
+    private static BookingChargeStatus ParseChargeStatus(string? status)
+    {
+        if (string.IsNullOrWhiteSpace(status))
+        {
+            throw new ArgumentException("Charge status is required.", nameof(status));
+        }
+
+        return Enum.TryParse<BookingChargeStatus>(status.Trim(), true, out var parsed)
+            ? parsed
+            : throw new ArgumentException($"Unsupported booking charge status '{status}'.", nameof(status));
+    }
+
+    private static decimal ResolvePartnerShareAmount(BookingChargeType chargeType, decimal amount)
+    {
+        var normalizedAmount = NormalizeAmount(amount);
+        var multiplier = chargeType switch
+        {
+            BookingChargeType.LatePenalty => 1.0m,
+            BookingChargeType.DamageFine => 0.5m,
+            _ => 0.5m
+        };
+
+        return decimal.Round(normalizedAmount * multiplier, 2, MidpointRounding.AwayFromZero);
     }
 
     private async Task<bool> IsEventAlreadyProcessedAsync(string? eventId, CancellationToken cancellationToken)

@@ -8,13 +8,38 @@ export interface Booking {
   endDate: string;
   price: number | null;
   priceHour?: number | null;
+  tripStartedAt?: string | null;
+  tripCompletedAt?: string | null;
+  completionReviewTicketId?: string | null;
   status: BookingStatus;
+}
+
+export interface BookingCharge {
+  id: number;
+  bookingId: number;
+  chargeType: "LatePenalty" | "DamageFine" | string;
+  amount: number;
+  partnerShareAmount: number;
+  currency: string;
+  status: "Pending" | "Paid" | "Canceled" | string;
+  description?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  paidAt?: string | null;
+  canceledAt?: string | null;
+}
+
+export interface BookingCompletionSubmissionResult {
+  booking: Booking;
+  reviewTicketId: string;
+  latePenaltyAmount: number;
 }
 
 export type BookingStatus =
   | "pending" //
   | "confirmed" //
   | "active" //
+  | "awaitingReview" //
   | "completed" //
   | "canceled"; //
 
@@ -26,6 +51,7 @@ export type ComputedBookingStatus =
   | "paymentPending" // Бронь создана, но ожидает оплаты
   | "upcoming" // Предстоящая (еще не началась)
   | "active" // Активная (идет сейчас)
+  | "awaitingReview" // Поездка завершена, ожидает проверки
   | "completed" // Завершенная (прошла)
   | "canceled"; // Отмененная
 

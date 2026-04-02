@@ -28,6 +28,24 @@ public sealed class InternalClientsController : ControllerBase
     }
 
     [AllowAnonymous]
+    [HttpGet("by-user/{relatedUserId:guid}")]
+    public async Task<IActionResult> GetByRelatedUserId(Guid relatedUserId, CancellationToken cancellationToken)
+    {
+        if (!IsAuthorizedInternalRequest())
+        {
+            return Unauthorized(new { error = "Internal API key is invalid." });
+        }
+
+        var client = await _clientService.GetByRelatedUserIdAsync(relatedUserId.ToString(), cancellationToken);
+        if (client is null)
+        {
+            return NotFound(new { error = "Client not found." });
+        }
+
+        return Ok(client);
+    }
+
+    [AllowAnonymous]
     [HttpPost("provision")]
     public async Task<IActionResult> Provision(
         [FromBody] ProvisionClientRequest request,

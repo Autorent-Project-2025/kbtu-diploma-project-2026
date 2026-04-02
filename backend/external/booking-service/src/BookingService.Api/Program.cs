@@ -22,6 +22,10 @@ var httpClientResilienceOptions = builder.Configuration.GetHttpClientResilienceO
 builder.Services.Configure<InternalAuthOptions>(builder.Configuration.GetSection(InternalAuthOptions.SectionName));
 builder.Services.Configure<CarServiceOptions>(builder.Configuration.GetSection(CarServiceOptions.SectionName));
 builder.Services.Configure<PaymentServiceOptions>(builder.Configuration.GetSection(PaymentServiceOptions.SectionName));
+builder.Services.Configure<ClientServiceOptions>(builder.Configuration.GetSection(ClientServiceOptions.SectionName));
+builder.Services.Configure<IdentityServiceOptions>(builder.Configuration.GetSection(IdentityServiceOptions.SectionName));
+builder.Services.Configure<TicketServiceOptions>(builder.Configuration.GetSection(TicketServiceOptions.SectionName));
+builder.Services.Configure<EmailServiceOptions>(builder.Configuration.GetSection(EmailServiceOptions.SectionName));
 builder.Services.AddOptions<RabbitMqOptions>()
     .Bind(builder.Configuration.GetSection(RabbitMqOptions.SectionName))
     .Validate(options =>
@@ -51,6 +55,14 @@ builder.Services.AddOptions<PendingBookingExpirationOptions>()
         options.BatchSize > 0 &&
         options.BatchSize <= 500,
         "Pending booking expiration configuration is invalid.");
+builder.Services.AddOptions<UnstartedBookingExpirationOptions>()
+    .Bind(builder.Configuration.GetSection(UnstartedBookingExpirationOptions.SectionName))
+    .Validate(options =>
+        options.PollIntervalSeconds > 0 &&
+        options.PollIntervalSeconds <= 3600 &&
+        options.BatchSize > 0 &&
+        options.BatchSize <= 500,
+        "Unstarted booking expiration configuration is invalid.");
 
 var connectionString = builder.Configuration.GetConnectionString("DbConnection");
 if (string.IsNullOrEmpty(connectionString))
@@ -148,10 +160,67 @@ builder.Services.AddHttpClient<IPaymentSyncClient, PaymentSyncClient>((servicePr
     client.Timeout = Timeout.InfiniteTimeSpan;
 })
 .AddConfiguredResilience(httpClientResilienceOptions);
+builder.Services.AddHttpClient<IClientBookingAccessClient, ClientBookingAccessClient>((serviceProvider, client) =>
+{
+    var options = serviceProvider
+        .GetRequiredService<Microsoft.Extensions.Options.IOptions<ClientServiceOptions>>()
+        .Value;
+
+    if (!string.IsNullOrWhiteSpace(options.BaseUrl))
+    {
+        client.BaseAddress = new Uri(options.BaseUrl, UriKind.Absolute);
+    }
+
+    client.Timeout = Timeout.InfiniteTimeSpan;
+})
+.AddConfiguredResilience(httpClientResilienceOptions);
+builder.Services.AddHttpClient<IIdentityUserReadClient, IdentityUserReadClient>((serviceProvider, client) =>
+{
+    var options = serviceProvider
+        .GetRequiredService<Microsoft.Extensions.Options.IOptions<IdentityServiceOptions>>()
+        .Value;
+
+    if (!string.IsNullOrWhiteSpace(options.BaseUrl))
+    {
+        client.BaseAddress = new Uri(options.BaseUrl, UriKind.Absolute);
+    }
+
+    client.Timeout = Timeout.InfiniteTimeSpan;
+})
+.AddConfiguredResilience(httpClientResilienceOptions);
+builder.Services.AddHttpClient<IBookingCompletionTicketClient, BookingCompletionTicketClient>((serviceProvider, client) =>
+{
+    var options = serviceProvider
+        .GetRequiredService<Microsoft.Extensions.Options.IOptions<TicketServiceOptions>>()
+        .Value;
+
+    if (!string.IsNullOrWhiteSpace(options.BaseUrl))
+    {
+        client.BaseAddress = new Uri(options.BaseUrl, UriKind.Absolute);
+    }
+
+    client.Timeout = Timeout.InfiniteTimeSpan;
+})
+.AddConfiguredResilience(httpClientResilienceOptions);
+builder.Services.AddHttpClient<IBookingEmailClient, BookingEmailClient>((serviceProvider, client) =>
+{
+    var options = serviceProvider
+        .GetRequiredService<Microsoft.Extensions.Options.IOptions<EmailServiceOptions>>()
+        .Value;
+
+    if (!string.IsNullOrWhiteSpace(options.BaseUrl))
+    {
+        client.BaseAddress = new Uri(options.BaseUrl, UriKind.Absolute);
+    }
+
+    client.Timeout = Timeout.InfiniteTimeSpan;
+})
+.AddConfiguredResilience(httpClientResilienceOptions);
 builder.Services.AddScoped<IBookingService, BookingService.Infrastructure.Services.BookingService>();
 builder.Services.AddSingleton<IRabbitMqPublisher, RabbitMqPublisher>();
 builder.Services.AddHostedService<PaymentSyncOutboxDispatcher>();
 builder.Services.AddHostedService<PendingBookingExpirationDispatcher>();
+builder.Services.AddHostedService<UnstartedBookingExpirationDispatcher>();
 
 var app = builder.Build();
 

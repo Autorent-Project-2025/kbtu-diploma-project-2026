@@ -117,6 +117,81 @@ namespace BookingService.Infrastructure.Integrations
                 cancellationToken);
         }
 
+        public Task<BookingChargePayload> CreateBookingChargeAsync(
+            int bookingId,
+            Guid userId,
+            Guid partnerUserId,
+            string chargeType,
+            decimal amount,
+            string? description = null,
+            CancellationToken cancellationToken = default)
+        {
+            return SendForResponseAsync<BookingChargePayload>(
+                HttpMethod.Post,
+                "/internal/payments/booking-charges",
+                new
+                {
+                    bookingId,
+                    userId,
+                    partnerUserId,
+                    chargeType,
+                    amount,
+                    description
+                },
+                cancellationToken);
+        }
+
+        public async Task<IReadOnlyCollection<BookingChargePayload>> GetBookingChargesAsync(
+            int bookingId,
+            CancellationToken cancellationToken = default)
+        {
+            var charges = await SendForOptionalResponseAsync<List<BookingChargePayload>>(
+                HttpMethod.Get,
+                $"/internal/payments/bookings/{bookingId}/charges",
+                null,
+                cancellationToken);
+
+            return charges ?? [];
+        }
+
+        public async Task<IReadOnlyCollection<BookingChargePayload>> GetUserBookingChargesAsync(
+            Guid userId,
+            string? chargeType = null,
+            string? status = null,
+            CancellationToken cancellationToken = default)
+        {
+            var queryParts = new List<string>();
+            if (!string.IsNullOrWhiteSpace(chargeType))
+            {
+                queryParts.Add($"chargeType={Uri.EscapeDataString(chargeType)}");
+            }
+
+            if (!string.IsNullOrWhiteSpace(status))
+            {
+                queryParts.Add($"status={Uri.EscapeDataString(status)}");
+            }
+
+            var suffix = queryParts.Count == 0 ? string.Empty : $"?{string.Join("&", queryParts)}";
+            var charges = await SendForOptionalResponseAsync<List<BookingChargePayload>>(
+                HttpMethod.Get,
+                $"/internal/payments/users/{userId}/booking-charges{suffix}",
+                null,
+                cancellationToken);
+
+            return charges ?? [];
+        }
+
+        public Task<BookingChargePayload> MarkBookingChargePaidAsync(
+            long chargeId,
+            CancellationToken cancellationToken = default)
+        {
+            return SendForResponseAsync<BookingChargePayload>(
+                HttpMethod.Post,
+                $"/internal/payments/booking-charges/{chargeId}/paid",
+                new { },
+                cancellationToken);
+        }
+
         private async Task<T> SendForResponseAsync<T>(
             HttpMethod method,
             string path,

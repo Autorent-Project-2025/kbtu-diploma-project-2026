@@ -29,6 +29,7 @@ public static class DependencyInjection
         services.Configure<EmailServiceOptions>(configuration.GetSection(EmailServiceOptions.SectionName));
         services.Configure<ClientServiceOptions>(configuration.GetSection(ClientServiceOptions.SectionName));
         services.Configure<PartnerServiceOptions>(configuration.GetSection(PartnerServiceOptions.SectionName));
+        services.Configure<BookingServiceOptions>(configuration.GetSection(BookingServiceOptions.SectionName));
         services.Configure<FileServiceOptions>(configuration.GetSection(FileServiceOptions.SectionName));
         services.Configure<ImageServiceOptions>(configuration.GetSection(ImageServiceOptions.SectionName));
         services.Configure<CarServiceOptions>(configuration.GetSection(CarServiceOptions.SectionName));
@@ -111,6 +112,20 @@ public static class DependencyInjection
             if (string.IsNullOrWhiteSpace(options.BaseUrl))
             {
                 throw new InvalidOperationException("ClientService:BaseUrl configuration is required.");
+            }
+
+            client.BaseAddress = new Uri(NormalizeBaseUrl(options.BaseUrl));
+            client.Timeout = Timeout.InfiniteTimeSpan;
+        })
+        .AddHttpMessageHandler<ObservabilityHttpClientHandler>()
+        .AddConfiguredResilience(httpClientResilienceOptions);
+
+        services.AddHttpClient<IBookingCompletionWorkflowClient, BookingCompletionWorkflowClient>((serviceProvider, client) =>
+        {
+            var options = serviceProvider.GetRequiredService<IOptions<BookingServiceOptions>>().Value;
+            if (string.IsNullOrWhiteSpace(options.BaseUrl))
+            {
+                throw new InvalidOperationException("BookingService:BaseUrl configuration is required.");
             }
 
             client.BaseAddress = new Uri(NormalizeBaseUrl(options.BaseUrl));

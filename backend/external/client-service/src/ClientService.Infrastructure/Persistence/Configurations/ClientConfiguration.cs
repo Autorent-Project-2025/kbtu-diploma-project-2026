@@ -45,6 +45,16 @@ public class ClientConfiguration : IEntityTypeConfiguration<Client>
         builder.Property(client => client.AvatarUrl)
             .HasMaxLength(1024);
 
+        builder.Property(client => client.BookingActionsBlocked)
+            .HasDefaultValue(false)
+            .IsRequired();
+
+        builder.Property(client => client.BookingBlockReason)
+            .HasMaxLength(512);
+
+        builder.Property(client => client.BookingBlockedAt)
+            .HasColumnType("timestamp with time zone");
+
         builder.Property(client => client.ProvisionRequestKey)
             .HasMaxLength(128);
 

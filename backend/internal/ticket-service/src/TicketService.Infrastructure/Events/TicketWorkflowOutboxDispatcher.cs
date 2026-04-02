@@ -120,6 +120,20 @@ public sealed class TicketWorkflowOutboxDispatcher : BackgroundService
                     break;
                 }
 
+                case TicketWorkflowOutboxEventTypes.BookingCompletionApproved:
+                {
+                    var payload = TicketWorkflowPayloadSerializer.Deserialize<BookingCompletionApprovedWorkflowPayload>(message.Payload);
+                    await ProcessBookingCompletionApprovedWorkflowAsync(serviceProvider, db, message, payload, cancellationToken);
+                    break;
+                }
+
+                case TicketWorkflowOutboxEventTypes.BookingCompletionFineIssued:
+                {
+                    var payload = TicketWorkflowPayloadSerializer.Deserialize<BookingCompletionFineIssuedWorkflowPayload>(message.Payload);
+                    await ProcessBookingCompletionFineIssuedWorkflowAsync(serviceProvider, db, message, payload, cancellationToken);
+                    break;
+                }
+
                 case TicketWorkflowOutboxEventTypes.Rejected:
                 {
                     var payload = TicketWorkflowPayloadSerializer.Deserialize<TicketRejectedWorkflowPayload>(message.Payload);
@@ -338,6 +352,47 @@ public sealed class TicketWorkflowOutboxDispatcher : BackgroundService
         }
     }
 
+    private async Task ProcessBookingCompletionApprovedWorkflowAsync(
+        IServiceProvider serviceProvider,
+        TicketDbContext db,
+        TicketWorkflowOutboxMessage message,
+        BookingCompletionApprovedWorkflowPayload payload,
+        CancellationToken cancellationToken)
+    {
+        var ticket = await LoadRequiredTicketAsync(db, payload.TicketId, cancellationToken);
+        if (ticket.TicketType != TicketType.BookingCompletion)
+        {
+            throw new InvalidOperationException("Booking completion approval workflow is valid only for booking completion tickets.");
+        }
+
+        var bookingCompletionWorkflowClient = serviceProvider.GetRequiredService<IBookingCompletionWorkflowClient>();
+        while (payload.CurrentStep != BookingCompletionApprovedWorkflowStep.Completed)
+        {
+            switch (payload.CurrentStep)
+            {
+                case BookingCompletionApprovedWorkflowStep.NotifyBookingService:
+                {
+                    await bookingCompletionWorkflowClient.ApproveCompletionReviewAsync(
+                        new ApproveBookingCompletionReviewWorkflowRequest(
+                            RequireBookingId(ticket.BookingId, nameof(ticket.BookingId)),
+                            ticket.Id,
+                            ticket.LatePenaltyAmount,
+                            RequireField(ticket.Email, nameof(ticket.Email)),
+                            RequireField(ticket.FullName, nameof(ticket.FullName))),
+                        cancellationToken);
+
+                    payload.CurrentStep = BookingCompletionApprovedWorkflowStep.Completed;
+                    message.Payload = TicketWorkflowPayloadSerializer.Serialize(payload);
+                    break;
+                }
+
+                default:
+                    throw new InvalidOperationException(
+                        $"Unsupported booking completion approved workflow step '{payload.CurrentStep}'.");
+            }
+        }
+    }
+
     private async Task ProcessRejectedWorkflowAsync(
         IServiceProvider serviceProvider,
         TicketDbContext db,
@@ -401,6 +456,48 @@ public sealed class TicketWorkflowOutboxDispatcher : BackgroundService
 
                 default:
                     throw new InvalidOperationException($"Unsupported rejected ticket workflow step '{payload.CurrentStep}'.");
+            }
+        }
+    }
+
+    private async Task ProcessBookingCompletionFineIssuedWorkflowAsync(
+        IServiceProvider serviceProvider,
+        TicketDbContext db,
+        TicketWorkflowOutboxMessage message,
+        BookingCompletionFineIssuedWorkflowPayload payload,
+        CancellationToken cancellationToken)
+    {
+        var ticket = await LoadRequiredTicketAsync(db, payload.TicketId, cancellationToken);
+        if (ticket.TicketType != TicketType.BookingCompletion)
+        {
+            throw new InvalidOperationException("Booking completion fine workflow is valid only for booking completion tickets.");
+        }
+
+        var bookingCompletionWorkflowClient = serviceProvider.GetRequiredService<IBookingCompletionWorkflowClient>();
+        while (payload.CurrentStep != BookingCompletionFineIssuedWorkflowStep.Completed)
+        {
+            switch (payload.CurrentStep)
+            {
+                case BookingCompletionFineIssuedWorkflowStep.NotifyBookingService:
+                {
+                    await bookingCompletionWorkflowClient.IssueCompletionFineAsync(
+                        new IssueBookingCompletionFineWorkflowRequest(
+                            RequireBookingId(ticket.BookingId, nameof(ticket.BookingId)),
+                            ticket.Id,
+                            ticket.LatePenaltyAmount,
+                            RequireChargeAmount(ticket.DamageFineAmount, nameof(ticket.DamageFineAmount)),
+                            RequireField(ticket.Email, nameof(ticket.Email)),
+                            RequireField(ticket.FullName, nameof(ticket.FullName))),
+                        cancellationToken);
+
+                    payload.CurrentStep = BookingCompletionFineIssuedWorkflowStep.Completed;
+                    message.Payload = TicketWorkflowPayloadSerializer.Serialize(payload);
+                    break;
+                }
+
+                default:
+                    throw new InvalidOperationException(
+                        $"Unsupported booking completion fine workflow step '{payload.CurrentStep}'.");
             }
         }
     }
@@ -490,6 +587,16 @@ public sealed class TicketWorkflowOutboxDispatcher : BackgroundService
         return value.Value;
     }
 
+    private static int RequireBookingId(int? value, string fieldName)
+    {
+        if (!value.HasValue || value.Value <= 0)
+        {
+            throw new InvalidOperationException($"{fieldName} is required.");
+        }
+
+        return value.Value;
+    }
+
     private static int RequireYear(int? value, string fieldName)
     {
         if (!value.HasValue)
@@ -521,6 +628,26 @@ public sealed class TicketWorkflowOutboxDispatcher : BackgroundService
         if (value.Value > 1_000_000m)
         {
             throw new InvalidOperationException($"{fieldName} must not exceed 1000000.");
+        }
+
+        return decimal.Round(value.Value, 2, MidpointRounding.AwayFromZero);
+    }
+
+    private static decimal RequireChargeAmount(decimal? value, string fieldName)
+    {
+        if (!value.HasValue)
+        {
+            throw new InvalidOperationException($"{fieldName} is required.");
+        }
+
+        if (value.Value <= 0m)
+        {
+            throw new InvalidOperationException($"{fieldName} must be greater than 0.");
+        }
+
+        if (value.Value > 10_000_000m)
+        {
+            throw new InvalidOperationException($"{fieldName} must not exceed 10000000.");
         }
 
         return decimal.Round(value.Value, 2, MidpointRounding.AwayFromZero);

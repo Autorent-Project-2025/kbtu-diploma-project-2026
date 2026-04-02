@@ -255,7 +255,8 @@
                     <li>1. После успешного submit бронь станет `confirmed`.</li>
                     <li>2. `booking-service` положит outbox-событие в оплату.</li>
                     <li>3. `payment-service` начислит партнёру сумму в `pending`.</li>
-                    <li>4. После `completed` эта сумма перейдёт в `available`.</li>
+                    <li>4. После поездки бронь сначала перейдёт в `awaitingReview`.</li>
+                    <li>5. После подтверждения завершения сумма перейдёт в `available`.</li>
                   </ol>
                 </article>
               </aside>
@@ -500,6 +501,8 @@ function getBookingStatusText(status: Booking["status"]): string {
       return "Подтверждено";
     case "active":
       return "Активно";
+    case "awaitingReview":
+      return "На проверке";
     case "completed":
       return "Завершено";
     case "canceled":

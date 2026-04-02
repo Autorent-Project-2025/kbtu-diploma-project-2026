@@ -14,6 +14,9 @@ export interface ClientProfile {
   relatedUserId: string;
   phoneNumber: string;
   avatarUrl: string | null;
+  bookingActionsBlocked: boolean;
+  bookingBlockReason: string | null;
+  bookingBlockedAt: string | null;
 }
 
 export interface UpdateProfilePayload {

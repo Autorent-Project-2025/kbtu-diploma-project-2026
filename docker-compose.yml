@@ -225,8 +225,14 @@ services:
       ConnectionStrings__DbConnection: Host=booking-db;Port=5432;Database=postgres_db;Username=postgres;Password=postgres
       InternalAuth__ApiKey: local-booking-service-key
       CarService__BaseUrl: http://car-service:8080
+      ClientService__BaseUrl: http://client-service:8080
+      ClientService__InternalApiKey: local-client-service-key
+      IdentityService__BaseUrl: http://identity-service:8080
+      IdentityService__InternalApiKey: local-identity-service-key
       PaymentService__BaseUrl: http://payment-service:8080
       PaymentService__InternalApiKey: local-payment-service-key
+      TicketService__BaseUrl: http://ticket-service:8080
+      EmailService__BaseUrl: http://email-service:8080
       RabbitMq__HostName: rabbitmq
       RabbitMq__Port: 5672
       RabbitMq__UserName: ${RABBITMQ_DEFAULT_USER:-autorent}
@@ -563,6 +569,8 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ConnectionStrings__DbConnection: Host=ticket-db;Port=5432;Database=postgres_db;Username=postgres;Password=postgres
+      BookingService__BaseUrl: http://booking-service:8080
+      BookingService__InternalApiKey: local-booking-service-key
       IdentityService__BaseUrl: http://identity-service:8080
       IdentityService__InternalApiKey: local-identity-service-key
       EmailService__BaseUrl: http://email-service:8080

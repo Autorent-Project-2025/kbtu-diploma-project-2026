@@ -1,7 +1,9 @@
 using System.Security.Cryptography;
 using System.Text;
 using BookingService.Application.DTOs.Booking;
+using BookingService.Application.DTOs.Common;
 using BookingService.Api.Options;
+using BookingService.Api.Contracts.Internal;
 using BookingService.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -24,6 +26,24 @@ public sealed class InternalBookingsController : ControllerBase
     {
         _bookingService = bookingService;
         _internalAuthOptions = internalAuthOptions.Value;
+    }
+
+    [AllowAnonymous]
+    [HttpGet("{id:int}")]
+    public async Task<IActionResult> GetById(int id, CancellationToken cancellationToken)
+    {
+        if (!IsAuthorizedInternalRequest())
+        {
+            return Unauthorized(new { error = "Internal API key is invalid." });
+        }
+
+        var booking = await _bookingService.GetBookingById(id, cancellationToken);
+        if (booking is null)
+        {
+            return NotFound(new { error = "Booking not found." });
+        }
+
+        return Ok(booking);
     }
 
     [AllowAnonymous]
@@ -98,6 +118,53 @@ public sealed class InternalBookingsController : ControllerBase
             cancellationToken);
 
         return Ok(payload);
+    }
+
+    [AllowAnonymous]
+    [HttpPost("{id:int}/completion-review/approve")]
+    public async Task<IActionResult> ApproveCompletionReview(
+        int id,
+        [FromBody] ApproveBookingCompletionReviewRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!IsAuthorizedInternalRequest())
+        {
+            return Unauthorized(new { error = "Internal API key is invalid." });
+        }
+
+        await _bookingService.ProcessCompletionReviewApproved(
+            id,
+            request.TicketId,
+            request.LatePenaltyAmount,
+            request.CustomerEmail,
+            request.CustomerFullName,
+            cancellationToken);
+
+        return Ok(new CommonResponseDto { Message = "Booking completion review approved." });
+    }
+
+    [AllowAnonymous]
+    [HttpPost("{id:int}/completion-review/fine-issued")]
+    public async Task<IActionResult> IssueCompletionReviewFine(
+        int id,
+        [FromBody] IssueBookingCompletionFineRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!IsAuthorizedInternalRequest())
+        {
+            return Unauthorized(new { error = "Internal API key is invalid." });
+        }
+
+        await _bookingService.ProcessCompletionReviewFineIssued(
+            id,
+            request.TicketId,
+            request.LatePenaltyAmount,
+            request.DamageFineAmount,
+            request.CustomerEmail,
+            request.CustomerFullName,
+            cancellationToken);
+
+        return Ok(new CommonResponseDto { Message = "Booking completion fine issued." });
     }
 
     private static IReadOnlyCollection<int> ParseIds(string? raw)

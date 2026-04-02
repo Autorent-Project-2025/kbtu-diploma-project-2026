@@ -1,6 +1,8 @@
 import api from "./axios";
 import type {
   Booking,
+  BookingCharge,
+  BookingCompletionSubmissionResult,
   BookingPaymentState,
   BookingPaymentStatus,
   BookingStatus,
@@ -23,6 +25,9 @@ interface BookingApiDto {
   endTime: string;
   priceHour?: number | null;
   totalPrice?: number | null;
+  tripStartedAt?: string | null;
+  tripCompletedAt?: string | null;
+  completionReviewTicketId?: string | null;
   status?: string | null;
 }
 
@@ -47,11 +52,39 @@ interface BookingPaymentStatusApiDto {
   canRetry?: boolean | null;
 }
 
+interface BookingChargeApiDto {
+  id: number;
+  bookingId: number;
+  chargeType?: string | null;
+  amount?: number | null;
+  partnerShareAmount?: number | null;
+  currency?: string | null;
+  status?: string | null;
+  description?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+  paidAt?: string | null;
+  canceledAt?: string | null;
+}
+
+interface BookingCompletionSubmissionApiDto {
+  booking: BookingApiDto;
+  reviewTicketId: string;
+  latePenaltyAmount?: number | null;
+}
+
 function normalizeStatus(value: string | null | undefined): BookingStatus {
   const normalized = (value ?? "").trim().toLowerCase();
   if (normalized === "pending") return "pending";
   if (normalized === "confirmed") return "confirmed";
   if (normalized === "active") return "active";
+  if (
+    normalized === "awaitingreview" ||
+    normalized === "awaiting_review" ||
+    normalized === "awaitingreview"
+  ) {
+    return "awaitingReview";
+  }
   if (normalized === "completed") return "completed";
   return "canceled";
 }
@@ -67,6 +100,9 @@ function mapBooking(dto: BookingApiDto): Booking {
     endDate: dto.endTime,
     price: dto.totalPrice ?? null,
     priceHour: dto.priceHour ?? null,
+    tripStartedAt: dto.tripStartedAt ?? null,
+    tripCompletedAt: dto.tripCompletedAt ?? null,
+    completionReviewTicketId: dto.completionReviewTicketId ?? null,
     status: normalizeStatus(dto.status),
   };
 }
@@ -105,6 +141,33 @@ function mapBookingPaymentStatus(
     paymentExpiresAt: dto.paymentExpiresAt ?? null,
     requiresInput: Boolean(dto.requiresInput),
     canRetry: Boolean(dto.canRetry),
+  };
+}
+
+function mapBookingCharge(dto: BookingChargeApiDto): BookingCharge {
+  return {
+    id: dto.id,
+    bookingId: dto.bookingId,
+    chargeType: dto.chargeType?.trim() || "Unknown",
+    amount: dto.amount ?? 0,
+    partnerShareAmount: dto.partnerShareAmount ?? 0,
+    currency: dto.currency?.trim().toUpperCase() || "KZT",
+    status: dto.status?.trim() || "Pending",
+    description: dto.description ?? null,
+    createdAt: dto.createdAt ?? new Date().toISOString(),
+    updatedAt: dto.updatedAt ?? dto.createdAt ?? new Date().toISOString(),
+    paidAt: dto.paidAt ?? null,
+    canceledAt: dto.canceledAt ?? null,
+  };
+}
+
+function mapBookingCompletionSubmission(
+  dto: BookingCompletionSubmissionApiDto
+): BookingCompletionSubmissionResult {
+  return {
+    booking: mapBooking(dto.booking),
+    reviewTicketId: dto.reviewTicketId,
+    latePenaltyAmount: dto.latePenaltyAmount ?? 0,
   };
 }
 
@@ -184,6 +247,56 @@ export async function createBooking(
 export async function getBooking(bookingId: number): Promise<Booking> {
   const response = await api.get(`/bookings/${bookingId}`);
   return mapBooking(response.data as BookingApiDto);
+}
+
+export async function startBookingTrip(bookingId: number): Promise<void> {
+  await api.post(`/bookings/${bookingId}/start`);
+}
+
+export async function completeBookingTrip(bookingId: number): Promise<void> {
+  await api.post(`/bookings/${bookingId}/complete`);
+}
+
+export async function submitBookingCompletionReview(
+  bookingId: number,
+  files: {
+    completionFrontPhotoFile: File;
+    completionBackPhotoFile: File;
+    completionSideLeftPhotoFile: File;
+    completionSideRightPhotoFile: File;
+    completionInteriorPhotoFile: File;
+  }
+): Promise<BookingCompletionSubmissionResult> {
+  const formData = new FormData();
+  formData.append("completionFrontPhotoFile", files.completionFrontPhotoFile);
+  formData.append("completionBackPhotoFile", files.completionBackPhotoFile);
+  formData.append("completionSideLeftPhotoFile", files.completionSideLeftPhotoFile);
+  formData.append("completionSideRightPhotoFile", files.completionSideRightPhotoFile);
+  formData.append("completionInteriorPhotoFile", files.completionInteriorPhotoFile);
+
+  const response = await api.post(`/bookings/${bookingId}/complete-review`, formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
+
+  return mapBookingCompletionSubmission(
+    response.data as BookingCompletionSubmissionApiDto
+  );
+}
+
+export async function getBookingCharges(bookingId: number): Promise<BookingCharge[]> {
+  const response = await api.get(`/bookings/${bookingId}/charges`);
+  const payload = Array.isArray(response.data) ? response.data : [];
+  return payload.map((item) => mapBookingCharge(item as BookingChargeApiDto));
+}
+
+export async function payBookingCharge(
+  bookingId: number,
+  chargeId: number
+): Promise<BookingCharge> {
+  const response = await api.post(`/bookings/${bookingId}/charges/${chargeId}/pay`);
+  return mapBookingCharge(response.data as BookingChargeApiDto);
 }
 
 export async function startBookingPayment(

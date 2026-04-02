@@ -43,6 +43,7 @@ public sealed class CreateTicketCommandHandler
         string? ownershipDocumentFileName = null;
         Guid? relatedPartnerUserId = null;
         IReadOnlyCollection<PartnerCarTicketImageData>? carImages = null;
+        IReadOnlyCollection<BookingCompletionTicketPhotoData>? completionPhotos = null;
 
         if (command.TicketType == TicketType.PartnerCar)
         {
@@ -61,6 +62,10 @@ public sealed class CreateTicketCommandHandler
                 command.AuthorizationHeader!,
                 cancellationToken);
         }
+        else if (command.TicketType == TicketType.BookingCompletion)
+        {
+            completionPhotos = await UploadBookingCompletionPhotosAsync(command, cancellationToken);
+        }
         else
         {
             identityDocumentFileName = await _fileStorageClient.UploadFileAsync(
@@ -75,29 +80,44 @@ public sealed class CreateTicketCommandHandler
             }
         }
 
-        var ticket = new Ticket(
-            Guid.NewGuid(),
-            command.TicketType,
-            firstName,
-            lastName,
-            email,
-            command.BirthDate,
-            phoneNumber,
-            identityDocumentFileName,
-            driverLicenseFileName,
-            command.AvatarUrl,
-            command.CompanyName,
-            command.ContactEmail,
-            relatedPartnerUserId,
-            command.CarBrand,
-            command.CarModel,
-            command.CarYear,
-            command.LicensePlate,
-            command.PriceHour,
-            command.PriceDay,
-            ownershipDocumentFileName,
-            carImages,
-            DateTime.UtcNow);
+        var ticket = command.TicketType == TicketType.BookingCompletion
+            ? Ticket.CreateBookingCompletion(
+                Guid.NewGuid(),
+                firstName,
+                lastName,
+                email,
+                phoneNumber,
+                command.BookingId ?? 0,
+                command.PlannedStartTime ?? default,
+                command.PlannedEndTime ?? default,
+                command.TripStartedAt ?? default,
+                command.TripCompletedAt ?? default,
+                command.LatePenaltyAmount,
+                completionPhotos ?? [],
+                DateTime.UtcNow)
+            : new Ticket(
+                Guid.NewGuid(),
+                command.TicketType,
+                firstName,
+                lastName,
+                email,
+                command.BirthDate,
+                phoneNumber,
+                identityDocumentFileName,
+                driverLicenseFileName,
+                command.AvatarUrl,
+                command.CompanyName,
+                command.ContactEmail,
+                relatedPartnerUserId,
+                command.CarBrand,
+                command.CarModel,
+                command.CarYear,
+                command.LicensePlate,
+                command.PriceHour,
+                command.PriceDay,
+                ownershipDocumentFileName,
+                carImages,
+                DateTime.UtcNow);
 
         await _ticketRepository.AddAsync(ticket, cancellationToken);
         await _ticketUnitOfWork.SaveChangesAsync(cancellationToken);
@@ -142,6 +162,40 @@ public sealed class CreateTicketCommandHandler
         return uploadedImages;
     }
 
+    private async Task<IReadOnlyCollection<BookingCompletionTicketPhotoData>> UploadBookingCompletionPhotosAsync(
+        CreateTicketCommand command,
+        CancellationToken cancellationToken)
+    {
+        return new[]
+        {
+            new BookingCompletionTicketPhotoData
+            {
+                Slot = "front",
+                FileName = await _fileStorageClient.UploadFileAsync(command.CompletionFrontPhotoFile!, cancellationToken)
+            },
+            new BookingCompletionTicketPhotoData
+            {
+                Slot = "back",
+                FileName = await _fileStorageClient.UploadFileAsync(command.CompletionBackPhotoFile!, cancellationToken)
+            },
+            new BookingCompletionTicketPhotoData
+            {
+                Slot = "side_left",
+                FileName = await _fileStorageClient.UploadFileAsync(command.CompletionSideLeftPhotoFile!, cancellationToken)
+            },
+            new BookingCompletionTicketPhotoData
+            {
+                Slot = "side_right",
+                FileName = await _fileStorageClient.UploadFileAsync(command.CompletionSideRightPhotoFile!, cancellationToken)
+            },
+            new BookingCompletionTicketPhotoData
+            {
+                Slot = "interior",
+                FileName = await _fileStorageClient.UploadFileAsync(command.CompletionInteriorPhotoFile!, cancellationToken)
+            }
+        };
+    }
+
     private static void Validate(CreateTicketCommand command)
     {
         if (string.IsNullOrWhiteSpace(command.Email))
@@ -149,9 +203,75 @@ public sealed class CreateTicketCommandHandler
             throw new ValidationException("Email is required.");
         }
 
-        if (command.TicketType is not TicketType.Client and not TicketType.Partner and not TicketType.PartnerCar)
+        if (command.TicketType is not TicketType.Client and not TicketType.Partner and not TicketType.PartnerCar and not TicketType.BookingCompletion)
         {
             throw new ValidationException("Ticket type is invalid.");
+        }
+
+        if (command.TicketType == TicketType.BookingCompletion)
+        {
+            if (string.IsNullOrWhiteSpace(command.FirstName))
+            {
+                throw new ValidationException("First name is required.");
+            }
+
+            if (string.IsNullOrWhiteSpace(command.LastName))
+            {
+                throw new ValidationException("Last name is required.");
+            }
+
+            if (string.IsNullOrWhiteSpace(command.PhoneNumber))
+            {
+                throw new ValidationException("Phone number is required.");
+            }
+
+            if (!command.BookingId.HasValue || command.BookingId.Value <= 0)
+            {
+                throw new ValidationException("BookingId is required.");
+            }
+
+            if (!command.PlannedStartTime.HasValue || !command.PlannedEndTime.HasValue)
+            {
+                throw new ValidationException("Planned start and end times are required.");
+            }
+
+            if (!command.TripStartedAt.HasValue || !command.TripCompletedAt.HasValue)
+            {
+                throw new ValidationException("Trip started and completed timestamps are required.");
+            }
+
+            if (command.PlannedEndTime.Value < command.PlannedStartTime.Value)
+            {
+                throw new ValidationException("PlannedEndTime must be greater than or equal to PlannedStartTime.");
+            }
+
+            if (command.TripStartedAt.Value < command.PlannedStartTime.Value.AddMinutes(-15))
+            {
+                throw new ValidationException("TripStartedAt cannot be earlier than 15 minutes before PlannedStartTime.");
+            }
+
+            if (command.TripCompletedAt.Value < command.TripStartedAt.Value)
+            {
+                throw new ValidationException("TripCompletedAt cannot be earlier than TripStartedAt.");
+            }
+
+            ValidateOptionalFine(command.LatePenaltyAmount, nameof(command.LatePenaltyAmount));
+
+            if (command.CompletionFrontPhotoFile is null ||
+                command.CompletionBackPhotoFile is null ||
+                command.CompletionSideLeftPhotoFile is null ||
+                command.CompletionSideRightPhotoFile is null ||
+                command.CompletionInteriorPhotoFile is null)
+            {
+                throw new ValidationException("All 5 completion photos are required.");
+            }
+
+            ValidateImage(command.CompletionFrontPhotoFile, nameof(command.CompletionFrontPhotoFile));
+            ValidateImage(command.CompletionBackPhotoFile, nameof(command.CompletionBackPhotoFile));
+            ValidateImage(command.CompletionSideLeftPhotoFile, nameof(command.CompletionSideLeftPhotoFile));
+            ValidateImage(command.CompletionSideRightPhotoFile, nameof(command.CompletionSideRightPhotoFile));
+            ValidateImage(command.CompletionInteriorPhotoFile, nameof(command.CompletionInteriorPhotoFile));
+            return;
         }
 
         if (command.TicketType == TicketType.PartnerCar)
@@ -333,6 +453,24 @@ public sealed class CreateTicketCommandHandler
         if (value > 1_000_000m)
         {
             throw new ValidationException($"{fieldName} must not exceed 1000000.");
+        }
+    }
+
+    private static void ValidateOptionalFine(decimal? value, string fieldName)
+    {
+        if (!value.HasValue)
+        {
+            return;
+        }
+
+        if (value.Value < 0m)
+        {
+            throw new ValidationException($"{fieldName} cannot be negative.");
+        }
+
+        if (value.Value > 10_000_000m)
+        {
+            throw new ValidationException($"{fieldName} must not exceed 10000000.");
         }
     }
 }

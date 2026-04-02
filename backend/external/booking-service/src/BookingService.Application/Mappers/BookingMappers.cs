@@ -19,6 +19,9 @@ namespace BookingService.Application.Mappers
             PriceHour = booking.PriceHour,
             TotalPrice = booking.TotalPrice,
             CreatedAt = booking.CreatedAt,
+            TripStartedAt = booking.TripStartedAt,
+            TripCompletedAt = booking.TripCompletedAt,
+            CompletionReviewTicketId = booking.CompletionReviewTicketId,
             Status = booking.Status.ToString().ToLowerInvariant()
         };
 
@@ -42,6 +45,9 @@ namespace BookingService.Application.Mappers
                 PriceHour = booking.PriceHour,
                 TotalPrice = booking.TotalPrice,
                 CreatedAt = booking.CreatedAt,
+                TripStartedAt = booking.TripStartedAt,
+                TripCompletedAt = booking.TripCompletedAt,
+                CompletionReviewTicketId = booking.CompletionReviewTicketId,
                 Status = booking.Status.ToString().ToLowerInvariant()
             };
         }

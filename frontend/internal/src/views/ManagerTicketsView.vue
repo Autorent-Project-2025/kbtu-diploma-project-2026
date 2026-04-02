@@ -380,6 +380,29 @@
                     Открыть
                   </button>
                 </li>
+                <li
+                  v-for="photo in completionTicketPhotos"
+                  :key="photo.slot"
+                  class="flex items-center justify-between gap-4 py-3"
+                >
+                  <div>
+                    <p
+                      class="font-semibold text-sm text-gray-900 dark:text-white"
+                    >
+                      Фото {{ completionPhotoLabel(photo.slot) }}
+                    </p>
+                    <p class="text-xs text-gray-400 dark:text-gray-500">
+                      {{ photo.fileName }}
+                    </p>
+                  </div>
+                  <button
+                    @click="openDocument(photo.slot)"
+                    :disabled="actionLoading"
+                    class="px-4 py-2 rounded-xl border border-gray-300 dark:border-gray-700 text-sm font-semibold text-gray-700 dark:text-gray-300 hover:border-emerald-500 transition-colors disabled:opacity-60"
+                  >
+                    Открыть
+                  </button>
+                </li>
               </ul>
               <p v-else class="text-sm text-gray-400 dark:text-gray-500">
                 К заявке не прикреплены документы.
@@ -447,11 +470,11 @@
                   Решение
                 </h3>
                 <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                  Причину нужно указать только для отказа.
+                  Причину нужно указать только для отказа. Для завершения поездки вместо отказа можно выставить штраф.
                 </p>
               </div>
 
-              <div class="space-y-1.5">
+              <div v-if="!isBookingCompletionTicket(selectedTicket)" class="space-y-1.5">
                 <label
                   for="rejectReason"
                   class="block text-xs font-bold uppercase tracking-[0.1em] text-gray-500 dark:text-gray-400"
@@ -465,6 +488,25 @@
                 />
               </div>
 
+              <div
+                v-else
+                class="space-y-1.5"
+              >
+                <label
+                  for="fineAmount"
+                  class="block text-xs font-bold uppercase tracking-[0.1em] text-gray-500 dark:text-gray-400"
+                >Сумма штрафа</label>
+                <input
+                  id="fineAmount"
+                  v-model="fineAmount"
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  placeholder="Например 15000"
+                  class="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-colors placeholder-gray-400"
+                />
+              </div>
+
               <div class="flex flex-col gap-3">
                 <button
                   @click="approveSelected"
@@ -474,11 +516,17 @@
                   {{ actionLoading ? "Обработка..." : "✓ Одобрить" }}
                 </button>
                 <button
-                  @click="rejectSelected"
+                  @click="isBookingCompletionTicket(selectedTicket) ? issueFineSelected() : rejectSelected()"
                   :disabled="actionLoading"
                   class="w-full px-5 py-3 rounded-2xl border border-red-300 dark:border-red-700 text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-60 disabled:cursor-not-allowed font-bold transition-colors"
                 >
-                  {{ actionLoading ? "Обработка..." : "✕ Отклонить" }}
+                  {{
+                    actionLoading
+                      ? "Обработка..."
+                      : isBookingCompletionTicket(selectedTicket)
+                        ? "Выставить штраф"
+                        : "✕ Отклонить"
+                  }}
                 </button>
               </div>
             </div>
@@ -496,11 +544,14 @@ import {
   getPendingTickets,
   getTicketById,
   getTicketDocumentTemporaryLink,
+  issueTicketFine,
   rejectTicket,
   type PartnerCarReviewPayload,
 } from "../api/tickets";
 import { useToast } from "../composables/useToast";
 import type {
+  BookingCompletionTicketData,
+  BookingCompletionTicketPhotoData,
   PartnerCarTicketData,
   PartnerCarTicketImageData,
   Ticket,
@@ -510,6 +561,7 @@ const tickets = ref<Ticket[]>([]);
 const selectedTicket = ref<Ticket | null>(null);
 const selectedTicketId = ref<string>("");
 const rejectReason = ref("");
+const fineAmount = ref("");
 const loading = ref(false);
 const actionLoading = ref(false);
 const { success: toastSuccess, error: toastError } = useToast();
@@ -573,16 +625,38 @@ const partnerCarImages = computed<PartnerCarTicketImageData[]>(() => {
   return [];
 });
 
+const completionTicketPhotos = computed<BookingCompletionTicketPhotoData[]>(() => {
+  if (!selectedTicket.value || !isBookingCompletionTicket(selectedTicket.value)) {
+    return [];
+  }
+
+  if (
+    Array.isArray(selectedTicket.value.completionPhotos) &&
+    selectedTicket.value.completionPhotos.length > 0
+  ) {
+    return selectedTicket.value.completionPhotos;
+  }
+
+  const data = selectedTicket.value.data;
+  if (data && (data as BookingCompletionTicketData).$type === "booking-completion") {
+    return (data as BookingCompletionTicketData).completionPhotos ?? [];
+  }
+
+  return [];
+});
+
 const ticketStats = computed(() => {
   let client = 0,
     partner = 0,
-    partnerCar = 0;
+    partnerCar = 0,
+    bookingCompletion = 0;
   for (const t of tickets.value) {
     if (t.ticketType === 2) partner++;
     else if (t.ticketType === 3) partnerCar++;
+    else if (t.ticketType === 4) bookingCompletion++;
     else client++;
   }
-  return { client, partner, partnerCar };
+  return { client, partner, partnerCar, bookingCompletion };
 });
 
 const statsStrip = computed(() => [
@@ -590,6 +664,7 @@ const statsStrip = computed(() => [
   { label: "Клиенты", value: ticketStats.value.client },
   { label: "Партнёры", value: ticketStats.value.partner },
   { label: "Авто", value: ticketStats.value.partnerCar },
+  { label: "Поездки", value: ticketStats.value.bookingCompletion },
 ]);
 
 const hasSelectedDocuments = computed(() => {
@@ -599,7 +674,8 @@ const hasSelectedDocuments = computed(() => {
     (isClientTicket(selectedTicket.value) &&
       selectedTicket.value.driverLicenseFileName) ||
     (isPartnerCarTicket(selectedTicket.value) &&
-      selectedTicket.value.ownershipDocumentFileName),
+      selectedTicket.value.ownershipDocumentFileName) ||
+    completionTicketPhotos.value.length > 0,
   );
 });
 
@@ -617,6 +693,7 @@ const selectedDocumentCount = computed(() => {
     selectedTicket.value.ownershipDocumentFileName
   )
     count++;
+  count += completionTicketPhotos.value.length;
   return count;
 });
 
@@ -632,6 +709,24 @@ const summaryRows = computed(() => {
       label: "Фотографии",
       value: String(partnerCarImages.value.length),
     });
+  if (isBookingCompletionTicket(selectedTicket.value)) {
+    rows.push({
+      label: "Фото после поездки",
+      value: String(completionTicketPhotos.value.length),
+    });
+    rows.push({
+      label: "Пеня за просрочку",
+      value: selectedTicket.value.latePenaltyAmount
+        ? `${selectedTicket.value.latePenaltyAmount.toFixed(2)} KZT`
+        : "Нет",
+    });
+    rows.push({
+      label: "Штраф за повреждение",
+      value: selectedTicket.value.damageFineAmount
+        ? `${selectedTicket.value.damageFineAmount.toFixed(2)} KZT`
+        : "Не назначен",
+    });
+  }
   return rows;
 });
 
@@ -639,12 +734,14 @@ function statusLabel(status: number) {
   if (status === 1) return "На рассмотрении";
   if (status === 2) return "Одобрена";
   if (status === 3) return "Отклонена";
+  if (status === 4) return "Выставлен штраф";
   return "Неизвестно";
 }
 
 function ticketTypeLabel(ticketType: number) {
   if (ticketType === 2) return "Партнёр";
   if (ticketType === 3) return "Авто партнёра";
+  if (ticketType === 4) return "Завершение поездки";
   return "Клиент";
 }
 
@@ -653,6 +750,8 @@ function getTicketTypeBadgeClass(ticketType: number) {
     return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300";
   if (ticketType === 3)
     return "bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-300";
+  if (ticketType === 4)
+    return "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300";
   return "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300";
 }
 
@@ -670,6 +769,18 @@ function isPartnerTicket(ticket: Ticket) {
 }
 function isPartnerCarTicket(ticket: Ticket) {
   return ticket.ticketType === 3;
+}
+function isBookingCompletionTicket(ticket: Ticket | null | undefined) {
+  return ticket?.ticketType === 4;
+}
+
+function completionPhotoLabel(slot: string) {
+  if (slot === "front") return "спереди";
+  if (slot === "back") return "сзади";
+  if (slot === "side_left") return "сбоку слева";
+  if (slot === "side_right") return "сбоку справа";
+  if (slot === "interior") return "из салона";
+  return slot;
 }
 
 function formatDate(value: string) {
@@ -839,13 +950,42 @@ async function rejectSelected() {
   }
 }
 
+async function issueFineSelected() {
+  if (!selectedTicket.value || actionLoading.value) return;
+  const amount = Number(fineAmount.value);
+  if (!Number.isFinite(amount) || amount <= 0) {
+    toastError("Укажите корректную сумму штрафа.");
+    return;
+  }
+
+  actionLoading.value = true;
+  try {
+    await issueTicketFine(selectedTicket.value.id, amount);
+    toastSuccess("Штраф выставлен");
+    fineAmount.value = "";
+    await loadPending();
+  } catch (e: any) {
+    toastError(e?.response?.data?.error || "Не удалось выставить штраф.");
+  } finally {
+    actionLoading.value = false;
+  }
+}
+
 function openImage(url: string) {
   if (!url) return;
   window.open(url, "_blank", "noopener,noreferrer");
 }
 
 async function openDocument(
-  documentType: "identity" | "license" | "ownership",
+  documentType:
+    | "identity"
+    | "license"
+    | "ownership"
+    | "front"
+    | "back"
+    | "side_left"
+    | "side_right"
+    | "interior",
 ) {
   if (!selectedTicket.value || actionLoading.value) return;
   actionLoading.value = true;

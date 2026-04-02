@@ -5,6 +5,7 @@ namespace BookingService.Domain.Enums
         Pending,
         Confirmed,
         Active,
+        AwaitingReview,
         Completed,
         Canceled
     }

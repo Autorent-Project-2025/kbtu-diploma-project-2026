@@ -224,6 +224,77 @@
                   <span>Оплатить</span>
                 </router-link>
 
+                <button
+                  v-if="canStartTripAction(b)"
+                  @click="handleStartTrip(b)"
+                  :disabled="startingId === b.id"
+                  class="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-400 text-white font-semibold rounded-xl transition-all hover:shadow-lg active:scale-95 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  <svg
+                    v-if="startingId !== b.id"
+                    class="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M14.752 11.168l-5.197-3.466A1 1 0 008 8.535v6.93a1 1 0 001.555.832l5.197-3.466a1 1 0 000-1.664z"
+                    />
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
+                  </svg>
+                  <span>{{ startingId === b.id ? "Запускаем..." : "Начать поездку" }}</span>
+                </button>
+
+                <router-link
+                  v-if="canCompleteTripAction(b)"
+                  :to="`/bookings/${b.id}/complete`"
+                  class="px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-xl transition-all hover:shadow-lg active:scale-95 flex items-center justify-center gap-2"
+                >
+                  <svg
+                    class="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M5 13l4 4L19 7"
+                    />
+                  </svg>
+                  <span>Завершить поездку</span>
+                </router-link>
+
+                <router-link
+                  v-if="canOpenCompletionDetails(b)"
+                  :to="`/bookings/${b.id}/complete`"
+                  class="px-6 py-3 bg-violet-600 hover:bg-violet-700 text-white font-semibold rounded-xl transition-all hover:shadow-lg active:scale-95 flex items-center justify-center gap-2"
+                >
+                  <svg
+                    class="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                    />
+                  </svg>
+                  <span>{{ b.status === "completed" ? "Детали завершения" : "Статус завершения" }}</span>
+                </router-link>
+
                 <!-- Cancel Button -->
                 <button
                   v-if="canCancel(b)"
@@ -324,13 +395,16 @@
 
 <script setup lang="ts">
 import { onMounted, ref, computed } from "vue";
-import { getMyBookings, cancelBooking } from "../api/booking";
+import { getMyBookings, cancelBooking, startBookingTrip } from "../api/booking";
 import type { Booking } from "../types/Booking";
 import {
   computeBookingStatus,
   canCancelBooking,
+  canCompleteTrip,
+  canStartTrip,
   formatBookingDate,
   getBookingDuration,
+  hasCompletionReviewDetails,
 } from "../utils/bookingUtils";
 import { useToast } from "../composables/useToast";
 import CancelBookingModal from "../components/CancelBookingModal.vue";
@@ -341,9 +415,16 @@ interface BookingWithComputedStatus extends Booking {
 
 const bookings = ref<BookingWithComputedStatus[]>([]);
 const currentFilter = ref<
-  "all" | "paymentPending" | "upcoming" | "active" | "completed" | "canceled"
+  | "all"
+  | "paymentPending"
+  | "upcoming"
+  | "active"
+  | "awaitingReview"
+  | "completed"
+  | "canceled"
 >("all");
 const cancelingId = ref<number | null>(null);
+const startingId = ref<number | null>(null);
 const bookingToCancel = ref<BookingWithComputedStatus | null>(null);
 const showCancelModal = ref(false);
 const { success, error } = useToast();
@@ -359,6 +440,9 @@ const filters = computed(() => {
   ).length;
   const active = bookings.value.filter(
     (b) => b.computedStatus === "active"
+  ).length;
+  const awaitingReview = bookings.value.filter(
+    (b) => b.computedStatus === "awaitingReview"
   ).length;
   const completed = bookings.value.filter(
     (b) => b.computedStatus === "completed"
@@ -376,6 +460,11 @@ const filters = computed(() => {
     },
     { label: "Предстоящие", value: "upcoming" as const, count: upcoming },
     { label: "Активные", value: "active" as const, count: active },
+    {
+      label: "На проверке",
+      value: "awaitingReview" as const,
+      count: awaitingReview,
+    },
     { label: "Завершенные", value: "completed" as const, count: completed },
     { label: "Отмененные", value: "canceled" as const, count: canceled },
   ];
@@ -439,6 +528,22 @@ function canPay(booking: BookingWithComputedStatus): boolean {
   return booking.computedStatus === "paymentPending";
 }
 
+function canStartTripAction(booking: BookingWithComputedStatus): boolean {
+  return canStartTrip(booking);
+}
+
+function canCompleteTripAction(booking: BookingWithComputedStatus): boolean {
+  return canCompleteTrip(booking);
+}
+
+function canOpenCompletionDetails(booking: BookingWithComputedStatus): boolean {
+  if (booking.status === "active") {
+    return false;
+  }
+
+  return hasCompletionReviewDetails(booking);
+}
+
 function confirmCancel(booking: BookingWithComputedStatus) {
   bookingToCancel.value = booking;
   showCancelModal.value = true;
@@ -464,9 +569,32 @@ async function handleCancelConfirm() {
     await loadBookings(); // Перезагружаем список
   } catch (e) {
     console.error("Failed to cancel booking", e);
-    error("Не удалось отменить бронирование");
+    error(
+      (e as any)?.response?.data?.detail ||
+        (e as any)?.response?.data?.error ||
+        "Не удалось отменить бронирование"
+    );
   } finally {
     cancelingId.value = null;
+  }
+}
+
+async function handleStartTrip(booking: BookingWithComputedStatus) {
+  startingId.value = booking.id;
+
+  try {
+    await startBookingTrip(booking.id);
+    success("Поездка начата");
+    await loadBookings();
+  } catch (e) {
+    console.error("Failed to start trip", e);
+    error(
+      (e as any)?.response?.data?.detail ||
+        (e as any)?.response?.data?.error ||
+        "Не удалось начать поездку"
+    );
+  } finally {
+    startingId.value = null;
   }
 }
 
@@ -478,6 +606,8 @@ function getStatusClass(status: ReturnType<typeof computeBookingStatus>) {
       return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300";
     case "active":
       return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300";
+    case "awaitingReview":
+      return "bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-300";
     case "completed":
       return "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300";
     case "canceled":
@@ -497,6 +627,8 @@ function getStatusIndicatorClass(
       return "bg-blue-500";
     case "active":
       return "bg-green-500";
+    case "awaitingReview":
+      return "bg-violet-500";
     case "completed":
       return "bg-gray-500";
     case "canceled":
@@ -514,6 +646,8 @@ function getStatusDotClass(status: ReturnType<typeof computeBookingStatus>) {
       return "bg-blue-600 dark:bg-blue-400";
     case "active":
       return "bg-green-600 dark:bg-green-400";
+    case "awaitingReview":
+      return "bg-violet-600 dark:bg-violet-400";
     case "completed":
       return "bg-gray-600 dark:bg-gray-400";
     case "canceled":
@@ -531,6 +665,8 @@ function getStatusText(status: ReturnType<typeof computeBookingStatus>) {
       return "Предстоящее";
     case "active":
       return "Активное";
+    case "awaitingReview":
+      return "На проверке";
     case "completed":
       return "Завершено";
     case "canceled":

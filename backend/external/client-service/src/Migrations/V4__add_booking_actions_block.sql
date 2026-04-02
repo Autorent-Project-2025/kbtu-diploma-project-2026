@@ -1,0 +1,4 @@
+ALTER TABLE clients
+    ADD COLUMN IF NOT EXISTS booking_actions_blocked BOOLEAN NOT NULL DEFAULT FALSE,
+    ADD COLUMN IF NOT EXISTS booking_block_reason VARCHAR(512),
+    ADD COLUMN IF NOT EXISTS booking_blocked_at TIMESTAMPTZ;

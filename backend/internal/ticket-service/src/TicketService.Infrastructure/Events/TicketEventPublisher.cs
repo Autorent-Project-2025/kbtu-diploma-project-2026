@@ -20,6 +20,31 @@ public sealed class TicketEventPublisher : ITicketEventPublisher
     {
         ArgumentNullException.ThrowIfNull(ticketApprovedEvent);
 
+        if (ticketApprovedEvent.TicketType == TicketType.BookingCompletion)
+        {
+            var bookingCompletionEventKey = $"ticket:{ticketApprovedEvent.TicketId}:booking-completion-approved";
+            if (_ticketDbContext.TicketWorkflowOutboxMessages.Local.Any(message => message.EventKey == bookingCompletionEventKey))
+            {
+                return Task.CompletedTask;
+            }
+
+            _ticketDbContext.TicketWorkflowOutboxMessages.Add(new TicketWorkflowOutboxMessage
+            {
+                TicketId = ticketApprovedEvent.TicketId,
+                EventKey = bookingCompletionEventKey,
+                EventType = TicketWorkflowOutboxEventTypes.BookingCompletionApproved,
+                Payload = TicketWorkflowPayloadSerializer.Serialize(new BookingCompletionApprovedWorkflowPayload
+                {
+                    TicketId = ticketApprovedEvent.TicketId,
+                    CurrentStep = BookingCompletionApprovedWorkflowStep.NotifyBookingService
+                }),
+                CreatedAt = DateTimeOffset.UtcNow,
+                NextAttemptAt = DateTimeOffset.UtcNow
+            });
+
+            return Task.CompletedTask;
+        }
+
         var eventKey = $"ticket:{ticketApprovedEvent.TicketId}:approved";
         if (_ticketDbContext.TicketWorkflowOutboxMessages.Local.Any(message => message.EventKey == eventKey))
         {
@@ -45,9 +70,46 @@ public sealed class TicketEventPublisher : ITicketEventPublisher
         return Task.CompletedTask;
     }
 
+    public Task PublishFineIssuedAsync(TicketFineIssuedEvent ticketFineIssuedEvent, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(ticketFineIssuedEvent);
+
+        if (ticketFineIssuedEvent.TicketType != TicketType.BookingCompletion)
+        {
+            return Task.CompletedTask;
+        }
+
+        var eventKey = $"ticket:{ticketFineIssuedEvent.TicketId}:booking-completion-fine-issued";
+        if (_ticketDbContext.TicketWorkflowOutboxMessages.Local.Any(message => message.EventKey == eventKey))
+        {
+            return Task.CompletedTask;
+        }
+
+        _ticketDbContext.TicketWorkflowOutboxMessages.Add(new TicketWorkflowOutboxMessage
+        {
+            TicketId = ticketFineIssuedEvent.TicketId,
+            EventKey = eventKey,
+            EventType = TicketWorkflowOutboxEventTypes.BookingCompletionFineIssued,
+            Payload = TicketWorkflowPayloadSerializer.Serialize(new BookingCompletionFineIssuedWorkflowPayload
+            {
+                TicketId = ticketFineIssuedEvent.TicketId,
+                CurrentStep = BookingCompletionFineIssuedWorkflowStep.NotifyBookingService
+            }),
+            CreatedAt = DateTimeOffset.UtcNow,
+            NextAttemptAt = DateTimeOffset.UtcNow
+        });
+
+        return Task.CompletedTask;
+    }
+
     public Task PublishRejectedAsync(TicketRejectedEvent ticketRejectedEvent, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(ticketRejectedEvent);
+
+        if (ticketRejectedEvent.TicketType == TicketType.BookingCompletion)
+        {
+            return Task.CompletedTask;
+        }
 
         var eventKey = $"ticket:{ticketRejectedEvent.TicketId}:rejected";
         if (_ticketDbContext.TicketWorkflowOutboxMessages.Local.Any(message => message.EventKey == eventKey))

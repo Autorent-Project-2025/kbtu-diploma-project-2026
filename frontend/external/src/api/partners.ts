@@ -50,6 +50,13 @@ function normalizeBookingStatus(value: string | null | undefined): BookingStatus
   if (normalized === "pending") return "pending";
   if (normalized === "confirmed") return "confirmed";
   if (normalized === "active") return "active";
+  if (
+    normalized === "awaitingreview" ||
+    normalized === "awaiting_review" ||
+    normalized === "awaitingreview"
+  ) {
+    return "awaitingReview";
+  }
   if (normalized === "completed") return "completed";
   return "canceled";
 }
