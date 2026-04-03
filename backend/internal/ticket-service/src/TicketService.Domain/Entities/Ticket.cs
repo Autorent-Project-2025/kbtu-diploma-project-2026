@@ -26,8 +26,6 @@ public sealed class Ticket
     public string? CarModel => Data is PartnerCarTicketData partnerCarData ? partnerCarData.CarModel : null;
     public int? CarYear => Data is PartnerCarTicketData partnerCarData ? partnerCarData.CarYear : null;
     public string? LicensePlate => Data is PartnerCarTicketData partnerCarData ? partnerCarData.LicensePlate : null;
-    public decimal? PriceHour => Data is PartnerCarTicketData partnerCarData ? partnerCarData.PriceHour : null;
-    public decimal? PriceDay => Data is PartnerCarTicketData partnerCarData ? partnerCarData.PriceDay : null;
     public string? OwnershipDocumentFileName => Data is PartnerCarTicketData partnerCarData ? partnerCarData.OwnershipDocumentFileName : null;
     public IReadOnlyCollection<PartnerCarTicketImageData> CarImages => Data is PartnerCarTicketData partnerCarData
         ? partnerCarData.CarImages
@@ -66,8 +64,6 @@ public sealed class Ticket
         string? carModel,
         int? carYear,
         string? licensePlate,
-        decimal? priceHour,
-        decimal? priceDay,
         string? ownershipDocumentFileName,
         IReadOnlyCollection<PartnerCarTicketImageData>? carImages,
         DateTime createdAt)
@@ -93,8 +89,6 @@ public sealed class Ticket
             carModel,
             carYear,
             licensePlate,
-            priceHour,
-            priceDay,
             ownershipDocumentFileName,
             carImages,
             Email);
@@ -153,8 +147,6 @@ public sealed class Ticket
         string? carModel,
         int? carYear,
         string? licensePlate,
-        decimal? priceHour,
-        decimal? priceDay,
         string? email)
     {
         EnsurePendingStatus();
@@ -168,9 +160,7 @@ public sealed class Ticket
             carBrand is not null ||
             carModel is not null ||
             carYear is not null ||
-            licensePlate is not null ||
-            priceHour is not null ||
-            priceDay is not null;
+            licensePlate is not null;
         if (shouldUpdateData)
         {
             Data = partnerCarData with
@@ -178,9 +168,7 @@ public sealed class Ticket
                 CarBrand = carBrand is null ? partnerCarData.CarBrand : NormalizeCarBrand(carBrand),
                 CarModel = carModel is null ? partnerCarData.CarModel : NormalizeCarModel(carModel),
                 CarYear = carYear is null ? partnerCarData.CarYear : NormalizeCarYear(carYear),
-                LicensePlate = licensePlate is null ? partnerCarData.LicensePlate : NormalizeLicensePlate(licensePlate),
-                PriceHour = priceHour is null ? partnerCarData.PriceHour : NormalizePrice(priceHour, nameof(priceHour)),
-                PriceDay = priceDay is null ? partnerCarData.PriceDay : NormalizePrice(priceDay, nameof(priceDay))
+                LicensePlate = licensePlate is null ? partnerCarData.LicensePlate : NormalizeLicensePlate(licensePlate)
             };
         }
 
@@ -281,8 +269,6 @@ public sealed class Ticket
         string? carModel,
         int? carYear,
         string? licensePlate,
-        decimal? priceHour,
-        decimal? priceDay,
         string? ownershipDocumentFileName,
         IReadOnlyCollection<PartnerCarTicketImageData>? carImages,
         string normalizedEmail)
@@ -343,8 +329,6 @@ public sealed class Ticket
             CarModel = NormalizeCarModel(carModel),
             CarYear = NormalizeCarYear(carYear),
             LicensePlate = NormalizeLicensePlate(licensePlate),
-            PriceHour = NormalizePrice(priceHour, nameof(priceHour)),
-            PriceDay = NormalizePrice(priceDay, nameof(priceDay)),
             OwnershipDocumentFileName = NormalizeOwnershipDocumentFileName(ownershipDocumentFileName),
             CarImages = NormalizePartnerCarImages(carImages),
             DecisionReason = null,

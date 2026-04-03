@@ -22,7 +22,7 @@ namespace BookingService.Infrastructure.Services
         private static readonly SemaphoreSlim InMemoryCreateLock = new(1, 1);
 
         private readonly ApplicationDbContext _db;
-        private readonly IPartnerCarReadClient _partnerCarReadClient;
+        private readonly IDynamicPricingService _dynamicPricingService;
         private readonly IPaymentSyncClient _paymentSyncClient;
         private readonly IClientBookingAccessClient _clientBookingAccessClient;
         private readonly IIdentityUserReadClient _identityUserReadClient;
@@ -34,7 +34,7 @@ namespace BookingService.Infrastructure.Services
 
         public BookingService(
             ApplicationDbContext db,
-            IPartnerCarReadClient partnerCarReadClient,
+            IDynamicPricingService dynamicPricingService,
             IPaymentSyncClient paymentSyncClient,
             IClientBookingAccessClient clientBookingAccessClient,
             IIdentityUserReadClient identityUserReadClient,
@@ -45,7 +45,7 @@ namespace BookingService.Infrastructure.Services
             IOptions<PendingBookingExpirationOptions> pendingBookingExpirationOptions)
         {
             _db = db;
-            _partnerCarReadClient = partnerCarReadClient;
+            _dynamicPricingService = dynamicPricingService;
             _paymentSyncClient = paymentSyncClient;
             _clientBookingAccessClient = clientBookingAccessClient;
             _identityUserReadClient = identityUserReadClient;
@@ -80,29 +80,16 @@ namespace BookingService.Infrastructure.Services
 
             EnsureValidDateRange(startTime, endTime);
 
-            var partnerCarSnapshot = await _partnerCarReadClient.GetByIdAsync(partnerCarId);
-            if (partnerCarSnapshot is null)
-            {
-                throw new KeyNotFoundException($"Partner car with id {partnerCarId} was not found.");
-            }
-
-            if (partnerCarSnapshot.PartnerUserId == Guid.Empty)
-            {
-                throw new InvalidOperationException("Partner car owner must be a valid UUID.");
-            }
-
-            if (partnerCarSnapshot.PriceHour.HasValue && partnerCarSnapshot.PriceHour.Value <= 0)
-            {
-                throw new InvalidOperationException("Partner car price hour must be greater than zero.");
-            }
+            var priceQuote = await _dynamicPricingService.CalculateQuoteAsync(partnerCarId, startTime, endTime);
 
             if (!_db.Database.IsRelational())
             {
                 return await CreateBookingInMemory(
                     userId,
                     partnerCarId,
-                    partnerCarSnapshot.PartnerUserId,
-                    partnerCarSnapshot.PriceHour,
+                    priceQuote.PartnerUserId,
+                    priceQuote.PriceHour,
+                    priceQuote.TotalPrice,
                     startTime,
                     endTime,
                     dto.UseSubscription);
@@ -116,8 +103,9 @@ namespace BookingService.Infrastructure.Services
                     var booking = await CreateBookingWithOverlapCheck(
                         userId,
                         partnerCarId,
-                        partnerCarSnapshot.PartnerUserId,
-                        partnerCarSnapshot.PriceHour,
+                        priceQuote.PartnerUserId,
+                        priceQuote.PriceHour,
+                        priceQuote.TotalPrice,
                         startTime,
                         endTime,
                         dto.UseSubscription);
@@ -777,7 +765,8 @@ namespace BookingService.Infrastructure.Services
             Guid userId,
             int partnerCarId,
             Guid partnerUserId,
-            decimal? priceHour,
+            decimal priceHour,
+            decimal totalPrice,
             DateTimeOffset startTime,
             DateTimeOffset endTime,
             bool useSubscription)
@@ -790,6 +779,7 @@ namespace BookingService.Infrastructure.Services
                     partnerCarId,
                     partnerUserId,
                     priceHour,
+                    totalPrice,
                     startTime,
                     endTime,
                     useSubscription);
@@ -806,7 +796,8 @@ namespace BookingService.Infrastructure.Services
             Guid userId,
             int partnerCarId,
             Guid partnerUserId,
-            decimal? priceHour,
+            decimal priceHour,
+            decimal quotedTotalPrice,
             DateTimeOffset startTime,
             DateTimeOffset endTime,
             bool useSubscription)
@@ -816,7 +807,6 @@ namespace BookingService.Infrastructure.Services
                 throw new InvalidOperationException("Car is already booked for this time.");
             }
 
-            var totalHours = (decimal)(endTime - startTime).TotalHours;
             decimal? totalPrice = null;
             int? subscriptionId = null;
             var usedSubscription = false;
@@ -837,10 +827,7 @@ namespace BookingService.Infrastructure.Services
             }
             else
             {
-                if (priceHour.HasValue)
-                {
-                    totalPrice = decimal.Round(priceHour.Value * totalHours, 2, MidpointRounding.AwayFromZero);
-                }
+                totalPrice = quotedTotalPrice;
             }
 
             var booking = new Booking

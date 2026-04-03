@@ -8,8 +8,6 @@ public sealed record PartnerCarProvisionRequested(
     string CarModel,
     int CarYear,
     string LicensePlate,
-    decimal PriceHour,
-    decimal PriceDay,
     string OwnershipDocumentFileName,
     IReadOnlyCollection<PartnerCarProvisionRequestedImage> Images);
 

@@ -2,8 +2,19 @@ namespace BookingService.Application.Interfaces.Integrations
 {
     public interface IPartnerCarReadClient
     {
-        Task<PartnerCarSnapshot?> GetByIdAsync(int partnerCarId, CancellationToken cancellationToken = default);
+        Task<PartnerCarPricingContext?> GetPricingContextAsync(
+            int partnerCarId,
+            DateTimeOffset startTime,
+            DateTimeOffset endTime,
+            CancellationToken cancellationToken = default);
     }
 
-    public sealed record PartnerCarSnapshot(Guid PartnerUserId, decimal? PriceHour);
+    public sealed record PartnerCarPricingContext(
+        int PartnerCarId,
+        Guid PartnerUserId,
+        int CarModelId,
+        decimal? MarketValueKzt,
+        decimal Rating,
+        int CurrentAvailableCarsCount,
+        bool IsMarketValueStale);
 }

@@ -257,6 +257,7 @@ services:
       ConnectionStrings__DbConnection: Host=booking-db;Port=5432;Database=postgres_db;Username=postgres;Password=postgres
       InternalAuth__ApiKey: local-booking-service-key
       CarService__BaseUrl: http://car-service:8080
+      CarService__InternalApiKey: local-car-service-key
       ClientService__BaseUrl: http://client-service:8080
       ClientService__InternalApiKey: local-client-service-key
       IdentityService__BaseUrl: http://identity-service:8080

@@ -389,7 +389,11 @@ function handleSuggestionClick() {
   bookingError.value = "";
 }
 
-async function handleBookingConfirm(startDate: string, endDate: string) {
+async function handleBookingConfirm(payloadData: {
+  startDate: string;
+  endDate: string;
+  useSubscription: boolean;
+}) {
   if (!selectedModel.value) {
     return;
   }
@@ -401,8 +405,8 @@ async function handleBookingConfirm(startDate: string, endDate: string) {
   try {
     const matchResult = await matchCarByModel({
       modelId: selectedModel.value.modelId,
-      startTime: startDate,
-      endTime: endDate,
+      startTime: payloadData.startDate,
+      endTime: payloadData.endDate,
     });
 
     if (!matchResult.isAvailable || !matchResult.partnerCarId) {
@@ -415,15 +419,22 @@ async function handleBookingConfirm(startDate: string, endDate: string) {
 
     const booking = await createBooking(
       matchResult.partnerCarId,
-      startDate,
-      endDate,
+      payloadData.startDate,
+      payloadData.endDate,
+      payloadData.useSubscription,
     );
 
     success(
-      `${selectedModel.value.brand} ${selectedModel.value.model}: бронь создана, завершите оплату.`,
+      payloadData.useSubscription
+        ? `${selectedModel.value.brand} ${selectedModel.value.model}: бронь создана по подписке.`
+        : `${selectedModel.value.brand} ${selectedModel.value.model}: бронь создана, завершите оплату.`,
     );
     closeBookingModal();
-    await router.push(`/bookings/${booking.id}/payment`);
+    if (payloadData.useSubscription) {
+      await router.push("/bookings");
+    } else {
+      await router.push(`/bookings/${booking.id}/payment`);
+    }
   } catch (e) {
     console.error("Ошибка автоподбора и бронирования:", e);
     bookingError.value = "Не удалось забронировать машину. Попробуйте снова.";

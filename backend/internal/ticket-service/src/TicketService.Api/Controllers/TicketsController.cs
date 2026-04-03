@@ -72,8 +72,6 @@ public sealed class TicketsController : ControllerBase
                 request.CarModel,
                 request.CarYear,
                 request.LicensePlate,
-                request.PriceHour,
-                request.PriceDay,
                 await MapToOptionalFilePayloadAsync(request.OwnershipDocumentFile, cancellationToken),
                 await MapToFilePayloadCollectionAsync(request.CarImageFiles, cancellationToken),
                 request.BookingId,
@@ -284,8 +282,6 @@ public sealed class TicketsController : ControllerBase
             request.CarModel,
             request.CarYear,
             request.LicensePlate,
-            request.PriceHour,
-            request.PriceDay,
             request.Email);
     }
 }

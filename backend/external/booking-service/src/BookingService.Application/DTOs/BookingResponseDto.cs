@@ -16,6 +16,7 @@ namespace BookingService.Application.DTOs.Booking
         public DateTimeOffset? TripStartedAt { get; set; }
         public DateTimeOffset? TripCompletedAt { get; set; }
         public Guid? CompletionReviewTicketId { get; set; }
+        public bool UsedSubscription { get; set; }
         public string? Status { get; set; }
     }
 }

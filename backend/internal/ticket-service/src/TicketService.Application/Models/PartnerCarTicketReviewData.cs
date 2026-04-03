@@ -5,6 +5,4 @@ public sealed record PartnerCarTicketReviewData(
     string? CarModel,
     int? CarYear,
     string? LicensePlate,
-    decimal? PriceHour,
-    decimal? PriceDay,
     string? Email);

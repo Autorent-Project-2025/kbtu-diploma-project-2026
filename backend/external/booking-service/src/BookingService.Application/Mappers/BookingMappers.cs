@@ -22,6 +22,7 @@ namespace BookingService.Application.Mappers
             TripStartedAt = booking.TripStartedAt,
             TripCompletedAt = booking.TripCompletedAt,
             CompletionReviewTicketId = booking.CompletionReviewTicketId,
+            UsedSubscription = booking.UsedSubscription,
             Status = booking.Status.ToString().ToLowerInvariant()
         };
 
@@ -48,6 +49,7 @@ namespace BookingService.Application.Mappers
                 TripStartedAt = booking.TripStartedAt,
                 TripCompletedAt = booking.TripCompletedAt,
                 CompletionReviewTicketId = booking.CompletionReviewTicketId,
+                UsedSubscription = booking.UsedSubscription,
                 Status = booking.Status.ToString().ToLowerInvariant()
             };
         }

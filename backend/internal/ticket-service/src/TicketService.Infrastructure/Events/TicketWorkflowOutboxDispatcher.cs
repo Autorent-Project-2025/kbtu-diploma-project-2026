@@ -311,8 +311,6 @@ public sealed class TicketWorkflowOutboxDispatcher : BackgroundService
                             RequireField(ticket.CarModel, nameof(ticket.CarModel)),
                             RequireYear(ticket.CarYear, nameof(ticket.CarYear)),
                             RequireField(ticket.LicensePlate, nameof(ticket.LicensePlate)),
-                            RequirePrice(ticket.PriceHour, nameof(ticket.PriceHour)),
-                            RequirePrice(ticket.PriceDay, nameof(ticket.PriceDay)),
                             RequireField(ticket.OwnershipDocumentFileName, nameof(ticket.OwnershipDocumentFileName)),
                             ticket.CarImages.Select(image => new PartnerCarProvisionRequestedImage(image.ImageId, image.ImageUrl)).ToArray()),
                         cancellationToken);
@@ -611,26 +609,6 @@ public sealed class TicketWorkflowOutboxDispatcher : BackgroundService
         }
 
         return value.Value;
-    }
-
-    private static decimal RequirePrice(decimal? value, string fieldName)
-    {
-        if (!value.HasValue)
-        {
-            throw new InvalidOperationException($"{fieldName} is required.");
-        }
-
-        if (value.Value <= 0m)
-        {
-            throw new InvalidOperationException($"{fieldName} must be greater than 0.");
-        }
-
-        if (value.Value > 1_000_000m)
-        {
-            throw new InvalidOperationException($"{fieldName} must not exceed 1000000.");
-        }
-
-        return decimal.Round(value.Value, 2, MidpointRounding.AwayFromZero);
     }
 
     private static decimal RequireChargeAmount(decimal? value, string fieldName)

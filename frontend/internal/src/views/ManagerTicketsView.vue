@@ -261,7 +261,7 @@
                   Данные автомобиля
                 </h3>
                 <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                  При необходимости скорректируйте перед решением.
+                  При необходимости скорректируйте характеристики. Витринная цена будет рассчитана системой после одобрения заявки.
                 </p>
               </div>
               <div class="grid sm:grid-cols-2 gap-4">
@@ -568,17 +568,25 @@ const { success: toastSuccess, error: toastError } = useToast();
 const lastUpdatedAt = ref<string>("");
 const maxAllowedCarYear = new Date().getUTCFullYear() + 1;
 
+type PartnerCarFormField = {
+  id: string;
+  key: "carBrand" | "carModel" | "carYear" | "licensePlate" | "email";
+  label: string;
+  type?: string;
+  min?: string;
+  max?: string;
+  step?: string;
+};
+
 const partnerCarForm = reactive({
   carBrand: "",
   carModel: "",
   carYear: null as number | null,
   licensePlate: "",
   email: "",
-  priceHour: null as number | null,
-  priceDay: null as number | null,
 });
 
-const carFormFields = [
+const carFormFields: PartnerCarFormField[] = [
   { id: "carBrand", key: "carBrand", label: "Марка" },
   { id: "carModel", key: "carModel", label: "Модель" },
   {
@@ -591,24 +599,6 @@ const carFormFields = [
   },
   { id: "licensePlate", key: "licensePlate", label: "Госномер" },
   { id: "contactEmail", key: "email", label: "Email партнёра", type: "email" },
-  {
-    id: "priceHour",
-    key: "priceHour",
-    label: "Цена за час",
-    type: "number",
-    min: "0.01",
-    max: "1000000",
-    step: "0.01",
-  },
-  {
-    id: "priceDay",
-    key: "priceDay",
-    label: "Цена за день",
-    type: "number",
-    min: "0.01",
-    max: "1000000",
-    step: "0.01",
-  },
 ];
 
 const partnerCarImages = computed<PartnerCarTicketImageData[]>(() => {
@@ -800,8 +790,6 @@ function syncPartnerCarForm(ticket: Ticket | null) {
       carYear: null,
       licensePlate: "",
       email: "",
-      priceHour: null,
-      priceDay: null,
     });
     return;
   }
@@ -816,10 +804,6 @@ function syncPartnerCarForm(ticket: Ticket | null) {
     ""
   ).trim();
   partnerCarForm.email = (ticket.email ?? "").trim();
-  const rph = ticket.priceHour ?? data?.priceHour ?? null;
-  const rpd = ticket.priceDay ?? data?.priceDay ?? null;
-  partnerCarForm.priceHour = rph === null ? null : Number(rph);
-  partnerCarForm.priceDay = rpd === null ? null : Number(rpd);
 }
 
 function buildPartnerCarPayload(): PartnerCarReviewPayload | null | undefined {
@@ -830,8 +814,6 @@ function buildPartnerCarPayload(): PartnerCarReviewPayload | null | undefined {
   const carYear = Number(partnerCarForm.carYear);
   const licensePlate = partnerCarForm.licensePlate.trim();
   const email = partnerCarForm.email.trim();
-  const priceHour = Number(partnerCarForm.priceHour);
-  const priceDay = Number(partnerCarForm.priceDay);
 
   if (
     !carBrand ||
@@ -842,20 +824,9 @@ function buildPartnerCarPayload(): PartnerCarReviewPayload | null | undefined {
   ) {
     toastError("Заполните марку, модель, год, госномер и email.");
     return null;
-    return null;
   }
   if (carYear < 1886 || carYear > maxAllowedCarYear) {
     toastError(`Год машины должен быть в диапазоне 1886-${maxAllowedCarYear}.`);
-    return null;
-    return null;
-  }
-  if (
-    !Number.isFinite(priceHour) ||
-    !Number.isFinite(priceDay) ||
-    priceHour <= 0 ||
-    priceDay <= 0
-  ) {
-    toastError("Укажите корректные значения цен за час и за день.");
     return null;
   }
   return {
@@ -863,8 +834,6 @@ function buildPartnerCarPayload(): PartnerCarReviewPayload | null | undefined {
     carModel,
     carYear,
     licensePlate,
-    priceHour,
-    priceDay,
     email,
   };
 }

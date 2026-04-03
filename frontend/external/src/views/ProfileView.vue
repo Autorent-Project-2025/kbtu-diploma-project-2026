@@ -716,7 +716,7 @@ import axios from "axios";
 
 const mySubscription = ref<any | null>(null);
 
-async function loadSubsription() {
+async function loadSubscription() {
   try {
     const { data } = await axios.get("/subscriptions/my");
     mySubscription.value = data;

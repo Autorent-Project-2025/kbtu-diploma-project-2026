@@ -11,6 +11,7 @@ export interface Booking {
   tripStartedAt?: string | null;
   tripCompletedAt?: string | null;
   completionReviewTicketId?: string | null;
+  usedSubscription?: boolean;
   status: BookingStatus;
 }
 

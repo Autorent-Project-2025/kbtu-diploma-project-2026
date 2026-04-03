@@ -12,6 +12,8 @@ using CarService.Infrastructure.Persistence;
 using CarService.Infrastructure.Persistence.Catalog;
 using CarService.Infrastructure.Persistence.Extensions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using CarService.Infrastructure.Options;
 
 namespace CarService.Infrastructure.Services
 {
@@ -22,19 +24,22 @@ namespace CarService.Infrastructure.Services
         private readonly CarCatalogResolver _catalogResolver;
         private readonly ICarMarketValueSyncService _carMarketValueSyncService;
         private readonly IPartnerCarDisplayPricingService _partnerCarDisplayPricingService;
+        private readonly MarketValueRefreshOptions _marketValueRefreshOptions;
 
         public PartnerCarService(
             ApplicationDbContext db,
             IBookingReadClient bookingReadClient,
             CarCatalogResolver catalogResolver,
             ICarMarketValueSyncService carMarketValueSyncService,
-            IPartnerCarDisplayPricingService partnerCarDisplayPricingService)
+            IPartnerCarDisplayPricingService partnerCarDisplayPricingService,
+            IOptions<MarketValueRefreshOptions> marketValueRefreshOptions)
         {
             _db = db;
             _bookingReadClient = bookingReadClient;
             _catalogResolver = catalogResolver;
             _carMarketValueSyncService = carMarketValueSyncService;
             _partnerCarDisplayPricingService = partnerCarDisplayPricingService;
+            _marketValueRefreshOptions = marketValueRefreshOptions.Value;
         }
 
         public async Task<PagedResult<PartnerCarResponseDto>> GetAllAsync(
@@ -377,6 +382,68 @@ namespace CarService.Infrastructure.Services
             _db.PartnerCars.Remove(entity);
             await _db.SaveChangesAsync(cancellationToken);
             return true;
+        }
+
+        public async Task<PartnerCarPricingContextDto?> GetPricingContextAsync(
+            int partnerCarId,
+            DateTimeOffset startTime,
+            DateTimeOffset endTime,
+            CancellationToken cancellationToken = default)
+        {
+            if (partnerCarId <= 0)
+            {
+                throw new ArgumentException("PartnerCarId must be greater than zero.", nameof(partnerCarId));
+            }
+
+            if (endTime <= startTime)
+            {
+                throw new ArgumentException("EndTime must be greater than StartTime.", nameof(endTime));
+            }
+
+            var partnerCar = await _db.PartnerCars
+                .AsNoTracking()
+                .IncludeModelCatalog()
+                .FirstOrDefaultAsync(entity => entity.Id == partnerCarId, cancellationToken);
+
+            if (partnerCar is null)
+            {
+                return null;
+            }
+
+            var candidateCarIds = await _db.PartnerCars
+                .AsNoTracking()
+                .Where(entity =>
+                    entity.CarModelId == partnerCar.CarModelId &&
+                    entity.Status == PartnerCarStatus.Available)
+                .Select(entity => entity.Id)
+                .ToArrayAsync(cancellationToken);
+
+            var availability = await _bookingReadClient.CheckAvailabilityByCarIdsAsync(
+                candidateCarIds,
+                startTime,
+                endTime,
+                cancellationToken);
+
+            var availableCarsCount = availability.Count(item => item.IsAvailable);
+            var effectiveRating = partnerCar.Rating ?? partnerCar.CarModel.Rating ?? 3.0m;
+            var marketValueFetchedAt = partnerCar.CarModel.MarketValueFetchedAt;
+            var staleCutoff = DateTimeOffset.UtcNow.AddHours(-_marketValueRefreshOptions.RefreshAfterHours);
+            var isMarketValueStale =
+                !partnerCar.CarModel.MarketValueKzt.HasValue ||
+                !marketValueFetchedAt.HasValue ||
+                marketValueFetchedAt <= staleCutoff;
+
+            return new PartnerCarPricingContextDto
+            {
+                PartnerCarId = partnerCar.Id,
+                PartnerUserId = partnerCar.PartnerUserId,
+                CarModelId = partnerCar.CarModelId,
+                MarketValueKzt = partnerCar.CarModel.MarketValueKzt,
+                MarketValueFetchedAt = marketValueFetchedAt,
+                IsMarketValueStale = isMarketValueStale,
+                Rating = effectiveRating,
+                CurrentAvailableCarsCount = availableCarsCount
+            };
         }
 
         public async Task<IReadOnlyCollection<MyPartnerCarSummaryDto>> GetMyCarsAsync(

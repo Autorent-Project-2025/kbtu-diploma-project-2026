@@ -72,6 +72,43 @@ namespace CarService.Api.Controllers
             return Ok(created);
         }
 
+        [AllowAnonymous]
+        [HttpGet("{partnerCarId:int}/pricing-context")]
+        public async Task<IActionResult> GetPricingContext(
+            int partnerCarId,
+            [FromQuery] DateTimeOffset startTime,
+            [FromQuery] DateTimeOffset endTime,
+            CancellationToken cancellationToken)
+        {
+            if (!IsAuthorizedInternalRequest())
+            {
+                return Unauthorized(new { error = "Internal API key is invalid." });
+            }
+
+            if (partnerCarId <= 0)
+            {
+                return BadRequest(new { error = "PartnerCarId must be greater than zero." });
+            }
+
+            if (endTime <= startTime)
+            {
+                return BadRequest(new { error = "EndTime must be greater than StartTime." });
+            }
+
+            var payload = await _partnerCarService.GetPricingContextAsync(
+                partnerCarId,
+                startTime,
+                endTime,
+                cancellationToken);
+
+            if (payload is null)
+            {
+                return NotFound(new { error = "Partner car not found." });
+            }
+
+            return Ok(payload);
+        }
+
         private bool IsAuthorizedInternalRequest()
         {
             if (string.IsNullOrWhiteSpace(_internalAuthOptions.ApiKey))

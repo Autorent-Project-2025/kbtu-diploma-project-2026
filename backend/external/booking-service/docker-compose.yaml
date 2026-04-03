@@ -47,6 +47,7 @@
       - Jwt__PublicKey=${Jwt__PublicKey}
       - InternalAuth__ApiKey=${InternalAuth__ApiKey}
       - CarService__BaseUrl=${CarService__BaseUrl}
+      - CarService__InternalApiKey=${CarService__InternalApiKey}
       - ClientService__BaseUrl=${ClientService__BaseUrl}
       - ClientService__InternalApiKey=${ClientService__InternalApiKey}
       - IdentityService__BaseUrl=${IdentityService__BaseUrl}
