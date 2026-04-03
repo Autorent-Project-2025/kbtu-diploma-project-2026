@@ -292,6 +292,7 @@ import {
 import { useAuth } from "../composables/useAuth";
 import { useToast } from "../composables/useToast";
 import type { Car } from "../types/Car";
+import { formatMoney } from "../utils/formatMoney";
 
 const route = useRoute();
 const router = useRouter();
@@ -371,11 +372,11 @@ function formatPriceRange() {
   }
 
   if (min != null && max != null && min !== max) {
-    return `$${min} - $${max}/час`;
+    return `${formatMoney(min)} - ${formatMoney(max)}/час`;
   }
 
   const singlePrice = min ?? max;
-  return singlePrice != null ? `$${singlePrice}/час` : "по запросу";
+  return singlePrice != null ? `${formatMoney(singlePrice)}/час` : "по запросу";
 }
 
 function formatDate(value: string): string {

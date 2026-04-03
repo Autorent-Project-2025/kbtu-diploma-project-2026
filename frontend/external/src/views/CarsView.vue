@@ -264,6 +264,7 @@ import { useAuth } from "../composables/useAuth";
 import { useToast } from "../composables/useToast";
 import { config } from "../config";
 import type { Car } from "../types/Car";
+import { formatMoney } from "../utils/formatMoney";
 import SmartRecommendationPanel from "../components/SmartRecommendationPanel.vue";
 
 const router = useRouter();
@@ -352,11 +353,11 @@ function formatPriceRange(model: AvailableModelCard): string {
     model.maxPriceHour != null &&
     model.minPriceHour !== model.maxPriceHour
   ) {
-    return `$${model.minPriceHour} - $${model.maxPriceHour}/час`;
+    return `${formatMoney(model.minPriceHour)} - ${formatMoney(model.maxPriceHour)}/час`;
   }
 
   const singlePrice = model.minPriceHour ?? model.maxPriceHour;
-  return singlePrice != null ? `$${singlePrice}/час` : "по запросу";
+  return singlePrice != null ? `${formatMoney(singlePrice)}/час` : "по запросу";
 }
 
 function openBookingModal(model: AvailableModelCard) {

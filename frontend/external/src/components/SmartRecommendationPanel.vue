@@ -41,7 +41,7 @@
           <label
             class="text-xs font-bold uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400"
           >
-            Budget / hour
+            Бюджет, ₸/час
           </label>
           <input
             v-model.number="filters.maxBudgetPerHour"
@@ -201,7 +201,7 @@
               <div class="grid grid-cols-2 gap-3">
                 <div class="rounded-2xl bg-gray-50 dark:bg-gray-800/60 p-3">
                   <p class="text-xs uppercase tracking-[0.12em] text-gray-400">
-                    Price / hour
+                    Цена / час
                   </p>
                   <p
                     class="mt-1 text-lg font-bold text-gray-900 dark:text-white"
@@ -265,6 +265,7 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import api from "../api/axios";
+import { formatMoney } from "../utils/formatMoney";
 
 type RecommendationItem = {
   partnerCarId: number;
@@ -292,15 +293,6 @@ const filters = ref({
   tripPurpose: "",
   transmission: "",
 });
-
-function formatMoney(value: number | null) {
-  if (value == null) return "—";
-  return new Intl.NumberFormat("ru-RU", {
-    style: "currency",
-    currency: "KZT",
-    maximumFractionDigits: 0,
-  }).format(value);
-}
 
 function resetFilters() {
   filters.value = {
