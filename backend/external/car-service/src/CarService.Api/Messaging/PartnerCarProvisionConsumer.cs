@@ -97,8 +97,6 @@ public sealed class PartnerCarProvisionConsumer : BackgroundService
                     CarModel = message.Payload.CarModel,
                     CarYear = message.Payload.CarYear,
                     LicensePlate = message.Payload.LicensePlate,
-                    PriceHour = message.Payload.PriceHour,
-                    PriceDay = message.Payload.PriceDay,
                     OwnershipFileName = message.Payload.OwnershipDocumentFileName,
                     Images = message.Payload.Images
                         .Select(image => new PartnerCarProvisionImageDto

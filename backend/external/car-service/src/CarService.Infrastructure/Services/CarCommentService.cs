@@ -2,7 +2,7 @@ using CarService.Application.DTOs.CarComment;
 using CarService.Application.DTOs.Common;
 using CarService.Application.Interfaces;
 using CarService.Domain.Entities;
-using CarService.Infrastructure.Persistance;
+using CarService.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
 namespace CarService.Infrastructure.Services
@@ -10,10 +10,17 @@ namespace CarService.Infrastructure.Services
     public sealed class CarCommentService : ICarCommentService
     {
         private readonly ApplicationDbContext _db;
+        private readonly IPartnerCarService _partnerCarService;
+        private readonly ICarModelService _carModelService;
 
-        public CarCommentService(ApplicationDbContext db)
+        public CarCommentService(
+            ApplicationDbContext db,
+            IPartnerCarService partnerCarService,
+            ICarModelService carModelService)
         {
             _db = db;
+            _partnerCarService = partnerCarService;
+            _carModelService = carModelService;
         }
 
         public async Task<PagedResult<CarCommentResponseDto>> GetByPartnerCarPaginatedAsync(
@@ -192,42 +199,13 @@ namespace CarService.Infrastructure.Services
 
         private async Task RecalculateRatingsAsync(int partnerCarId, int modelId, CancellationToken cancellationToken)
         {
-            var partnerCar = await _db.PartnerCars.FirstOrDefaultAsync(car => car.Id == partnerCarId, cancellationToken);
-            if (partnerCar is not null)
-            {
-                var partnerRatings = await _db.CarComments
-                    .Where(comment => comment.PartnerCarId == partnerCarId)
-                    .Select(comment => comment.Rating)
-                    .ToListAsync(cancellationToken);
-
-                partnerCar.RatingsCount = partnerRatings.Count;
-                partnerCar.Rating = partnerRatings.Count == 0
-                    ? null
-                    : Math.Round((decimal)partnerRatings.Average(), 1, MidpointRounding.AwayFromZero);
-            }
-
-            await RecalculateModelRatingOnlyAsync(modelId, cancellationToken);
+            await _partnerCarService.RecalculateRatingAsync(partnerCarId, cancellationToken);
+            await _carModelService.RecalculateRatingAsync(modelId, cancellationToken);
         }
 
         private async Task RecalculateModelRatingOnlyAsync(int modelId, CancellationToken cancellationToken)
         {
-            var model = await _db.CarModels.FirstOrDefaultAsync(entity => entity.Id == modelId, cancellationToken);
-            if (model is null)
-            {
-                return;
-            }
-
-            var ratings = await _db.CarComments
-                .Where(comment => comment.CarId == modelId)
-                .Select(comment => comment.Rating)
-                .ToListAsync(cancellationToken);
-
-            model.RatingsCount = ratings.Count;
-            model.Rating = ratings.Count == 0
-                ? null
-                : Math.Round((decimal)ratings.Average(), 1, MidpointRounding.AwayFromZero);
-
-            await _db.SaveChangesAsync(cancellationToken);
+            await _carModelService.RecalculateRatingAsync(modelId, cancellationToken);
         }
 
         private static CarCommentResponseDto MapToDto(CarComment entity)

@@ -8,7 +8,9 @@ using CarService.Application.Interfaces;
 using CarService.Application.Interfaces.Integrations;
 using CarService.Domain.Entities;
 using CarService.Domain.Enums;
-using CarService.Infrastructure.Persistance;
+using CarService.Infrastructure.Persistence;
+using CarService.Infrastructure.Persistence.Catalog;
+using CarService.Infrastructure.Persistence.Extensions;
 using Microsoft.EntityFrameworkCore;
 
 namespace CarService.Infrastructure.Services
@@ -18,15 +20,21 @@ namespace CarService.Infrastructure.Services
         private readonly ApplicationDbContext _db;
         private readonly IBookingReadClient _bookingReadClient;
         private readonly CarCatalogResolver _catalogResolver;
+        private readonly ICarMarketValueSyncService _carMarketValueSyncService;
+        private readonly IPartnerCarDisplayPricingService _partnerCarDisplayPricingService;
 
         public PartnerCarService(
             ApplicationDbContext db,
             IBookingReadClient bookingReadClient,
-            CarCatalogResolver catalogResolver)
+            CarCatalogResolver catalogResolver,
+            ICarMarketValueSyncService carMarketValueSyncService,
+            IPartnerCarDisplayPricingService partnerCarDisplayPricingService)
         {
             _db = db;
             _bookingReadClient = bookingReadClient;
             _catalogResolver = catalogResolver;
+            _carMarketValueSyncService = carMarketValueSyncService;
+            _partnerCarDisplayPricingService = partnerCarDisplayPricingService;
         }
 
         public async Task<PagedResult<PartnerCarResponseDto>> GetAllAsync(
@@ -140,8 +148,8 @@ namespace CarService.Infrastructure.Services
                 LicensePlate = NormalizeRequired(dto.LicensePlate, nameof(dto.LicensePlate), 20),
                 OwnershipFileName = null,
                 Color = NormalizeOptional(dto.Color, 50),
-                PriceHour = dto.PriceHour,
-                PriceDay = dto.PriceDay,
+                PriceHour = null,
+                PriceDay = null,
                 Status = dto.Status,
                 CreatedAt = DateTimeOffset.UtcNow,
                 RatingsCount = 0
@@ -149,6 +157,7 @@ namespace CarService.Infrastructure.Services
 
             _db.PartnerCars.Add(entity);
             await _db.SaveChangesAsync(cancellationToken);
+            await _carMarketValueSyncService.EnsureCarModelMarketValueAsync(entity.CarModelId, cancellationToken);
 
             var persistedEntity = await _db.PartnerCars
                 .AsNoTracking()
@@ -174,8 +183,6 @@ namespace CarService.Infrastructure.Services
             var normalizedModel = NormalizeRequired(dto.CarModel, nameof(dto.CarModel), 255);
             var normalizedYear = NormalizeCarYear(dto.CarYear, nameof(dto.CarYear));
             var normalizedLicensePlate = NormalizeRequired(dto.LicensePlate, nameof(dto.LicensePlate), 20).ToUpperInvariant();
-            var normalizedPriceHour = NormalizePrice(dto.PriceHour, nameof(dto.PriceHour));
-            var normalizedPriceDay = NormalizePrice(dto.PriceDay, nameof(dto.PriceDay));
             var normalizedOwnershipFileName = NormalizeRequired(dto.OwnershipFileName, nameof(dto.OwnershipFileName), 255);
             var normalizedImages = (dto.Images ?? [])
                 .Select((image, index) => new NormalizedProvisionImage(
@@ -206,8 +213,6 @@ namespace CarService.Infrastructure.Services
                         normalizedModel,
                         normalizedYear,
                         normalizedLicensePlate,
-                        normalizedPriceHour,
-                        normalizedPriceDay,
                         normalizedOwnershipFileName,
                         normalizedImages);
 
@@ -271,8 +276,8 @@ namespace CarService.Infrastructure.Services
                 CarModelId = model.Id,
                 LicensePlate = normalizedLicensePlate,
                 OwnershipFileName = normalizedOwnershipFileName,
-                PriceHour = normalizedPriceHour,
-                PriceDay = normalizedPriceDay,
+                PriceHour = null,
+                PriceDay = null,
                 Status = PartnerCarStatus.Available,
                 CreatedAt = DateTimeOffset.UtcNow,
                 RatingsCount = 0,
@@ -301,8 +306,6 @@ namespace CarService.Infrastructure.Services
                         normalizedModel,
                         normalizedYear,
                         normalizedLicensePlate,
-                        normalizedPriceHour,
-                        normalizedPriceDay,
                         normalizedOwnershipFileName,
                         normalizedImages);
 
@@ -319,6 +322,7 @@ namespace CarService.Infrastructure.Services
 
             _db.PartnerCarImages.AddRange(images);
             await _db.SaveChangesAsync(cancellationToken);
+            await _carMarketValueSyncService.EnsureCarModelMarketValueAsync(entity.CarModelId, cancellationToken);
 
             var persistedEntity = await _db.PartnerCars
                 .AsNoTracking()
@@ -350,8 +354,6 @@ namespace CarService.Infrastructure.Services
 
             entity.LicensePlate = NormalizeRequired(dto.LicensePlate, nameof(dto.LicensePlate), 20);
             entity.Color = NormalizeOptional(dto.Color, 50);
-            entity.PriceHour = dto.PriceHour;
-            entity.PriceDay = dto.PriceDay;
             entity.Status = dto.Status;
 
             await _db.SaveChangesAsync(cancellationToken);
@@ -670,6 +672,7 @@ namespace CarService.Infrastructure.Services
                 : Math.Round((decimal)ratings.Average(), 1, MidpointRounding.AwayFromZero);
 
             await _db.SaveChangesAsync(cancellationToken);
+            await _partnerCarDisplayPricingService.RecalculateForPartnerCarAsync(partnerCarId, cancellationToken);
         }
 
         private static PartnerCarResponseDto MapToResponse(PartnerCar entity)
@@ -760,8 +763,6 @@ namespace CarService.Infrastructure.Services
             string model,
             int year,
             string licensePlate,
-            decimal priceHour,
-            decimal priceDay,
             string ownershipFileName,
             IReadOnlyCollection<NormalizedProvisionImage> images)
         {
@@ -770,8 +771,6 @@ namespace CarService.Infrastructure.Services
                 !string.Equals(existingCar.CarModel.ModelLookup.Name, model, StringComparison.Ordinal) ||
                 existingCar.CarModel.Year != year ||
                 !string.Equals(existingCar.LicensePlate, licensePlate, StringComparison.Ordinal) ||
-                existingCar.PriceHour != priceHour ||
-                existingCar.PriceDay != priceDay ||
                 !string.Equals(existingCar.OwnershipFileName, ownershipFileName, StringComparison.Ordinal) ||
                 !HaveMatchingImages(existingCar.Images, images))
             {
@@ -831,16 +830,6 @@ namespace CarService.Infrastructure.Services
             }
 
             return value;
-        }
-
-        private static decimal NormalizePrice(decimal value, string paramName)
-        {
-            if (value <= 0m || value > 1_000_000m)
-            {
-                throw new ArgumentException($"{paramName} must be greater than 0 and less than or equal to 1000000.", paramName);
-            }
-
-            return Math.Round(value, 2, MidpointRounding.AwayFromZero);
         }
 
         private static double Normalize(double value, double min, double max)

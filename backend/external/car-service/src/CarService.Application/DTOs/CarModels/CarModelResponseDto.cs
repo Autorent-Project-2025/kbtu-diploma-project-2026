@@ -16,5 +16,11 @@ namespace CarService.Application.DTOs.CarModels
         public int RatingsCount { get; set; }
         public decimal? PriceHour { get; set; }
         public decimal? PriceDay { get; set; }
+        public decimal? MarketValueKzt { get; set; }
+        public DateTimeOffset? MarketValueFetchedAt { get; set; }
+        public int MarketValueSampleCount { get; set; }
+        public int MarketValueFilteredSampleCount { get; set; }
+        public string? MarketValueConfidence { get; set; }
+        public string? MarketValueStatus { get; set; }
     }
 }

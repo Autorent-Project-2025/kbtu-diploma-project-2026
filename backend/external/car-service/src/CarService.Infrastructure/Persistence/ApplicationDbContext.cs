@@ -1,7 +1,7 @@
 using CarService.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 
-namespace CarService.Infrastructure.Persistance
+namespace CarService.Infrastructure.Persistence
 {
     public class ApplicationDbContext : DbContext
     {

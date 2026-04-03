@@ -2,7 +2,7 @@ using CarService.Application.DTOs.Recommendation;
 using CarService.Application.Interfaces;
 using CarService.Domain.Entities;
 using CarService.Domain.Enums;
-using CarService.Infrastructure.Persistance;
+using CarService.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
 namespace CarService.Infrastructure.Services;

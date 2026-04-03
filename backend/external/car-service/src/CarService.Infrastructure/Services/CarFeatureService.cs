@@ -1,6 +1,6 @@
 ﻿using CarService.Application.DTOs.CarFeature;
 using CarService.Application.Interfaces;
-using CarService.Infrastructure.Persistance;
+using CarService.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
 namespace CarService.Infrastructure.Services

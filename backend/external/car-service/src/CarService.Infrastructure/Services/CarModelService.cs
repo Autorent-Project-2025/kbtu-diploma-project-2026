@@ -3,8 +3,11 @@ using CarService.Application.DTOs.CarImage;
 using CarService.Application.DTOs.CarModels;
 using CarService.Application.DTOs.Common;
 using CarService.Application.Interfaces;
+using CarService.Domain.Constants;
 using CarService.Domain.Entities;
-using CarService.Infrastructure.Persistance;
+using CarService.Infrastructure.Persistence;
+using CarService.Infrastructure.Persistence.Catalog;
+using CarService.Infrastructure.Persistence.Extensions;
 using Microsoft.EntityFrameworkCore;
 
 namespace CarService.Infrastructure.Services
@@ -13,13 +16,19 @@ namespace CarService.Infrastructure.Services
     {
         private readonly ApplicationDbContext _db;
         private readonly CarCatalogResolver _catalogResolver;
+        private readonly ICarMarketValueSyncService _carMarketValueSyncService;
+        private readonly IPartnerCarDisplayPricingService _partnerCarDisplayPricingService;
 
         public CarModelService(
             ApplicationDbContext db,
-            CarCatalogResolver catalogResolver)
+            CarCatalogResolver catalogResolver,
+            ICarMarketValueSyncService carMarketValueSyncService,
+            IPartnerCarDisplayPricingService partnerCarDisplayPricingService)
         {
             _db = db;
             _catalogResolver = catalogResolver;
+            _carMarketValueSyncService = carMarketValueSyncService;
+            _partnerCarDisplayPricingService = partnerCarDisplayPricingService;
         }
 
         public async Task<PagedResult<CarModelResponseDto>> GetAllAsync(
@@ -147,15 +156,22 @@ namespace CarService.Infrastructure.Services
                 FuelType = NormalizeOptional(dto.FuelType, 50),
                 Doors = dto.Doors,
                 Description = NormalizeOptional(dto.Description, 585),
-                RatingsCount = 0
+                RatingsCount = 0,
+                MarketValueStatus = MarketValueStatusConstants.Pending
             };
 
             _db.CarModels.Add(entity);
             await _db.SaveChangesAsync(cancellationToken);
+            await _carMarketValueSyncService.EnsureCarModelMarketValueAsync(entity.Id, cancellationToken);
 
-            entity.Brand = brand;
-            entity.ModelLookup = model;
-            return MapToResponse(entity, null);
+            var persistedEntity = await _db.CarModels
+                .AsNoTracking()
+                .IncludeCatalog()
+                .FirstAsync(carModel => carModel.Id == entity.Id, cancellationToken);
+            var averagePricesByModelId = await GetAveragePricesByModelIdsAsync([entity.Id], cancellationToken);
+            averagePricesByModelId.TryGetValue(entity.Id, out var averagePrices);
+
+            return MapToResponse(persistedEntity, averagePrices);
         }
 
         public async Task<CarModelResponseDto?> UpdateAsync(
@@ -180,12 +196,27 @@ namespace CarService.Infrastructure.Services
             entity.FuelType = NormalizeOptional(dto.FuelType, 50);
             entity.Doors = dto.Doors;
             entity.Description = NormalizeOptional(dto.Description, 585);
+            entity.MarketValueKzt = null;
+            entity.MarketValueFetchedAt = null;
+            entity.MarketValueSource = null;
+            entity.MarketValueSourceUrl = null;
+            entity.MarketValueSampleCount = 0;
+            entity.MarketValueFilteredSampleCount = 0;
+            entity.MarketValueConfidence = null;
+            entity.MarketValueStatus = MarketValueStatusConstants.Pending;
+            entity.MarketValueError = null;
 
             await _db.SaveChangesAsync(cancellationToken);
+            await _carMarketValueSyncService.EnsureCarModelMarketValueAsync(entity.Id, cancellationToken);
 
-            entity.Brand = brand;
-            entity.ModelLookup = model;
-            return MapToResponse(entity, null);
+            var persistedEntity = await _db.CarModels
+                .AsNoTracking()
+                .IncludeCatalog()
+                .FirstAsync(carModel => carModel.Id == entity.Id, cancellationToken);
+            var averagePricesByModelId = await GetAveragePricesByModelIdsAsync([entity.Id], cancellationToken);
+            averagePricesByModelId.TryGetValue(entity.Id, out var averagePrices);
+
+            return MapToResponse(persistedEntity, averagePrices);
         }
 
         public async Task<bool> DeleteAsync(int id, CancellationToken cancellationToken = default)
@@ -220,6 +251,7 @@ namespace CarService.Infrastructure.Services
                 : Math.Round((decimal)comments.Average(), 1, MidpointRounding.AwayFromZero);
 
             await _db.SaveChangesAsync(cancellationToken);
+            await _partnerCarDisplayPricingService.RecalculateForCarModelAsync(modelId, cancellationToken);
         }
 
         private async Task<Dictionary<int, CarModelAveragePrices>> GetAveragePricesByModelIdsAsync(
@@ -267,7 +299,13 @@ namespace CarService.Infrastructure.Services
                 Rating = entity.Rating,
                 RatingsCount = entity.RatingsCount,
                 PriceHour = averagePrices?.PriceHour,
-                PriceDay = averagePrices?.PriceDay
+                PriceDay = averagePrices?.PriceDay,
+                MarketValueKzt = entity.MarketValueKzt,
+                MarketValueFetchedAt = entity.MarketValueFetchedAt,
+                MarketValueSampleCount = entity.MarketValueSampleCount,
+                MarketValueFilteredSampleCount = entity.MarketValueFilteredSampleCount,
+                MarketValueConfidence = entity.MarketValueConfidence,
+                MarketValueStatus = entity.MarketValueStatus
             };
         }
 
@@ -289,6 +327,12 @@ namespace CarService.Infrastructure.Services
                 RatingsCount = entity.RatingsCount,
                 PriceHour = averagePrices?.PriceHour,
                 PriceDay = averagePrices?.PriceDay,
+                MarketValueKzt = entity.MarketValueKzt,
+                MarketValueFetchedAt = entity.MarketValueFetchedAt,
+                MarketValueSampleCount = entity.MarketValueSampleCount,
+                MarketValueFilteredSampleCount = entity.MarketValueFilteredSampleCount,
+                MarketValueConfidence = entity.MarketValueConfidence,
+                MarketValueStatus = entity.MarketValueStatus,
                 Features = entity.CarFeatures
                     .Select(carFeature => new CarFeatureDto
                     {

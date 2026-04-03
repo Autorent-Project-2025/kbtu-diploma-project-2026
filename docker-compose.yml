@@ -131,6 +131,35 @@ services:
     networks:
       - data
 
+  car-market-value-service:
+    build:
+      context: ./backend/internal/car-market-value-service/src
+      dockerfile: ./Dockerfile
+    restart: unless-stopped
+    env_file:
+      - path: ./backend/internal/car-market-value-service/.env.example
+        required: true
+      - path: ./backend/internal/car-market-value-service/.env
+        required: false
+    environment:
+      PORT: 8080
+    expose:
+      - "8080"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/healthz')"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    networks:
+      - backend
+
   car-service:
     build:
       context: ./backend
@@ -148,6 +177,7 @@ services:
       BookingService__BaseUrl: http://booking-service:8080
       BookingService__InternalApiKey: local-booking-service-key
       ImageService__BaseUrl: http://image-service:8080
+      CarMarketValueService__BaseUrl: http://car-market-value-service:8080
       InternalAuth__ApiKey: local-car-service-key
       RabbitMq__HostName: rabbitmq
       RabbitMq__Port: 5672
@@ -163,6 +193,8 @@ services:
         condition: service_healthy
       car-flyway:
         condition: service_completed_successfully
+      car-market-value-service:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/healthz"]
       interval: 10s
