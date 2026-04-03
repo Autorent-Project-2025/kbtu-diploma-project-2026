@@ -1,8 +1,7 @@
 using CarService.Domain.Entities;
-using CarService.Infrastructure.Persistance;
 using Microsoft.EntityFrameworkCore;
 
-namespace CarService.Infrastructure.Services
+namespace CarService.Infrastructure.Persistence.Catalog
 {
     public sealed class CarCatalogResolver
     {

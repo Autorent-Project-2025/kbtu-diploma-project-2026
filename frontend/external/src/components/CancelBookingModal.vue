@@ -135,7 +135,7 @@
                     <p
                       class="text-sm font-semibold text-gray-900 dark:text-white"
                     >
-                      ${{ booking.price }}
+                      {{ formatMoney(booking.price) }}
                     </p>
                     <p class="text-xs text-gray-600 dark:text-gray-400">
                       Стоимость
@@ -215,6 +215,7 @@
 <script setup lang="ts">
 import type { Booking } from "../types/Booking";
 import { formatBookingDate } from "../utils/bookingUtils";
+import { formatMoney } from "../utils/formatMoney";
 
 interface Props {
   isOpen: boolean;

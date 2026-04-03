@@ -19,6 +19,11 @@ namespace BookingService.Infrastructure.Persistence.Configurations
             builder.Property(b => b.CreatedAt)
                 .HasDefaultValueSql("NOW()");
 
+            builder.Property(b => b.PricingBreakdownJson)
+                .HasColumnType("jsonb");
+
+            builder.Ignore(b => b.PricingBreakdown);
+
             builder.HasIndex(b => new { b.PartnerCarId, b.StartTime, b.EndTime })
                 .HasDatabaseName("idx_booking_car_time");
 

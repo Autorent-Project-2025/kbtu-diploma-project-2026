@@ -22,6 +22,8 @@ namespace BookingService.Application.Mappers
             TripStartedAt = booking.TripStartedAt,
             TripCompletedAt = booking.TripCompletedAt,
             CompletionReviewTicketId = booking.CompletionReviewTicketId,
+            UsedSubscription = booking.UsedSubscription,
+            PricingBreakdownJson = booking.PricingBreakdownJson,
             Status = booking.Status.ToString().ToLowerInvariant()
         };
 
@@ -48,6 +50,8 @@ namespace BookingService.Application.Mappers
                 TripStartedAt = booking.TripStartedAt,
                 TripCompletedAt = booking.TripCompletedAt,
                 CompletionReviewTicketId = booking.CompletionReviewTicketId,
+                UsedSubscription = booking.UsedSubscription,
+                PricingBreakdownJson = booking.PricingBreakdownJson,
                 Status = booking.Status.ToString().ToLowerInvariant()
             };
         }

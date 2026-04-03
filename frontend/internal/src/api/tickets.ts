@@ -6,8 +6,6 @@ export interface PartnerCarReviewPayload {
   carModel?: string;
   carYear?: number;
   licensePlate?: string;
-  priceHour?: number;
-  priceDay?: number;
   email?: string;
 }
 

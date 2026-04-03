@@ -3,6 +3,7 @@ import type {
   Booking,
   BookingCharge,
   BookingCompletionSubmissionResult,
+  BookingPricingBreakdown,
   BookingPaymentState,
   BookingPaymentStatus,
   BookingStatus,
@@ -28,6 +29,8 @@ interface BookingApiDto {
   tripStartedAt?: string | null;
   tripCompletedAt?: string | null;
   completionReviewTicketId?: string | null;
+  usedSubscription?: boolean | null;
+  pricingBreakdown?: BookingPricingBreakdown | null;
   status?: string | null;
 }
 
@@ -103,6 +106,8 @@ function mapBooking(dto: BookingApiDto): Booking {
     tripStartedAt: dto.tripStartedAt ?? null,
     tripCompletedAt: dto.tripCompletedAt ?? null,
     completionReviewTicketId: dto.completionReviewTicketId ?? null,
+    usedSubscription: dto.usedSubscription ?? false,
+    pricingBreakdown: dto.pricingBreakdown ?? null,
     status: normalizeStatus(dto.status),
   };
 }

@@ -2,7 +2,7 @@ using CarService.Application.DTOs.CarImage;
 using CarService.Application.Interfaces;
 using CarService.Application.Interfaces.Integrations;
 using CarService.Domain.Entities;
-using CarService.Infrastructure.Persistance;
+using CarService.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
 namespace CarService.Infrastructure.Services

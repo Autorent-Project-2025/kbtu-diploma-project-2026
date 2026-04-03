@@ -1,3 +1,19 @@
+export interface BookingPricingBreakdown {
+  quotedAtUtc: string;
+  marketValueKzt: number;
+  rating: number;
+  currentAvailableCarsCount: number;
+  daysBeforeBooking: number;
+  billableHours: number;
+  ratingCoefficient: number;
+  advanceBookingCoefficient: number;
+  availabilityCoefficient: number;
+  quotedPriceHour: number;
+  quotedTotalPrice: number;
+  currency: string;
+  isMarketValueStale: boolean;
+}
+
 export interface Booking {
   id: number;
   carId: number;
@@ -11,6 +27,8 @@ export interface Booking {
   tripStartedAt?: string | null;
   tripCompletedAt?: string | null;
   completionReviewTicketId?: string | null;
+  usedSubscription?: boolean;
+  pricingBreakdown?: BookingPricingBreakdown | null;
   status: BookingStatus;
 }
 

@@ -20,8 +20,6 @@ public sealed record CreateTicketCommand(
     string? CarModel,
     int? CarYear,
     string? LicensePlate,
-    decimal? PriceHour,
-    decimal? PriceDay,
     TicketDocumentFilePayload? OwnershipDocumentFile,
     IReadOnlyCollection<TicketDocumentFilePayload>? CarImageFiles,
     int? BookingId,

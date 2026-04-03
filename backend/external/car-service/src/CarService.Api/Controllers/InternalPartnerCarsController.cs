@@ -49,16 +49,6 @@ namespace CarService.Api.Controllers
                 return BadRequest(new { error = $"CarYear must be between 1886 and {maxAllowedCarYear}." });
             }
 
-            if (request.PriceHour <= 0m || request.PriceHour > 1_000_000m)
-            {
-                return BadRequest(new { error = "PriceHour must be greater than 0 and less than or equal to 1000000." });
-            }
-
-            if (request.PriceDay <= 0m || request.PriceDay > 1_000_000m)
-            {
-                return BadRequest(new { error = "PriceDay must be greater than 0 and less than or equal to 1000000." });
-            }
-
             var created = await _partnerCarService.ProvisionAsync(
                 new PartnerCarProvisionDto
                 {
@@ -68,8 +58,6 @@ namespace CarService.Api.Controllers
                     CarModel = request.CarModel,
                     CarYear = request.CarYear,
                     LicensePlate = request.LicensePlate,
-                    PriceHour = request.PriceHour,
-                    PriceDay = request.PriceDay,
                     OwnershipFileName = request.OwnershipDocumentFileName,
                     Images = (request.Images ?? [])
                         .Select(image => new PartnerCarProvisionImageDto
@@ -82,6 +70,43 @@ namespace CarService.Api.Controllers
                 cancellationToken);
 
             return Ok(created);
+        }
+
+        [AllowAnonymous]
+        [HttpGet("{partnerCarId:int}/pricing-context")]
+        public async Task<IActionResult> GetPricingContext(
+            int partnerCarId,
+            [FromQuery] DateTimeOffset startTime,
+            [FromQuery] DateTimeOffset endTime,
+            CancellationToken cancellationToken)
+        {
+            if (!IsAuthorizedInternalRequest())
+            {
+                return Unauthorized(new { error = "Internal API key is invalid." });
+            }
+
+            if (partnerCarId <= 0)
+            {
+                return BadRequest(new { error = "PartnerCarId must be greater than zero." });
+            }
+
+            if (endTime <= startTime)
+            {
+                return BadRequest(new { error = "EndTime must be greater than StartTime." });
+            }
+
+            var payload = await _partnerCarService.GetPricingContextAsync(
+                partnerCarId,
+                startTime,
+                endTime,
+                cancellationToken);
+
+            if (payload is null)
+            {
+                return NotFound(new { error = "Partner car not found." });
+            }
+
+            return Ok(payload);
         }
 
         private bool IsAuthorizedInternalRequest()

@@ -58,8 +58,6 @@ public sealed class TicketConfiguration : IEntityTypeConfiguration<Ticket>
         builder.Ignore(ticket => ticket.CarModel);
         builder.Ignore(ticket => ticket.CarYear);
         builder.Ignore(ticket => ticket.LicensePlate);
-        builder.Ignore(ticket => ticket.PriceHour);
-        builder.Ignore(ticket => ticket.PriceDay);
         builder.Ignore(ticket => ticket.OwnershipDocumentFileName);
         builder.Ignore(ticket => ticket.CarImages);
         builder.Ignore(ticket => ticket.BookingId);
@@ -144,16 +142,12 @@ public sealed class TicketConfiguration : IEntityTypeConfiguration<Ticket>
         var carModel = GetOptionalString(root, "carModel");
         var carYear = GetOptionalInt(root, "carYear");
         var licensePlate = GetOptionalString(root, "licensePlate");
-        var priceHour = GetOptionalDecimal(root, "priceHour");
-        var priceDay = GetOptionalDecimal(root, "priceDay");
         if (relatedPartnerUserId.HasValue ||
             !string.IsNullOrWhiteSpace(ownershipDocumentFileName) ||
             !string.IsNullOrWhiteSpace(carBrand) ||
             !string.IsNullOrWhiteSpace(carModel) ||
             carYear.HasValue ||
-            !string.IsNullOrWhiteSpace(licensePlate) ||
-            priceHour.HasValue ||
-            priceDay.HasValue)
+            !string.IsNullOrWhiteSpace(licensePlate))
         {
             return new PartnerCarTicketData
             {
@@ -167,8 +161,6 @@ public sealed class TicketConfiguration : IEntityTypeConfiguration<Ticket>
                 CarModel = carModel ?? string.Empty,
                 CarYear = carYear,
                 LicensePlate = licensePlate ?? string.Empty,
-                PriceHour = priceHour,
-                PriceDay = priceDay,
                 OwnershipDocumentFileName = ownershipDocumentFileName ?? string.Empty,
                 CarImages = GetPartnerCarImages(root),
                 DecisionReason = decisionReason,

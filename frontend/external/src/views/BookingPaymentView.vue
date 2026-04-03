@@ -279,6 +279,44 @@
             </p>
           </article>
 
+          <article
+            v-if="pricingBreakdown"
+            class="bg-white dark:bg-gray-900 rounded-3xl border border-gray-200 dark:border-gray-800 shadow-xl p-6"
+          >
+            <p class="text-sm uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400 font-bold">Расчет цены</p>
+            <div class="mt-4 space-y-3 text-sm text-gray-600 dark:text-gray-300">
+              <p>
+                Сохранен: <span class="font-semibold text-gray-900 dark:text-white">{{ formatDate(pricingBreakdown.quotedAtUtc) }}</span>
+              </p>
+              <p>
+                Рыночная стоимость: <span class="font-semibold text-gray-900 dark:text-white">{{ formatAmount(pricingBreakdown.marketValueKzt, pricingBreakdown.currency) }}</span>
+              </p>
+              <p>
+                Ставка за час: <span class="font-semibold text-gray-900 dark:text-white">{{ formatAmount(pricingBreakdown.quotedPriceHour, pricingBreakdown.currency) }}</span>
+              </p>
+              <p>
+                Оплачиваемые часы: <span class="font-semibold text-gray-900 dark:text-white">{{ pricingBreakdown.billableHours }}</span>
+              </p>
+              <p>
+                Итог расчета: <span class="font-semibold text-gray-900 dark:text-white">{{ formatAmount(pricingBreakdown.quotedTotalPrice, pricingBreakdown.currency) }}</span>
+              </p>
+              <p>
+                Коэффициенты:
+                <span class="font-semibold text-gray-900 dark:text-white">
+                  x{{ formatCoefficient(pricingBreakdown.ratingCoefficient) }} рейтинг,
+                  x{{ formatCoefficient(pricingBreakdown.advanceBookingCoefficient) }} раннее бронирование,
+                  x{{ formatCoefficient(pricingBreakdown.availabilityCoefficient) }} доступность
+                </span>
+              </p>
+              <p
+                v-if="pricingBreakdown.isMarketValueStale"
+                class="font-medium text-amber-700 dark:text-amber-300"
+              >
+                Рыночный снапшот на момент расчета уже был устаревшим.
+              </p>
+            </div>
+          </article>
+
           <article class="bg-gradient-to-br from-amber-500 to-orange-600 rounded-3xl shadow-xl p-6 text-white">
             <p class="text-sm uppercase tracking-[0.2em] font-bold text-amber-100">Mock Rules</p>
             <ul class="mt-4 space-y-3 text-sm text-amber-50">
@@ -348,6 +386,8 @@ const submitDisabled = computed(() => {
     !payment.value.requiresInput
   );
 });
+
+const pricingBreakdown = computed(() => booking.value?.pricingBreakdown ?? null);
 
 onMounted(async () => {
   clockTimer = window.setInterval(() => {
@@ -474,6 +514,10 @@ function formatAmount(amount: number | null | undefined, currency: string): stri
     currency,
     maximumFractionDigits: 2,
   }).format(amount);
+}
+
+function formatCoefficient(value: number): string {
+  return value.toFixed(2);
 }
 
 function getPaymentStatusText(status: BookingPaymentState): string {

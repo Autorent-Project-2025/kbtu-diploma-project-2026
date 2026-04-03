@@ -712,13 +712,13 @@ import { getMyBookings } from "../api/booking";
 import { useToast } from "../composables/useToast";
 import type { Booking } from "../types/Booking";
 
-import axios from "axios";
+import api from "../api/axios";
 
 const mySubscription = ref<any | null>(null);
 
-async function loadSubsription() {
+async function loadSubscription() {
   try {
-    const { data } = await axios.get("/subscriptions/my");
+    const { data } = await api.get("/subscriptions/my");
     mySubscription.value = data;
   } catch {
     mySubscription.value = null;

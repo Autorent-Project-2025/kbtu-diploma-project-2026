@@ -143,7 +143,7 @@
               v-if="loadingPrice"
               class="mt-4 text-sm text-gray-500 dark:text-gray-400"
             >
-              Calculating price...
+              Рассчитываем стоимость...
             </div>
 
             <div
@@ -157,7 +157,7 @@
                   Estimated total
                 </span>
                 <span
-                  class="text-xl font-bold text-blue-600 dark:text-blue-400"
+                class="text-xl font-bold text-blue-600 dark:text-blue-400"
                 >
                   {{ useSubscription ? 0 : pricePreview.finalPrice }}
                   {{ pricePreview.currency }}
@@ -169,24 +169,24 @@
                 class="text-sm text-gray-600 dark:text-gray-400 space-y-1"
               >
                 <p>
-                  Base price/hour: {{ pricePreview.basePricePerHour }}
+                  Рыночная стоимость: {{ pricePreview.marketValueKzt }}
                   {{ pricePreview.currency }}
                 </p>
-                <p>Total hours: {{ pricePreview.totalHours }}</p>
-                <p>Days (display): {{ pricePreview.days }}</p>
+                <p>Ставка за час: {{ pricePreview.priceHour }} {{ pricePreview.currency }}</p>
+                <p>Оплачиваемые часы: {{ pricePreview.billableHours }}</p>
+                <p>Рейтинг: {{ pricePreview.rating }} (x{{ pricePreview.ratingCoefficient }})</p>
                 <p>
-                  Demand: {{ pricePreview.demandLevel }} (x{{
-                    pricePreview.demandCoefficient
+                  Предварительное бронирование: {{ pricePreview.daysBeforeBooking }} дн. (x{{
+                    pricePreview.advanceBookingCoefficient
                   }})
                 </p>
-                <p>
-                  Weekend coefficient: x{{ pricePreview.weekendCoefficient }}
-                </p>
-                <p>
-                  Duration coefficient: x{{ pricePreview.durationCoefficient }}
-                </p>
-                <p class="pt-1 font-medium text-blue-700 dark:text-blue-300">
-                  {{ pricePreview.explanation }}
+                <p>Доступных машин этой модели: {{ pricePreview.currentAvailableCarsCount }}</p>
+                <p>Коэффициент доступности: x{{ pricePreview.availabilityCoefficient }}</p>
+                <p
+                  v-if="pricePreview.isMarketValueStale"
+                  class="pt-1 font-medium text-amber-700 dark:text-amber-300"
+                >
+                  Рыночная стоимость устарела, цена рассчитана по последнему доступному снапшоту.
                 </p>
               </div>
 
@@ -194,7 +194,7 @@
                 v-else
                 class="text-sm text-emerald-700 dark:text-emerald-300 font-medium"
               >
-                This booking will use your active subscription.
+                Это бронирование будет оформлено по активной подписке.
               </div>
             </div>
 
@@ -234,7 +234,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
-import axios from "axios";
+import api from "../api/axios";
 import type { Car } from "../types/Car";
 
 interface Props {
@@ -254,16 +254,18 @@ interface Emits {
 
 type PricePreview = {
   partnerCarId: number;
-  basePricePerHour: number;
-  totalHours: number;
-  days: number;
-  demandCoefficient: number;
-  weekendCoefficient: number;
-  durationCoefficient: number;
+  marketValueKzt: number;
+  rating: number;
+  currentAvailableCarsCount: number;
+  daysBeforeBooking: number;
+  billableHours: number;
+  ratingCoefficient: number;
+  advanceBookingCoefficient: number;
+  availabilityCoefficient: number;
+  priceHour: number;
   finalPrice: number;
   currency: string;
-  demandLevel: string;
-  explanation: string;
+  isMarketValueStale: boolean;
 };
 
 type MySubscription = {
@@ -336,7 +338,7 @@ const displayError = computed(() => {
 
 async function loadMySubscription() {
   try {
-    const { data } = await axios.get("/subscriptions/my");
+    const { data } = await api.get("/subscriptions/my");
     mySubscription.value = data;
   } catch {
     mySubscription.value = null;
@@ -364,11 +366,11 @@ async function fetchPricePreview() {
   try {
     loadingPrice.value = true;
 
-    const { data } = await axios.get("/bookings/price-preview", {
+    const { data } = await api.get("/bookings/price-preview", {
       params: {
         partnerCarId: props.car.id,
-        startDate: start.toISOString(),
-        endDate: end.toISOString(),
+        startTime: start.toISOString(),
+        endTime: end.toISOString(),
       },
     });
 

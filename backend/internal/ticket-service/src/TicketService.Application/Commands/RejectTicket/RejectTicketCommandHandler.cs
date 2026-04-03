@@ -81,8 +81,6 @@ public sealed class RejectTicketCommandHandler
             partnerCarData.CarModel,
             partnerCarData.CarYear,
             partnerCarData.LicensePlate,
-            partnerCarData.PriceHour,
-            partnerCarData.PriceDay,
             partnerCarData.Email);
     }
 }

@@ -1,7 +1,7 @@
 using CarService.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 
-namespace CarService.Infrastructure.Services
+namespace CarService.Infrastructure.Persistence.Extensions
 {
     internal static class CarCatalogQueryExtensions
     {

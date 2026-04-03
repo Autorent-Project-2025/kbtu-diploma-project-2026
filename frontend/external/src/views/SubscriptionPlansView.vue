@@ -210,7 +210,7 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
-import axios from "axios";
+import api from "../api/axios";
 
 type SubscriptionPlan = {
   id: number;
@@ -266,7 +266,7 @@ function getPlanBadge(planType: string) {
 }
 
 async function loadPlans() {
-  const { data } = await axios.get("/subscriptions/plans");
+  const { data } = await api.get("/subscriptions/plans");
   plans.value = data;
   for (const plan of plans.value) {
     if (!(plan.id in autoRenewByPlan.value)) {
@@ -277,7 +277,7 @@ async function loadPlans() {
 
 async function loadMySubscription() {
   try {
-    const { data } = await axios.get("/subscriptions/my");
+    const { data } = await api.get("/subscriptions/my");
     mySubscription.value = data;
   } catch (error: any) {
     if (error?.response?.status === 401) {
@@ -310,7 +310,7 @@ async function subscribe(subscriptionPlanId: number) {
     actionLoading.value = true;
     errorMessage.value = "";
 
-    await axios.post("/subscriptions", {
+    await api.post("/subscriptions", {
       subscriptionPlanId,
       autoRenew: !!autoRenewByPlan.value[subscriptionPlanId],
     });
@@ -333,7 +333,7 @@ async function cancelSubscription() {
     actionLoading.value = true;
     errorMessage.value = "";
 
-    await axios.post(`/subscriptions/${mySubscription.value.id}/cancel`);
+    await api.post(`/subscriptions/${mySubscription.value.id}/cancel`);
     await loadData();
   } catch (error: any) {
     errorMessage.value =

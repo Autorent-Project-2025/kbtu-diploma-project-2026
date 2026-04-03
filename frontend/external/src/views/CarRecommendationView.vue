@@ -16,7 +16,7 @@
         <input
           v-model.number="filters.maxBudgetPerHour"
           type="number"
-          placeholder="Max budget / hour"
+          placeholder="Макс. бюджет, ₸/час"
           class="px-4 py-3 rounded-xl border bg-white dark:bg-slate-800"
         />
 
@@ -94,9 +94,7 @@
             </div>
 
             <div class="flex items-center justify-between">
-              <span class="font-semibold"
-                >{{ car.priceHour ?? "—" }} / hour</span
-              >
+              <span class="font-semibold">{{ formatPricePerHour(car.priceHour) }}</span>
               <span class="text-sm text-gray-500">Score: {{ car.score }}</span>
             </div>
           </div>
@@ -112,7 +110,8 @@
 
 <script setup lang="ts">
 import { ref } from "vue";
-import axios from "axios";
+import api from "../api/axios";
+import { formatPricePerHour } from "../utils/formatMoney";
 
 type RecommendedCar = {
   id: number;
@@ -140,7 +139,7 @@ async function fetchRecommendations() {
   try {
     loading.value = true;
 
-    const { data } = await axios.get("/recommendations", {
+    const { data } = await api.get("/recommendations", {
       params: filters.value,
     });
 

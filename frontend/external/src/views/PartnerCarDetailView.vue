@@ -27,8 +27,8 @@
           <div class="grid md:grid-cols-2 gap-4 text-gray-700 dark:text-gray-300">
             <p>Гос номер: <b>{{ car.licensePlate }}</b></p>
             <p>Статус: <b>{{ statusLabel(car.status) }}</b></p>
-            <p>Цена/час: <b>{{ car.priceHour ?? "—" }}</b></p>
-            <p>Цена/день: <b>{{ car.priceDay ?? "—" }}</b></p>
+            <p>Цена/час: <b>{{ formatMoney(car.priceHour) }}</b></p>
+            <p>Цена/день: <b>{{ formatMoney(car.priceDay) }}</b></p>
             <p>Рейтинг: <b>{{ car.rating ?? "нет" }}</b></p>
             <p class="flex items-center gap-2">
               Файл собственности:
@@ -74,6 +74,7 @@ import { useRoute } from "vue-router";
 import { getMyPartnerCarDetails, type PartnerCarDetails } from "../api/partnerCars";
 import { getMyPartnerFileTemporaryLink } from "../api/partners";
 import { useToast } from "../composables/useToast";
+import { formatMoney } from "../utils/formatMoney";
 
 const route = useRoute();
 const { error } = useToast();

@@ -46,7 +46,9 @@
       - ASPNETCORE_ENVIRONMENT=Development
       - Jwt__PublicKey=${Jwt__PublicKey}
       - InternalAuth__ApiKey=${InternalAuth__ApiKey}
+      - Observability__LogPath=${Observability__LogPath}
       - CarService__BaseUrl=${CarService__BaseUrl}
+      - CarService__InternalApiKey=${CarService__InternalApiKey}
       - ClientService__BaseUrl=${ClientService__BaseUrl}
       - ClientService__InternalApiKey=${ClientService__InternalApiKey}
       - IdentityService__BaseUrl=${IdentityService__BaseUrl}
@@ -61,6 +63,9 @@
         condition: service_healthy
       flyway:
         condition: service_completed_successfully
+    volumes:
+      - booking_logs:/tmp/autorent/booking-service
 
 volumes:
   rental_pgdata:
+  booking_logs:

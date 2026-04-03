@@ -38,8 +38,6 @@ public sealed class PartnerCarProvisioningClient : IPartnerCarProvisioningClient
                 request.CarModel,
                 request.CarYear,
                 request.LicensePlate,
-                request.PriceHour,
-                request.PriceDay,
                 request.OwnershipDocumentFileName,
                 images = request.Images.Select(image => new
                 {
