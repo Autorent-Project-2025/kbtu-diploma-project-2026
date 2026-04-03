@@ -1,10 +1,20 @@
 using BookingService.Domain.Enums;
+using BookingService.Domain.ValueObjects;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Text.Json;
 
 namespace BookingService.Domain.Entities
 {
     public class Booking
     {
+        private static readonly JsonSerializerOptions PricingBreakdownSerializerOptions = new()
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        };
+
+        [NotMapped]
+        private BookingPricingBreakdownSnapshot? _pricingBreakdown;
+
         [Column("id")]
         public int Id { get; set; }
 
@@ -46,6 +56,46 @@ namespace BookingService.Domain.Entities
 
         [Column("completion_review_ticket_id")]
         public Guid? CompletionReviewTicketId { get; set; }
+
+        [Column("pricing_breakdown")]
+        public string? PricingBreakdownJson { get; private set; }
+
+        [NotMapped]
+        public BookingPricingBreakdownSnapshot? PricingBreakdown
+        {
+            get
+            {
+                if (_pricingBreakdown is not null)
+                {
+                    return _pricingBreakdown;
+                }
+
+                if (string.IsNullOrWhiteSpace(PricingBreakdownJson))
+                {
+                    return null;
+                }
+
+                try
+                {
+                    _pricingBreakdown = JsonSerializer.Deserialize<BookingPricingBreakdownSnapshot>(
+                        PricingBreakdownJson,
+                        PricingBreakdownSerializerOptions);
+                }
+                catch (JsonException)
+                {
+                    _pricingBreakdown = null;
+                }
+
+                return _pricingBreakdown;
+            }
+            set
+            {
+                _pricingBreakdown = value;
+                PricingBreakdownJson = value is null
+                    ? null
+                    : JsonSerializer.Serialize(value, PricingBreakdownSerializerOptions);
+            }
+        }
 
         [Column("status")]
         public BookingStatus Status { get; set; } = BookingStatus.Pending;

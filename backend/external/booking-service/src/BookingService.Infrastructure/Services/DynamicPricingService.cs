@@ -40,9 +40,10 @@ namespace BookingService.Infrastructure.Services
             if (!context.MarketValueKzt.HasValue || context.MarketValueKzt.Value <= 0m)
                 throw new InvalidOperationException("Market value is not available for this car.");
 
+            var quotedAtUtc = DateTimeOffset.UtcNow;
             var rating = context.Rating <= 0m ? 3.0m : context.Rating;
             var billableHours = Math.Max(1, (int)Math.Ceiling((endTime - startTime).TotalHours));
-            var daysBeforeBooking = Math.Max(0, (int)Math.Floor((startTime - DateTimeOffset.UtcNow).TotalDays));
+            var daysBeforeBooking = Math.Max(0, (int)Math.Floor((startTime - quotedAtUtc).TotalDays));
             var ratingCoefficient = 1m + (rating - 3m) * 0.05m;
             var advanceBookingCoefficient = 1m - decimal.Min(0.2m, 0.01m * daysBeforeBooking);
             var availabilityCoefficient = decimal.Max(
@@ -60,6 +61,7 @@ namespace BookingService.Infrastructure.Services
             {
                 PartnerCarId = context.PartnerCarId,
                 PartnerUserId = context.PartnerUserId,
+                QuotedAtUtc = quotedAtUtc,
                 MarketValueKzt = RoundCurrency(context.MarketValueKzt.Value),
                 Rating = RoundCurrency(rating),
                 CurrentAvailableCarsCount = context.CurrentAvailableCarsCount,
@@ -85,6 +87,7 @@ namespace BookingService.Infrastructure.Services
             return new PricePreviewDto
             {
                 PartnerCarId = quote.PartnerCarId,
+                QuotedAtUtc = quote.QuotedAtUtc,
                 MarketValueKzt = quote.MarketValueKzt,
                 Rating = quote.Rating,
                 CurrentAvailableCarsCount = quote.CurrentAvailableCarsCount,

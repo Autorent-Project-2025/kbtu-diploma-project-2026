@@ -1,9 +1,7 @@
-namespace BookingService.Application.DTOs
+namespace BookingService.Domain.ValueObjects
 {
-    public sealed class BookingPriceQuoteDto
+    public sealed class BookingPricingBreakdownSnapshot
     {
-        public int PartnerCarId { get; set; }
-        public Guid PartnerUserId { get; set; }
         public DateTimeOffset QuotedAtUtc { get; set; }
         public decimal MarketValueKzt { get; set; }
         public decimal Rating { get; set; }
@@ -13,8 +11,8 @@ namespace BookingService.Application.DTOs
         public decimal RatingCoefficient { get; set; }
         public decimal AdvanceBookingCoefficient { get; set; }
         public decimal AvailabilityCoefficient { get; set; }
-        public decimal PriceHour { get; set; }
-        public decimal TotalPrice { get; set; }
+        public decimal QuotedPriceHour { get; set; }
+        public decimal QuotedTotalPrice { get; set; }
         public string Currency { get; set; } = "KZT";
         public bool IsMarketValueStale { get; set; }
     }

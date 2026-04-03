@@ -1,10 +1,12 @@
 using BookingService.Application.DTOs.Booking;
+using BookingService.Application.DTOs;
 using BookingService.Application.DTOs.Common;
 using BookingService.Application.Interfaces;
 using BookingService.Application.Interfaces.Integrations;
 using BookingService.Application.Mappers;
 using BookingService.Domain.Entities;
 using BookingService.Domain.Enums;
+using BookingService.Domain.ValueObjects;
 using BookingService.Infrastructure.Integrations;
 using BookingService.Infrastructure.Options;
 using BookingService.Infrastructure.Persistence;
@@ -87,9 +89,7 @@ namespace BookingService.Infrastructure.Services
                 return await CreateBookingInMemory(
                     userId,
                     partnerCarId,
-                    priceQuote.PartnerUserId,
-                    priceQuote.PriceHour,
-                    priceQuote.TotalPrice,
+                    priceQuote,
                     startTime,
                     endTime,
                     dto.UseSubscription);
@@ -103,9 +103,7 @@ namespace BookingService.Infrastructure.Services
                     var booking = await CreateBookingWithOverlapCheck(
                         userId,
                         partnerCarId,
-                        priceQuote.PartnerUserId,
-                        priceQuote.PriceHour,
-                        priceQuote.TotalPrice,
+                        priceQuote,
                         startTime,
                         endTime,
                         dto.UseSubscription);
@@ -764,9 +762,7 @@ namespace BookingService.Infrastructure.Services
         private async Task<BookingResponseDto> CreateBookingInMemory(
             Guid userId,
             int partnerCarId,
-            Guid partnerUserId,
-            decimal priceHour,
-            decimal totalPrice,
+            BookingPriceQuoteDto priceQuote,
             DateTimeOffset startTime,
             DateTimeOffset endTime,
             bool useSubscription)
@@ -777,9 +773,7 @@ namespace BookingService.Infrastructure.Services
                 var booking = await CreateBookingWithOverlapCheck(
                     userId,
                     partnerCarId,
-                    partnerUserId,
-                    priceHour,
-                    totalPrice,
+                    priceQuote,
                     startTime,
                     endTime,
                     useSubscription);
@@ -795,9 +789,7 @@ namespace BookingService.Infrastructure.Services
         private async Task<Booking> CreateBookingWithOverlapCheck(
             Guid userId,
             int partnerCarId,
-            Guid partnerUserId,
-            decimal priceHour,
-            decimal quotedTotalPrice,
+            BookingPriceQuoteDto priceQuote,
             DateTimeOffset startTime,
             DateTimeOffset endTime,
             bool useSubscription)
@@ -827,31 +819,52 @@ namespace BookingService.Infrastructure.Services
             }
             else
             {
-                totalPrice = quotedTotalPrice;
+                totalPrice = priceQuote.TotalPrice;
             }
 
             var booking = new Booking
             {
                 PartnerCarId = partnerCarId,
                 UserId = userId,
-                PartnerUserId = partnerUserId,
+                PartnerUserId = priceQuote.PartnerUserId,
                 StartTime = startTime,
                 EndTime = endTime,
                 Status = BookingStatus.Pending,
-                PriceHour = priceHour,
+                PriceHour = priceQuote.PriceHour,
                 TotalPrice = totalPrice,
                 SubscriptionId = subscriptionId,
                 UsedSubscription = usedSubscription,
                 CreatedAt = DateTimeOffset.UtcNow,
                 TripStartedAt = null,
                 TripCompletedAt = null,
-                CompletionReviewTicketId = null
+                CompletionReviewTicketId = null,
+                PricingBreakdown = CreatePricingBreakdownSnapshot(priceQuote)
             };
 
             _db.Bookings.Add(booking);
             await _db.SaveChangesAsync();
 
             return booking;
+        }
+
+        private static BookingPricingBreakdownSnapshot CreatePricingBreakdownSnapshot(BookingPriceQuoteDto priceQuote)
+        {
+            return new BookingPricingBreakdownSnapshot
+            {
+                QuotedAtUtc = priceQuote.QuotedAtUtc,
+                MarketValueKzt = priceQuote.MarketValueKzt,
+                Rating = priceQuote.Rating,
+                CurrentAvailableCarsCount = priceQuote.CurrentAvailableCarsCount,
+                DaysBeforeBooking = priceQuote.DaysBeforeBooking,
+                BillableHours = priceQuote.BillableHours,
+                RatingCoefficient = priceQuote.RatingCoefficient,
+                AdvanceBookingCoefficient = priceQuote.AdvanceBookingCoefficient,
+                AvailabilityCoefficient = priceQuote.AvailabilityCoefficient,
+                QuotedPriceHour = priceQuote.PriceHour,
+                QuotedTotalPrice = priceQuote.TotalPrice,
+                Currency = priceQuote.Currency,
+                IsMarketValueStale = priceQuote.IsMarketValueStale
+            };
         }
 
         private Task<bool> HasOverlappingActiveBookings(int partnerCarId, DateTimeOffset startTime, DateTimeOffset endTime)

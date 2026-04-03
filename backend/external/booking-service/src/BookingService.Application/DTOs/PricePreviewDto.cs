@@ -3,6 +3,7 @@ namespace BookingService.Application.DTOs;
 public class PricePreviewDto
 {
     public int PartnerCarId { get; set; }
+    public DateTimeOffset QuotedAtUtc { get; set; }
     public decimal MarketValueKzt { get; set; }
     public decimal Rating { get; set; }
     public int CurrentAvailableCarsCount { get; set; }
