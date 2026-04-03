@@ -179,6 +179,7 @@ services:
       ImageService__BaseUrl: http://image-service:8080
       CarMarketValueService__BaseUrl: http://car-market-value-service:8080
       InternalAuth__ApiKey: local-car-service-key
+      Observability__LogPath: /tmp/autorent/car-service/car-service.jsonl
       RabbitMq__HostName: rabbitmq
       RabbitMq__Port: 5672
       RabbitMq__UserName: ${RABBITMQ_DEFAULT_USER:-autorent}
@@ -204,6 +205,8 @@ services:
     networks:
       - backend
       - data
+    volumes:
+      - car_logs:/tmp/autorent/car-service
 
   booking-db:
     image: postgres:16
@@ -256,6 +259,7 @@ services:
       ASPNETCORE_ENVIRONMENT: Development
       ConnectionStrings__DbConnection: Host=booking-db;Port=5432;Database=postgres_db;Username=postgres;Password=postgres
       InternalAuth__ApiKey: local-booking-service-key
+      Observability__LogPath: /tmp/autorent/booking-service/booking-service.jsonl
       CarService__BaseUrl: http://car-service:8080
       CarService__InternalApiKey: local-car-service-key
       ClientService__BaseUrl: http://client-service:8080
@@ -291,6 +295,8 @@ services:
     networks:
       - backend
       - data
+    volumes:
+      - booking_logs:/tmp/autorent/booking-service
 
   client-db:
     image: postgres:16
@@ -949,6 +955,8 @@ services:
       - loki
     volumes:
       - ./ops/observability/promtail/promtail.yml:/etc/promtail/promtail.yml:ro
+      - car_logs:/tmp/autorent/car-service:ro
+      - booking_logs:/tmp/autorent/booking-service:ro
       - gateway_logs:/tmp/autorent/api-gateway:ro
       - ticket_logs:/tmp/autorent/ticket-service:ro
       - identity_logs:/tmp/autorent/identity-service:ro
@@ -995,6 +1003,8 @@ volumes:
   ticket_logs:
   identity_logs:
   email_logs:
+  car_logs:
+  booking_logs:
 
 networks:
   frontend:

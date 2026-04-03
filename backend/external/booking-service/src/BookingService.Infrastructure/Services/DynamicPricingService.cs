@@ -1,16 +1,25 @@
 using BookingService.Application.DTOs;
 using BookingService.Application.Interfaces;
 using BookingService.Application.Interfaces.Integrations;
+using BookingService.Infrastructure.Observability;
+using Microsoft.Extensions.Logging;
 
 namespace BookingService.Infrastructure.Services
 {
     public class DynamicPricingService : IDynamicPricingService
     {
         private readonly IPartnerCarReadClient _partnerCarReadClient;
+        private readonly ILogger<DynamicPricingService> _logger;
+        private readonly ObservabilityLogWriter _observabilityLogWriter;
 
-        public DynamicPricingService(IPartnerCarReadClient partnerCarReadClient)
+        public DynamicPricingService(
+            IPartnerCarReadClient partnerCarReadClient,
+            ILogger<DynamicPricingService> logger,
+            ObservabilityLogWriter observabilityLogWriter)
         {
             _partnerCarReadClient = partnerCarReadClient;
+            _logger = logger;
+            _observabilityLogWriter = observabilityLogWriter;
         }
 
         public async Task<BookingPriceQuoteDto> CalculateQuoteAsync(
@@ -32,13 +41,50 @@ namespace BookingService.Infrastructure.Services
                 cancellationToken);
 
             if (context is null)
+            {
+                _logger.LogWarning(
+                    "Dynamic pricing context was not found for partner car {PartnerCarId} and range {StartTime} - {EndTime}.",
+                    partnerCarId,
+                    startTime,
+                    endTime);
+                await WriteQuoteRejectedAsync(
+                    "partner_car_not_found",
+                    partnerCarId,
+                    startTime,
+                    endTime,
+                    cancellationToken);
                 throw new KeyNotFoundException("Car not found.");
+            }
 
             if (context.PartnerUserId == Guid.Empty)
+            {
+                _logger.LogWarning(
+                    "Dynamic pricing context has invalid partner user id for partner car {PartnerCarId}.",
+                    partnerCarId);
+                await WriteQuoteRejectedAsync(
+                    "invalid_partner_user",
+                    partnerCarId,
+                    startTime,
+                    endTime,
+                    cancellationToken);
                 throw new InvalidOperationException("Partner car owner must be a valid UUID.");
+            }
 
             if (!context.MarketValueKzt.HasValue || context.MarketValueKzt.Value <= 0m)
+            {
+                _logger.LogWarning(
+                    "Dynamic pricing cannot be calculated for partner car {PartnerCarId} because market value is unavailable or invalid. MarketValueKzt={MarketValueKzt}.",
+                    partnerCarId,
+                    context.MarketValueKzt);
+                await WriteQuoteRejectedAsync(
+                    "market_value_unavailable",
+                    partnerCarId,
+                    startTime,
+                    endTime,
+                    cancellationToken,
+                    context.MarketValueKzt);
                 throw new InvalidOperationException("Market value is not available for this car.");
+            }
 
             var quotedAtUtc = DateTimeOffset.UtcNow;
             var rating = context.Rating <= 0m ? 3.0m : context.Rating;
@@ -56,6 +102,48 @@ namespace BookingService.Infrastructure.Services
                 advanceBookingCoefficient *
                 availabilityCoefficient);
             var totalPrice = RoundCurrency(priceHour * billableHours);
+
+            _logger.LogInformation(
+                "Dynamic price calculated for partner car {PartnerCarId}: startTime={StartTime}, endTime={EndTime}, quotedAtUtc={QuotedAtUtc}, marketValueKzt={MarketValueKzt}, rating={Rating}, daysBeforeBooking={DaysBeforeBooking}, currentAvailableCarsCount={CurrentAvailableCarsCount}, ratingCoefficient={RatingCoefficient}, advanceBookingCoefficient={AdvanceBookingCoefficient}, availabilityCoefficient={AvailabilityCoefficient}, billableHours={BillableHours}, priceHour={PriceHour}, totalPrice={TotalPrice}, isMarketValueStale={IsMarketValueStale}.",
+                context.PartnerCarId,
+                startTime,
+                endTime,
+                quotedAtUtc,
+                context.MarketValueKzt.Value,
+                rating,
+                daysBeforeBooking,
+                context.CurrentAvailableCarsCount,
+                ratingCoefficient,
+                advanceBookingCoefficient,
+                availabilityCoefficient,
+                billableHours,
+                priceHour,
+                totalPrice,
+                context.IsMarketValueStale);
+
+            await _observabilityLogWriter.WriteAsync(new
+            {
+                timestamp = DateTimeOffset.UtcNow,
+                service = "booking-service",
+                level = "Information",
+                @event = "booking_price_quote_calculated",
+                partnerCarId = context.PartnerCarId,
+                partnerUserId = context.PartnerUserId,
+                startTime,
+                endTime,
+                quotedAtUtc,
+                marketValueKzt = context.MarketValueKzt.Value,
+                rating,
+                daysBeforeBooking,
+                currentAvailableCarsCount = context.CurrentAvailableCarsCount,
+                ratingCoefficient,
+                advanceBookingCoefficient,
+                availabilityCoefficient,
+                billableHours,
+                priceHour,
+                totalPrice,
+                isMarketValueStale = context.IsMarketValueStale
+            }, cancellationToken);
 
             return new BookingPriceQuoteDto
             {
@@ -106,6 +194,28 @@ namespace BookingService.Infrastructure.Services
         private static decimal RoundCurrency(decimal amount)
         {
             return decimal.Round(amount, 2, MidpointRounding.AwayFromZero);
+        }
+
+        private Task WriteQuoteRejectedAsync(
+            string reason,
+            int partnerCarId,
+            DateTimeOffset startTime,
+            DateTimeOffset endTime,
+            CancellationToken cancellationToken,
+            decimal? marketValueKzt = null)
+        {
+            return _observabilityLogWriter.WriteAsync(new
+            {
+                timestamp = DateTimeOffset.UtcNow,
+                service = "booking-service",
+                level = "Warning",
+                @event = "booking_price_quote_rejected",
+                reason,
+                partnerCarId,
+                startTime,
+                endTime,
+                marketValueKzt
+            }, cancellationToken);
         }
     }
 }

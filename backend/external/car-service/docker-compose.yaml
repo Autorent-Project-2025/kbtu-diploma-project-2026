@@ -54,11 +54,15 @@ services:
       - MarketValueRefresh__RefreshAfterHours=${MarketValueRefresh__RefreshAfterHours}
       - MarketValueRefresh__PollIntervalSeconds=${MarketValueRefresh__PollIntervalSeconds}
       - MarketValueRefresh__BatchSize=${MarketValueRefresh__BatchSize}
+      - Observability__LogPath=${Observability__LogPath}
     depends_on:
       postgres:
         condition: service_healthy
       flyway:
         condition: service_completed_successfully
+    volumes:
+      - car_logs:/tmp/autorent/car-service
 
 volumes:
   rental_pgdata:
+  car_logs:

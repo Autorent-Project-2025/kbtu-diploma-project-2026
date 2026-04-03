@@ -6,6 +6,7 @@ using CarService.Api.Middleware;
 using CarService.Application.Interfaces;
 using CarService.Application.Interfaces.Integrations;
 using CarService.Infrastructure.Integrations;
+using CarService.Infrastructure.Observability;
 using CarService.Infrastructure.Options;
 using CarService.Infrastructure.Persistence;
 using CarService.Infrastructure.Persistence.Catalog;
@@ -20,6 +21,9 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddSingleton<ObservabilityLogWriter>();
+builder.Services.AddTransient<ObservabilityHttpClientHandler>();
 var httpClientResilienceOptions = builder.Configuration.GetHttpClientResilienceOptions();
 
 builder.Services.Configure<PartnerServiceOptions>(builder.Configuration.GetSection(PartnerServiceOptions.SectionName));
@@ -166,6 +170,7 @@ builder.Services.AddHttpClient<IPartnerContextClient, PartnerContextClient>((ser
     client.BaseAddress = new Uri(NormalizeBaseUrl(options.BaseUrl));
     client.Timeout = Timeout.InfiniteTimeSpan;
 })
+.AddHttpMessageHandler<ObservabilityHttpClientHandler>()
 .AddConfiguredResilience(httpClientResilienceOptions);
 
 builder.Services.AddHttpClient<IBookingReadClient, BookingReadClient>((serviceProvider, client) =>
@@ -184,6 +189,7 @@ builder.Services.AddHttpClient<IBookingReadClient, BookingReadClient>((servicePr
     client.BaseAddress = new Uri(NormalizeBaseUrl(options.BaseUrl));
     client.Timeout = Timeout.InfiniteTimeSpan;
 })
+.AddHttpMessageHandler<ObservabilityHttpClientHandler>()
 .AddConfiguredResilience(httpClientResilienceOptions);
 
 builder.Services.AddHttpClient<IImageStorageClient, ImageStorageClient>((serviceProvider, client) =>
@@ -197,6 +203,7 @@ builder.Services.AddHttpClient<IImageStorageClient, ImageStorageClient>((service
     client.BaseAddress = new Uri(NormalizeBaseUrl(options.BaseUrl));
     client.Timeout = Timeout.InfiniteTimeSpan;
 })
+.AddHttpMessageHandler<ObservabilityHttpClientHandler>()
 .AddConfiguredResilience(httpClientResilienceOptions);
 
 builder.Services.AddHttpClient<ICarMarketValueClient, CarMarketValueClient>((serviceProvider, client) =>
@@ -210,10 +217,12 @@ builder.Services.AddHttpClient<ICarMarketValueClient, CarMarketValueClient>((ser
     client.BaseAddress = new Uri(NormalizeBaseUrl(options.BaseUrl));
     client.Timeout = Timeout.InfiniteTimeSpan;
 })
+.AddHttpMessageHandler<ObservabilityHttpClientHandler>()
 .AddConfiguredResilience(httpClientResilienceOptions);
 
 var app = builder.Build();
 
+app.UseMiddleware<RequestObservabilityMiddleware>();
 app.UseMiddleware<ApiExceptionMiddleware>();
 app.UseHttpsRedirection();
 app.UseCors("app-cors");

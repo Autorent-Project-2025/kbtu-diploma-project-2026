@@ -12,8 +12,10 @@ using CarService.Infrastructure.Persistence;
 using CarService.Infrastructure.Persistence.Catalog;
 using CarService.Infrastructure.Persistence.Extensions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using CarService.Infrastructure.Options;
+using CarService.Infrastructure.Observability;
 
 namespace CarService.Infrastructure.Services
 {
@@ -25,6 +27,8 @@ namespace CarService.Infrastructure.Services
         private readonly ICarMarketValueSyncService _carMarketValueSyncService;
         private readonly IPartnerCarDisplayPricingService _partnerCarDisplayPricingService;
         private readonly MarketValueRefreshOptions _marketValueRefreshOptions;
+        private readonly ILogger<PartnerCarService> _logger;
+        private readonly ObservabilityLogWriter _observabilityLogWriter;
 
         public PartnerCarService(
             ApplicationDbContext db,
@@ -32,7 +36,9 @@ namespace CarService.Infrastructure.Services
             CarCatalogResolver catalogResolver,
             ICarMarketValueSyncService carMarketValueSyncService,
             IPartnerCarDisplayPricingService partnerCarDisplayPricingService,
-            IOptions<MarketValueRefreshOptions> marketValueRefreshOptions)
+            IOptions<MarketValueRefreshOptions> marketValueRefreshOptions,
+            ILogger<PartnerCarService> logger,
+            ObservabilityLogWriter observabilityLogWriter)
         {
             _db = db;
             _bookingReadClient = bookingReadClient;
@@ -40,6 +46,8 @@ namespace CarService.Infrastructure.Services
             _carMarketValueSyncService = carMarketValueSyncService;
             _partnerCarDisplayPricingService = partnerCarDisplayPricingService;
             _marketValueRefreshOptions = marketValueRefreshOptions.Value;
+            _logger = logger;
+            _observabilityLogWriter = observabilityLogWriter;
         }
 
         public async Task<PagedResult<PartnerCarResponseDto>> GetAllAsync(
@@ -407,6 +415,21 @@ namespace CarService.Infrastructure.Services
 
             if (partnerCar is null)
             {
+                _logger.LogWarning(
+                    "Pricing context was requested for missing partner car {PartnerCarId}.",
+                    partnerCarId);
+
+                await _observabilityLogWriter.WriteAsync(new
+                {
+                    timestamp = DateTimeOffset.UtcNow,
+                    service = "car-service",
+                    level = "Warning",
+                    @event = "partner_car_pricing_context_missing",
+                    partnerCarId,
+                    startTime,
+                    endTime
+                }, cancellationToken);
+
                 return null;
             }
 
@@ -432,6 +455,37 @@ namespace CarService.Infrastructure.Services
                 !partnerCar.CarModel.MarketValueKzt.HasValue ||
                 !marketValueFetchedAt.HasValue ||
                 marketValueFetchedAt <= staleCutoff;
+
+            _logger.LogInformation(
+                "Pricing context prepared for partner car {PartnerCarId}: carModelId={CarModelId}, startTime={StartTime}, endTime={EndTime}, candidateCarsCount={CandidateCarsCount}, currentAvailableCarsCount={CurrentAvailableCarsCount}, rating={Rating}, marketValueKzt={MarketValueKzt}, marketValueFetchedAt={MarketValueFetchedAt}, isMarketValueStale={IsMarketValueStale}.",
+                partnerCar.Id,
+                partnerCar.CarModelId,
+                startTime,
+                endTime,
+                candidateCarIds.Length,
+                availableCarsCount,
+                effectiveRating,
+                partnerCar.CarModel.MarketValueKzt,
+                marketValueFetchedAt,
+                isMarketValueStale);
+
+            await _observabilityLogWriter.WriteAsync(new
+            {
+                timestamp = DateTimeOffset.UtcNow,
+                service = "car-service",
+                level = "Information",
+                @event = "partner_car_pricing_context_prepared",
+                partnerCarId = partnerCar.Id,
+                carModelId = partnerCar.CarModelId,
+                startTime,
+                endTime,
+                candidateCarsCount = candidateCarIds.Length,
+                currentAvailableCarsCount = availableCarsCount,
+                rating = effectiveRating,
+                marketValueKzt = partnerCar.CarModel.MarketValueKzt,
+                marketValueFetchedAt,
+                isMarketValueStale
+            }, cancellationToken);
 
             return new PartnerCarPricingContextDto
             {

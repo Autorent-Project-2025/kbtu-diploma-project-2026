@@ -3,6 +3,7 @@ using CarService.Application.Interfaces.Integrations;
 using CarService.Domain.Constants;
 using CarService.Domain.Entities;
 using CarService.Infrastructure.Options;
+using CarService.Infrastructure.Observability;
 using CarService.Infrastructure.Persistence;
 using CarService.Infrastructure.Persistence.Extensions;
 using Microsoft.EntityFrameworkCore;
@@ -18,19 +19,22 @@ namespace CarService.Infrastructure.Services
         private readonly IPartnerCarDisplayPricingService _partnerCarDisplayPricingService;
         private readonly MarketValueRefreshOptions _options;
         private readonly ILogger<CarMarketValueSyncService> _logger;
+        private readonly ObservabilityLogWriter _observabilityLogWriter;
 
         public CarMarketValueSyncService(
             ApplicationDbContext db,
             ICarMarketValueClient carMarketValueClient,
             IPartnerCarDisplayPricingService partnerCarDisplayPricingService,
             IOptions<MarketValueRefreshOptions> options,
-            ILogger<CarMarketValueSyncService> logger)
+            ILogger<CarMarketValueSyncService> logger,
+            ObservabilityLogWriter observabilityLogWriter)
         {
             _db = db;
             _carMarketValueClient = carMarketValueClient;
             _partnerCarDisplayPricingService = partnerCarDisplayPricingService;
             _options = options.Value;
             _logger = logger;
+            _observabilityLogWriter = observabilityLogWriter;
         }
 
         public async Task EnsureCarModelMarketValueAsync(
@@ -112,6 +116,38 @@ namespace CarService.Infrastructure.Services
 
                 await _db.SaveChangesAsync(cancellationToken);
 
+                _logger.LogInformation(
+                    "Market value refreshed for car model {CarModelId} ({Brand} {Model} {Year}): marketValueKzt={MarketValueKzt}, sampleCount={SampleCount}, filteredSampleCount={FilteredSampleCount}, confidence={Confidence}, fetchedAt={FetchedAt}, source={Source}.",
+                    carModel.Id,
+                    carModel.Brand.Name,
+                    carModel.ModelLookup.Name,
+                    carModel.Year,
+                    carModel.MarketValueKzt,
+                    carModel.MarketValueSampleCount,
+                    carModel.MarketValueFilteredSampleCount,
+                    carModel.MarketValueConfidence,
+                    carModel.MarketValueFetchedAt,
+                    carModel.MarketValueSource);
+
+                await _observabilityLogWriter.WriteAsync(new
+                {
+                    timestamp = DateTimeOffset.UtcNow,
+                    service = "car-service",
+                    level = "Information",
+                    @event = "car_model_market_value_refreshed",
+                    carModelId = carModel.Id,
+                    brand = carModel.Brand.Name,
+                    model = carModel.ModelLookup.Name,
+                    year = carModel.Year,
+                    marketValueKzt = carModel.MarketValueKzt,
+                    sampleCount = carModel.MarketValueSampleCount,
+                    filteredSampleCount = carModel.MarketValueFilteredSampleCount,
+                    confidence = carModel.MarketValueConfidence,
+                    fetchedAt = carModel.MarketValueFetchedAt,
+                    source = carModel.MarketValueSource,
+                    sourceUrl = carModel.MarketValueSourceUrl
+                }, cancellationToken);
+
                 try
                 {
                     await _partnerCarDisplayPricingService.RecalculateForCarModelAsync(carModel.Id, cancellationToken);
@@ -139,6 +175,19 @@ namespace CarService.Infrastructure.Services
                     carModel.Brand.Name,
                     carModel.ModelLookup.Name,
                     carModel.Year);
+
+                await _observabilityLogWriter.WriteAsync(new
+                {
+                    timestamp = DateTimeOffset.UtcNow,
+                    service = "car-service",
+                    level = "Warning",
+                    @event = "car_model_market_value_refresh_failed",
+                    carModelId = carModel.Id,
+                    brand = carModel.Brand.Name,
+                    model = carModel.ModelLookup.Name,
+                    year = carModel.Year,
+                    error = ex.Message
+                }, cancellationToken);
             }
         }
 
