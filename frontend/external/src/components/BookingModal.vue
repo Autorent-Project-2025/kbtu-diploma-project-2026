@@ -234,7 +234,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
-import axios from "axios";
+import api from "../api/axios";
 import type { Car } from "../types/Car";
 
 interface Props {
@@ -338,7 +338,7 @@ const displayError = computed(() => {
 
 async function loadMySubscription() {
   try {
-    const { data } = await axios.get("/subscriptions/my");
+    const { data } = await api.get("/subscriptions/my");
     mySubscription.value = data;
   } catch {
     mySubscription.value = null;
@@ -366,7 +366,7 @@ async function fetchPricePreview() {
   try {
     loadingPrice.value = true;
 
-    const { data } = await axios.get("/bookings/price-preview", {
+    const { data } = await api.get("/bookings/price-preview", {
       params: {
         partnerCarId: props.car.id,
         startTime: start.toISOString(),

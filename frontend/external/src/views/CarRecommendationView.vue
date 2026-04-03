@@ -112,7 +112,7 @@
 
 <script setup lang="ts">
 import { ref } from "vue";
-import axios from "axios";
+import api from "../api/axios";
 
 type RecommendedCar = {
   id: number;
@@ -140,7 +140,7 @@ async function fetchRecommendations() {
   try {
     loading.value = true;
 
-    const { data } = await axios.get("/recommendations", {
+    const { data } = await api.get("/recommendations", {
       params: filters.value,
     });
 

@@ -192,11 +192,39 @@
                       <span
                         class="text-3xl font-bold text-gray-900 dark:text-white"
                       >
-                        ${{ b.price }}
+                        {{ formatMoney(b.price, b.pricingBreakdown?.currency) }}
                       </span>
                       <span class="text-sm text-gray-500 dark:text-gray-400">
                         общая стоимость
                       </span>
+                    </div>
+
+                    <div
+                      v-if="b.pricingBreakdown"
+                      class="rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 px-4 py-3 text-sm text-slate-700 dark:text-slate-200"
+                    >
+                      <p class="font-semibold text-slate-900 dark:text-white">
+                        {{
+                          b.usedSubscription
+                            ? `Обычная стоимость: ${formatMoney(b.pricingBreakdown.quotedTotalPrice, b.pricingBreakdown.currency)}`
+                            : `Снапшот расчета сохранен ${formatDate(b.pricingBreakdown.quotedAtUtc)}`
+                        }}
+                      </p>
+                      <p class="mt-1">
+                        {{ formatMoney(b.pricingBreakdown.quotedPriceHour, b.pricingBreakdown.currency) }}/час ·
+                        {{ b.pricingBreakdown.billableHours }} ч.
+                      </p>
+                      <p class="mt-1">
+                        x{{ b.pricingBreakdown.ratingCoefficient }} рейтинг ·
+                        x{{ b.pricingBreakdown.advanceBookingCoefficient }} раннее бронирование ·
+                        x{{ b.pricingBreakdown.availabilityCoefficient }} доступность
+                      </p>
+                      <p
+                        v-if="b.pricingBreakdown.isMarketValueStale"
+                        class="mt-1 font-medium text-amber-700 dark:text-amber-300"
+                      >
+                        Использован последний доступный рыночный снапшот.
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -543,6 +571,18 @@ function getDurationText(booking: Booking): string {
     parts.push(`${duration.minutes} мин.`);
 
   return parts.join(" ");
+}
+
+function formatMoney(amount: number | null | undefined, currency = "KZT"): string {
+  if (amount == null) {
+    return "Цена не рассчитана";
+  }
+
+  return new Intl.NumberFormat("ru-RU", {
+    style: "currency",
+    currency,
+    maximumFractionDigits: 2,
+  }).format(amount);
 }
 
 function canCancel(booking: BookingWithComputedStatus): boolean {

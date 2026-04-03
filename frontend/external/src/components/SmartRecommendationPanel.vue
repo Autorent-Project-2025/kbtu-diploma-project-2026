@@ -264,7 +264,7 @@
 
 <script setup lang="ts">
 import { ref } from "vue";
-import axios from "axios";
+import api from "../api/axios";
 
 type RecommendationItem = {
   partnerCarId: number;
@@ -318,7 +318,7 @@ async function fetchRecommendations() {
     loading.value = true;
     errorMessage.value = "";
 
-    const { data } = await axios.get("/recommendations", {
+    const { data } = await api.get("/recommendations", {
       params: filters.value,
     });
 
