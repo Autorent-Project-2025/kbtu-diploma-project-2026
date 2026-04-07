@@ -36,7 +36,7 @@
             <div class="space-y-2">
               <h2 class="text-2xl font-bold">Выберите даты</h2>
               <p class="text-primary-100 text-sm">
-                {{ car.brand }} {{ car.model }}
+                {{ selection.brand }} {{ selection.model }}
               </p>
             </div>
           </div>
@@ -147,6 +147,74 @@
             </div>
 
             <div
+              v-if="matchedPreview"
+              class="rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 p-4 space-y-4"
+            >
+              <div class="flex items-start gap-4">
+                <div
+                  class="h-24 w-32 shrink-0 overflow-hidden rounded-2xl bg-gray-200 dark:bg-gray-800"
+                >
+                  <img
+                    v-if="previewHeroImage"
+                    :src="previewHeroImage"
+                    :alt="`${selection.brand} ${selection.model}`"
+                    class="h-full w-full object-cover"
+                  />
+                  <div
+                    v-else
+                    class="flex h-full w-full items-center justify-center text-xs text-gray-500 dark:text-gray-400"
+                  >
+                    Нет фото
+                  </div>
+                </div>
+
+                <div class="min-w-0 flex-1 space-y-1">
+                  <p class="text-xs font-bold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
+                    Подобранная машина
+                  </p>
+                  <p class="text-lg font-bold text-gray-900 dark:text-white">
+                    {{ selection.brand }} {{ selection.model }}
+                  </p>
+                  <p class="text-sm text-gray-600 dark:text-gray-300">
+                    Партнер: {{ matchedPreview.partnerName }}
+                  </p>
+                  <p class="text-sm text-gray-600 dark:text-gray-300">
+                    {{ matchedPreview.modelYear }} год
+                    <span v-if="matchedPreview.rating != null">
+                      · рейтинг {{ matchedPreview.rating }}
+                    </span>
+                    <span v-if="matchedPreview.licensePlate">
+                      · {{ matchedPreview.licensePlate }}
+                    </span>
+                  </p>
+                  <p
+                    v-if="matchedPreview.listedPriceHour != null"
+                    class="text-sm font-medium text-primary-700 dark:text-primary-300"
+                  >
+                    Ставка партнера: {{ matchedPreview.listedPriceHour }} KZT/час
+                  </p>
+                </div>
+              </div>
+
+              <div
+                v-if="previewGallery.length > 0"
+                class="grid grid-cols-4 gap-2"
+              >
+                <div
+                  v-for="imageUrl in previewGallery.slice(0, 4)"
+                  :key="imageUrl"
+                  class="h-16 overflow-hidden rounded-xl bg-gray-200 dark:bg-gray-800"
+                >
+                  <img
+                    :src="imageUrl"
+                    :alt="`${selection.brand} ${selection.model}`"
+                    class="h-full w-full object-cover"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div
               v-if="pricePreview"
               class="mt-4 rounded-2xl border border-blue-200 dark:border-blue-800 p-4 bg-blue-50 dark:bg-slate-900"
             >
@@ -219,11 +287,12 @@
             </button>
             <button
               @click="confirmBooking"
-              :disabled="!isValid || isLoading"
+              :disabled="!canConfirm || submitting || validatingSelection"
               class="flex-1 px-6 py-3 bg-primary-600 hover:bg-primary-700 disabled:bg-gray-400 text-white font-semibold rounded-xl transition-all hover:shadow-lg active:scale-95 disabled:cursor-not-allowed disabled:hover:shadow-none"
             >
-              <span v-if="!isLoading">Забронировать</span>
-              <span v-else>Загрузка...</span>
+              <span v-if="submitting">Загрузка...</span>
+              <span v-else-if="validatingSelection">Проверяем...</span>
+              <span v-else>Забронировать</span>
             </button>
           </div>
         </div>
@@ -234,39 +303,32 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
+import { getBookingPricePreview, type BookingPricePreview } from "../api/booking";
+import { matchCarByModel } from "../api/cars";
 import api from "../api/axios";
-import type { Car } from "../types/Car";
+import { getPublicPartnerCarDetails } from "../api/partnerCars";
+import { getPartnerPublicProfileByRelatedUserId } from "../api/partners";
+import type { BookingModelSelection } from "../types/Car";
 
 interface Props {
   isOpen: boolean;
-  car: Car;
+  selection: BookingModelSelection;
   bookingError?: string;
-  suggestedDates?: string[];
+  submitting?: boolean;
 }
 
 interface Emits {
   (e: "close"): void;
   (
     e: "confirm",
-    payload: { startDate: string; endDate: string; useSubscription: boolean },
+    payload: {
+      startDate: string;
+      endDate: string;
+      useSubscription: boolean;
+      partnerCarId: number;
+    },
   ): void;
 }
-
-type PricePreview = {
-  partnerCarId: number;
-  marketValueKzt: number;
-  rating: number;
-  currentAvailableCarsCount: number;
-  daysBeforeBooking: number;
-  billableHours: number;
-  ratingCoefficient: number;
-  advanceBookingCoefficient: number;
-  availabilityCoefficient: number;
-  priceHour: number;
-  finalPrice: number;
-  currency: string;
-  isMarketValueStale: boolean;
-};
 
 type MySubscription = {
   id: number;
@@ -281,17 +343,34 @@ type MySubscription = {
   remainingBookings: number;
 };
 
+type MatchedPartnerCarPreview = {
+  partnerCarId: number;
+  partnerUserId: string;
+  partnerName: string;
+  licensePlate: string;
+  modelYear: number;
+  rating: number | null;
+  ratingsCount: number;
+  listedPriceHour: number | null;
+  coverImageUrl: string | null;
+  imageUrls: string[];
+};
+
 const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
 
-const isLoading = ref(false);
 const startDate = ref("");
 const endDate = ref("");
 const validationError = ref("");
-const pricePreview = ref<PricePreview | null>(null);
+const availabilityError = ref("");
+const pricePreview = ref<BookingPricePreview | null>(null);
 const loadingPrice = ref(false);
 const mySubscription = ref<MySubscription | null>(null);
 const useSubscription = ref(false);
+const matchedPartnerCarId = ref<number | null>(null);
+const matchedPreview = ref<MatchedPartnerCarPreview | null>(null);
+const validatingSelection = ref(false);
+let previewRequestId = 0;
 
 const minDate = computed(() => {
   const now = new Date();
@@ -311,29 +390,85 @@ watch(
       endDate.value = tomorrow.toISOString().slice(0, 16);
 
       validationError.value = "";
+      availabilityError.value = "";
+      pricePreview.value = null;
+      matchedPartnerCarId.value = null;
+      matchedPreview.value = null;
+      validatingSelection.value = false;
       useSubscription.value = false;
 
-      await Promise.all([fetchPricePreview(), loadMySubscription()]);
+      await loadMySubscription();
     } else {
+      previewRequestId += 1;
       pricePreview.value = null;
+      matchedPartnerCarId.value = null;
+      matchedPreview.value = null;
       loadingPrice.value = false;
+      availabilityError.value = "";
       mySubscription.value = null;
+      validatingSelection.value = false;
       useSubscription.value = false;
     }
   },
 );
 
-watch([startDate, endDate], () => {
-  if (!isValid.value) {
-    pricePreview.value = null;
+watch([startDate, endDate, () => props.selection.modelId, () => props.isOpen], () => {
+  if (!props.isOpen) {
     return;
   }
 
-  fetchPricePreview();
+  if (!isValid.value) {
+    previewRequestId += 1;
+    matchedPartnerCarId.value = null;
+    matchedPreview.value = null;
+    pricePreview.value = null;
+    availabilityError.value = "";
+    return;
+  }
+
+  void refreshMatchedSelection();
 });
 
 const displayError = computed(() => {
-  return props.bookingError?.trim() || validationError.value;
+  return validationError.value || availabilityError.value || props.bookingError?.trim() || "";
+});
+
+const canConfirm = computed(() => {
+  return (
+    isValid.value &&
+    matchedPartnerCarId.value !== null &&
+    matchedPreview.value !== null &&
+    !loadingPrice.value
+  );
+});
+
+const previewHeroImage = computed(() => {
+  return (
+    matchedPreview.value?.coverImageUrl ??
+    matchedPreview.value?.imageUrls[0] ??
+    props.selection.imageUrl ??
+    null
+  );
+});
+
+const previewGallery = computed(() => {
+  const preview = matchedPreview.value;
+  if (!preview) {
+    return [];
+  }
+
+  const gallery = [...(preview.imageUrls ?? [])];
+  const heroImage = preview.coverImageUrl ?? gallery[0] ?? null;
+  if (!heroImage) {
+    return gallery;
+  }
+
+  const heroIndex = gallery.findIndex((imageUrl) => imageUrl === heroImage);
+  if (heroIndex >= 0) {
+    gallery.splice(heroIndex, 1);
+  }
+
+  return gallery;
 });
 
 async function loadMySubscription() {
@@ -346,9 +481,18 @@ async function loadMySubscription() {
 }
 
 async function fetchPricePreview() {
-  if (!startDate.value || !endDate.value || !props.car?.id) {
+  await refreshMatchedSelection();
+}
+
+async function refreshMatchedSelection(options?: {
+  expectedPartnerCarId?: number | null;
+  preserveCurrentPreview?: boolean;
+}): Promise<"ready" | "changed" | "unavailable" | "stale"> {
+  if (!startDate.value || !endDate.value || !props.selection?.modelId) {
+    matchedPartnerCarId.value = null;
+    matchedPreview.value = null;
     pricePreview.value = null;
-    return;
+    return "unavailable";
   }
 
   const start = new Date(startDate.value);
@@ -359,27 +503,92 @@ async function fetchPricePreview() {
     Number.isNaN(end.getTime()) ||
     end <= start
   ) {
+    matchedPartnerCarId.value = null;
+    matchedPreview.value = null;
     pricePreview.value = null;
-    return;
+    return "unavailable";
   }
+
+  const currentRequestId = ++previewRequestId;
+  const preserveCurrentPreview = options?.preserveCurrentPreview ?? false;
 
   try {
     loadingPrice.value = true;
+    availabilityError.value = "";
+    if (!preserveCurrentPreview) {
+      matchedPartnerCarId.value = null;
+      matchedPreview.value = null;
+      pricePreview.value = null;
+    }
 
-    const { data } = await api.get("/bookings/price-preview", {
-      params: {
-        partnerCarId: props.car.id,
-        startTime: start.toISOString(),
-        endTime: end.toISOString(),
-      },
+    const matchResult = await matchCarByModel({
+      modelId: props.selection.modelId,
+      startTime: start.toISOString(),
+      endTime: end.toISOString(),
     });
 
-    pricePreview.value = data;
+    if (currentRequestId !== previewRequestId) {
+      return "stale";
+    }
+
+    if (!matchResult.isAvailable || !matchResult.partnerCarId) {
+      matchedPartnerCarId.value = null;
+      matchedPreview.value = null;
+      pricePreview.value = null;
+      availabilityError.value = buildAvailabilityError(
+        matchResult.suggestedStartTimesUtc,
+      );
+      return "unavailable";
+    }
+
+    const [preview, publicPartnerCar, partnerProfile] = await Promise.all([
+      getBookingPricePreview(
+        matchResult.partnerCarId,
+        start.toISOString(),
+        end.toISOString(),
+      ),
+      getPublicPartnerCarDetails(matchResult.partnerCarId),
+      matchResult.partnerUserId
+        ? getPartnerPublicProfileByRelatedUserId(matchResult.partnerUserId).catch(() => null)
+        : Promise.resolve(null),
+    ]);
+
+    if (currentRequestId !== previewRequestId) {
+      return "stale";
+    }
+
+    const nextPreview = buildMatchedPreview(
+      matchResult.partnerCarId,
+      matchResult.partnerUserId ?? publicPartnerCar.partnerUserId,
+      publicPartnerCar,
+      partnerProfile?.carrierName ?? null,
+    );
+    const matchChanged =
+      options?.expectedPartnerCarId != null &&
+      options.expectedPartnerCarId !== matchResult.partnerCarId;
+
+    matchedPartnerCarId.value = matchResult.partnerCarId;
+    pricePreview.value = preview;
+    matchedPreview.value = nextPreview;
+
+    if (matchChanged) {
+      availabilityError.value =
+        "На эти даты подобрана другая машина. Проверьте обновленный preview и нажмите «Забронировать» еще раз.";
+      return "changed";
+    }
+
+    return "ready";
   } catch (error) {
     console.error("Failed to fetch price preview:", error);
+    matchedPartnerCarId.value = null;
+    matchedPreview.value = null;
     pricePreview.value = null;
+    availabilityError.value = "Не удалось подобрать машину для расчета стоимости.";
+    return "unavailable";
   } finally {
-    loadingPrice.value = false;
+    if (currentRequestId === previewRequestId) {
+      loadingPrice.value = false;
+    }
   }
 }
 
@@ -436,13 +645,78 @@ function closeModal() {
   emit("close");
 }
 
-function confirmBooking() {
-  if (!isValid.value) return;
+async function confirmBooking() {
+  if (!canConfirm.value || matchedPartnerCarId.value === null) return;
 
-  emit("confirm", {
-    startDate: new Date(startDate.value).toISOString(),
-    endDate: new Date(endDate.value).toISOString(),
-    useSubscription: useSubscription.value,
-  });
+  validatingSelection.value = true;
+
+  try {
+    const refreshResult = await refreshMatchedSelection({
+      expectedPartnerCarId: matchedPartnerCarId.value,
+      preserveCurrentPreview: true,
+    });
+
+    if (refreshResult !== "ready" || matchedPartnerCarId.value === null) {
+      return;
+    }
+
+    emit("confirm", {
+      startDate: new Date(startDate.value).toISOString(),
+      endDate: new Date(endDate.value).toISOString(),
+      useSubscription: useSubscription.value,
+      partnerCarId: matchedPartnerCarId.value,
+    });
+  } finally {
+    validatingSelection.value = false;
+  }
+}
+
+function buildAvailabilityError(suggestedStartTimesUtc?: string[]): string {
+  const suggestions = (suggestedStartTimesUtc ?? [])
+    .slice(0, 3)
+    .map(formatSuggestionDate)
+    .filter(Boolean);
+
+  if (suggestions.length === 0) {
+    return "На выбранные даты машин этой модели нет.";
+  }
+
+  return `На выбранные даты машин этой модели нет. Ближайшие варианты: ${suggestions.join(", ")}.`;
+}
+
+function formatSuggestionDate(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  return new Intl.DateTimeFormat("ru-RU", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(date);
+}
+
+function buildMatchedPreview(
+  partnerCarId: number,
+  partnerUserId: string,
+  publicPartnerCar: Awaited<ReturnType<typeof getPublicPartnerCarDetails>>,
+  carrierName: string | null,
+): MatchedPartnerCarPreview {
+  const imageUrls = (publicPartnerCar.images ?? [])
+    .map((image) => image.imageUrl)
+    .filter((imageUrl): imageUrl is string => Boolean(imageUrl));
+
+  return {
+    partnerCarId,
+    partnerUserId,
+    partnerName: carrierName?.trim() || "Партнер",
+    licensePlate: publicPartnerCar.licensePlate ?? "",
+    modelYear: publicPartnerCar.modelYear,
+    rating: publicPartnerCar.rating ?? null,
+    ratingsCount: publicPartnerCar.ratingsCount,
+    listedPriceHour: publicPartnerCar.priceHour ?? null,
+    coverImageUrl: imageUrls[0] ?? null,
+    imageUrls,
+  };
 }
 </script>

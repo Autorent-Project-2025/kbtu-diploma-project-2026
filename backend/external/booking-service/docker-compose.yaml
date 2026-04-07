@@ -49,6 +49,8 @@
       - Observability__LogPath=${Observability__LogPath}
       - CarService__BaseUrl=${CarService__BaseUrl}
       - CarService__InternalApiKey=${CarService__InternalApiKey}
+      - PartnerService__BaseUrl=${PartnerService__BaseUrl}
+      - PartnerService__InternalApiKey=${PartnerService__InternalApiKey}
       - ClientService__BaseUrl=${ClientService__BaseUrl}
       - ClientService__InternalApiKey=${ClientService__InternalApiKey}
       - IdentityService__BaseUrl=${IdentityService__BaseUrl}

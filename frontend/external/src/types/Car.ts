@@ -10,6 +10,10 @@ export interface Car {
   description: string | null;
 }
 
+export type BookingModelSelection = Omit<Car, "id"> & {
+  modelId: number;
+};
+
 // Спецификации автомобиля
 export interface CarSpecifications {
   engine?: string;

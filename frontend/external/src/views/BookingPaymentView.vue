@@ -36,12 +36,54 @@
             <div class="grid md:grid-cols-2 gap-4">
               <article class="p-5 rounded-2xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
                 <p class="text-sm text-gray-500 dark:text-gray-400">Автомобиль</p>
-                <p class="mt-2 text-2xl font-bold text-gray-900 dark:text-white">
-                  {{ booking.carBrand }} {{ booking.carModel }}
-                </p>
-                <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                  {{ formatDate(booking.startDate) }} -> {{ formatDate(booking.endDate) }}
-                </p>
+                <div class="mt-3 flex gap-4">
+                  <div class="h-24 w-32 shrink-0 overflow-hidden rounded-2xl bg-gray-200 dark:bg-gray-700">
+                    <img
+                      v-if="getBookingHeroImage(booking)"
+                      :src="getBookingHeroImage(booking)!"
+                      :alt="`${booking.carBrand} ${booking.carModel}`"
+                      class="h-full w-full object-cover"
+                    />
+                    <div
+                      v-else
+                      class="flex h-full w-full items-center justify-center text-xs text-gray-500 dark:text-gray-400"
+                    >
+                      Нет фото
+                    </div>
+                  </div>
+
+                  <div class="min-w-0 space-y-2">
+                    <p class="text-2xl font-bold text-gray-900 dark:text-white">
+                      {{ booking.carBrand }} {{ booking.carModel }}
+                    </p>
+                    <p
+                      v-if="booking.partnerName"
+                      class="text-sm font-medium text-primary-700 dark:text-primary-300"
+                    >
+                      Партнер: {{ booking.partnerName }}
+                    </p>
+                    <p class="text-sm text-gray-600 dark:text-gray-400">
+                      {{ formatDate(booking.startDate) }} -> {{ formatDate(booking.endDate) }}
+                    </p>
+                  </div>
+                </div>
+
+                <div
+                  v-if="getBookingGalleryImages(booking).length > 0"
+                  class="mt-4 flex flex-wrap gap-2"
+                >
+                  <div
+                    v-for="imageUrl in getBookingGalleryImages(booking)"
+                    :key="imageUrl"
+                    class="h-12 w-16 overflow-hidden rounded-xl bg-gray-200 dark:bg-gray-700"
+                  >
+                    <img
+                      :src="imageUrl"
+                      :alt="`${booking.carBrand} ${booking.carModel}`"
+                      class="h-full w-full object-cover"
+                    />
+                  </div>
+                </div>
               </article>
 
               <article class="p-5 rounded-2xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
@@ -514,6 +556,18 @@ function formatAmount(amount: number | null | undefined, currency: string): stri
     currency,
     maximumFractionDigits: 2,
   }).format(amount);
+}
+
+function getBookingHeroImage(currentBooking: Booking): string | null {
+  return currentBooking.coverImageUrl ?? currentBooking.imageUrls?.[0] ?? null;
+}
+
+function getBookingGalleryImages(currentBooking: Booking): string[] {
+  const heroImage = getBookingHeroImage(currentBooking);
+
+  return (currentBooking.imageUrls ?? [])
+    .filter((imageUrl) => imageUrl !== heroImage)
+    .slice(0, 4);
 }
 
 function formatCoefficient(value: number): string {

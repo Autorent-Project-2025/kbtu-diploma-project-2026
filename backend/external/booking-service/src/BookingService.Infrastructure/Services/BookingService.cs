@@ -25,9 +25,11 @@ namespace BookingService.Infrastructure.Services
 
         private readonly ApplicationDbContext _db;
         private readonly IDynamicPricingService _dynamicPricingService;
+        private readonly IPartnerCarReadClient _partnerCarReadClient;
         private readonly IPaymentSyncClient _paymentSyncClient;
         private readonly IClientBookingAccessClient _clientBookingAccessClient;
         private readonly IIdentityUserReadClient _identityUserReadClient;
+        private readonly IPartnerProfileReadClient _partnerProfileReadClient;
         private readonly IBookingCompletionTicketClient _bookingCompletionTicketClient;
         private readonly IBookingEmailClient _bookingEmailClient;
         private readonly ISubscriptionService _subscriptionService;
@@ -37,9 +39,11 @@ namespace BookingService.Infrastructure.Services
         public BookingService(
             ApplicationDbContext db,
             IDynamicPricingService dynamicPricingService,
+            IPartnerCarReadClient partnerCarReadClient,
             IPaymentSyncClient paymentSyncClient,
             IClientBookingAccessClient clientBookingAccessClient,
             IIdentityUserReadClient identityUserReadClient,
+            IPartnerProfileReadClient partnerProfileReadClient,
             IBookingCompletionTicketClient bookingCompletionTicketClient,
             IBookingEmailClient bookingEmailClient,
             ISubscriptionService subscriptionService,
@@ -48,9 +52,11 @@ namespace BookingService.Infrastructure.Services
         {
             _db = db;
             _dynamicPricingService = dynamicPricingService;
+            _partnerCarReadClient = partnerCarReadClient;
             _paymentSyncClient = paymentSyncClient;
             _clientBookingAccessClient = clientBookingAccessClient;
             _identityUserReadClient = identityUserReadClient;
+            _partnerProfileReadClient = partnerProfileReadClient;
             _bookingCompletionTicketClient = bookingCompletionTicketClient;
             _bookingEmailClient = bookingEmailClient;
             _subscriptionService = subscriptionService;
@@ -822,11 +828,19 @@ namespace BookingService.Infrastructure.Services
                 totalPrice = priceQuote.TotalPrice;
             }
 
+            var displaySnapshot = await GetBookingDisplaySnapshotAsync(
+                partnerCarId,
+                priceQuote.PartnerUserId);
+
             var booking = new Booking
             {
                 PartnerCarId = partnerCarId,
                 UserId = userId,
                 PartnerUserId = priceQuote.PartnerUserId,
+                CarBrand = displaySnapshot.CarBrand,
+                CarModel = displaySnapshot.CarModel,
+                PartnerName = displaySnapshot.PartnerName,
+                CoverImageUrl = displaySnapshot.CoverImageUrl,
                 StartTime = startTime,
                 EndTime = endTime,
                 Status = BookingStatus.Pending,
@@ -838,7 +852,8 @@ namespace BookingService.Infrastructure.Services
                 TripStartedAt = null,
                 TripCompletedAt = null,
                 CompletionReviewTicketId = null,
-                PricingBreakdown = CreatePricingBreakdownSnapshot(priceQuote)
+                PricingBreakdown = CreatePricingBreakdownSnapshot(priceQuote),
+                ImageUrls = displaySnapshot.ImageUrls
             };
 
             _db.Bookings.Add(booking);
@@ -865,6 +880,46 @@ namespace BookingService.Infrastructure.Services
                 Currency = priceQuote.Currency,
                 IsMarketValueStale = priceQuote.IsMarketValueStale
             };
+        }
+
+        private async Task<BookingDisplaySnapshot> GetBookingDisplaySnapshotAsync(
+            int partnerCarId,
+            Guid partnerUserId,
+            CancellationToken cancellationToken = default)
+        {
+            var partnerCarTask = _partnerCarReadClient.GetSnapshotAsync(partnerCarId, cancellationToken);
+            var partnerProfileTask = _partnerProfileReadClient.GetPublicProfileByRelatedUserIdAsync(
+                partnerUserId,
+                cancellationToken);
+
+            var partnerCar = await partnerCarTask
+                ?? throw new KeyNotFoundException("Partner car snapshot not found.");
+
+            if (partnerCar.PartnerUserId != partnerUserId)
+            {
+                throw new InvalidOperationException("Partner car snapshot does not match pricing partner user.");
+            }
+
+            PartnerPublicProfilePayload? partnerProfile = null;
+            try
+            {
+                partnerProfile = await partnerProfileTask;
+            }
+            catch
+            {
+                partnerProfile = null;
+            }
+
+            var partnerName = string.IsNullOrWhiteSpace(partnerProfile?.CarrierName)
+                ? "Партнер"
+                : partnerProfile!.CarrierName.Trim();
+
+            return new BookingDisplaySnapshot(
+                string.IsNullOrWhiteSpace(partnerCar.CarBrand) ? string.Empty : partnerCar.CarBrand.Trim(),
+                string.IsNullOrWhiteSpace(partnerCar.CarModel) ? string.Empty : partnerCar.CarModel.Trim(),
+                partnerName,
+                NormalizeOptionalUrl(partnerCar.CoverImageUrl),
+                NormalizeImageUrls(partnerCar.ImageUrls, partnerCar.CoverImageUrl));
         }
 
         private Task<bool> HasOverlappingActiveBookings(int partnerCarId, DateTimeOffset startTime, DateTimeOffset endTime)
@@ -1088,6 +1143,31 @@ namespace BookingService.Infrastructure.Services
         private static bool IsChargeStatus(string? actualStatus, string expectedStatus)
         {
             return string.Equals(actualStatus?.Trim(), expectedStatus, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static string? NormalizeOptionalUrl(string? value)
+        {
+            return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+        }
+
+        private static IReadOnlyList<string> NormalizeImageUrls(
+            IReadOnlyList<string>? imageUrls,
+            string? coverImageUrl)
+        {
+            var normalized = (imageUrls ?? [])
+                .Where(item => !string.IsNullOrWhiteSpace(item))
+                .Select(item => item.Trim())
+                .Distinct(StringComparer.Ordinal)
+                .ToList();
+
+            var normalizedCover = NormalizeOptionalUrl(coverImageUrl);
+            if (normalizedCover is not null)
+            {
+                normalized.RemoveAll(item => string.Equals(item, normalizedCover, StringComparison.Ordinal));
+                normalized.Insert(0, normalizedCover);
+            }
+
+            return normalized;
         }
 
         private static decimal RoundCurrency(decimal amount)
@@ -1429,5 +1509,12 @@ namespace BookingService.Infrastructure.Services
             return ex.SqlState == PostgresErrorCodes.ExclusionViolation &&
                    string.Equals(ex.ConstraintName, "prevent_overlapping_bookings", StringComparison.Ordinal);
         }
+
+        private sealed record BookingDisplaySnapshot(
+            string CarBrand,
+            string CarModel,
+            string PartnerName,
+            string? CoverImageUrl,
+            IReadOnlyList<string> ImageUrls);
     }
 }

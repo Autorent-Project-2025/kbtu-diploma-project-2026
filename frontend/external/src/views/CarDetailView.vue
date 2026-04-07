@@ -260,14 +260,13 @@
     </div>
 
     <BookingModal
-      v-if="modalCar"
+      v-if="bookingSelection"
       :is-open="isBookingModalOpen"
-      :car="modalCar"
+      :selection="bookingSelection"
       :booking-error="bookingError"
-      :suggested-dates="bookingSuggestions"
+      :submitting="creatingBooking"
       @close="closeBookingModal"
       @confirm="handleBookingConfirm"
-      @suggestion-click="handleSuggestionClick"
     />
 
     <LoginRequiredModal
@@ -284,14 +283,10 @@ import { useRoute, useRouter } from "vue-router";
 import BookingModal from "../components/BookingModal.vue";
 import LoginRequiredModal from "../components/LoginRequiredModal.vue";
 import { createBooking } from "../api/booking";
-import {
-  getModelDetailsPayload,
-  matchCarByModel,
-  type ModelDetailsPayload,
-} from "../api/cars";
+import { getModelDetailsPayload, type ModelDetailsPayload } from "../api/cars";
 import { useAuth } from "../composables/useAuth";
 import { useToast } from "../composables/useToast";
-import type { Car } from "../types/Car";
+import type { BookingModelSelection } from "../types/Car";
 import { formatMoney } from "../utils/formatMoney";
 
 const route = useRoute();
@@ -300,27 +295,26 @@ const { isAuthenticated } = useAuth();
 const { success, error } = useToast();
 
 const loading = ref(true);
-const matching = ref(false);
+const creatingBooking = ref(false);
 const payload = ref<ModelDetailsPayload | null>(null);
 const currentImageIndex = ref(0);
 
 const isBookingModalOpen = ref(false);
 const showLoginModal = ref(false);
 const bookingError = ref("");
-const bookingSuggestions = ref<string[]>([]);
 
 const modelImages = computed(() => payload.value?.model.images ?? []);
 const currentImage = computed(
   () => modelImages.value[currentImageIndex.value]?.imageUrl ?? "",
 );
 
-const modalCar = computed<Car | null>(() => {
+const bookingSelection = computed<BookingModelSelection | null>(() => {
   if (!payload.value) {
     return null;
   }
 
   return {
-    id: payload.value.model.id,
+    modelId: payload.value.model.id,
     brand: payload.value.model.brand,
     model: payload.value.model.model,
     year: payload.value.model.year,
@@ -398,17 +392,11 @@ function openBookingModal() {
   }
 
   bookingError.value = "";
-  bookingSuggestions.value = [];
   isBookingModalOpen.value = true;
 }
 
 function closeBookingModal() {
   isBookingModalOpen.value = false;
-  bookingError.value = "";
-  bookingSuggestions.value = [];
-}
-
-function handleSuggestionClick() {
   bookingError.value = "";
 }
 
@@ -421,32 +409,18 @@ async function handleBookingConfirm(payloadData: {
   startDate: string;
   endDate: string;
   useSubscription: boolean;
+  partnerCarId: number;
 }) {
   if (!payload.value) {
     return;
   }
 
-  matching.value = true;
+  creatingBooking.value = true;
   bookingError.value = "";
-  bookingSuggestions.value = [];
 
   try {
-    const matchResult = await matchCarByModel({
-      modelId: payload.value.model.id,
-      startTime: payloadData.startDate,
-      endTime: payloadData.endDate,
-    });
-
-    if (!matchResult.isAvailable || !matchResult.partnerCarId) {
-      bookingError.value = "На выбранные даты машин этой модели нет.";
-      bookingSuggestions.value = (
-        matchResult.suggestedStartTimesUtc ?? []
-      ).slice(0, 5);
-      return;
-    }
-
     const booking = await createBooking(
-      matchResult.partnerCarId,
+      payloadData.partnerCarId,
       payloadData.startDate,
       payloadData.endDate,
       payloadData.useSubscription,
@@ -470,7 +444,7 @@ async function handleBookingConfirm(payloadData: {
     bookingError.value = "Не удалось забронировать машину. Попробуйте снова.";
     error("Не удалось забронировать машину.");
   } finally {
-    matching.value = false;
+    creatingBooking.value = false;
   }
 }
 </script>

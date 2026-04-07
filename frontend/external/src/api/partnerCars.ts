@@ -46,6 +46,19 @@ export interface PartnerCarDetails {
   images: PartnerCarImage[];
 }
 
+export interface PublicPartnerCarDetails {
+  id: number;
+  partnerUserId: string;
+  licensePlate: string;
+  priceHour?: number | null;
+  rating?: number | null;
+  ratingsCount: number;
+  modelBrand: string;
+  modelName: string;
+  modelYear: number;
+  images: PartnerCarImage[];
+}
+
 export async function getMyPartnerCars(): Promise<PartnerCarSummary[]> {
   const response = await api.get("/cars/my");
   return (response.data ?? []) as PartnerCarSummary[];
@@ -54,6 +67,21 @@ export async function getMyPartnerCars(): Promise<PartnerCarSummary[]> {
 export async function getMyPartnerCarDetails(carId: number): Promise<PartnerCarDetails> {
   const response = await api.get(`/cars/my/${carId}`);
   const payload = response.data as PartnerCarDetails;
+
+  return {
+    ...payload,
+    images: (payload.images ?? []).map((image) => ({
+      ...image,
+      imageUrl: resolveAssetUrl(image.imageUrl) ?? image.imageUrl,
+    })),
+  };
+}
+
+export async function getPublicPartnerCarDetails(
+  partnerCarId: number,
+): Promise<PublicPartnerCarDetails> {
+  const response = await api.get(`/cars/partner-cars/${partnerCarId}`);
+  const payload = response.data as PublicPartnerCarDetails;
 
   return {
     ...payload,

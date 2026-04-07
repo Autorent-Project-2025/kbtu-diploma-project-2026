@@ -1,6 +1,7 @@
 using BookingService.Domain.Enums;
 using BookingService.Domain.ValueObjects;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Linq;
 using System.Text.Json;
 
 namespace BookingService.Domain.Entities
@@ -15,6 +16,9 @@ namespace BookingService.Domain.Entities
         [NotMapped]
         private BookingPricingBreakdownSnapshot? _pricingBreakdown;
 
+        [NotMapped]
+        private List<string>? _imageUrls;
+
         [Column("id")]
         public int Id { get; set; }
 
@@ -26,6 +30,18 @@ namespace BookingService.Domain.Entities
 
         [Column("partner_user_id")]
         public Guid PartnerUserId { get; set; }
+
+        [Column("car_brand")]
+        public string? CarBrand { get; set; }
+
+        [Column("car_model")]
+        public string? CarModel { get; set; }
+
+        [Column("partner_name")]
+        public string? PartnerName { get; set; }
+
+        [Column("cover_image_url")]
+        public string? CoverImageUrl { get; set; }
 
         [Column("start_time")]
         public DateTimeOffset StartTime { get; set; }
@@ -59,6 +75,9 @@ namespace BookingService.Domain.Entities
 
         [Column("pricing_breakdown")]
         public string? PricingBreakdownJson { get; private set; }
+
+        [Column("image_urls")]
+        public string? ImageUrlsJson { get; private set; }
 
         [NotMapped]
         public BookingPricingBreakdownSnapshot? PricingBreakdown
@@ -94,6 +113,49 @@ namespace BookingService.Domain.Entities
                 PricingBreakdownJson = value is null
                     ? null
                     : JsonSerializer.Serialize(value, PricingBreakdownSerializerOptions);
+            }
+        }
+
+        [NotMapped]
+        public IReadOnlyList<string> ImageUrls
+        {
+            get
+            {
+                if (_imageUrls is not null)
+                {
+                    return _imageUrls;
+                }
+
+                if (string.IsNullOrWhiteSpace(ImageUrlsJson))
+                {
+                    _imageUrls = [];
+                    return _imageUrls;
+                }
+
+                try
+                {
+                    _imageUrls = JsonSerializer.Deserialize<List<string>>(
+                        ImageUrlsJson,
+                        PricingBreakdownSerializerOptions) ?? [];
+                }
+                catch (JsonException)
+                {
+                    _imageUrls = [];
+                }
+
+                return _imageUrls;
+            }
+            set
+            {
+                _imageUrls = value?
+                    .Where(item => !string.IsNullOrWhiteSpace(item))
+                    .Select(item => item.Trim())
+                    .Distinct(StringComparer.Ordinal)
+                    .ToList() ?? [];
+
+                ImageUrlsJson = _imageUrls.Count == 0
+                    ? null
+                    : JsonSerializer.Serialize(_imageUrls, PricingBreakdownSerializerOptions);
             }
         }
 
