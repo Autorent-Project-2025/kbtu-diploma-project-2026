@@ -11,6 +11,7 @@ using BookingService.Infrastructure.Integrations;
 using BookingService.Infrastructure.Options;
 using BookingService.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Npgsql;
 using System.Data;
@@ -35,6 +36,7 @@ namespace BookingService.Infrastructure.Services
         private readonly ISubscriptionService _subscriptionService;
         private readonly PaymentServiceOptions _paymentServiceOptions;
         private readonly PendingBookingExpirationOptions _pendingBookingExpirationOptions;
+        private readonly ILogger<BookingService> _logger;
 
         public BookingService(
             ApplicationDbContext db,
@@ -48,7 +50,8 @@ namespace BookingService.Infrastructure.Services
             IBookingEmailClient bookingEmailClient,
             ISubscriptionService subscriptionService,
             IOptions<PaymentServiceOptions> paymentServiceOptions,
-            IOptions<PendingBookingExpirationOptions> pendingBookingExpirationOptions)
+            IOptions<PendingBookingExpirationOptions> pendingBookingExpirationOptions,
+            ILogger<BookingService> logger)
         {
             _db = db;
             _dynamicPricingService = dynamicPricingService;
@@ -62,6 +65,7 @@ namespace BookingService.Infrastructure.Services
             _subscriptionService = subscriptionService;
             _paymentServiceOptions = paymentServiceOptions.Value;
             _pendingBookingExpirationOptions = pendingBookingExpirationOptions.Value;
+            _logger = logger;
         }
 
         public async Task<bool> IsPartnerCarAvailable(int partnerCarId, DateTimeOffset startTime, DateTimeOffset endTime)
@@ -115,6 +119,7 @@ namespace BookingService.Infrastructure.Services
                         dto.UseSubscription);
 
                     await transaction.CommitAsync();
+                    await EnsureMockPaymentSessionStartedAsync(booking);
                     return booking.ToBookingResponseDto();
                 }
                 catch (PostgresException ex) when (IsSerializationFailure(ex))
@@ -784,6 +789,7 @@ namespace BookingService.Infrastructure.Services
                     endTime,
                     useSubscription);
 
+                await EnsureMockPaymentSessionStartedAsync(booking);
                 return booking.ToBookingResponseDto();
             }
             finally
@@ -1345,6 +1351,36 @@ namespace BookingService.Infrastructure.Services
             }
 
             return booking.TotalPrice.Value;
+        }
+
+        private async Task EnsureMockPaymentSessionStartedAsync(
+            Booking booking,
+            CancellationToken cancellationToken = default)
+        {
+            if (booking.UsedSubscription || booking.Status != BookingStatus.Pending)
+            {
+                return;
+            }
+
+            var totalPrice = ResolveBookingPaymentAmount(booking);
+            var currency = ResolvePaymentCurrency();
+
+            try
+            {
+                await _paymentSyncClient.StartMockPaymentAsync(
+                    booking.Id,
+                    booking.UserId,
+                    totalPrice,
+                    currency,
+                    cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(
+                    ex,
+                    "Failed to eagerly start mock payment session for booking {BookingId}. Payment session will be retried on checkout open.",
+                    booking.Id);
+            }
         }
 
         private string ResolvePaymentCurrency()

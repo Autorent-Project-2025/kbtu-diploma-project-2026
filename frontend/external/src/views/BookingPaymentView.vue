@@ -97,42 +97,23 @@
               </article>
             </div>
 
-            <div class="grid md:grid-cols-2 gap-4">
+            <div>
               <article
                 :class="[
                   'p-5 rounded-2xl border transition-colors',
-                  isDeadlineCritical(sessionRemainingMs)
+                  isDeadlineCritical(paymentDeadlineRemainingMs)
                     ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
                     : 'bg-sky-50 dark:bg-sky-900/20 border-sky-200 dark:border-sky-800',
                 ]"
               >
-                <p class="text-sm font-bold uppercase tracking-[0.18em]" :class="isDeadlineCritical(sessionRemainingMs) ? 'text-red-700 dark:text-red-300' : 'text-sky-700 dark:text-sky-300'">
-                  Сессия оплаты
+                <p class="text-sm font-bold uppercase tracking-[0.18em]" :class="isDeadlineCritical(paymentDeadlineRemainingMs) ? 'text-red-700 dark:text-red-300' : 'text-sky-700 dark:text-sky-300'">
+                  Оплатите в течение
                 </p>
                 <p class="mt-3 text-3xl font-extrabold text-gray-900 dark:text-white">
-                  {{ formatCountdown(sessionRemainingMs) }}
+                  {{ formatCountdown(paymentDeadlineRemainingMs) }}
                 </p>
                 <p class="mt-2 text-sm text-gray-600 dark:text-gray-300">
-                  {{ payment.paymentExpiresAt ? `Истекает ${formatDate(payment.paymentExpiresAt)}` : "Сессия ещё не создана" }}
-                </p>
-              </article>
-
-              <article
-                :class="[
-                  'p-5 rounded-2xl border transition-colors',
-                  isDeadlineCritical(bookingRemainingMs)
-                    ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
-                    : 'bg-violet-50 dark:bg-violet-900/20 border-violet-200 dark:border-violet-800',
-                ]"
-              >
-                <p class="text-sm font-bold uppercase tracking-[0.18em]" :class="isDeadlineCritical(bookingRemainingMs) ? 'text-red-700 dark:text-red-300' : 'text-violet-700 dark:text-violet-300'">
-                  Бронь удерживает слот
-                </p>
-                <p class="mt-3 text-3xl font-extrabold text-gray-900 dark:text-white">
-                  {{ formatCountdown(bookingRemainingMs) }}
-                </p>
-                <p class="mt-2 text-sm text-gray-600 dark:text-gray-300">
-                  {{ payment.bookingExpiresAt ? `Авто-отмена ${formatDate(payment.bookingExpiresAt)}` : "Для этой брони TTL больше не действует" }}
+                  {{ paymentDeadlineAt ? `Дедлайн ${formatDate(paymentDeadlineAt)}` : "Дедлайн появится после старта сессии" }}
                 </p>
               </article>
             </div>
@@ -622,29 +603,23 @@ const badgeTextClass = computed(() => {
   }
 });
 
-const sessionRemainingMs = computed(() => {
-  if (!payment.value?.paymentExpiresAt) {
+const paymentDeadlineAt = computed(() => {
+  const candidates = [payment.value?.paymentExpiresAt, payment.value?.bookingExpiresAt]
+    .filter((value): value is string => Boolean(value))
+    .sort((left, right) => new Date(left).getTime() - new Date(right).getTime());
+
+  return candidates[0] ?? null;
+});
+
+const paymentDeadlineRemainingMs = computed(() => {
+  if (!paymentDeadlineAt.value) {
     return null;
   }
 
-  return new Date(payment.value.paymentExpiresAt).getTime() - now.value;
+  return new Date(paymentDeadlineAt.value).getTime() - now.value;
 });
 
-const bookingRemainingMs = computed(() => {
-  if (!payment.value?.bookingExpiresAt) {
-    return null;
-  }
-
-  return new Date(payment.value.bookingExpiresAt).getTime() - now.value;
-});
-
-watch(sessionRemainingMs, async (currentValue, previousValue) => {
-  if (shouldAutoRefreshDeadline(currentValue, previousValue)) {
-    await refreshCheckoutStatus();
-  }
-});
-
-watch(bookingRemainingMs, async (currentValue, previousValue) => {
+watch(paymentDeadlineRemainingMs, async (currentValue, previousValue) => {
   if (shouldAutoRefreshDeadline(currentValue, previousValue)) {
     await refreshCheckoutStatus();
   }
