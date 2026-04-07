@@ -2,11 +2,13 @@ import api from "./axios";
 import type {
   Booking,
   BookingCharge,
+  BookingCarCommentSubmissionResult,
   BookingCompletionSubmissionResult,
   BookingPricingBreakdown,
   BookingPaymentState,
   BookingPaymentStatus,
   BookingStatus,
+  SubmitBookingCarCommentPayload,
   SubmitBookingPaymentPayload,
 } from "../types/Booking";
 import type { PaginatedResponse } from "../types/Pagination";
@@ -49,6 +51,9 @@ interface BookingApiDto {
   tripStartedAt?: string | null;
   tripCompletedAt?: string | null;
   completionReviewTicketId?: string | null;
+  carCommentId?: number | null;
+  carCommentSubmittedAt?: string | null;
+  canLeaveComment?: boolean | null;
   usedSubscription?: boolean | null;
   pricingBreakdown?: BookingPricingBreakdown | null;
   status?: string | null;
@@ -96,6 +101,12 @@ interface BookingCompletionSubmissionApiDto {
   latePenaltyAmount?: number | null;
 }
 
+interface BookingCarCommentSubmissionApiDto {
+  booking: BookingApiDto;
+  commentId: number;
+  submittedAt: string;
+}
+
 function normalizeStatus(value: string | null | undefined): BookingStatus {
   const normalized = (value ?? "").trim().toLowerCase();
   if (normalized === "pending") return "pending";
@@ -137,6 +148,9 @@ function mapBooking(dto: BookingApiDto): Booking {
     tripStartedAt: dto.tripStartedAt ?? null,
     tripCompletedAt: dto.tripCompletedAt ?? null,
     completionReviewTicketId: dto.completionReviewTicketId ?? null,
+    carCommentId: dto.carCommentId ?? null,
+    carCommentSubmittedAt: dto.carCommentSubmittedAt ?? null,
+    canLeaveComment: Boolean(dto.canLeaveComment),
     usedSubscription: dto.usedSubscription ?? false,
     pricingBreakdown: dto.pricingBreakdown ?? null,
     status: normalizeStatus(dto.status),
@@ -204,6 +218,16 @@ function mapBookingCompletionSubmission(
     booking: mapBooking(dto.booking),
     reviewTicketId: dto.reviewTicketId,
     latePenaltyAmount: dto.latePenaltyAmount ?? 0,
+  };
+}
+
+function mapBookingCarCommentSubmission(
+  dto: BookingCarCommentSubmissionApiDto,
+): BookingCarCommentSubmissionResult {
+  return {
+    booking: mapBooking(dto.booking),
+    commentId: dto.commentId,
+    submittedAt: dto.submittedAt,
   };
 }
 
@@ -354,6 +378,16 @@ export async function submitBookingCompletionReview(
 
   return mapBookingCompletionSubmission(
     response.data as BookingCompletionSubmissionApiDto,
+  );
+}
+
+export async function submitBookingCarComment(
+  bookingId: number,
+  payload: SubmitBookingCarCommentPayload,
+): Promise<BookingCarCommentSubmissionResult> {
+  const response = await api.post(`/bookings/${bookingId}/car-comment`, payload);
+  return mapBookingCarCommentSubmission(
+    response.data as BookingCarCommentSubmissionApiDto,
   );
 }
 

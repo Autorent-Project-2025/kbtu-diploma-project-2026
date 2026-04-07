@@ -30,6 +30,9 @@ export interface Booking {
   tripStartedAt?: string | null;
   tripCompletedAt?: string | null;
   completionReviewTicketId?: string | null;
+  carCommentId?: number | null;
+  carCommentSubmittedAt?: string | null;
+  canLeaveComment?: boolean;
   usedSubscription?: boolean;
   pricingBreakdown?: BookingPricingBreakdown | null;
   status: BookingStatus;
@@ -54,6 +57,12 @@ export interface BookingCompletionSubmissionResult {
   booking: Booking;
   reviewTicketId: string;
   latePenaltyAmount: number;
+}
+
+export interface BookingCarCommentSubmissionResult {
+  booking: Booking;
+  commentId: number;
+  submittedAt: string;
 }
 
 export type BookingStatus =
@@ -112,4 +121,9 @@ export interface SubmitBookingPaymentPayload {
   expiryMonth: number;
   expiryYear: number;
   cvv: string;
+}
+
+export interface SubmitBookingCarCommentPayload {
+  rating: number;
+  content: string;
 }

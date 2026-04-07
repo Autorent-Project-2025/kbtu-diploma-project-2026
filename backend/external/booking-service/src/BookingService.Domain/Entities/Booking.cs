@@ -73,6 +73,12 @@ namespace BookingService.Domain.Entities
         [Column("completion_review_ticket_id")]
         public Guid? CompletionReviewTicketId { get; set; }
 
+        [Column("car_comment_id")]
+        public int? CarCommentId { get; set; }
+
+        [Column("car_comment_submitted_at")]
+        public DateTimeOffset? CarCommentSubmittedAt { get; set; }
+
         [Column("pricing_breakdown")]
         public string? PricingBreakdownJson { get; private set; }
 

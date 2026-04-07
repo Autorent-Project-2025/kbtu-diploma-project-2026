@@ -101,6 +101,33 @@ namespace CarService.Infrastructure.Services
             CarCommentCreateDto dto,
             CancellationToken cancellationToken = default)
         {
+            return await CreateFromCompletedBookingAsync(dto, userId, userName, cancellationToken);
+        }
+
+        public async Task<CarCommentResponseDto> CreateFromCompletedBookingAsync(
+            CarCommentCreateDto dto,
+            string userId,
+            string userName,
+            CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(dto);
+
+            if (dto.BookingId <= 0)
+            {
+                throw new ArgumentException("BookingId must be greater than zero.", nameof(dto.BookingId));
+            }
+
+            ValidateRating(dto.Rating);
+
+            var existingComment = await _db.CarComments
+                .AsNoTracking()
+                .FirstOrDefaultAsync(comment => comment.BookingId == dto.BookingId, cancellationToken);
+
+            if (existingComment is not null)
+            {
+                return MapToDto(existingComment);
+            }
+
             var partnerCar = await _db.PartnerCars
                 .FirstOrDefaultAsync(car => car.Id == dto.PartnerCarId, cancellationToken);
 
@@ -115,13 +142,30 @@ namespace CarService.Infrastructure.Services
                 UserName = NormalizeRequired(userName, nameof(userName), 255),
                 CarId = partnerCar.CarModelId,
                 PartnerCarId = partnerCar.Id,
+                BookingId = dto.BookingId,
                 Content = NormalizeRequired(dto.Content, nameof(dto.Content), 4000),
                 Rating = dto.Rating,
                 CreatedOn = DateTime.UtcNow
             };
 
             _db.CarComments.Add(entity);
-            await _db.SaveChangesAsync(cancellationToken);
+            try
+            {
+                await _db.SaveChangesAsync(cancellationToken);
+            }
+            catch (DbUpdateException)
+            {
+                var persistedComment = await _db.CarComments
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(comment => comment.BookingId == dto.BookingId, cancellationToken);
+
+                if (persistedComment is not null)
+                {
+                    return MapToDto(persistedComment);
+                }
+
+                throw;
+            }
 
             await RecalculateRatingsAsync(partnerCar.Id, partnerCar.CarModelId, cancellationToken);
 
@@ -147,7 +191,14 @@ namespace CarService.Infrastructure.Services
                 throw new UnauthorizedAccessException("You are not authorized to update this comment.");
             }
 
+            if (entity.BookingId.HasValue)
+            {
+                throw new InvalidOperationException(
+                    "Booking-linked car comments cannot be edited.");
+            }
+
             entity.Content = NormalizeRequired(dto.Content, nameof(dto.Content), 4000);
+            ValidateRating(dto.Rating);
             entity.Rating = dto.Rating;
 
             await _db.SaveChangesAsync(cancellationToken);
@@ -177,6 +228,12 @@ namespace CarService.Infrastructure.Services
             if (!string.Equals(entity.UserId, userId, StringComparison.Ordinal))
             {
                 throw new UnauthorizedAccessException("You are not authorized to delete this comment.");
+            }
+
+            if (entity.BookingId.HasValue)
+            {
+                throw new InvalidOperationException(
+                    "Booking-linked car comments cannot be deleted.");
             }
 
             var partnerCarId = entity.PartnerCarId;
@@ -216,6 +273,7 @@ namespace CarService.Infrastructure.Services
                 UserId = entity.UserId,
                 UserName = entity.UserName,
                 CarId = entity.CarId,
+                BookingId = entity.BookingId,
                 PartnerCarId = entity.PartnerCarId,
                 Content = entity.Content,
                 Rating = entity.Rating,
@@ -237,6 +295,14 @@ namespace CarService.Infrastructure.Services
             }
 
             return normalized;
+        }
+
+        private static void ValidateRating(int rating)
+        {
+            if (rating is < 1 or > 5)
+            {
+                throw new ArgumentException("Rating must be between 1 and 5.", nameof(rating));
+            }
         }
     }
 }

@@ -26,6 +26,7 @@ namespace BookingService.Application.Interfaces
         Task<bool> ConfirmBooking(int id, Guid userId);
         Task<bool> StartTrip(int id, Guid userId);
         Task<BookingCompletionSubmissionResponseDto> SubmitCompletionReview(int id, Guid userId, BookingCompletionSubmissionDto dto);
+        Task<BookingCarCommentSubmissionResponseDto> SubmitCarComment(int id, Guid userId, BookingCarCommentCreateDto dto, CancellationToken cancellationToken = default);
         Task<bool> CompleteBooking(int id, Guid userId);
         Task<IReadOnlyCollection<BookingChargeResponseDto>> GetBookingCharges(int id, Guid userId, CancellationToken cancellationToken = default);
         Task<BookingChargeResponseDto> PayBookingCharge(int id, long chargeId, Guid userId, CancellationToken cancellationToken = default);

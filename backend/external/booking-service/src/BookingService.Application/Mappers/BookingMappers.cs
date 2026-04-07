@@ -1,5 +1,6 @@
 using BookingService.Application.DTOs.Booking;
 using BookingService.Domain.Entities;
+using BookingService.Domain.Enums;
 using System.Linq.Expressions;
 
 namespace BookingService.Application.Mappers
@@ -24,6 +25,9 @@ namespace BookingService.Application.Mappers
             TripStartedAt = booking.TripStartedAt,
             TripCompletedAt = booking.TripCompletedAt,
             CompletionReviewTicketId = booking.CompletionReviewTicketId,
+            CarCommentId = booking.CarCommentId,
+            CarCommentSubmittedAt = booking.CarCommentSubmittedAt,
+            CanLeaveComment = booking.Status == BookingStatus.Completed && booking.CarCommentId == null,
             UsedSubscription = booking.UsedSubscription,
             PricingBreakdownJson = booking.PricingBreakdownJson,
             ImageUrlsJson = booking.ImageUrlsJson,
@@ -55,6 +59,9 @@ namespace BookingService.Application.Mappers
                 TripStartedAt = booking.TripStartedAt,
                 TripCompletedAt = booking.TripCompletedAt,
                 CompletionReviewTicketId = booking.CompletionReviewTicketId,
+                CarCommentId = booking.CarCommentId,
+                CarCommentSubmittedAt = booking.CarCommentSubmittedAt,
+                CanLeaveComment = booking.Status == BookingStatus.Completed && booking.CarCommentId is null,
                 UsedSubscription = booking.UsedSubscription,
                 PricingBreakdownJson = booking.PricingBreakdownJson,
                 ImageUrlsJson = booking.ImageUrlsJson,

@@ -27,6 +27,7 @@ namespace BookingService.Infrastructure.Services
         private readonly ApplicationDbContext _db;
         private readonly IDynamicPricingService _dynamicPricingService;
         private readonly IPartnerCarReadClient _partnerCarReadClient;
+        private readonly ICarCommentWriteClient _carCommentWriteClient;
         private readonly IPaymentSyncClient _paymentSyncClient;
         private readonly IClientBookingAccessClient _clientBookingAccessClient;
         private readonly IIdentityUserReadClient _identityUserReadClient;
@@ -42,6 +43,7 @@ namespace BookingService.Infrastructure.Services
             ApplicationDbContext db,
             IDynamicPricingService dynamicPricingService,
             IPartnerCarReadClient partnerCarReadClient,
+            ICarCommentWriteClient carCommentWriteClient,
             IPaymentSyncClient paymentSyncClient,
             IClientBookingAccessClient clientBookingAccessClient,
             IIdentityUserReadClient identityUserReadClient,
@@ -56,6 +58,7 @@ namespace BookingService.Infrastructure.Services
             _db = db;
             _dynamicPricingService = dynamicPricingService;
             _partnerCarReadClient = partnerCarReadClient;
+            _carCommentWriteClient = carCommentWriteClient;
             _paymentSyncClient = paymentSyncClient;
             _clientBookingAccessClient = clientBookingAccessClient;
             _identityUserReadClient = identityUserReadClient;
@@ -568,6 +571,51 @@ namespace BookingService.Infrastructure.Services
                 Booking = booking.ToBookingResponseDto(),
                 ReviewTicketId = reviewTicket.Id,
                 LatePenaltyAmount = latePenaltyAmount
+            };
+        }
+
+        public async Task<BookingCarCommentSubmissionResponseDto> SubmitCarComment(
+            int id,
+            Guid userId,
+            BookingCarCommentCreateDto dto,
+            CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(dto);
+
+            var booking = await GetRequiredUserBookingEntity(id, userId);
+            if (booking.Status != BookingStatus.Completed)
+            {
+                throw new InvalidOperationException("Car comment can only be submitted for completed bookings.");
+            }
+
+            var normalizedContent = NormalizeRequiredText(dto.Content, nameof(dto.Content), 4000);
+            ValidateCommentRating(dto.Rating);
+
+            var createdComment = await _carCommentWriteClient.CreateForCompletedBookingAsync(
+                new CreateCompletedBookingCarCommentPayload
+                {
+                    BookingId = booking.Id,
+                    PartnerCarId = booking.PartnerCarId,
+                    UserId = userId.ToString("D"),
+                    UserName = await ResolveCommentAuthorNameAsync(userId, cancellationToken),
+                    Rating = dto.Rating,
+                    Content = normalizedContent
+                },
+                cancellationToken);
+
+            var submittedAt = NormalizeCommentSubmittedAt(createdComment.CreatedOn);
+            if (booking.CarCommentId != createdComment.Id || booking.CarCommentSubmittedAt != submittedAt)
+            {
+                booking.CarCommentId = createdComment.Id;
+                booking.CarCommentSubmittedAt = submittedAt;
+                await _db.SaveChangesAsync(cancellationToken);
+            }
+
+            return new BookingCarCommentSubmissionResponseDto
+            {
+                Booking = booking.ToBookingResponseDto(),
+                CommentId = createdComment.Id,
+                SubmittedAt = submittedAt
             };
         }
 
@@ -1103,6 +1151,73 @@ namespace BookingService.Infrastructure.Services
             {
                 throw new ArgumentException("File content is required.", parameterName);
             }
+        }
+
+        private async Task<string> ResolveCommentAuthorNameAsync(
+            Guid userId,
+            CancellationToken cancellationToken)
+        {
+            var clientProfile = await _clientBookingAccessClient.GetClientProfileAsync(userId, cancellationToken);
+            var fullName = BuildPersonName(clientProfile?.FirstName, clientProfile?.LastName);
+            if (!string.IsNullOrWhiteSpace(fullName))
+            {
+                return fullName;
+            }
+
+            var identityUser = await _identityUserReadClient.GetUserByIdAsync(userId, cancellationToken)
+                ?? throw new KeyNotFoundException("User account not found.");
+
+            var userName = identityUser.Username?.Trim();
+            if (!string.IsNullOrWhiteSpace(userName))
+            {
+                return userName;
+            }
+
+            throw new InvalidOperationException("User name is required to submit booking car comment.");
+        }
+
+        private static string BuildPersonName(string? firstName, string? lastName)
+        {
+            var parts = new[] { firstName?.Trim(), lastName?.Trim() }
+                .Where(part => !string.IsNullOrWhiteSpace(part));
+
+            return string.Join(" ", parts);
+        }
+
+        private static string NormalizeRequiredText(string? value, string parameterName, int maxLength)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                throw new ArgumentException($"{parameterName} is required.", parameterName);
+            }
+
+            var normalized = value.Trim();
+            if (normalized.Length > maxLength)
+            {
+                throw new ArgumentException(
+                    $"{parameterName} length must not exceed {maxLength}.",
+                    parameterName);
+            }
+
+            return normalized;
+        }
+
+        private static void ValidateCommentRating(int rating)
+        {
+            if (rating is < 1 or > 5)
+            {
+                throw new ArgumentException("Rating must be between 1 and 5.", nameof(rating));
+            }
+        }
+
+        private static DateTimeOffset NormalizeCommentSubmittedAt(DateTime createdOn)
+        {
+            return createdOn.Kind switch
+            {
+                DateTimeKind.Utc => new DateTimeOffset(createdOn, TimeSpan.Zero),
+                DateTimeKind.Local => createdOn.ToUniversalTime(),
+                _ => new DateTimeOffset(DateTime.SpecifyKind(createdOn, DateTimeKind.Utc), TimeSpan.Zero)
+            };
         }
 
         private static decimal CalculateLatePenaltyAmount(Booking booking, DateTimeOffset tripCompletedAt)
