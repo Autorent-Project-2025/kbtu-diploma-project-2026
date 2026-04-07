@@ -281,6 +281,13 @@
                 </span>
 
                 <span
+                  v-if="b.carCommentId"
+                  class="inline-flex items-center justify-center px-4 py-2 rounded-xl text-xs font-bold bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300"
+                >
+                  ОТЗЫВ ОСТАВЛЕН
+                </span>
+
+                <span
                   :class="getStatusClass(b.computedStatus)"
                   class="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-2xl text-sm font-extrabold uppercase tracking-wider shadow-lg"
                 >
@@ -389,6 +396,32 @@
                   }}</span>
                 </router-link>
 
+                <button
+                  v-if="b.canLeaveComment"
+                  @click="openReviewModal(b)"
+                  :disabled="reviewSubmittingId === b.id"
+                  class="px-6 py-3 bg-sky-600 hover:bg-sky-700 disabled:bg-gray-400 text-white font-semibold rounded-xl transition-all hover:shadow-lg active:scale-95 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  <svg
+                    class="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M8 10h8M8 14h5m-6 7h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"
+                    />
+                  </svg>
+                  <span>{{
+                    reviewSubmittingId === b.id
+                      ? "Отправляем..."
+                      : "Оставить отзыв"
+                  }}</span>
+                </button>
+
                 <!-- Cancel Button -->
                 <button
                   v-if="canCancel(b)"
@@ -484,12 +517,26 @@
       @close="closeCancelModal"
       @confirm="handleCancelConfirm"
     />
+
+    <ReviewModal
+      v-if="bookingToReview && reviewSubject"
+      :is-open="showReviewModal"
+      :subject="reviewSubject"
+      :submitting="isReviewSubmitting"
+      @close="closeReviewModal"
+      @submit="handleReviewSubmit"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { onMounted, ref, computed } from "vue";
-import { getMyBookings, cancelBooking, startBookingTrip } from "../api/booking";
+import {
+  getMyBookings,
+  cancelBooking,
+  startBookingTrip,
+  submitBookingCarComment,
+} from "../api/booking";
 import type { Booking } from "../types/Booking";
 import {
   computeBookingStatus,
@@ -502,6 +549,7 @@ import {
 } from "../utils/bookingUtils";
 import { useToast } from "../composables/useToast";
 import CancelBookingModal from "../components/CancelBookingModal.vue";
+import ReviewModal from "../components/ReviewModal.vue";
 
 interface BookingWithComputedStatus extends Booking {
   computedStatus: ReturnType<typeof computeBookingStatus>;
@@ -521,6 +569,9 @@ const cancelingId = ref<number | null>(null);
 const startingId = ref<number | null>(null);
 const bookingToCancel = ref<BookingWithComputedStatus | null>(null);
 const showCancelModal = ref(false);
+const bookingToReview = ref<BookingWithComputedStatus | null>(null);
+const showReviewModal = ref(false);
+const reviewSubmittingId = ref<number | null>(null);
 const { success, error } = useToast();
 
 // Filters configuration
@@ -571,6 +622,24 @@ const filteredBookings = computed(() => {
   return bookings.value.filter((b) => b.computedStatus === currentFilter.value);
 });
 
+const reviewSubject = computed(() => {
+  if (!bookingToReview.value) {
+    return null;
+  }
+
+  return {
+    brand: bookingToReview.value.carBrand,
+    model: bookingToReview.value.carModel,
+    year: null,
+  };
+});
+
+const isReviewSubmitting = computed(
+  () =>
+    bookingToReview.value != null &&
+    reviewSubmittingId.value === bookingToReview.value.id,
+);
+
 onMounted(async () => {
   await loadBookings();
 });
@@ -582,15 +651,19 @@ async function loadBookings() {
     // Обрабатываем оба формата ответа
     const items = Array.isArray(data) ? data : data.items;
 
-    bookings.value = items.map((b: Booking) => ({
-      ...b,
-      computedStatus: computeBookingStatus(b),
-    }));
+    bookings.value = items.map(toBookingWithComputedStatus);
   } catch (e) {
     console.error("Failed to load bookings", e);
     error("Не удалось загрузить бронирования");
     bookings.value = []; // Очищаем список при ошибке
   }
+}
+
+function toBookingWithComputedStatus(booking: Booking): BookingWithComputedStatus {
+  return {
+    ...booking,
+    computedStatus: computeBookingStatus(booking),
+  };
 }
 
 function formatDate(dateString: string): string {
@@ -674,6 +747,22 @@ function closeCancelModal() {
   }, 300);
 }
 
+function openReviewModal(booking: BookingWithComputedStatus) {
+  bookingToReview.value = booking;
+  showReviewModal.value = true;
+}
+
+function closeReviewModal() {
+  if (isReviewSubmitting.value) {
+    return;
+  }
+
+  showReviewModal.value = false;
+  setTimeout(() => {
+    bookingToReview.value = null;
+  }, 300);
+}
+
 async function handleCancelConfirm() {
   if (!bookingToCancel.value) return;
 
@@ -714,6 +803,47 @@ async function handleStartTrip(booking: BookingWithComputedStatus) {
   } finally {
     startingId.value = null;
   }
+}
+
+async function handleReviewSubmit(rating: number, content: string) {
+  if (!bookingToReview.value) {
+    return;
+  }
+
+  reviewSubmittingId.value = bookingToReview.value.id;
+
+  try {
+    const result = await submitBookingCarComment(bookingToReview.value.id, {
+      rating,
+      content,
+    });
+
+    updateBookingInList(result.booking);
+    reviewSubmittingId.value = null;
+    showReviewModal.value = false;
+    setTimeout(() => {
+      bookingToReview.value = null;
+    }, 300);
+    success("Отзыв успешно опубликован");
+  } catch (e) {
+    console.error("Failed to submit booking car comment", e);
+    error(
+      (e as any)?.response?.data?.detail ||
+        (e as any)?.response?.data?.error ||
+        "Не удалось отправить отзыв",
+    );
+  } finally {
+    reviewSubmittingId.value = null;
+  }
+}
+
+function updateBookingInList(updatedBooking: Booking) {
+  const index = bookings.value.findIndex((item) => item.id === updatedBooking.id);
+  if (index === -1) {
+    return;
+  }
+
+  bookings.value[index] = toBookingWithComputedStatus(updatedBooking);
 }
 
 function getStatusClass(status: ReturnType<typeof computeBookingStatus>) {

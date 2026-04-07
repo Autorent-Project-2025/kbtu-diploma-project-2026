@@ -23,6 +23,12 @@ namespace CarService.Application.Interfaces
             CarCommentCreateDto dto,
             CancellationToken cancellationToken = default);
 
+        Task<CarCommentResponseDto> CreateFromCompletedBookingAsync(
+            CarCommentCreateDto dto,
+            string userId,
+            string userName,
+            CancellationToken cancellationToken = default);
+
         Task<CarCommentResponseDto?> UpdateAsync(
             string userId,
             int commentId,

@@ -36,7 +36,10 @@
             <div class="pr-12">
               <h2 class="text-2xl font-bold text-white mb-2">Оставить отзыв</h2>
               <p class="text-primary-100">
-                {{ car.brand }} {{ car.model }} ({{ car.year }})
+                {{ subject.brand }} {{ subject.model }}
+                <template v-if="subject.year != null">
+                  ({{ subject.year }})
+                </template>
               </p>
             </div>
           </div>
@@ -138,11 +141,11 @@
               </button>
               <button
                 type="submit"
-                :disabled="submitting"
+                :disabled="isSubmitting"
                 class="flex-1 btn-premium py-3 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <span
-                  v-if="!submitting"
+                  v-if="!isSubmitting"
                   class="flex items-center justify-center gap-2"
                 >
                   <svg
@@ -193,11 +196,15 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
-import type { CarDetails } from "../types/Car";
 
 interface Props {
   isOpen: boolean;
-  car: CarDetails;
+  subject: {
+    brand: string;
+    model: string;
+    year?: number | null;
+  };
+  submitting?: boolean;
 }
 
 interface Emits {
@@ -211,11 +218,11 @@ const emit = defineEmits<Emits>();
 const rating = ref(0);
 const hoverRating = ref(0);
 const content = ref("");
-const submitting = ref(false);
 const errors = ref({
   rating: "",
   content: "",
 });
+const isSubmitting = computed(() => Boolean(props.submitting));
 
 const ratingText = computed(() => {
   const texts = ["", "Ужасно", "Плохо", "Нормально", "Хорошо", "Отлично"];
@@ -247,13 +254,11 @@ function validateForm(): boolean {
 
 async function handleSubmit() {
   if (!validateForm()) return;
-
-  submitting.value = true;
   emit("submit", rating.value, content.value);
 }
 
 function handleClose() {
-  if (!submitting.value) {
+  if (!isSubmitting.value) {
     resetForm();
     emit("close");
   }
@@ -275,13 +280,6 @@ watch(
     }
   }
 );
-
-// Expose submitting state control for parent
-defineExpose({
-  setSubmitting: (value: boolean) => {
-    submitting.value = value;
-  },
-});
 </script>
 
 <style scoped>

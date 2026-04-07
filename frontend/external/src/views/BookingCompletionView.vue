@@ -208,6 +208,25 @@
             Консультант подтвердил завершение, а все начисления по поездке закрыты.
           </p>
 
+          <div class="flex flex-wrap items-center gap-3">
+            <button
+              v-if="booking.canLeaveComment"
+              type="button"
+              class="px-5 py-3 rounded-2xl bg-sky-600 hover:bg-sky-700 disabled:opacity-60 text-white font-bold transition-colors"
+              :disabled="reviewSubmitting"
+              @click="showReviewModal = true"
+            >
+              {{ reviewSubmitting ? "Отправляем отзыв..." : "Оставить отзыв" }}
+            </button>
+
+            <div
+              v-else-if="booking.carCommentId"
+              class="rounded-2xl border border-sky-200/70 dark:border-sky-700/40 bg-sky-50 dark:bg-sky-900/20 px-4 py-3 text-sm font-semibold text-sky-800 dark:text-sky-200"
+            >
+              Отзыв уже оставлен.
+            </div>
+          </div>
+
           <div v-if="orderedCharges.length > 0" class="grid gap-3">
             <article
               v-for="charge in orderedCharges"
@@ -237,6 +256,15 @@
         </section>
       </template>
     </div>
+
+    <ReviewModal
+      v-if="booking"
+      :is-open="showReviewModal"
+      :subject="reviewSubject"
+      :submitting="reviewSubmitting"
+      @close="closeReviewModal"
+      @submit="handleReviewSubmit"
+    />
   </div>
 </template>
 
@@ -247,11 +275,13 @@ import {
   getBooking,
   getBookingCharges,
   payBookingCharge,
+  submitBookingCarComment,
   submitBookingCompletionReview,
 } from "../api/booking";
 import type { Booking, BookingCharge } from "../types/Booking";
 import { getTripDuration } from "../utils/bookingUtils";
 import { useToast } from "../composables/useToast";
+import ReviewModal from "../components/ReviewModal.vue";
 
 type CompletionPhotoKey =
   | "completionFrontPhotoFile"
@@ -271,6 +301,8 @@ const loading = ref(true);
 const loadError = ref<string | null>(null);
 const submitting = ref(false);
 const payingChargeId = ref<number | null>(null);
+const showReviewModal = ref(false);
+const reviewSubmitting = ref(false);
 const now = ref(Date.now());
 
 const completionPhotoFields: Array<{ key: CompletionPhotoKey; label: string }> = [
@@ -343,6 +375,12 @@ const orderedCharges = computed(() =>
 const canSubmitCompletionReview = computed(() =>
   completionPhotoFields.every((field) => selectedFiles.value[field.key] instanceof File)
 );
+
+const reviewSubject = computed(() => ({
+  brand: booking.value?.carBrand ?? "",
+  model: booking.value?.carModel ?? "",
+  year: null,
+}));
 
 onMounted(async () => {
   if (!Number.isFinite(bookingId) || bookingId <= 0) {
@@ -461,6 +499,41 @@ async function payCharge(chargeId: number) {
     );
   } finally {
     payingChargeId.value = null;
+  }
+}
+
+function closeReviewModal() {
+  if (reviewSubmitting.value) {
+    return;
+  }
+
+  showReviewModal.value = false;
+}
+
+async function handleReviewSubmit(rating: number, content: string) {
+  if (!booking.value) {
+    return;
+  }
+
+  reviewSubmitting.value = true;
+  try {
+    const result = await submitBookingCarComment(booking.value.id, {
+      rating,
+      content,
+    });
+
+    booking.value = result.booking;
+    showReviewModal.value = false;
+    success("Отзыв успешно опубликован.");
+  } catch (e: any) {
+    console.error("Failed to submit booking car comment", e);
+    error(
+      e?.response?.data?.detail ||
+        e?.response?.data?.error ||
+        "Не удалось отправить отзыв."
+    );
+  } finally {
+    reviewSubmitting.value = false;
   }
 }
 

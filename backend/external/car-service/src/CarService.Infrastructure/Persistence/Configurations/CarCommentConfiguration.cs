@@ -13,6 +13,10 @@ namespace CarService.Infrastructure.Persistence.Configurations
             builder.Property(comment => comment.UserId)
                 .HasMaxLength(64);
 
+            builder.HasIndex(comment => comment.BookingId)
+                .IsUnique()
+                .HasFilter("\"booking_id\" IS NOT NULL");
+
             builder.HasOne(comment => comment.Car)
                 .WithMany(model => model.Comments)
                 .HasForeignKey(comment => comment.CarId)

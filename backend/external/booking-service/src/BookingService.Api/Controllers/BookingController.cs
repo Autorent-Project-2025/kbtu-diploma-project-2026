@@ -179,6 +179,25 @@ namespace BookingService.Api.Controllers
             return Ok(result);
         }
 
+        [HttpPost("{id:int}/car-comment")]
+        public async Task<IActionResult> SubmitCarComment(
+            int id,
+            [FromBody] CreateBookingCarCommentRequest request,
+            CancellationToken cancellationToken)
+        {
+            var result = await _bookingService.SubmitCarComment(
+                id,
+                GetUserId(),
+                new BookingCarCommentCreateDto
+                {
+                    Rating = request.Rating,
+                    Content = request.Content
+                },
+                cancellationToken);
+
+            return Ok(result);
+        }
+
         [HttpGet("{id:int}/charges")]
         public async Task<IActionResult> GetCharges(int id, CancellationToken cancellationToken)
         {
