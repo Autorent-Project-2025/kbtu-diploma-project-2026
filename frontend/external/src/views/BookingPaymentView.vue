@@ -20,9 +20,6 @@
             <h1 class="text-4xl font-extrabold text-gray-900 dark:text-white">
               Завершите оплату бронирования
             </h1>
-            <p class="text-gray-600 dark:text-gray-400 max-w-2xl">
-              Это тестовый checkout. Карта не списывается, а результат определяется псевдо-данными.
-            </p>
           </div>
 
           <div v-if="loading" class="py-16 text-center">
@@ -52,16 +49,41 @@
                     </div>
                   </div>
 
-                  <div class="min-w-0 space-y-2">
+                  <div class="min-w-0 space-y-3">
                     <p class="text-2xl font-bold text-gray-900 dark:text-white">
                       {{ booking.carBrand }} {{ booking.carModel }}
                     </p>
-                    <p
+
+                    <div
                       v-if="booking.partnerName"
-                      class="text-sm font-medium text-primary-700 dark:text-primary-300"
+                      class="inline-flex max-w-full items-center gap-3 rounded-2xl bg-primary-50 dark:bg-primary-900/20 px-4 py-3"
                     >
-                      Партнер: {{ booking.partnerName }}
-                    </p>
+                      <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white text-primary-600 shadow-sm dark:bg-primary-950/70 dark:text-primary-300">
+                        <svg
+                          class="h-5 w-5"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                            d="M5.121 17.804A11.955 11.955 0 0112 15c2.461 0 4.748.745 6.879 2.022M15 11a3 3 0 11-6 0 3 3 0 016 0zm6 1a9 9 0 11-18 0 9 9 0 0118 0z"
+                          />
+                        </svg>
+                      </div>
+
+                      <div class="min-w-0">
+                        <p class="text-xs font-bold uppercase tracking-[0.2em] text-primary-700 dark:text-primary-300">
+                          Ваш партнер
+                        </p>
+                        <p class="truncate text-base font-bold text-gray-900 dark:text-white">
+                          {{ booking.partnerName }}
+                        </p>
+                      </div>
+                    </div>
+
                     <p class="text-sm text-gray-600 dark:text-gray-400">
                       {{ formatDate(booking.startDate) }} -> {{ formatDate(booking.endDate) }}
                     </p>
@@ -111,9 +133,6 @@
                 </p>
                 <p class="mt-3 text-3xl font-extrabold text-gray-900 dark:text-white">
                   {{ formatCountdown(paymentDeadlineRemainingMs) }}
-                </p>
-                <p class="mt-2 text-sm text-gray-600 dark:text-gray-300">
-                  {{ paymentDeadlineAt ? `Дедлайн ${formatDate(paymentDeadlineAt)}` : "Дедлайн появится после старта сессии" }}
                 </p>
               </article>
             </div>
@@ -296,9 +315,6 @@
             <p class="text-sm uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400 font-bold">Статус брони</p>
             <p class="mt-3 text-3xl font-extrabold text-gray-900 dark:text-white">
               {{ booking ? getBookingStatusText(booking.status) : "..." }}
-            </p>
-            <p class="mt-3 text-sm text-gray-600 dark:text-gray-400">
-              Пока статус `pending`, эта бронь удерживает слот автомобиля, но партнёру деньги ещё не начислены.
             </p>
           </article>
 
