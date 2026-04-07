@@ -144,6 +144,41 @@ namespace CarService.Infrastructure.Services
             };
         }
 
+        public async Task<PartnerCarSnapshotDto?> GetSnapshotAsync(int partnerCarId, CancellationToken cancellationToken = default)
+        {
+            var entity = await _db.PartnerCars
+                .AsNoTracking()
+                .IncludeModelCatalog()
+                .Include(partnerCar => partnerCar.Images)
+                .FirstOrDefaultAsync(partnerCar => partnerCar.Id == partnerCarId, cancellationToken);
+
+            if (entity is null)
+            {
+                return null;
+            }
+
+            var orderedImages = entity.Images
+                .OrderBy(image => image.DisplayOrder)
+                .ThenBy(image => image.Id)
+                .Select(image => image.ImageUrl)
+                .Where(imageUrl => !string.IsNullOrWhiteSpace(imageUrl))
+                .ToList();
+
+            return new PartnerCarSnapshotDto
+            {
+                PartnerCarId = entity.Id,
+                PartnerUserId = entity.PartnerUserId,
+                CarBrand = entity.CarModel.Brand.Name,
+                CarModel = entity.CarModel.ModelLookup.Name,
+                ModelYear = entity.CarModel.Year,
+                LicensePlate = entity.LicensePlate,
+                PriceHour = entity.PriceHour,
+                Rating = entity.Rating,
+                CoverImageUrl = orderedImages.FirstOrDefault(),
+                ImageUrls = orderedImages
+            };
+        }
+
         public async Task<PartnerCarResponseDto> CreateAsync(
             Guid currentUserId,
             PartnerCarCreateDto dto,

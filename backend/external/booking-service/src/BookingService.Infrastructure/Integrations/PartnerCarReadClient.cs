@@ -61,6 +61,38 @@ namespace BookingService.Infrastructure.Integrations
                 payload.IsMarketValueStale);
         }
 
+        public async Task<PartnerCarSnapshotPayload?> GetSnapshotAsync(
+            int partnerCarId,
+            CancellationToken cancellationToken = default)
+        {
+            if (string.IsNullOrWhiteSpace(_options.InternalApiKey))
+            {
+                throw new InvalidOperationException("CarService:InternalApiKey configuration is required.");
+            }
+
+            using var request = new HttpRequestMessage(
+                HttpMethod.Get,
+                $"/internal/partner-cars/{partnerCarId}/snapshot");
+            request.Headers.Add(InternalApiKeyHeader, _options.InternalApiKey);
+
+            using var response = await _httpClient.SendAsync(request, cancellationToken);
+            if (response.StatusCode == HttpStatusCode.NotFound)
+            {
+                return null;
+            }
+
+            response.EnsureSuccessStatusCode();
+
+            var payload = await response.Content.ReadFromJsonAsync<PartnerCarSnapshotPayload>(
+                cancellationToken: cancellationToken);
+            if (payload is null)
+            {
+                throw new InvalidOperationException("Car service returned empty snapshot response.");
+            }
+
+            return payload;
+        }
+
         private sealed class PartnerCarPayload
         {
             public int PartnerCarId { get; init; }

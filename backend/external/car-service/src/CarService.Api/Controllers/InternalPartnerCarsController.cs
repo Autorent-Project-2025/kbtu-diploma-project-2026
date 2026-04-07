@@ -73,6 +73,31 @@ namespace CarService.Api.Controllers
         }
 
         [AllowAnonymous]
+        [HttpGet("{partnerCarId:int}/snapshot")]
+        public async Task<IActionResult> GetSnapshot(
+            int partnerCarId,
+            CancellationToken cancellationToken)
+        {
+            if (!IsAuthorizedInternalRequest())
+            {
+                return Unauthorized(new { error = "Internal API key is invalid." });
+            }
+
+            if (partnerCarId <= 0)
+            {
+                return BadRequest(new { error = "PartnerCarId must be greater than zero." });
+            }
+
+            var payload = await _partnerCarService.GetSnapshotAsync(partnerCarId, cancellationToken);
+            if (payload is null)
+            {
+                return NotFound(new { error = "Partner car not found." });
+            }
+
+            return Ok(payload);
+        }
+
+        [AllowAnonymous]
         [HttpGet("{partnerCarId:int}/pricing-context")]
         public async Task<IActionResult> GetPricingContext(
             int partnerCarId,

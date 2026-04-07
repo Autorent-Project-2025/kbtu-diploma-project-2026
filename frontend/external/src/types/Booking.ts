@@ -20,6 +20,9 @@ export interface Booking {
   partnerUserId?: string;
   carBrand: string;
   carModel: string;
+  partnerName?: string | null;
+  coverImageUrl?: string | null;
+  imageUrls?: string[];
   startDate: string;
   endDate: string;
   price: number | null;

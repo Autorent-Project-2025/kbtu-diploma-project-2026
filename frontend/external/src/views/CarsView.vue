@@ -103,7 +103,7 @@
 
           <button
             @click="loadModelCards"
-            :disabled="matching"
+            :disabled="creatingBooking"
             class="px-4 py-3 rounded-xl border-2 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 font-semibold hover:border-primary-500"
           >
             Обновить
@@ -219,7 +219,7 @@
               </router-link>
               <button
                 @click="openBookingModal(model)"
-                :disabled="matching"
+                :disabled="creatingBooking"
                 class="px-4 py-3 rounded-xl bg-primary-600 hover:bg-primary-700 text-white font-semibold"
               >
                 Забронировать
@@ -231,14 +231,13 @@
     </div>
 
     <BookingModal
-      v-if="selectedModelAsCar"
+      v-if="selectedModelSelection"
       :is-open="isModalOpen"
-      :car="selectedModelAsCar"
+      :selection="selectedModelSelection"
       :booking-error="bookingError"
-      :suggested-dates="bookingSuggestions"
+      :submitting="creatingBooking"
       @close="closeBookingModal"
       @confirm="handleBookingConfirm"
-      @suggestion-click="handleSuggestionClick"
     />
 
     <LoginRequiredModal
@@ -255,7 +254,6 @@ import { useRouter } from "vue-router";
 import { createBooking } from "../api/booking";
 import {
   getAvailableModelCards,
-  matchCarByModel,
   type AvailableModelCard,
 } from "../api/cars";
 import BookingModal from "../components/BookingModal.vue";
@@ -263,7 +261,7 @@ import LoginRequiredModal from "../components/LoginRequiredModal.vue";
 import { useAuth } from "../composables/useAuth";
 import { useToast } from "../composables/useToast";
 import { config } from "../config";
-import type { Car } from "../types/Car";
+import type { BookingModelSelection } from "../types/Car";
 import { formatMoney } from "../utils/formatMoney";
 import SmartRecommendationPanel from "../components/SmartRecommendationPanel.vue";
 
@@ -272,7 +270,7 @@ const { isAuthenticated } = useAuth();
 const { success, error } = useToast();
 
 const loading = ref(true);
-const matching = ref(false);
+const creatingBooking = ref(false);
 const sortType = ref<
   "popular" | "price_asc" | "price_desc" | "available" | "newest"
 >("popular");
@@ -282,7 +280,6 @@ const selectedModel = ref<AvailableModelCard | null>(null);
 const isModalOpen = ref(false);
 const showLoginModal = ref(false);
 const bookingError = ref("");
-const bookingSuggestions = ref<string[]>([]);
 
 const sortedModels = computed(() => {
   return [...models.value].sort((left, right) => {
@@ -309,13 +306,13 @@ const sortedModels = computed(() => {
   });
 });
 
-const selectedModelAsCar = computed<Car | null>(() => {
+const selectedModelSelection = computed<BookingModelSelection | null>(() => {
   if (!selectedModel.value) {
     return null;
   }
 
   return {
-    id: selectedModel.value.modelId,
+    modelId: selectedModel.value.modelId,
     brand: selectedModel.value.brand,
     model: selectedModel.value.model,
     year: selectedModel.value.year,
@@ -368,14 +365,12 @@ function openBookingModal(model: AvailableModelCard) {
 
   selectedModel.value = model;
   bookingError.value = "";
-  bookingSuggestions.value = [];
   isModalOpen.value = true;
 }
 
 function closeBookingModal() {
   isModalOpen.value = false;
   bookingError.value = "";
-  bookingSuggestions.value = [];
   setTimeout(() => {
     selectedModel.value = null;
   }, 200);
@@ -386,40 +381,22 @@ function goToLogin() {
   router.push("/login");
 }
 
-function handleSuggestionClick() {
-  bookingError.value = "";
-}
-
 async function handleBookingConfirm(payloadData: {
   startDate: string;
   endDate: string;
   useSubscription: boolean;
+  partnerCarId: number;
 }) {
   if (!selectedModel.value) {
     return;
   }
 
-  matching.value = true;
+  creatingBooking.value = true;
   bookingError.value = "";
-  bookingSuggestions.value = [];
 
   try {
-    const matchResult = await matchCarByModel({
-      modelId: selectedModel.value.modelId,
-      startTime: payloadData.startDate,
-      endTime: payloadData.endDate,
-    });
-
-    if (!matchResult.isAvailable || !matchResult.partnerCarId) {
-      bookingError.value = "На выбранные даты машин этой модели нет.";
-      bookingSuggestions.value = (
-        matchResult.suggestedStartTimesUtc ?? []
-      ).slice(0, 5);
-      return;
-    }
-
     const booking = await createBooking(
-      matchResult.partnerCarId,
+      payloadData.partnerCarId,
       payloadData.startDate,
       payloadData.endDate,
       payloadData.useSubscription,
@@ -441,7 +418,7 @@ async function handleBookingConfirm(payloadData: {
     bookingError.value = "Не удалось забронировать машину. Попробуйте снова.";
     error("Не удалось забронировать машину.");
   } finally {
-    matching.value = false;
+    creatingBooking.value = false;
   }
 }
 </script>

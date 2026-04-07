@@ -8,6 +8,8 @@ obj/
 out/
 artifacts/
 
+.dotnet/
+
 # User-specific files
 *.user
 *.userosscache

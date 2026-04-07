@@ -28,6 +28,7 @@ builder.Services.Configure<CarServiceOptions>(builder.Configuration.GetSection(C
 builder.Services.Configure<PaymentServiceOptions>(builder.Configuration.GetSection(PaymentServiceOptions.SectionName));
 builder.Services.Configure<ClientServiceOptions>(builder.Configuration.GetSection(ClientServiceOptions.SectionName));
 builder.Services.Configure<IdentityServiceOptions>(builder.Configuration.GetSection(IdentityServiceOptions.SectionName));
+builder.Services.Configure<PartnerServiceOptions>(builder.Configuration.GetSection(PartnerServiceOptions.SectionName));
 builder.Services.Configure<TicketServiceOptions>(builder.Configuration.GetSection(TicketServiceOptions.SectionName));
 builder.Services.Configure<EmailServiceOptions>(builder.Configuration.GetSection(EmailServiceOptions.SectionName));
 builder.Services.AddOptions<RabbitMqOptions>()
@@ -192,6 +193,22 @@ builder.Services.AddHttpClient<IIdentityUserReadClient, IdentityUserReadClient>(
         client.BaseAddress = new Uri(options.BaseUrl, UriKind.Absolute);
     }
 
+    client.Timeout = Timeout.InfiniteTimeSpan;
+})
+.AddHttpMessageHandler<ObservabilityHttpClientHandler>()
+.AddConfiguredResilience(httpClientResilienceOptions);
+builder.Services.AddHttpClient<IPartnerProfileReadClient, PartnerProfileReadClient>((serviceProvider, client) =>
+{
+    var options = serviceProvider
+        .GetRequiredService<Microsoft.Extensions.Options.IOptions<PartnerServiceOptions>>()
+        .Value;
+
+    if (string.IsNullOrWhiteSpace(options.BaseUrl))
+    {
+        throw new InvalidOperationException("Configuration value 'PartnerService:BaseUrl' is required.");
+    }
+
+    client.BaseAddress = new Uri(options.BaseUrl, UriKind.Absolute);
     client.Timeout = Timeout.InfiniteTimeSpan;
 })
 .AddHttpMessageHandler<ObservabilityHttpClientHandler>()

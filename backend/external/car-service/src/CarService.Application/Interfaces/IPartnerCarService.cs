@@ -8,6 +8,7 @@ namespace CarService.Application.Interfaces
     {
         Task<PagedResult<PartnerCarResponseDto>> GetAllAsync(PartnerCarQueryParams queryParams, CancellationToken cancellationToken = default);
         Task<PartnerCarDetailsDto?> GetByIdAsync(int id, CancellationToken cancellationToken = default);
+        Task<PartnerCarSnapshotDto?> GetSnapshotAsync(int partnerCarId, CancellationToken cancellationToken = default);
         Task<PartnerCarResponseDto> CreateAsync(Guid currentUserId, PartnerCarCreateDto dto, CancellationToken cancellationToken = default);
         Task<PartnerCarResponseDto> ProvisionAsync(PartnerCarProvisionDto dto, CancellationToken cancellationToken = default);
         Task<PartnerCarResponseDto?> UpdateAsync(Guid currentUserId, int id, PartnerCarUpdateDto dto, CancellationToken cancellationToken = default);

@@ -12,8 +12,10 @@ namespace BookingService.Application.Mappers
             UserId = booking.UserId,
             PartnerCarId = booking.PartnerCarId,
             PartnerUserId = booking.PartnerUserId,
-            CarBrand = string.Empty,
-            CarModel = string.Empty,
+            CarBrand = booking.CarBrand ?? string.Empty,
+            CarModel = booking.CarModel ?? string.Empty,
+            PartnerName = booking.PartnerName,
+            CoverImageUrl = booking.CoverImageUrl,
             StartTime = booking.StartTime,
             EndTime = booking.EndTime,
             PriceHour = booking.PriceHour,
@@ -24,6 +26,7 @@ namespace BookingService.Application.Mappers
             CompletionReviewTicketId = booking.CompletionReviewTicketId,
             UsedSubscription = booking.UsedSubscription,
             PricingBreakdownJson = booking.PricingBreakdownJson,
+            ImageUrlsJson = booking.ImageUrlsJson,
             Status = booking.Status.ToString().ToLowerInvariant()
         };
 
@@ -40,8 +43,10 @@ namespace BookingService.Application.Mappers
                 UserId = booking.UserId,
                 PartnerCarId = booking.PartnerCarId,
                 PartnerUserId = booking.PartnerUserId,
-                CarBrand = string.Empty,
-                CarModel = string.Empty,
+                CarBrand = booking.CarBrand ?? string.Empty,
+                CarModel = booking.CarModel ?? string.Empty,
+                PartnerName = booking.PartnerName,
+                CoverImageUrl = booking.CoverImageUrl,
                 StartTime = booking.StartTime,
                 EndTime = booking.EndTime,
                 PriceHour = booking.PriceHour,
@@ -52,6 +57,7 @@ namespace BookingService.Application.Mappers
                 CompletionReviewTicketId = booking.CompletionReviewTicketId,
                 UsedSubscription = booking.UsedSubscription,
                 PricingBreakdownJson = booking.PricingBreakdownJson,
+                ImageUrlsJson = booking.ImageUrlsJson,
                 Status = booking.Status.ToString().ToLowerInvariant()
             };
         }

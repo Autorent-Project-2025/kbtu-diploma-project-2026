@@ -65,12 +65,36 @@
                     ></div>
                   </div>
 
+                  <div
+                    class="h-24 w-32 flex-shrink-0 overflow-hidden rounded-2xl bg-gray-100 dark:bg-gray-800"
+                  >
+                    <img
+                      v-if="getCoverImage(b)"
+                      :src="getCoverImage(b)!"
+                      :alt="`${b.carBrand} ${b.carModel}`"
+                      class="h-full w-full object-cover"
+                    />
+                    <div
+                      v-else
+                      class="flex h-full w-full items-center justify-center text-xs text-gray-500 dark:text-gray-400"
+                    >
+                      Нет фото
+                    </div>
+                  </div>
+
                   <div class="space-y-2 flex-1">
                     <h3
                       class="text-2xl font-bold text-gray-900 dark:text-white"
                     >
                       {{ b.carBrand }} {{ b.carModel }}
                     </h3>
+
+                    <p
+                      v-if="b.partnerName"
+                      class="text-sm font-medium text-primary-700 dark:text-primary-300"
+                    >
+                      Партнер: {{ b.partnerName }}
+                    </p>
 
                     <!-- Dates -->
                     <div
@@ -225,6 +249,23 @@
                       >
                         Использован последний доступный рыночный снапшот.
                       </p>
+                    </div>
+
+                    <div
+                      v-if="getGalleryImages(b).length > 0"
+                      class="flex flex-wrap gap-2 pt-1"
+                    >
+                      <div
+                        v-for="imageUrl in getGalleryImages(b)"
+                        :key="imageUrl"
+                        class="h-12 w-16 overflow-hidden rounded-xl bg-gray-100 dark:bg-gray-800"
+                      >
+                        <img
+                          :src="imageUrl"
+                          :alt="`${b.carBrand} ${b.carModel}`"
+                          class="h-full w-full object-cover"
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -583,6 +624,18 @@ function formatMoney(amount: number | null | undefined, currency = "KZT"): strin
     currency,
     maximumFractionDigits: 2,
   }).format(amount);
+}
+
+function getCoverImage(booking: Booking): string | null {
+  return booking.coverImageUrl ?? booking.imageUrls?.[0] ?? null;
+}
+
+function getGalleryImages(booking: Booking): string[] {
+  const coverImage = getCoverImage(booking);
+
+  return (booking.imageUrls ?? [])
+    .filter((imageUrl) => imageUrl !== coverImage)
+    .slice(0, 3);
 }
 
 function canCancel(booking: BookingWithComputedStatus): boolean {

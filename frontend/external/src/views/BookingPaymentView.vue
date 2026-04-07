@@ -20,9 +20,6 @@
             <h1 class="text-4xl font-extrabold text-gray-900 dark:text-white">
               Завершите оплату бронирования
             </h1>
-            <p class="text-gray-600 dark:text-gray-400 max-w-2xl">
-              Это тестовый checkout. Карта не списывается, а результат определяется псевдо-данными.
-            </p>
           </div>
 
           <div v-if="loading" class="py-16 text-center">
@@ -36,12 +33,79 @@
             <div class="grid md:grid-cols-2 gap-4">
               <article class="p-5 rounded-2xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
                 <p class="text-sm text-gray-500 dark:text-gray-400">Автомобиль</p>
-                <p class="mt-2 text-2xl font-bold text-gray-900 dark:text-white">
-                  {{ booking.carBrand }} {{ booking.carModel }}
-                </p>
-                <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                  {{ formatDate(booking.startDate) }} -> {{ formatDate(booking.endDate) }}
-                </p>
+                <div class="mt-3 flex gap-4">
+                  <div class="h-24 w-32 shrink-0 overflow-hidden rounded-2xl bg-gray-200 dark:bg-gray-700">
+                    <img
+                      v-if="getBookingHeroImage(booking)"
+                      :src="getBookingHeroImage(booking)!"
+                      :alt="`${booking.carBrand} ${booking.carModel}`"
+                      class="h-full w-full object-cover"
+                    />
+                    <div
+                      v-else
+                      class="flex h-full w-full items-center justify-center text-xs text-gray-500 dark:text-gray-400"
+                    >
+                      Нет фото
+                    </div>
+                  </div>
+
+                  <div class="min-w-0 space-y-3">
+                    <p class="text-2xl font-bold text-gray-900 dark:text-white">
+                      {{ booking.carBrand }} {{ booking.carModel }}
+                    </p>
+
+                    <div
+                      v-if="booking.partnerName"
+                      class="inline-flex max-w-full items-center gap-3 rounded-2xl bg-primary-50 dark:bg-primary-900/20 px-4 py-3"
+                    >
+                      <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white text-primary-600 shadow-sm dark:bg-primary-950/70 dark:text-primary-300">
+                        <svg
+                          class="h-5 w-5"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                            d="M5.121 17.804A11.955 11.955 0 0112 15c2.461 0 4.748.745 6.879 2.022M15 11a3 3 0 11-6 0 3 3 0 016 0zm6 1a9 9 0 11-18 0 9 9 0 0118 0z"
+                          />
+                        </svg>
+                      </div>
+
+                      <div class="min-w-0">
+                        <p class="text-xs font-bold uppercase tracking-[0.2em] text-primary-700 dark:text-primary-300">
+                          Ваш партнер
+                        </p>
+                        <p class="truncate text-base font-bold text-gray-900 dark:text-white">
+                          {{ booking.partnerName }}
+                        </p>
+                      </div>
+                    </div>
+
+                    <p class="text-sm text-gray-600 dark:text-gray-400">
+                      {{ formatDate(booking.startDate) }} -> {{ formatDate(booking.endDate) }}
+                    </p>
+                  </div>
+                </div>
+
+                <div
+                  v-if="getBookingGalleryImages(booking).length > 0"
+                  class="mt-4 flex flex-wrap gap-2"
+                >
+                  <div
+                    v-for="imageUrl in getBookingGalleryImages(booking)"
+                    :key="imageUrl"
+                    class="h-12 w-16 overflow-hidden rounded-xl bg-gray-200 dark:bg-gray-700"
+                  >
+                    <img
+                      :src="imageUrl"
+                      :alt="`${booking.carBrand} ${booking.carModel}`"
+                      class="h-full w-full object-cover"
+                    />
+                  </div>
+                </div>
               </article>
 
               <article class="p-5 rounded-2xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
@@ -55,42 +119,20 @@
               </article>
             </div>
 
-            <div class="grid md:grid-cols-2 gap-4">
+            <div>
               <article
                 :class="[
                   'p-5 rounded-2xl border transition-colors',
-                  isDeadlineCritical(sessionRemainingMs)
+                  isDeadlineCritical(paymentDeadlineRemainingMs)
                     ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
                     : 'bg-sky-50 dark:bg-sky-900/20 border-sky-200 dark:border-sky-800',
                 ]"
               >
-                <p class="text-sm font-bold uppercase tracking-[0.18em]" :class="isDeadlineCritical(sessionRemainingMs) ? 'text-red-700 dark:text-red-300' : 'text-sky-700 dark:text-sky-300'">
-                  Сессия оплаты
+                <p class="text-sm font-bold uppercase tracking-[0.18em]" :class="isDeadlineCritical(paymentDeadlineRemainingMs) ? 'text-red-700 dark:text-red-300' : 'text-sky-700 dark:text-sky-300'">
+                  Оплатите в течение
                 </p>
                 <p class="mt-3 text-3xl font-extrabold text-gray-900 dark:text-white">
-                  {{ formatCountdown(sessionRemainingMs) }}
-                </p>
-                <p class="mt-2 text-sm text-gray-600 dark:text-gray-300">
-                  {{ payment.paymentExpiresAt ? `Истекает ${formatDate(payment.paymentExpiresAt)}` : "Сессия ещё не создана" }}
-                </p>
-              </article>
-
-              <article
-                :class="[
-                  'p-5 rounded-2xl border transition-colors',
-                  isDeadlineCritical(bookingRemainingMs)
-                    ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
-                    : 'bg-violet-50 dark:bg-violet-900/20 border-violet-200 dark:border-violet-800',
-                ]"
-              >
-                <p class="text-sm font-bold uppercase tracking-[0.18em]" :class="isDeadlineCritical(bookingRemainingMs) ? 'text-red-700 dark:text-red-300' : 'text-violet-700 dark:text-violet-300'">
-                  Бронь удерживает слот
-                </p>
-                <p class="mt-3 text-3xl font-extrabold text-gray-900 dark:text-white">
-                  {{ formatCountdown(bookingRemainingMs) }}
-                </p>
-                <p class="mt-2 text-sm text-gray-600 dark:text-gray-300">
-                  {{ payment.bookingExpiresAt ? `Авто-отмена ${formatDate(payment.bookingExpiresAt)}` : "Для этой брони TTL больше не действует" }}
+                  {{ formatCountdown(paymentDeadlineRemainingMs) }}
                 </p>
               </article>
             </div>
@@ -273,9 +315,6 @@
             <p class="text-sm uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400 font-bold">Статус брони</p>
             <p class="mt-3 text-3xl font-extrabold text-gray-900 dark:text-white">
               {{ booking ? getBookingStatusText(booking.status) : "..." }}
-            </p>
-            <p class="mt-3 text-sm text-gray-600 dark:text-gray-400">
-              Пока статус `pending`, эта бронь удерживает слот автомобиля, но партнёру деньги ещё не начислены.
             </p>
           </article>
 
@@ -516,6 +555,18 @@ function formatAmount(amount: number | null | undefined, currency: string): stri
   }).format(amount);
 }
 
+function getBookingHeroImage(currentBooking: Booking): string | null {
+  return currentBooking.coverImageUrl ?? currentBooking.imageUrls?.[0] ?? null;
+}
+
+function getBookingGalleryImages(currentBooking: Booking): string[] {
+  const heroImage = getBookingHeroImage(currentBooking);
+
+  return (currentBooking.imageUrls ?? [])
+    .filter((imageUrl) => imageUrl !== heroImage)
+    .slice(0, 4);
+}
+
 function formatCoefficient(value: number): string {
   return value.toFixed(2);
 }
@@ -568,29 +619,23 @@ const badgeTextClass = computed(() => {
   }
 });
 
-const sessionRemainingMs = computed(() => {
-  if (!payment.value?.paymentExpiresAt) {
+const paymentDeadlineAt = computed(() => {
+  const candidates = [payment.value?.paymentExpiresAt, payment.value?.bookingExpiresAt]
+    .filter((value): value is string => Boolean(value))
+    .sort((left, right) => new Date(left).getTime() - new Date(right).getTime());
+
+  return candidates[0] ?? null;
+});
+
+const paymentDeadlineRemainingMs = computed(() => {
+  if (!paymentDeadlineAt.value) {
     return null;
   }
 
-  return new Date(payment.value.paymentExpiresAt).getTime() - now.value;
+  return new Date(paymentDeadlineAt.value).getTime() - now.value;
 });
 
-const bookingRemainingMs = computed(() => {
-  if (!payment.value?.bookingExpiresAt) {
-    return null;
-  }
-
-  return new Date(payment.value.bookingExpiresAt).getTime() - now.value;
-});
-
-watch(sessionRemainingMs, async (currentValue, previousValue) => {
-  if (shouldAutoRefreshDeadline(currentValue, previousValue)) {
-    await refreshCheckoutStatus();
-  }
-});
-
-watch(bookingRemainingMs, async (currentValue, previousValue) => {
+watch(paymentDeadlineRemainingMs, async (currentValue, previousValue) => {
   if (shouldAutoRefreshDeadline(currentValue, previousValue)) {
     await refreshCheckoutStatus();
   }

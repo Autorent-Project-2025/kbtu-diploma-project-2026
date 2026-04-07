@@ -36,7 +36,7 @@
             <div class="space-y-2">
               <h2 class="text-2xl font-bold">Выберите даты</h2>
               <p class="text-primary-100 text-sm">
-                {{ car.brand }} {{ car.model }}
+                {{ selection.brand }} {{ selection.model }}
               </p>
             </div>
           </div>
@@ -196,6 +196,10 @@
               >
                 Это бронирование будет оформлено по активной подписке.
               </div>
+
+              <p class="mt-3 text-sm text-blue-700 dark:text-blue-300">
+                Машину партнера и данные по поездке покажем сразу после создания брони.
+              </p>
             </div>
 
             <div
@@ -219,11 +223,12 @@
             </button>
             <button
               @click="confirmBooking"
-              :disabled="!isValid || isLoading"
+              :disabled="!canConfirm || submitting || validatingSelection"
               class="flex-1 px-6 py-3 bg-primary-600 hover:bg-primary-700 disabled:bg-gray-400 text-white font-semibold rounded-xl transition-all hover:shadow-lg active:scale-95 disabled:cursor-not-allowed disabled:hover:shadow-none"
             >
-              <span v-if="!isLoading">Забронировать</span>
-              <span v-else>Загрузка...</span>
+              <span v-if="submitting">Загрузка...</span>
+              <span v-else-if="validatingSelection">Проверяем...</span>
+              <span v-else>Забронировать</span>
             </button>
           </div>
         </div>
@@ -234,39 +239,30 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
+import { getBookingPricePreview, type BookingPricePreview } from "../api/booking";
+import { matchCarByModel } from "../api/cars";
 import api from "../api/axios";
-import type { Car } from "../types/Car";
+import type { BookingModelSelection } from "../types/Car";
 
 interface Props {
   isOpen: boolean;
-  car: Car;
+  selection: BookingModelSelection;
   bookingError?: string;
-  suggestedDates?: string[];
+  submitting?: boolean;
 }
 
 interface Emits {
   (e: "close"): void;
   (
     e: "confirm",
-    payload: { startDate: string; endDate: string; useSubscription: boolean },
+    payload: {
+      startDate: string;
+      endDate: string;
+      useSubscription: boolean;
+      partnerCarId: number;
+    },
   ): void;
 }
-
-type PricePreview = {
-  partnerCarId: number;
-  marketValueKzt: number;
-  rating: number;
-  currentAvailableCarsCount: number;
-  daysBeforeBooking: number;
-  billableHours: number;
-  ratingCoefficient: number;
-  advanceBookingCoefficient: number;
-  availabilityCoefficient: number;
-  priceHour: number;
-  finalPrice: number;
-  currency: string;
-  isMarketValueStale: boolean;
-};
 
 type MySubscription = {
   id: number;
@@ -284,14 +280,17 @@ type MySubscription = {
 const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
 
-const isLoading = ref(false);
 const startDate = ref("");
 const endDate = ref("");
 const validationError = ref("");
-const pricePreview = ref<PricePreview | null>(null);
+const availabilityError = ref("");
+const pricePreview = ref<BookingPricePreview | null>(null);
 const loadingPrice = ref(false);
 const mySubscription = ref<MySubscription | null>(null);
 const useSubscription = ref(false);
+const matchedPartnerCarId = ref<number | null>(null);
+const validatingSelection = ref(false);
+let previewRequestId = 0;
 
 const minDate = computed(() => {
   const now = new Date();
@@ -311,29 +310,53 @@ watch(
       endDate.value = tomorrow.toISOString().slice(0, 16);
 
       validationError.value = "";
+      availabilityError.value = "";
+      pricePreview.value = null;
+      matchedPartnerCarId.value = null;
+      validatingSelection.value = false;
       useSubscription.value = false;
 
-      await Promise.all([fetchPricePreview(), loadMySubscription()]);
+      await loadMySubscription();
     } else {
+      previewRequestId += 1;
       pricePreview.value = null;
+      matchedPartnerCarId.value = null;
       loadingPrice.value = false;
+      availabilityError.value = "";
       mySubscription.value = null;
+      validatingSelection.value = false;
       useSubscription.value = false;
     }
   },
 );
 
-watch([startDate, endDate], () => {
-  if (!isValid.value) {
-    pricePreview.value = null;
+watch([startDate, endDate, () => props.selection.modelId, () => props.isOpen], () => {
+  if (!props.isOpen) {
     return;
   }
 
-  fetchPricePreview();
+  if (!isValid.value) {
+    previewRequestId += 1;
+    matchedPartnerCarId.value = null;
+    pricePreview.value = null;
+    availabilityError.value = "";
+    return;
+  }
+
+  void refreshMatchedSelection();
 });
 
 const displayError = computed(() => {
-  return props.bookingError?.trim() || validationError.value;
+  return validationError.value || availabilityError.value || props.bookingError?.trim() || "";
+});
+
+const canConfirm = computed(() => {
+  return (
+    isValid.value &&
+    matchedPartnerCarId.value !== null &&
+    pricePreview.value !== null &&
+    !loadingPrice.value
+  );
 });
 
 async function loadMySubscription() {
@@ -345,10 +368,13 @@ async function loadMySubscription() {
   }
 }
 
-async function fetchPricePreview() {
-  if (!startDate.value || !endDate.value || !props.car?.id) {
+async function refreshMatchedSelection(options?: {
+  expectedPartnerCarId?: number | null;
+}): Promise<"ready" | "changed" | "unavailable" | "stale"> {
+  if (!startDate.value || !endDate.value || !props.selection?.modelId) {
+    matchedPartnerCarId.value = null;
     pricePreview.value = null;
-    return;
+    return "unavailable";
   }
 
   const start = new Date(startDate.value);
@@ -359,27 +385,72 @@ async function fetchPricePreview() {
     Number.isNaN(end.getTime()) ||
     end <= start
   ) {
+    matchedPartnerCarId.value = null;
     pricePreview.value = null;
-    return;
+    return "unavailable";
   }
+
+  const currentRequestId = ++previewRequestId;
 
   try {
     loadingPrice.value = true;
+    availabilityError.value = "";
+    matchedPartnerCarId.value = null;
+    pricePreview.value = null;
 
-    const { data } = await api.get("/bookings/price-preview", {
-      params: {
-        partnerCarId: props.car.id,
-        startTime: start.toISOString(),
-        endTime: end.toISOString(),
-      },
+    const matchResult = await matchCarByModel({
+      modelId: props.selection.modelId,
+      startTime: start.toISOString(),
+      endTime: end.toISOString(),
     });
 
-    pricePreview.value = data;
+    if (currentRequestId !== previewRequestId) {
+      return "stale";
+    }
+
+    if (!matchResult.isAvailable || !matchResult.partnerCarId) {
+      matchedPartnerCarId.value = null;
+      pricePreview.value = null;
+      availabilityError.value = buildAvailabilityError(
+        matchResult.suggestedStartTimesUtc,
+      );
+      return "unavailable";
+    }
+
+    const preview = await getBookingPricePreview(
+      matchResult.partnerCarId,
+      start.toISOString(),
+      end.toISOString(),
+    );
+
+    if (currentRequestId !== previewRequestId) {
+      return "stale";
+    }
+
+    const matchChanged =
+      options?.expectedPartnerCarId != null &&
+      options.expectedPartnerCarId !== matchResult.partnerCarId;
+
+    matchedPartnerCarId.value = matchResult.partnerCarId;
+    pricePreview.value = preview;
+
+    if (matchChanged) {
+      availabilityError.value =
+        "На эти даты подобралась другая машина. Мы обновили стоимость, проверьте её и нажмите «Забронировать» еще раз.";
+      return "changed";
+    }
+
+    return "ready";
   } catch (error) {
     console.error("Failed to fetch price preview:", error);
+    matchedPartnerCarId.value = null;
     pricePreview.value = null;
+    availabilityError.value = "Не удалось подобрать машину для расчета стоимости.";
+    return "unavailable";
   } finally {
-    loadingPrice.value = false;
+    if (currentRequestId === previewRequestId) {
+      loadingPrice.value = false;
+    }
   }
 }
 
@@ -436,13 +507,53 @@ function closeModal() {
   emit("close");
 }
 
-function confirmBooking() {
-  if (!isValid.value) return;
+async function confirmBooking() {
+  if (!canConfirm.value || matchedPartnerCarId.value === null) return;
 
-  emit("confirm", {
-    startDate: new Date(startDate.value).toISOString(),
-    endDate: new Date(endDate.value).toISOString(),
-    useSubscription: useSubscription.value,
-  });
+  validatingSelection.value = true;
+
+  try {
+    const refreshResult = await refreshMatchedSelection({
+      expectedPartnerCarId: matchedPartnerCarId.value,
+    });
+
+    if (refreshResult !== "ready" || matchedPartnerCarId.value === null) {
+      return;
+    }
+
+    emit("confirm", {
+      startDate: new Date(startDate.value).toISOString(),
+      endDate: new Date(endDate.value).toISOString(),
+      useSubscription: useSubscription.value,
+      partnerCarId: matchedPartnerCarId.value,
+    });
+  } finally {
+    validatingSelection.value = false;
+  }
+}
+
+function buildAvailabilityError(suggestedStartTimesUtc?: string[]): string {
+  const suggestions = (suggestedStartTimesUtc ?? [])
+    .slice(0, 3)
+    .map(formatSuggestionDate)
+    .filter(Boolean);
+
+  if (suggestions.length === 0) {
+    return "На выбранные даты машин этой модели нет.";
+  }
+
+  return `На выбранные даты машин этой модели нет. Ближайшие варианты: ${suggestions.join(", ")}.`;
+}
+
+function formatSuggestionDate(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  return new Intl.DateTimeFormat("ru-RU", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(date);
 }
 </script>

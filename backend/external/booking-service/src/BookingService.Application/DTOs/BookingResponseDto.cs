@@ -17,6 +17,8 @@ namespace BookingService.Application.DTOs.Booking
         public Guid PartnerUserId { get; set; }
         public string CarBrand { get; set; } = string.Empty;
         public string CarModel { get; set; } = string.Empty;
+        public string? PartnerName { get; set; }
+        public string? CoverImageUrl { get; set; }
         public DateTimeOffset StartTime { get; set; }
         public DateTimeOffset EndTime { get; set; }
         public decimal? PriceHour { get; set; }
@@ -30,6 +32,9 @@ namespace BookingService.Application.DTOs.Booking
 
         [JsonIgnore]
         public string? PricingBreakdownJson { get; set; }
+
+        [JsonIgnore]
+        public string? ImageUrlsJson { get; set; }
 
         public BookingPricingBreakdownDto? PricingBreakdown
         {
@@ -49,6 +54,28 @@ namespace BookingService.Application.DTOs.Booking
                 catch (JsonException)
                 {
                     return null;
+                }
+            }
+        }
+
+        public IReadOnlyList<string> ImageUrls
+        {
+            get
+            {
+                if (string.IsNullOrWhiteSpace(ImageUrlsJson))
+                {
+                    return [];
+                }
+
+                try
+                {
+                    return JsonSerializer.Deserialize<List<string>>(
+                               ImageUrlsJson,
+                               PricingBreakdownSerializerOptions) ?? [];
+                }
+                catch (JsonException)
+                {
+                    return [];
                 }
             }
         }

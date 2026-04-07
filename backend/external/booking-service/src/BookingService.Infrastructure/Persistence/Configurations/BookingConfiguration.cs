@@ -22,7 +22,23 @@ namespace BookingService.Infrastructure.Persistence.Configurations
             builder.Property(b => b.PricingBreakdownJson)
                 .HasColumnType("jsonb");
 
+            builder.Property(b => b.ImageUrlsJson)
+                .HasColumnType("jsonb");
+
+            builder.Property(b => b.CarBrand)
+                .HasMaxLength(255);
+
+            builder.Property(b => b.CarModel)
+                .HasMaxLength(255);
+
+            builder.Property(b => b.PartnerName)
+                .HasMaxLength(255);
+
+            builder.Property(b => b.CoverImageUrl)
+                .HasMaxLength(2048);
+
             builder.Ignore(b => b.PricingBreakdown);
+            builder.Ignore(b => b.ImageUrls);
 
             builder.HasIndex(b => new { b.PartnerCarId, b.StartTime, b.EndTime })
                 .HasDatabaseName("idx_booking_car_time");

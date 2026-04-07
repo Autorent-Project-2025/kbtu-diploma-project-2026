@@ -10,10 +10,27 @@ import type {
   SubmitBookingPaymentPayload,
 } from "../types/Booking";
 import type { PaginatedResponse } from "../types/Pagination";
+import { resolveAssetUrl } from "../utils/resolveAssetUrl";
 
 export interface GetMyBookingsParams {
   page?: number;
   pageSize?: number;
+}
+
+export interface BookingPricePreview {
+  partnerCarId: number;
+  marketValueKzt: number;
+  rating: number;
+  currentAvailableCarsCount: number;
+  daysBeforeBooking: number;
+  billableHours: number;
+  ratingCoefficient: number;
+  advanceBookingCoefficient: number;
+  availabilityCoefficient: number;
+  priceHour: number;
+  finalPrice: number;
+  currency: string;
+  isMarketValueStale: boolean;
 }
 
 interface BookingApiDto {
@@ -22,6 +39,9 @@ interface BookingApiDto {
   partnerUserId?: string;
   carBrand: string;
   carModel: string;
+  partnerName?: string | null;
+  coverImageUrl?: string | null;
+  imageUrls?: string[] | null;
   startTime: string;
   endTime: string;
   priceHour?: number | null;
@@ -93,12 +113,23 @@ function normalizeStatus(value: string | null | undefined): BookingStatus {
 }
 
 function mapBooking(dto: BookingApiDto): Booking {
+  const normalizedImageUrls = (dto.imageUrls ?? [])
+    .map((imageUrl) => resolveAssetUrl(imageUrl) ?? imageUrl)
+    .filter((imageUrl): imageUrl is string => Boolean(imageUrl));
+  const resolvedCoverImageUrl = resolveAssetUrl(dto.coverImageUrl ?? null);
+
   return {
     id: dto.id,
     carId: dto.partnerCarId,
     partnerUserId: dto.partnerUserId,
     carBrand: dto.carBrand ?? "",
     carModel: dto.carModel ?? "",
+    partnerName: dto.partnerName?.trim() || null,
+    coverImageUrl:
+      resolvedCoverImageUrl ??
+      normalizedImageUrls[0] ??
+      null,
+    imageUrls: normalizedImageUrls,
     startDate: dto.startTime,
     endDate: dto.endTime,
     price: dto.totalPrice ?? null,
@@ -254,6 +285,22 @@ export async function createBooking(
   });
 
   return mapBooking(response.data as BookingApiDto);
+}
+
+export async function getBookingPricePreview(
+  partnerCarId: number,
+  startTime: string,
+  endTime: string,
+): Promise<BookingPricePreview> {
+  const response = await api.get("/bookings/price-preview", {
+    params: {
+      partnerCarId,
+      startTime,
+      endTime,
+    },
+  });
+
+  return response.data as BookingPricePreview;
 }
 
 export async function getBooking(bookingId: number): Promise<Booking> {
