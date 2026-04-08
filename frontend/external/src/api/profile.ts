@@ -15,6 +15,7 @@ export interface ClientProfile {
   relatedUserId: string;
   phoneNumber: string;
   avatarUrl: string | null;
+  avatarImageId: string | null;
   bookingActionsBlocked: boolean;
   bookingBlockReason: string | null;
   bookingBlockedAt: string | null;
@@ -26,6 +27,7 @@ export interface UpdateProfilePayload {
   birthDate: string;
   phoneNumber: string;
   avatarUrl: string | null;
+  avatarImageId: string | null;
 }
 
 export interface BookingStats {
@@ -46,7 +48,7 @@ export interface MyComment {
   createdOn: string;
 }
 
-interface ImageUploadResponse {
+export interface AvatarUploadResult {
   imageId: string;
   imageUrl: string;
 }
@@ -72,19 +74,28 @@ export async function updateMyProfile(
   return normalizeProfile(res.data as ClientProfile);
 }
 
-export async function uploadAvatarImage(file: File): Promise<string> {
+export async function uploadAvatarImage(
+  file: File,
+): Promise<AvatarUploadResult> {
   const res = await api.post("/internal/api/images", file, {
     headers: {
       "Content-Type": "application/octet-stream",
     },
   });
 
-  const payload = res.data as ImageUploadResponse;
-  if (!payload?.imageUrl?.trim()) {
+  const payload = res.data as AvatarUploadResult;
+  if (!payload?.imageId?.trim() || !payload?.imageUrl?.trim()) {
     throw new Error("Image service returned invalid upload response.");
   }
 
-  return resolveAssetUrl(payload.imageUrl) ?? payload.imageUrl;
+  return {
+    imageId: payload.imageId,
+    imageUrl: resolveAssetUrl(payload.imageUrl) ?? payload.imageUrl,
+  };
+}
+
+export async function deleteAvatarImage(imageId: string): Promise<void> {
+  await api.delete(`/internal/api/images/${encodeURIComponent(imageId)}`);
 }
 
 export async function getMyBookingStats(): Promise<BookingStats> {

@@ -111,6 +111,7 @@
           <!-- Edit toggle -->
           <button
             @click="toggleEditMode"
+            :disabled="avatarUploading || saving"
             class="shrink-0 px-5 py-3 rounded-2xl border border-gray-300 dark:border-gray-700 text-gray-800 dark:text-gray-100 font-semibold hover:border-emerald-500 dark:hover:border-emerald-500 transition-colors"
           >
             {{ editMode ? "Отмена" : "Редактировать" }}
@@ -310,6 +311,7 @@
           <div class="flex gap-2 shrink-0">
             <button
               @click="startEditing"
+              :disabled="avatarUploading || saving"
               class="px-4 py-2.5 rounded-2xl bg-amber-600 hover:bg-amber-700 text-white text-sm font-bold transition-colors"
             >
               Заполнить
@@ -431,6 +433,7 @@
             </button>
             <button
               @click="cancelEditing"
+              :disabled="avatarUploading"
               class="px-6 py-3 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 font-semibold rounded-2xl hover:border-gray-400 transition-colors"
             >
               Отмена
@@ -741,8 +744,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, onBeforeUnmount } from "vue";
 import {
+  deleteAvatarImage,
   getMyProfile,
   updateMyProfile,
   getMyBookingStats,
@@ -798,6 +802,7 @@ const form = ref({
   birthDate: "",
   phoneNumber: "",
   avatarUrl: "",
+  avatarImageId: "",
 });
 
 const formErrors = ref<Record<string, string>>({});
@@ -869,6 +874,10 @@ onMounted(async () => {
   ]);
 });
 
+onBeforeUnmount(() => {
+  cleanupUnsavedAvatar();
+});
+
 // ─── Data loaders ─────────────────────────────────────────────────────────────
 async function loadProfile() {
   try {
@@ -934,6 +943,7 @@ function syncFormWithProfile(currentProfile: ClientProfile) {
     birthDate: currentProfile.birthDate,
     phoneNumber: currentProfile.phoneNumber,
     avatarUrl: currentProfile.avatarUrl ?? "",
+    avatarImageId: currentProfile.avatarImageId ?? "",
   };
   formErrors.value = {};
   avatarUploadError.value = null;
@@ -949,6 +959,10 @@ function toggleEditMode() {
 }
 
 function startEditing() {
+  if (avatarUploading.value) {
+    return;
+  }
+
   if (profile.value) {
     syncFormWithProfile(profile.value);
   }
@@ -957,6 +971,12 @@ function startEditing() {
 }
 
 function cancelEditing() {
+  if (avatarUploading.value) {
+    return;
+  }
+
+  cleanupUnsavedAvatar();
+
   if (profile.value) {
     syncFormWithProfile(profile.value);
   }
@@ -974,6 +994,7 @@ async function saveProfile() {
       birthDate: form.value.birthDate,
       phoneNumber: form.value.phoneNumber.trim(),
       avatarUrl: form.value.avatarUrl.trim() || null,
+      avatarImageId: form.value.avatarImageId.trim() || null,
     });
     syncFormWithProfile(profile.value);
     editMode.value = false;
@@ -1008,7 +1029,18 @@ async function handleAvatarUpload(event: Event) {
 
   try {
     avatarUploading.value = true;
-    form.value.avatarUrl = await uploadAvatarImage(file);
+    const previousUnsavedAvatarImageId = getUnsavedAvatarImageId();
+    const upload = await uploadAvatarImage(file);
+    form.value.avatarUrl = upload.imageUrl;
+    form.value.avatarImageId = upload.imageId;
+
+    if (
+      previousUnsavedAvatarImageId &&
+      previousUnsavedAvatarImageId !== upload.imageId
+    ) {
+      void deleteAvatarImageBestEffort(previousUnsavedAvatarImageId);
+    }
+
     success("Аватар загружен. Сохраните профиль, чтобы применить изменения.");
   } catch (uploadError) {
     avatarUploadError.value = getErrorMessage(
@@ -1019,6 +1051,34 @@ async function handleAvatarUpload(event: Event) {
   } finally {
     avatarUploading.value = false;
     input.value = "";
+  }
+}
+
+function getUnsavedAvatarImageId(): string | null {
+  const draftAvatarImageId = form.value.avatarImageId.trim();
+  const savedAvatarImageId = profile.value?.avatarImageId?.trim() ?? "";
+
+  if (!draftAvatarImageId || draftAvatarImageId === savedAvatarImageId) {
+    return null;
+  }
+
+  return draftAvatarImageId;
+}
+
+function cleanupUnsavedAvatar() {
+  const unsavedAvatarImageId = getUnsavedAvatarImageId();
+  if (!unsavedAvatarImageId) {
+    return;
+  }
+
+  void deleteAvatarImageBestEffort(unsavedAvatarImageId);
+}
+
+async function deleteAvatarImageBestEffort(imageId: string) {
+  try {
+    await deleteAvatarImage(imageId);
+  } catch {
+    // Cleanup is best-effort only.
   }
 }
 

@@ -54,10 +54,16 @@ public sealed class ProfileController : ControllerBase
             LastName = request.LastName,
             BirthDate = request.BirthDate,
             PhoneNumber = request.PhoneNumber,
-            AvatarUrl = request.AvatarUrl
+            AvatarUrl = request.AvatarUrl,
+            AvatarImageId = request.AvatarImageId
         };
 
-        var updated = await _clientService.UpdateByRelatedUserIdAsync(relatedUserId, dto, cancellationToken);
+        var authorizationHeader = Request.Headers.Authorization.ToString();
+        var updated = await _clientService.UpdateByRelatedUserIdAsync(
+            relatedUserId,
+            dto,
+            authorizationHeader,
+            cancellationToken);
         if (updated is null)
         {
             return NotFound(new { error = "Client profile not found for current user." });

@@ -351,6 +351,7 @@ services:
       ASPNETCORE_ENVIRONMENT: Development
       ConnectionStrings__DbConnection: Host=client-db;Port=5432;Database=postgres_db;Username=postgres;Password=postgres
       InternalAuth__ApiKey: local-client-service-key
+      ImageService__BaseUrl: http://image-service:8080
     expose:
       - "8080"
     depends_on:

@@ -45,6 +45,9 @@ public class ClientConfiguration : IEntityTypeConfiguration<Client>
         builder.Property(client => client.AvatarUrl)
             .HasMaxLength(1024);
 
+        builder.Property(client => client.AvatarImageId)
+            .HasMaxLength(255);
+
         builder.Property(client => client.BookingActionsBlocked)
             .HasDefaultValue(false)
             .IsRequired();

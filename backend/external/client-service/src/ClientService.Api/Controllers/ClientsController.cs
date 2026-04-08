@@ -53,7 +53,12 @@ public class ClientsController : ControllerBase
     [Authorize(Policy = "clients:update")]
     public async Task<IActionResult> Update(int id, [FromBody] UpdateClientRequest request, CancellationToken cancellationToken)
     {
-        var updated = await _clientService.UpdateAsync(id, MapToUpdateDto(request), cancellationToken);
+        var authorizationHeader = Request.Headers.Authorization.ToString();
+        var updated = await _clientService.UpdateAsync(
+            id,
+            MapToUpdateDto(request),
+            authorizationHeader,
+            cancellationToken);
         if (updated is null)
         {
             return NotFound(new { error = "Client not found" });
@@ -127,7 +132,8 @@ public class ClientsController : ControllerBase
             DriverLicenseFileName = request.DriverLicenseFileName,
             RelatedUserId = request.RelatedUserId,
             PhoneNumber = request.PhoneNumber,
-            AvatarUrl = request.AvatarUrl
+            AvatarUrl = request.AvatarUrl,
+            AvatarImageId = request.AvatarImageId
         };
     }
 
@@ -142,7 +148,8 @@ public class ClientsController : ControllerBase
             DriverLicenseFileName = request.DriverLicenseFileName,
             RelatedUserId = request.RelatedUserId,
             PhoneNumber = request.PhoneNumber,
-            AvatarUrl = request.AvatarUrl
+            AvatarUrl = request.AvatarUrl,
+            AvatarImageId = request.AvatarImageId
         };
     }
 

@@ -1,5 +1,6 @@
 using ClientService.Application.DTOs;
 using ClientService.Application.Interfaces;
+using ClientService.Application.Interfaces.Integrations;
 using ClientService.Application.Mappers;
 using ClientService.Domain.Entities;
 using ClientService.Infrastructure.Persistence;
@@ -10,10 +11,12 @@ namespace ClientService.Infrastructure.Services;
 public class ClientService : IClientService
 {
     private readonly ApplicationDbContext _db;
+    private readonly IImageStorageClient _imageStorageClient;
 
-    public ClientService(ApplicationDbContext db)
+    public ClientService(ApplicationDbContext db, IImageStorageClient imageStorageClient)
     {
         _db = db;
+        _imageStorageClient = imageStorageClient;
     }
 
     public async Task<IReadOnlyCollection<ClientResponseDto>> GetAllAsync(CancellationToken cancellationToken = default)
@@ -50,6 +53,7 @@ public class ClientService : IClientService
             dto.RelatedUserId,
             dto.PhoneNumber,
             dto.AvatarUrl,
+            dto.AvatarImageId,
             dto.ProvisionRequestKey);
 
         if (normalized.ProvisionRequestKey is not null)
@@ -81,6 +85,7 @@ public class ClientService : IClientService
             RelatedUserId = normalized.RelatedUserId,
             PhoneNumber = normalized.PhoneNumber,
             AvatarUrl = normalized.AvatarUrl,
+            AvatarImageId = normalized.AvatarImageId,
             ProvisionRequestKey = normalized.ProvisionRequestKey
         };
 
@@ -90,10 +95,20 @@ public class ClientService : IClientService
         return entity.ToClientResponseDto();
     }
 
-    public async Task<ClientResponseDto?> UpdateAsync(int id, ClientUpdateDto dto, CancellationToken cancellationToken = default)
+    public async Task<ClientResponseDto?> UpdateAsync(
+        int id,
+        ClientUpdateDto dto,
+        string authorizationHeader,
+        CancellationToken cancellationToken = default)
     {
         EnsureValidId(id);
         ArgumentNullException.ThrowIfNull(dto);
+
+        var entity = await _db.Clients.FirstOrDefaultAsync(client => client.Id == id, cancellationToken);
+        if (entity is null)
+        {
+            return null;
+        }
 
         var normalized = NormalizeAndValidate(
             dto.FirstName,
@@ -104,13 +119,8 @@ public class ClientService : IClientService
             dto.RelatedUserId,
             dto.PhoneNumber,
             dto.AvatarUrl,
+            ResolveAvatarImageId(entity.AvatarUrl, entity.AvatarImageId, dto.AvatarUrl, dto.AvatarImageId),
             null);
-
-        var entity = await _db.Clients.FirstOrDefaultAsync(client => client.Id == id, cancellationToken);
-        if (entity is null)
-        {
-            return null;
-        }
 
         var relatedUserExists = await _db.Clients.AnyAsync(
             client => client.Id != id && client.RelatedUserId == normalized.RelatedUserId,
@@ -128,9 +138,16 @@ public class ClientService : IClientService
         entity.DriverLicenseFileName = normalized.DriverLicenseFileName;
         entity.RelatedUserId = normalized.RelatedUserId;
         entity.PhoneNumber = normalized.PhoneNumber;
+        var previousAvatarImageId = entity.AvatarImageId;
         entity.AvatarUrl = normalized.AvatarUrl;
+        entity.AvatarImageId = normalized.AvatarImageId;
 
         await _db.SaveChangesAsync(cancellationToken);
+        await TryDeleteReplacedAvatarAsync(
+            previousAvatarImageId,
+            entity.AvatarImageId,
+            authorizationHeader,
+            cancellationToken);
 
         return entity.ToClientResponseDto();
     }
@@ -204,6 +221,7 @@ public class ClientService : IClientService
         string? relatedUserId,
         string? phoneNumber,
         string? avatarUrl,
+        string? avatarImageId,
         string? provisionRequestKey)
     {
         if (birthDate == default)
@@ -216,12 +234,7 @@ public class ClientService : IClientService
             throw new ArgumentException("BirthDate cannot be in the future.", nameof(birthDate));
         }
 
-        var normalizedAvatarUrl = NormalizeOptional(avatarUrl, nameof(avatarUrl), 1024);
-        if (normalizedAvatarUrl is not null &&
-            !Uri.TryCreate(normalizedAvatarUrl, UriKind.Absolute, out _))
-        {
-            throw new ArgumentException("AvatarUrl must be a valid absolute URL.", nameof(avatarUrl));
-        }
+        var normalizedAvatar = NormalizeAvatar(avatarUrl, avatarImageId);
 
         return new NormalizedClientData(
             NormalizeRequired(firstName, nameof(firstName), 100),
@@ -231,8 +244,95 @@ public class ClientService : IClientService
             NormalizeOptional(driverLicenseFileName, nameof(driverLicenseFileName), 255),
             NormalizeRequired(relatedUserId, nameof(relatedUserId), 64),
             NormalizeRequired(phoneNumber, nameof(phoneNumber), 32),
-            normalizedAvatarUrl,
+            normalizedAvatar.AvatarUrl,
+            normalizedAvatar.AvatarImageId,
             NormalizeOptional(provisionRequestKey, nameof(provisionRequestKey), 128));
+    }
+
+    private static NormalizedAvatarData NormalizeAvatar(string? avatarUrl, string? avatarImageId)
+    {
+        var normalizedAvatarUrl = NormalizeOptional(avatarUrl, nameof(avatarUrl), 1024);
+        if (normalizedAvatarUrl is not null &&
+            !Uri.TryCreate(normalizedAvatarUrl, UriKind.Absolute, out _))
+        {
+            throw new ArgumentException("AvatarUrl must be a valid absolute URL.", nameof(avatarUrl));
+        }
+
+        var normalizedAvatarImageId = NormalizeOptional(avatarImageId, nameof(avatarImageId), 255);
+        if (normalizedAvatarImageId is not null)
+        {
+            if (normalizedAvatarUrl is null)
+            {
+                throw new ArgumentException("AvatarImageId requires AvatarUrl.", nameof(avatarImageId));
+            }
+
+            if (!AvatarUrlMatchesImageId(normalizedAvatarUrl, normalizedAvatarImageId))
+            {
+                throw new ArgumentException(
+                    "AvatarImageId must match the file name in AvatarUrl.",
+                    nameof(avatarImageId));
+            }
+        }
+
+        return new NormalizedAvatarData(normalizedAvatarUrl, normalizedAvatarImageId);
+    }
+
+    private static bool AvatarUrlMatchesImageId(string avatarUrl, string avatarImageId)
+    {
+        if (!Uri.TryCreate(avatarUrl, UriKind.Absolute, out var avatarUri))
+        {
+            return false;
+        }
+
+        var fileName = Path.GetFileName(Uri.UnescapeDataString(avatarUri.AbsolutePath));
+        return string.Equals(fileName, avatarImageId, StringComparison.Ordinal);
+    }
+
+    private static string? ResolveAvatarImageId(
+        string? currentAvatarUrl,
+        string? currentAvatarImageId,
+        string? requestedAvatarUrl,
+        string? requestedAvatarImageId)
+    {
+        if (string.IsNullOrWhiteSpace(requestedAvatarUrl))
+        {
+            return null;
+        }
+
+        if (!string.IsNullOrWhiteSpace(requestedAvatarImageId))
+        {
+            return requestedAvatarImageId;
+        }
+
+        return string.Equals(currentAvatarUrl, requestedAvatarUrl, StringComparison.Ordinal)
+            ? currentAvatarImageId
+            : null;
+    }
+
+    private async Task TryDeleteReplacedAvatarAsync(
+        string? previousAvatarImageId,
+        string? currentAvatarImageId,
+        string authorizationHeader,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(previousAvatarImageId) ||
+            string.Equals(previousAvatarImageId, currentAvatarImageId, StringComparison.Ordinal) ||
+            string.IsNullOrWhiteSpace(authorizationHeader))
+        {
+            return;
+        }
+
+        try
+        {
+            await _imageStorageClient.DeleteAsync(
+                previousAvatarImageId,
+                authorizationHeader,
+                cancellationToken);
+        }
+        catch
+        {
+            // Profile update is already persisted; failure here should not roll it back.
+        }
     }
 
     private static string NormalizeRequired(string? value, string paramName, int maxLength)
@@ -284,7 +384,12 @@ public class ClientService : IClientService
         string RelatedUserId,
         string PhoneNumber,
         string? AvatarUrl,
+        string? AvatarImageId,
         string? ProvisionRequestKey);
+
+    private sealed record NormalizedAvatarData(
+        string? AvatarUrl,
+        string? AvatarImageId);
 
     private static void EnsureMatchingProvision(Client existingClient, NormalizedClientData normalized)
     {
@@ -295,7 +400,8 @@ public class ClientService : IClientService
             !string.Equals(existingClient.DriverLicenseFileName, normalized.DriverLicenseFileName, StringComparison.Ordinal) ||
             !string.Equals(existingClient.RelatedUserId, normalized.RelatedUserId, StringComparison.Ordinal) ||
             !string.Equals(existingClient.PhoneNumber, normalized.PhoneNumber, StringComparison.Ordinal) ||
-            !string.Equals(existingClient.AvatarUrl, normalized.AvatarUrl, StringComparison.Ordinal))
+            !string.Equals(existingClient.AvatarUrl, normalized.AvatarUrl, StringComparison.Ordinal) ||
+            !string.Equals(existingClient.AvatarImageId, normalized.AvatarImageId, StringComparison.Ordinal))
         {
             throw new InvalidOperationException("Provision request key is already used for another client payload.");
         }
@@ -321,6 +427,7 @@ public class ClientService : IClientService
     public async Task<ClientResponseDto?> UpdateByRelatedUserIdAsync(
         string relatedUserId,
         ProfileUpdateDto dto,
+        string authorizationHeader,
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(relatedUserId))
@@ -353,16 +460,23 @@ public class ClientService : IClientService
         entity.BirthDate = dto.BirthDate;
         entity.PhoneNumber = NormalizeRequired(dto.PhoneNumber, nameof(dto.PhoneNumber), 32);
 
-        var normalizedAvatarUrl = NormalizeOptional(dto.AvatarUrl, nameof(dto.AvatarUrl), 1024);
-        if (normalizedAvatarUrl is not null &&
-            !Uri.TryCreate(normalizedAvatarUrl, UriKind.Absolute, out _))
-        {
-            throw new ArgumentException("AvatarUrl must be a valid absolute URL.", nameof(dto.AvatarUrl));
-        }
-
-        entity.AvatarUrl = normalizedAvatarUrl;
+        var normalizedAvatar = NormalizeAvatar(
+            dto.AvatarUrl,
+            ResolveAvatarImageId(
+                entity.AvatarUrl,
+                entity.AvatarImageId,
+                dto.AvatarUrl,
+                dto.AvatarImageId));
+        var previousAvatarImageId = entity.AvatarImageId;
+        entity.AvatarUrl = normalizedAvatar.AvatarUrl;
+        entity.AvatarImageId = normalizedAvatar.AvatarImageId;
 
         await _db.SaveChangesAsync(cancellationToken);
+        await TryDeleteReplacedAvatarAsync(
+            previousAvatarImageId,
+            entity.AvatarImageId,
+            authorizationHeader,
+            cancellationToken);
 
         return entity.ToClientResponseDto();
     }

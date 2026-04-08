@@ -2,11 +2,15 @@ using ClientService.Api.Middleware;
 using ClientService.Api.Options;
 using ClientService.Application.Constants;
 using ClientService.Application.Interfaces;
+using ClientService.Application.Interfaces.Integrations;
+using ClientService.Infrastructure.Integrations;
+using ClientService.Infrastructure.Options;
 using ClientService.Infrastructure.Persistence;
 using ClientService.Infrastructure.Utils;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.Extensions.Options;
 using System.Security.Cryptography;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -14,6 +18,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.Configure<InternalAuthOptions>(builder.Configuration.GetSection(InternalAuthOptions.SectionName));
+builder.Services.Configure<ImageServiceOptions>(builder.Configuration.GetSection(ImageServiceOptions.SectionName));
 
 var connectionString = builder.Configuration.GetConnectionString("DbConnection");
 if (string.IsNullOrWhiteSpace(connectionString))
@@ -95,6 +100,18 @@ builder.Services.AddAuthorization(options =>
         policy.RequireClaim("permissions", PermissionConstants.ClientDelete));
 });
 
+builder.Services.AddHttpClient<IImageStorageClient, ImageStorageClient>((serviceProvider, client) =>
+{
+    var options = serviceProvider.GetRequiredService<IOptions<ImageServiceOptions>>().Value;
+    if (string.IsNullOrWhiteSpace(options.BaseUrl))
+    {
+        throw new InvalidOperationException("ImageService:BaseUrl configuration is required.");
+    }
+
+    client.BaseAddress = new Uri(NormalizeBaseUrl(options.BaseUrl));
+    client.Timeout = Timeout.InfiniteTimeSpan;
+});
+
 builder.Services.AddScoped<IClientService, ClientService.Infrastructure.Services.ClientService>();
 
 var app = builder.Build();
@@ -108,3 +125,8 @@ app.MapControllers();
 app.MapGet("/healthz", () => Results.Ok(new { status = "ok" }));
 
 app.Run();
+
+static string NormalizeBaseUrl(string url)
+{
+    return url.Trim().TrimEnd('/');
+}
