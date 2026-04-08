@@ -49,6 +49,8 @@ services:
       - PartnerService__BaseUrl=${PartnerService__BaseUrl}
       - BookingService__BaseUrl=${BookingService__BaseUrl}
       - BookingService__InternalApiKey=${BookingService__InternalApiKey}
+      - ClientService__BaseUrl=${ClientService__BaseUrl}
+      - ClientService__InternalApiKey=${ClientService__InternalApiKey}
       - ImageService__BaseUrl=${ImageService__BaseUrl}
       - CarMarketValueService__BaseUrl=${CarMarketValueService__BaseUrl}
       - MarketValueRefresh__RefreshAfterHours=${MarketValueRefresh__RefreshAfterHours}

@@ -28,6 +28,7 @@ var httpClientResilienceOptions = builder.Configuration.GetHttpClientResilienceO
 
 builder.Services.Configure<PartnerServiceOptions>(builder.Configuration.GetSection(PartnerServiceOptions.SectionName));
 builder.Services.Configure<BookingServiceOptions>(builder.Configuration.GetSection(BookingServiceOptions.SectionName));
+builder.Services.Configure<ClientServiceOptions>(builder.Configuration.GetSection(ClientServiceOptions.SectionName));
 builder.Services.Configure<ImageServiceOptions>(builder.Configuration.GetSection(ImageServiceOptions.SectionName));
 builder.Services.Configure<InternalAuthOptions>(builder.Configuration.GetSection(InternalAuthOptions.SectionName));
 builder.Services.Configure<CarMarketValueServiceOptions>(builder.Configuration.GetSection(CarMarketValueServiceOptions.SectionName));
@@ -184,6 +185,25 @@ builder.Services.AddHttpClient<IBookingReadClient, BookingReadClient>((servicePr
     if (string.IsNullOrWhiteSpace(options.InternalApiKey))
     {
         throw new InvalidOperationException("BookingService:InternalApiKey configuration is required.");
+    }
+
+    client.BaseAddress = new Uri(NormalizeBaseUrl(options.BaseUrl));
+    client.Timeout = Timeout.InfiniteTimeSpan;
+})
+.AddHttpMessageHandler<ObservabilityHttpClientHandler>()
+.AddConfiguredResilience(httpClientResilienceOptions);
+
+builder.Services.AddHttpClient<IClientProfileReadClient, ClientProfileReadClient>((serviceProvider, client) =>
+{
+    var options = serviceProvider.GetRequiredService<IOptions<ClientServiceOptions>>().Value;
+    if (string.IsNullOrWhiteSpace(options.BaseUrl))
+    {
+        throw new InvalidOperationException("ClientService:BaseUrl configuration is required.");
+    }
+
+    if (string.IsNullOrWhiteSpace(options.InternalApiKey))
+    {
+        throw new InvalidOperationException("ClientService:InternalApiKey configuration is required.");
     }
 
     client.BaseAddress = new Uri(NormalizeBaseUrl(options.BaseUrl));

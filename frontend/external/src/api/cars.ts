@@ -87,6 +87,7 @@ export interface CarCommentDto {
   userName: string;
   carId: number;
   partnerCarId?: number | null;
+  avatarUrl?: string | null;
   content: string;
   rating: number;
   createdOn: string;
@@ -260,6 +261,7 @@ export async function getModelDetailsPayload(modelId: number): Promise<ModelDeta
       const carrierName = await resolveCarrierName(partnerCar.partnerUserId);
       return comments.map((comment) => ({
         ...comment,
+        avatarUrl: resolveAssetUrl(comment.avatarUrl) ?? comment.avatarUrl,
         carrierPartnerUserId: partnerCar.partnerUserId,
         carrierName,
       }));

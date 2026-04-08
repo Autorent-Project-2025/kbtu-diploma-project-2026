@@ -8,6 +8,7 @@ namespace CarService.Application.DTOs.CarComment
         public int CarId { get; set; }
         public int? BookingId { get; set; }
         public int? PartnerCarId { get; set; }
+        public string? AvatarUrl { get; set; }
         public string Content { get; set; } = string.Empty;
         public int Rating { get; set; }
         public DateTime CreatedOn { get; set; }

@@ -204,16 +204,30 @@
               class="p-6 bg-gray-50 dark:bg-gray-800 rounded-2xl space-y-3"
             >
               <div class="flex items-start justify-between gap-4">
-                <div class="space-y-1">
-                  <p class="font-semibold text-gray-900 dark:text-white">
-                    {{ review.userName }}
-                  </p>
-                  <p class="text-sm text-gray-500 dark:text-gray-400">
-                    {{ formatDate(review.createdOn) }}
-                  </p>
-                  <p class="text-sm text-primary-700 dark:text-primary-300">
-                    Перевозчик: {{ review.carrierName }}
-                  </p>
+                <div class="flex items-start gap-4 min-w-0">
+                  <div
+                    class="w-12 h-12 shrink-0 rounded-2xl overflow-hidden bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center text-white font-bold shadow-lg"
+                  >
+                    <img
+                      v-if="review.avatarUrl"
+                      :src="review.avatarUrl"
+                      :alt="review.userName"
+                      class="w-full h-full object-cover"
+                    />
+                    <span v-else>{{ getInitials(review.userName) }}</span>
+                  </div>
+
+                  <div class="space-y-1 min-w-0">
+                    <p class="font-semibold text-gray-900 dark:text-white">
+                      {{ review.userName }}
+                    </p>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">
+                      {{ formatDate(review.createdOn) }}
+                    </p>
+                    <p class="text-sm text-primary-700 dark:text-primary-300">
+                      Перевозчик: {{ review.carrierName }}
+                    </p>
+                  </div>
                 </div>
 
                 <div class="flex items-center gap-1">
@@ -383,6 +397,20 @@ function formatDate(value: string): string {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(date);
+}
+
+function getInitials(name: string): string {
+  const parts = (name ?? "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2);
+
+  if (parts.length === 0) {
+    return "?";
+  }
+
+  return parts.map((part) => part[0]?.toUpperCase() ?? "").join("");
 }
 
 function openBookingModal() {
