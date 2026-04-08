@@ -1,5 +1,7 @@
 import api from "./axios";
 import type { PaginatedResponse } from "../types/Pagination";
+import { getPublicPartnerCarDetails } from "./partnerCars";
+import { getPartnerPublicProfileByRelatedUserId } from "./partners";
 import { resolveAssetUrl } from "../utils/resolveAssetUrl";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -43,6 +45,9 @@ export interface MyComment {
   userName: string;
   carId: number;
   partnerCarId: number | null;
+  carDisplayName?: string | null;
+  licensePlate?: string | null;
+  carrierName?: string | null;
   content: string;
   rating: number;
   createdOn: string;
@@ -52,6 +57,15 @@ export interface AvatarUploadResult {
   imageId: string;
   imageUrl: string;
 }
+
+interface CommentContext {
+  carDisplayName: string | null;
+  licensePlate: string | null;
+  carrierName: string | null;
+}
+
+const commentContextCache = new Map<number, CommentContext>();
+const carrierNameCache = new Map<string, string | null>();
 
 function normalizeProfile(profile: ClientProfile): ClientProfile {
   return {
@@ -117,8 +131,9 @@ export async function getMyComments(
     pageSize: number;
     totalPages?: number;
   };
+  const items = await enrichCommentsWithContext(data.items ?? []);
   return {
-    items: data.items ?? [],
+    items,
     totalCount: data.totalCount ?? 0,
     page: data.page ?? page,
     pageSize: data.pageSize ?? pageSize,
@@ -126,4 +141,98 @@ export async function getMyComments(
       data.totalPages ??
       Math.ceil((data.totalCount ?? 0) / (data.pageSize ?? pageSize)),
   };
+}
+
+async function enrichCommentsWithContext(items: MyComment[]): Promise<MyComment[]> {
+  const partnerCarIds = items
+    .map((comment) => comment.partnerCarId)
+    .filter(
+      (partnerCarId): partnerCarId is number =>
+        typeof partnerCarId === "number" &&
+        Number.isInteger(partnerCarId) &&
+        partnerCarId > 0,
+    );
+
+  if (partnerCarIds.length === 0) {
+    return items;
+  }
+
+  const uniquePartnerCarIds = Array.from(new Set(partnerCarIds));
+  const contexts = await Promise.all(
+    uniquePartnerCarIds.map(async (partnerCarId) => [
+      partnerCarId,
+      await getCommentContext(partnerCarId),
+    ] as const),
+  );
+
+  const contextMap = new Map<number, CommentContext>(contexts);
+
+  return items.map((comment) => {
+    const context = comment.partnerCarId ? contextMap.get(comment.partnerCarId) : null;
+    return {
+      ...comment,
+      carDisplayName: context?.carDisplayName ?? null,
+      licensePlate: context?.licensePlate ?? null,
+      carrierName: context?.carrierName ?? null,
+    };
+  });
+}
+
+async function getCommentContext(partnerCarId: number): Promise<CommentContext> {
+  const cached = commentContextCache.get(partnerCarId);
+  if (cached) {
+    return cached;
+  }
+
+  try {
+    const car = await getPublicPartnerCarDetails(partnerCarId);
+    const carDisplayName = [
+      car.modelBrand?.trim(),
+      car.modelName?.trim(),
+      car.modelYear ? String(car.modelYear) : "",
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .trim();
+
+    const carrierName = await resolveCarrierName(car.partnerUserId);
+    const context: CommentContext = {
+      carDisplayName: carDisplayName || `Машина #${partnerCarId}`,
+      licensePlate: car.licensePlate?.trim() || null,
+      carrierName,
+    };
+
+    commentContextCache.set(partnerCarId, context);
+    return context;
+  } catch {
+    const fallback: CommentContext = {
+      carDisplayName: `Машина #${partnerCarId}`,
+      licensePlate: null,
+      carrierName: null,
+    };
+
+    commentContextCache.set(partnerCarId, fallback);
+    return fallback;
+  }
+}
+
+async function resolveCarrierName(partnerUserId: string | null | undefined): Promise<string | null> {
+  const normalizedPartnerUserId = partnerUserId?.trim() ?? "";
+  if (!normalizedPartnerUserId) {
+    return null;
+  }
+
+  if (carrierNameCache.has(normalizedPartnerUserId)) {
+    return carrierNameCache.get(normalizedPartnerUserId) ?? null;
+  }
+
+  try {
+    const profile = await getPartnerPublicProfileByRelatedUserId(normalizedPartnerUserId);
+    const carrierName = profile.carrierName?.trim() || null;
+    carrierNameCache.set(normalizedPartnerUserId, carrierName);
+    return carrierName;
+  } catch {
+    carrierNameCache.set(normalizedPartnerUserId, null);
+    return null;
+  }
 }
