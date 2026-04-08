@@ -650,20 +650,23 @@ function buildRecentDateBuckets(days: number): Array<{
     const formatted = formatter.format(date);
 
     return {
-      isoDate: toDateKey(date.toISOString()),
+      isoDate: toDateKey(date),
       label: formatted,
       shortLabel: formatted.split(" ")[0] ?? formatted,
     };
   });
 }
 
-function toDateKey(value: string) {
-  const date = new Date(value);
+function toDateKey(value: string | Date) {
+  const date = value instanceof Date ? new Date(value.getTime()) : new Date(value);
   if (Number.isNaN(date.getTime())) {
-    return value.slice(0, 10);
+    return typeof value === "string" ? value.slice(0, 10) : "";
   }
 
-  return date.toISOString().slice(0, 10);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 function resolveCarName(booking: PartnerBooking) {

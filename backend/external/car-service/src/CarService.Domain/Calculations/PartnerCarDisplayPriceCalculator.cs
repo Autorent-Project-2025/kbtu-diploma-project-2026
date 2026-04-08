@@ -3,7 +3,7 @@ namespace CarService.Domain.Calculations
     public static class PartnerCarDisplayPriceCalculator
     {
         private const decimal DefaultRating = 3.0m;
-        private const decimal HourlyBaseFactor = 0.001m;
+        private const decimal HourlyBaseFactor = 0.0001m;
         private const decimal DailyDiscountFactor = 0.90m;
 
         public static (decimal? PriceHour, decimal? PriceDay) Calculate(

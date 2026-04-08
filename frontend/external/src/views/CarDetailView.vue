@@ -41,11 +41,17 @@
               class="relative h-96 rounded-3xl overflow-hidden bg-gradient-to-br from-gray-200 to-gray-300 dark:from-gray-800 dark:to-gray-900 shadow-2xl"
             >
               <img
-                v-if="currentImage"
-                :src="currentImage"
+                v-if="currentImageMeta"
+                :src="currentImageMeta.imageUrl"
                 :alt="`${payload.model.brand} ${payload.model.model}`"
                 class="w-full h-full object-cover"
               />
+              <span
+                v-if="currentImageMeta"
+                class="absolute left-4 top-4 rounded-full bg-black/70 px-3 py-1 text-xs font-semibold tracking-wide text-white"
+              >
+                {{ getCarImageTypeLabel(currentImageMeta.imageType) }}
+              </span>
               <div
                 v-else
                 class="w-full h-full flex items-center justify-center text-gray-500 dark:text-gray-400"
@@ -71,6 +77,11 @@
                   :alt="`${payload.model.brand} ${payload.model.model}`"
                   class="w-full h-full object-cover"
                 />
+                <span
+                  class="pointer-events-none absolute bottom-2 left-2 rounded-full bg-black/70 px-2 py-1 text-[10px] font-semibold text-white"
+                >
+                  {{ getCarImageTypeLabel(img.imageType) }}
+                </span>
               </button>
             </div>
           </div>
@@ -83,6 +94,15 @@
               <p class="text-lg text-gray-600 dark:text-gray-400">
                 {{ payload.model.year }} год выпуска
               </p>
+              <div v-if="payload.tags.length > 0" class="flex flex-wrap gap-2 pt-2">
+                <span
+                  v-for="tag in payload.tags"
+                  :key="`${payload.model.id}-${tag}`"
+                  class="px-3 py-1.5 rounded-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm font-semibold text-gray-700 dark:text-gray-300"
+                >
+                  {{ tag }}
+                </span>
+              </div>
             </div>
 
             <div class="grid sm:grid-cols-2 gap-4">
@@ -204,16 +224,30 @@
               class="p-6 bg-gray-50 dark:bg-gray-800 rounded-2xl space-y-3"
             >
               <div class="flex items-start justify-between gap-4">
-                <div class="space-y-1">
-                  <p class="font-semibold text-gray-900 dark:text-white">
-                    {{ review.userName }}
-                  </p>
-                  <p class="text-sm text-gray-500 dark:text-gray-400">
-                    {{ formatDate(review.createdOn) }}
-                  </p>
-                  <p class="text-sm text-primary-700 dark:text-primary-300">
-                    Перевозчик: {{ review.carrierName }}
-                  </p>
+                <div class="flex items-start gap-4 min-w-0">
+                  <div
+                    class="w-12 h-12 shrink-0 rounded-2xl overflow-hidden bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center text-white font-bold shadow-lg"
+                  >
+                    <img
+                      v-if="review.avatarUrl"
+                      :src="review.avatarUrl"
+                      :alt="review.userName"
+                      class="w-full h-full object-cover"
+                    />
+                    <span v-else>{{ getInitials(review.userName) }}</span>
+                  </div>
+
+                  <div class="space-y-1 min-w-0">
+                    <p class="font-semibold text-gray-900 dark:text-white">
+                      {{ review.userName }}
+                    </p>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">
+                      {{ formatDate(review.createdOn) }}
+                    </p>
+                    <p class="text-sm text-primary-700 dark:text-primary-300">
+                      Перевозчик: {{ review.carrierName }}
+                    </p>
+                  </div>
                 </div>
 
                 <div class="flex items-center gap-1">
@@ -287,6 +321,7 @@ import { getModelDetailsPayload, type ModelDetailsPayload } from "../api/cars";
 import { useAuth } from "../composables/useAuth";
 import { useToast } from "../composables/useToast";
 import type { BookingModelSelection } from "../types/Car";
+import { getCarImageTypeLabel } from "../utils/carImageType";
 import { formatMoney } from "../utils/formatMoney";
 
 const route = useRoute();
@@ -304,8 +339,8 @@ const showLoginModal = ref(false);
 const bookingError = ref("");
 
 const modelImages = computed(() => payload.value?.model.images ?? []);
-const currentImage = computed(
-  () => modelImages.value[currentImageIndex.value]?.imageUrl ?? "",
+const currentImageMeta = computed(
+  () => modelImages.value[currentImageIndex.value] ?? null,
 );
 
 const bookingSelection = computed<BookingModelSelection | null>(() => {
@@ -383,6 +418,20 @@ function formatDate(value: string): string {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(date);
+}
+
+function getInitials(name: string): string {
+  const parts = (name ?? "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2);
+
+  if (parts.length === 0) {
+    return "?";
+  }
+
+  return parts.map((part) => part[0]?.toUpperCase() ?? "").join("");
 }
 
 function openBookingModal() {

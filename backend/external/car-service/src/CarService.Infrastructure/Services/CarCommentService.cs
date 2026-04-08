@@ -1,26 +1,30 @@
 using CarService.Application.DTOs.CarComment;
 using CarService.Application.DTOs.Common;
 using CarService.Application.Interfaces;
+using CarService.Application.Interfaces.Integrations;
 using CarService.Domain.Entities;
 using CarService.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
 namespace CarService.Infrastructure.Services
 {
-    public sealed class CarCommentService : ICarCommentService
-    {
-        private readonly ApplicationDbContext _db;
-        private readonly IPartnerCarService _partnerCarService;
-        private readonly ICarModelService _carModelService;
+        public sealed class CarCommentService : ICarCommentService
+        {
+            private readonly ApplicationDbContext _db;
+            private readonly IPartnerCarService _partnerCarService;
+            private readonly ICarModelService _carModelService;
+            private readonly IClientProfileReadClient _clientProfileReadClient;
 
         public CarCommentService(
             ApplicationDbContext db,
             IPartnerCarService partnerCarService,
-            ICarModelService carModelService)
+            ICarModelService carModelService,
+            IClientProfileReadClient clientProfileReadClient)
         {
             _db = db;
             _partnerCarService = partnerCarService;
             _carModelService = carModelService;
+            _clientProfileReadClient = clientProfileReadClient;
         }
 
         public async Task<PagedResult<CarCommentResponseDto>> GetByPartnerCarPaginatedAsync(
@@ -41,6 +45,8 @@ namespace CarService.Infrastructure.Services
                 .Take(paginationParams.PageSize)
                 .Select(comment => MapToDto(comment))
                 .ToListAsync(cancellationToken);
+
+            await EnrichWithAvatarUrlsAsync(items, cancellationToken);
 
             return new PagedResult<CarCommentResponseDto>
             {
@@ -76,6 +82,8 @@ namespace CarService.Infrastructure.Services
                 .Select(comment => MapToDto(comment))
                 .ToListAsync(cancellationToken);
 
+            await EnrichWithAvatarUrlsAsync(items, cancellationToken);
+
             return new PagedResult<CarCommentResponseDto>
             {
                 Items = items,
@@ -92,7 +100,14 @@ namespace CarService.Infrastructure.Services
                 .AsNoTracking()
                 .FirstOrDefaultAsync(comment => comment.Id == id, cancellationToken);
 
-            return entity is null ? null : MapToDto(entity);
+            if (entity is null)
+            {
+                return null;
+            }
+
+            var dto = MapToDto(entity);
+            await EnrichWithAvatarUrlsAsync([dto], cancellationToken);
+            return dto;
         }
 
         public async Task<CarCommentResponseDto> CreateAsync(
@@ -169,7 +184,9 @@ namespace CarService.Infrastructure.Services
 
             await RecalculateRatingsAsync(partnerCar.Id, partnerCar.CarModelId, cancellationToken);
 
-            return MapToDto(entity);
+            var created = MapToDto(entity);
+            await EnrichWithAvatarUrlsAsync([created], cancellationToken);
+            return created;
         }
 
         public async Task<CarCommentResponseDto?> UpdateAsync(
@@ -212,7 +229,9 @@ namespace CarService.Infrastructure.Services
                 await RecalculateModelRatingOnlyAsync(entity.CarId, cancellationToken);
             }
 
-            return MapToDto(entity);
+            var updated = MapToDto(entity);
+            await EnrichWithAvatarUrlsAsync([updated], cancellationToken);
+            return updated;
         }
 
         public async Task<bool> DeleteAsync(string userId, int commentId, CancellationToken cancellationToken = default)
@@ -275,10 +294,57 @@ namespace CarService.Infrastructure.Services
                 CarId = entity.CarId,
                 BookingId = entity.BookingId,
                 PartnerCarId = entity.PartnerCarId,
+                AvatarUrl = null,
                 Content = entity.Content,
                 Rating = entity.Rating,
                 CreatedOn = entity.CreatedOn
             };
+        }
+
+        private async Task EnrichWithAvatarUrlsAsync(
+            IReadOnlyCollection<CarCommentResponseDto> comments,
+            CancellationToken cancellationToken)
+        {
+            var userIds = comments
+                .Select(comment => comment.UserId?.Trim())
+                .Where(userId => !string.IsNullOrWhiteSpace(userId))
+                .Distinct(StringComparer.Ordinal)
+                .ToArray();
+
+            if (userIds.Length == 0)
+            {
+                return;
+            }
+
+            try
+            {
+                var avatarLookups = await Task.WhenAll(
+                    userIds.Select(async userId => new
+                    {
+                        UserId = userId!,
+                        AvatarUrl = await _clientProfileReadClient.GetAvatarUrlByRelatedUserIdAsync(
+                            userId!,
+                            cancellationToken)
+                    }));
+
+                var avatarMap = avatarLookups.ToDictionary(
+                    item => item.UserId,
+                    item => item.AvatarUrl,
+                    StringComparer.Ordinal);
+
+                foreach (var comment in comments)
+                {
+                    if (!string.IsNullOrWhiteSpace(comment.UserId) &&
+                        avatarMap.TryGetValue(comment.UserId, out var avatarUrl))
+                    {
+                        comment.AvatarUrl = avatarUrl;
+                    }
+                }
+            }
+            catch
+            {
+                // Avatar enrichment is best-effort only.
+            }
         }
 
         private static string NormalizeRequired(string? value, string paramName, int maxLength)

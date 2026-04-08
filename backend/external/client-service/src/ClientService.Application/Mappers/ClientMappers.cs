@@ -18,6 +18,7 @@ public static class ClientMappers
         RelatedUserId = entity.RelatedUserId,
         PhoneNumber = entity.PhoneNumber,
         AvatarUrl = entity.AvatarUrl,
+        AvatarImageId = entity.AvatarImageId,
         BookingActionsBlocked = entity.BookingActionsBlocked,
         BookingBlockReason = entity.BookingBlockReason,
         BookingBlockedAt = entity.BookingBlockedAt
@@ -42,6 +43,7 @@ public static class ClientMappers
             RelatedUserId = entity.RelatedUserId,
             PhoneNumber = entity.PhoneNumber,
             AvatarUrl = entity.AvatarUrl,
+            AvatarImageId = entity.AvatarImageId,
             BookingActionsBlocked = entity.BookingActionsBlocked,
             BookingBlockReason = entity.BookingBlockReason,
             BookingBlockedAt = entity.BookingBlockedAt

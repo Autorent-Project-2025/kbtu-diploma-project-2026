@@ -8,6 +8,7 @@ namespace BookingService.Infrastructure.Services
 {
     public class DynamicPricingService : IDynamicPricingService
     {
+        private const decimal HourlyBaseFactor = 0.0001m;
         private readonly IPartnerCarReadClient _partnerCarReadClient;
         private readonly ILogger<DynamicPricingService> _logger;
         private readonly ObservabilityLogWriter _observabilityLogWriter;
@@ -97,7 +98,7 @@ namespace BookingService.Infrastructure.Services
                 decimal.Min(1.2m, 1m + (20 - context.CurrentAvailableCarsCount) * 0.02m));
             var priceHour = RoundCurrency(
                 context.MarketValueKzt.Value *
-                0.001m *
+                HourlyBaseFactor *
                 ratingCoefficient *
                 advanceBookingCoefficient *
                 availabilityCoefficient);

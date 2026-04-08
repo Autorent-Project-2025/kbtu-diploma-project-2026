@@ -34,6 +34,9 @@ public class Client
     [Column("avatar_url")]
     public string? AvatarUrl { get; set; }
 
+    [Column("avatar_image_id")]
+    public string? AvatarImageId { get; set; }
+
     [Column("booking_actions_blocked")]
     public bool BookingActionsBlocked { get; set; }
 
