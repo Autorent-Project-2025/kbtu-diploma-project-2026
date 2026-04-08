@@ -171,14 +171,17 @@
               class="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-700"
             />
             <div
-              class="absolute top-4 left-4 glass px-3 py-1.5 rounded-full backdrop-blur-md"
+              class="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-black/70 via-black/25 to-transparent pointer-events-none"
+            ></div>
+            <div
+              class="absolute top-4 left-4 px-3 py-1.5 rounded-full bg-black/75 border border-white/20 shadow-lg shadow-black/25 backdrop-blur-md"
             >
               <span class="text-sm font-semibold text-white">{{
                 model.year
               }}</span>
             </div>
             <div
-              class="absolute top-4 right-4 glass px-3 py-1.5 rounded-full backdrop-blur-md"
+              class="absolute top-4 right-4 px-3 py-1.5 rounded-full bg-black/75 border border-white/20 shadow-lg shadow-black/25 backdrop-blur-md"
             >
               <span class="text-sm font-semibold text-white"
                 >{{ model.availableCarsCount }} авто</span
