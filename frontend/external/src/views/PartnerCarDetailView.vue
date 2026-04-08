@@ -66,9 +66,14 @@
               :href="image.imageUrl"
               target="_blank"
               rel="noopener noreferrer"
-              class="block overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-700"
+              class="relative block overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-700"
             >
               <img :src="image.imageUrl" alt="car image" class="w-full h-48 object-cover" />
+              <span
+                class="absolute bottom-3 left-3 rounded-full bg-black/70 px-3 py-1 text-xs font-semibold text-white"
+              >
+                {{ getCarImageTypeLabel(image.imageType) }}
+              </span>
             </a>
           </div>
         </section>
@@ -156,6 +161,7 @@ import { useRoute } from "vue-router";
 import { getMyPartnerCarDetails, type PartnerCarDetails } from "../api/partnerCars";
 import { getMyPartnerFileTemporaryLink } from "../api/partners";
 import { useToast } from "../composables/useToast";
+import { getCarImageTypeLabel } from "../utils/carImageType";
 import { formatMoney } from "../utils/formatMoney";
 import { buildCarTags } from "../utils/carTags";
 

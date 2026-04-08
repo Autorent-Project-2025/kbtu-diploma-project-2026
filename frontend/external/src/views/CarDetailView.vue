@@ -41,11 +41,17 @@
               class="relative h-96 rounded-3xl overflow-hidden bg-gradient-to-br from-gray-200 to-gray-300 dark:from-gray-800 dark:to-gray-900 shadow-2xl"
             >
               <img
-                v-if="currentImage"
-                :src="currentImage"
+                v-if="currentImageMeta"
+                :src="currentImageMeta.imageUrl"
                 :alt="`${payload.model.brand} ${payload.model.model}`"
                 class="w-full h-full object-cover"
               />
+              <span
+                v-if="currentImageMeta"
+                class="absolute left-4 top-4 rounded-full bg-black/70 px-3 py-1 text-xs font-semibold tracking-wide text-white"
+              >
+                {{ getCarImageTypeLabel(currentImageMeta.imageType) }}
+              </span>
               <div
                 v-else
                 class="w-full h-full flex items-center justify-center text-gray-500 dark:text-gray-400"
@@ -71,6 +77,11 @@
                   :alt="`${payload.model.brand} ${payload.model.model}`"
                   class="w-full h-full object-cover"
                 />
+                <span
+                  class="pointer-events-none absolute bottom-2 left-2 rounded-full bg-black/70 px-2 py-1 text-[10px] font-semibold text-white"
+                >
+                  {{ getCarImageTypeLabel(img.imageType) }}
+                </span>
               </button>
             </div>
           </div>
@@ -310,6 +321,7 @@ import { getModelDetailsPayload, type ModelDetailsPayload } from "../api/cars";
 import { useAuth } from "../composables/useAuth";
 import { useToast } from "../composables/useToast";
 import type { BookingModelSelection } from "../types/Car";
+import { getCarImageTypeLabel } from "../utils/carImageType";
 import { formatMoney } from "../utils/formatMoney";
 
 const route = useRoute();
@@ -327,8 +339,8 @@ const showLoginModal = ref(false);
 const bookingError = ref("");
 
 const modelImages = computed(() => payload.value?.model.images ?? []);
-const currentImage = computed(
-  () => modelImages.value[currentImageIndex.value]?.imageUrl ?? "",
+const currentImageMeta = computed(
+  () => modelImages.value[currentImageIndex.value] ?? null,
 );
 
 const bookingSelection = computed<BookingModelSelection | null>(() => {
