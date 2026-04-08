@@ -9,50 +9,79 @@
       >
         <div class="flex flex-col sm:flex-row sm:items-center gap-6">
           <!-- Avatar -->
-          <div class="relative shrink-0">
-            <div
-              class="w-24 h-24 rounded-3xl overflow-hidden border-2 border-emerald-400/40 shadow-xl"
-            >
-              <img
-                v-if="profile?.avatarUrl"
-                :src="profile.avatarUrl"
-                :alt="`${profile.firstName} ${profile.lastName}`"
-                class="w-full h-full object-cover"
-              />
+          <div class="shrink-0 space-y-2">
+            <div class="relative">
               <div
-                v-else
-                class="w-full h-full bg-gradient-to-br from-emerald-500 to-emerald-700 flex items-center justify-center"
+                class="w-24 h-24 rounded-3xl overflow-hidden border-2 border-emerald-400/40 shadow-xl"
               >
-                <span class="text-white text-3xl font-extrabold">
-                  {{ initials }}
-                </span>
-              </div>
-            </div>
-            <!-- Upload button -->
-            <label
-              class="absolute -bottom-2 -right-2 w-8 h-8 rounded-xl bg-emerald-600 hover:bg-emerald-700 flex items-center justify-center cursor-pointer shadow-lg transition-colors"
-              title="Загрузить фото"
-            >
-              <svg
-                class="w-4 h-4 text-white"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M12 4v16m8-8H4"
+                <img
+                  v-if="displayAvatarUrl"
+                  :src="displayAvatarUrl"
+                  :alt="displayName"
+                  class="w-full h-full object-cover"
                 />
-              </svg>
-              <input
-                type="file"
-                accept="image/*"
-                class="hidden"
-                @change="handleAvatarUpload"
-              />
-            </label>
+                <div
+                  v-else
+                  class="w-full h-full bg-gradient-to-br from-emerald-500 to-emerald-700 flex items-center justify-center"
+                >
+                  <span class="text-white text-3xl font-extrabold">
+                    {{ initials }}
+                  </span>
+                </div>
+              </div>
+              <!-- Upload button -->
+              <label
+                v-if="editMode"
+                :class="
+                  avatarUploading
+                    ? 'bg-emerald-500/70 cursor-wait pointer-events-none'
+                    : 'bg-emerald-600 hover:bg-emerald-700 cursor-pointer'
+                "
+                class="absolute -bottom-2 -right-2 w-8 h-8 rounded-xl flex items-center justify-center shadow-lg transition-colors"
+                :title="
+                  avatarUploading
+                    ? 'Загружаем фото'
+                    : 'Загрузить фото профиля'
+                "
+              >
+                <svg
+                  class="w-4 h-4 text-white"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M12 4v16m8-8H4"
+                  />
+                </svg>
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  class="hidden"
+                  :disabled="avatarUploading || saving"
+                  @change="handleAvatarUpload"
+                />
+              </label>
+            </div>
+            <p
+              v-if="editMode"
+              class="w-24 text-center text-[11px] leading-4 text-gray-500 dark:text-gray-400"
+            >
+              {{
+                avatarUploading
+                  ? "Загружаем..."
+                  : "JPG, PNG, WEBP до 10 МБ"
+              }}
+            </p>
+            <p
+              v-if="avatarUploadError"
+              class="w-24 text-center text-[11px] leading-4 text-red-500"
+            >
+              {{ avatarUploadError }}
+            </p>
           </div>
 
           <!-- Name & meta -->
@@ -81,7 +110,7 @@
 
           <!-- Edit toggle -->
           <button
-            @click="editMode = !editMode"
+            @click="toggleEditMode"
             class="shrink-0 px-5 py-3 rounded-2xl border border-gray-300 dark:border-gray-700 text-gray-800 dark:text-gray-100 font-semibold hover:border-emerald-500 dark:hover:border-emerald-500 transition-colors"
           >
             {{ editMode ? "Отмена" : "Редактировать" }}
@@ -280,7 +309,7 @@
           </div>
           <div class="flex gap-2 shrink-0">
             <button
-              @click="editMode = true"
+              @click="startEditing"
               class="px-4 py-2.5 rounded-2xl bg-amber-600 hover:bg-amber-700 text-white text-sm font-bold transition-colors"
             >
               Заполнить
@@ -364,30 +393,44 @@
               </p>
             </div>
 
-            <div class="space-y-1.5 sm:col-span-2">
-              <label
-                class="text-xs font-bold uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400"
-                >URL аватара</label
+            <div
+              class="sm:col-span-2 rounded-2xl border border-dashed border-emerald-200 dark:border-emerald-800 bg-emerald-50/70 dark:bg-emerald-950/20 px-4 py-3"
+            >
+              <p
+                class="text-xs font-bold uppercase tracking-[0.2em] text-emerald-700 dark:text-emerald-300"
               >
-              <input
-                v-model="form.avatarUrl"
-                type="url"
-                placeholder="https://..."
-                class="w-full px-4 py-3 rounded-2xl border border-gray-300 dark:border-gray-700 bg-transparent text-gray-900 dark:text-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all"
-              />
+                Аватар профиля
+              </p>
+              <p class="mt-2 text-sm text-gray-600 dark:text-gray-300">
+                Загрузите изображение кнопкой на фото сверху. Поддерживаются
+                JPG, PNG и WEBP до 10 МБ.
+              </p>
+              <p
+                v-if="avatarChanged"
+                class="mt-2 text-sm font-semibold text-emerald-700 dark:text-emerald-300"
+              >
+                Новый аватар загружен. Нажмите «Сохранить», чтобы применить
+                изменения.
+              </p>
+              <p
+                v-if="avatarUploadError"
+                class="mt-2 text-sm text-red-500 dark:text-red-400"
+              >
+                {{ avatarUploadError }}
+              </p>
             </div>
           </div>
 
           <div class="flex items-center gap-3">
             <button
               @click="saveProfile"
-              :disabled="saving"
+              :disabled="saving || avatarUploading"
               class="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-bold rounded-2xl shadow-lg shadow-emerald-500/20 transition-colors"
             >
               {{ saving ? "Сохраняем..." : "Сохранить" }}
             </button>
             <button
-              @click="editMode = false"
+              @click="cancelEditing"
               class="px-6 py-3 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 font-semibold rounded-2xl hover:border-gray-400 transition-colors"
             >
               Отмена
@@ -704,6 +747,7 @@ import {
   updateMyProfile,
   getMyBookingStats,
   getMyComments,
+  uploadAvatarImage,
   type ClientProfile,
   type BookingStats,
   type MyComment,
@@ -711,6 +755,7 @@ import {
 import { getMyBookings } from "../api/booking";
 import { useToast } from "../composables/useToast";
 import type { Booking } from "../types/Booking";
+import { resolveAssetUrl } from "../utils/resolveAssetUrl";
 
 import api from "../api/axios";
 
@@ -732,6 +777,8 @@ const loading = ref(true);
 const loadError = ref<string | null>(null);
 const saving = ref(false);
 const editMode = ref(false);
+const avatarUploading = ref(false);
+const avatarUploadError = ref<string | null>(null);
 const onboardingDismissed = ref(
   localStorage.getItem("profile_onboarding_dismissed") === "1",
 );
@@ -754,6 +801,13 @@ const form = ref({
 });
 
 const formErrors = ref<Record<string, string>>({});
+const supportedAvatarMimeTypes = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+]);
+const maxAvatarSizeMb = 10;
+const maxAvatarSizeBytes = maxAvatarSizeMb * 1024 * 1024;
 
 // ─── Computed ─────────────────────────────────────────────────────────────────
 const initials = computed(() => {
@@ -770,6 +824,33 @@ const showOnboardingBanner = computed(() => {
     !profile.value.identityDocumentFileName ||
     !profile.value.driverLicenseFileName
   );
+});
+
+const displayAvatarUrl = computed(() => {
+  const candidate = editMode.value
+    ? form.value.avatarUrl
+    : profile.value?.avatarUrl ?? null;
+
+  return resolveAssetUrl(candidate);
+});
+
+const displayName = computed(() => {
+  const firstName = editMode.value
+    ? form.value.firstName.trim()
+    : profile.value?.firstName ?? "";
+  const lastName = editMode.value
+    ? form.value.lastName.trim()
+    : profile.value?.lastName ?? "";
+  const fullName = `${firstName} ${lastName}`.trim();
+
+  return fullName || "Profile avatar";
+});
+
+const avatarChanged = computed(() => {
+  const savedAvatarUrl = profile.value?.avatarUrl?.trim() ?? "";
+  const draftAvatarUrl = form.value.avatarUrl.trim();
+
+  return savedAvatarUrl !== draftAvatarUrl;
 });
 
 function dismissOnboarding() {
@@ -793,14 +874,8 @@ async function loadProfile() {
   try {
     loading.value = true;
     profile.value = await getMyProfile();
-    form.value = {
-      firstName: profile.value.firstName,
-      lastName: profile.value.lastName,
-      birthDate: profile.value.birthDate,
-      phoneNumber: profile.value.phoneNumber,
-      avatarUrl: profile.value.avatarUrl ?? "",
-    };
-  } catch (e) {
+    syncFormWithProfile(profile.value);
+  } catch {
     loadError.value = "Не удалось загрузить профиль";
   } finally {
     loading.value = false;
@@ -852,6 +927,43 @@ function validateForm(): boolean {
   return Object.keys(errors).length === 0;
 }
 
+function syncFormWithProfile(currentProfile: ClientProfile) {
+  form.value = {
+    firstName: currentProfile.firstName,
+    lastName: currentProfile.lastName,
+    birthDate: currentProfile.birthDate,
+    phoneNumber: currentProfile.phoneNumber,
+    avatarUrl: currentProfile.avatarUrl ?? "",
+  };
+  formErrors.value = {};
+  avatarUploadError.value = null;
+}
+
+function toggleEditMode() {
+  if (editMode.value) {
+    cancelEditing();
+    return;
+  }
+
+  startEditing();
+}
+
+function startEditing() {
+  if (profile.value) {
+    syncFormWithProfile(profile.value);
+  }
+
+  editMode.value = true;
+}
+
+function cancelEditing() {
+  if (profile.value) {
+    syncFormWithProfile(profile.value);
+  }
+
+  editMode.value = false;
+}
+
 async function saveProfile() {
   if (!validateForm()) return;
   try {
@@ -863,26 +975,68 @@ async function saveProfile() {
       phoneNumber: form.value.phoneNumber.trim(),
       avatarUrl: form.value.avatarUrl.trim() || null,
     });
+    syncFormWithProfile(profile.value);
     editMode.value = false;
     success("Профиль обновлён");
-  } catch {
-    error("Не удалось сохранить");
+  } catch (saveError) {
+    error(getErrorMessage(saveError, "Не удалось сохранить"));
   } finally {
     saving.value = false;
   }
 }
 
-function handleAvatarUpload(event: Event) {
-  const file = (event.target as HTMLInputElement).files?.[0];
+async function handleAvatarUpload(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
   if (!file) return;
 
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    const result = e.target?.result as string;
-    if (form.value !== null) form.value.avatarUrl = result;
-    if (profile.value) profile.value.avatarUrl = result;
+  avatarUploadError.value = null;
+
+  if (file.type && !supportedAvatarMimeTypes.has(file.type)) {
+    avatarUploadError.value = "Только JPG, PNG или WEBP.";
+    error(avatarUploadError.value);
+    input.value = "";
+    return;
+  }
+
+  if (file.size > maxAvatarSizeBytes) {
+    avatarUploadError.value = `Размер файла не должен превышать ${maxAvatarSizeMb} МБ.`;
+    error(avatarUploadError.value);
+    input.value = "";
+    return;
+  }
+
+  try {
+    avatarUploading.value = true;
+    form.value.avatarUrl = await uploadAvatarImage(file);
+    success("Аватар загружен. Сохраните профиль, чтобы применить изменения.");
+  } catch (uploadError) {
+    avatarUploadError.value = getErrorMessage(
+      uploadError,
+      "Не удалось загрузить аватар",
+    );
+    error(avatarUploadError.value);
+  } finally {
+    avatarUploading.value = false;
+    input.value = "";
+  }
+}
+
+function getErrorMessage(cause: unknown, fallback: string): string {
+  const errorLike = cause as {
+    response?: {
+      data?: {
+        message?: string;
+        error?: string;
+      };
+    };
   };
-  reader.readAsDataURL(file);
+
+  return (
+    errorLike.response?.data?.message ??
+    errorLike.response?.data?.error ??
+    fallback
+  );
 }
 
 // ─── Formatting ───────────────────────────────────────────────────────────────

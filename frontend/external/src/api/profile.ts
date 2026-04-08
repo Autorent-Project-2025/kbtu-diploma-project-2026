@@ -1,5 +1,6 @@
 import api from "./axios";
 import type { PaginatedResponse } from "../types/Pagination";
+import { resolveAssetUrl } from "../utils/resolveAssetUrl";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -45,18 +46,45 @@ export interface MyComment {
   createdOn: string;
 }
 
+interface ImageUploadResponse {
+  imageId: string;
+  imageUrl: string;
+}
+
+function normalizeProfile(profile: ClientProfile): ClientProfile {
+  return {
+    ...profile,
+    avatarUrl: resolveAssetUrl(profile.avatarUrl) ?? profile.avatarUrl,
+  };
+}
+
 // ─── API calls ───────────────────────────────────────────────────────────────
 
 export async function getMyProfile(): Promise<ClientProfile> {
   const res = await api.get("/clients/profile");
-  return res.data as ClientProfile;
+  return normalizeProfile(res.data as ClientProfile);
 }
 
 export async function updateMyProfile(
   payload: UpdateProfilePayload,
 ): Promise<ClientProfile> {
   const res = await api.put("/clients/profile", payload);
-  return res.data as ClientProfile;
+  return normalizeProfile(res.data as ClientProfile);
+}
+
+export async function uploadAvatarImage(file: File): Promise<string> {
+  const res = await api.post("/internal/api/images", file, {
+    headers: {
+      "Content-Type": "application/octet-stream",
+    },
+  });
+
+  const payload = res.data as ImageUploadResponse;
+  if (!payload?.imageUrl?.trim()) {
+    throw new Error("Image service returned invalid upload response.");
+  }
+
+  return resolveAssetUrl(payload.imageUrl) ?? payload.imageUrl;
 }
 
 export async function getMyBookingStats(): Promise<BookingStats> {
