@@ -196,6 +196,16 @@
               </p>
             </div>
 
+            <div v-if="model.tags.length > 0" class="flex flex-wrap gap-2">
+              <span
+                v-for="tag in model.tags"
+                :key="`${model.modelId}-${tag}`"
+                class="px-3 py-1 rounded-full bg-gray-100 dark:bg-gray-800 text-xs font-semibold text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700"
+              >
+                {{ tag }}
+              </span>
+            </div>
+
             <div class="flex items-center justify-between text-sm">
               <span class="text-gray-600 dark:text-gray-400">Цена:</span>
               <span class="font-bold text-primary-600 dark:text-primary-400">{{

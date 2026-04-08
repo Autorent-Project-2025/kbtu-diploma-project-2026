@@ -24,6 +24,15 @@
           <h1 class="text-3xl font-extrabold text-gray-900 dark:text-white">
             {{ car.brand }} {{ car.model }} {{ car.year }}
           </h1>
+          <div v-if="carTags.length > 0" class="flex flex-wrap gap-2">
+            <span
+              v-for="tag in carTags"
+              :key="`${car.id}-${tag}`"
+              class="px-3 py-1.5 rounded-full bg-white/80 dark:bg-gray-900/70 border border-gray-200 dark:border-gray-800 text-sm font-semibold text-gray-700 dark:text-gray-300"
+            >
+              {{ tag }}
+            </span>
+          </div>
           <div class="grid md:grid-cols-2 gap-4 text-gray-700 dark:text-gray-300">
             <p>Гос номер: <b>{{ car.licensePlate }}</b></p>
             <p>Статус: <b>{{ statusLabel(car.status) }}</b></p>
@@ -142,12 +151,13 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useRoute } from "vue-router";
 import { getMyPartnerCarDetails, type PartnerCarDetails } from "../api/partnerCars";
 import { getMyPartnerFileTemporaryLink } from "../api/partners";
 import { useToast } from "../composables/useToast";
 import { formatMoney } from "../utils/formatMoney";
+import { buildCarTags } from "../utils/carTags";
 
 const route = useRoute();
 const { error } = useToast();
@@ -155,6 +165,20 @@ const loading = ref(true);
 const errorMessage = ref("");
 const car = ref<PartnerCarDetails | null>(null);
 const openingOwnershipDocument = ref(false);
+const carTags = computed(() =>
+  car.value
+    ? buildCarTags(
+        {
+          engine: car.value.engine,
+          transmission: car.value.transmission,
+          fuelType: car.value.fuelType,
+          seats: car.value.seats,
+          doors: car.value.doors,
+        },
+        8,
+      )
+    : [],
+);
 
 function statusLabel(status: number): string {
   if (status === 0) return "Доступна";

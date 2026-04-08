@@ -2,6 +2,7 @@ import api from "./axios";
 import { getPartnerPublicProfileByRelatedUserId } from "./partners";
 import type { PaginatedResponse } from "../types/Pagination";
 import { resolveAssetUrl } from "../utils/resolveAssetUrl";
+import { buildCarTags } from "../utils/carTags";
 
 function toCamelCase(obj: any): any {
   if (Array.isArray(obj)) {
@@ -33,6 +34,7 @@ export interface AvailableCarModel {
 export interface AvailableModelCard extends AvailableCarModel {
   imageUrl: string | null;
   description?: string | null;
+  tags: string[];
 }
 
 export interface CarModelImageDto {
@@ -104,6 +106,7 @@ export interface ModelDetailsPayload {
   reviews: ModelReviewDto[];
   minPriceHour: number | null;
   maxPriceHour: number | null;
+  tags: string[];
 }
 
 export interface MatchCarByModelPayload {
@@ -242,6 +245,17 @@ export async function getAvailableModelCards(): Promise<AvailableModelCard[]> {
       ...item,
       imageUrl: resolveAssetUrl(detail?.images?.[0]?.imageUrl ?? null),
       description: detail?.description ?? null,
+      tags: buildCarTags(
+        {
+          engine: detail?.engine,
+          transmission: detail?.transmission,
+          fuelType: detail?.fuelType,
+          seats: detail?.seats,
+          doors: detail?.doors,
+          features: detail?.features ?? [],
+        },
+        4,
+      ),
     };
   });
 }
@@ -282,6 +296,17 @@ export async function getModelDetailsPayload(modelId: number): Promise<ModelDeta
     reviews,
     minPriceHour: availability?.minPriceHour ?? getMinPrice(partnerCars),
     maxPriceHour: availability?.maxPriceHour ?? getMaxPrice(partnerCars),
+    tags: buildCarTags(
+      {
+        engine: model.engine,
+        transmission: model.transmission,
+        fuelType: model.fuelType,
+        seats: model.seats,
+        doors: model.doors,
+        features: model.features ?? [],
+      },
+      8,
+    ),
   };
 }
 

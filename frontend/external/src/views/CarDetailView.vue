@@ -83,6 +83,15 @@
               <p class="text-lg text-gray-600 dark:text-gray-400">
                 {{ payload.model.year }} год выпуска
               </p>
+              <div v-if="payload.tags.length > 0" class="flex flex-wrap gap-2 pt-2">
+                <span
+                  v-for="tag in payload.tags"
+                  :key="`${payload.model.id}-${tag}`"
+                  class="px-3 py-1.5 rounded-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm font-semibold text-gray-700 dark:text-gray-300"
+                >
+                  {{ tag }}
+                </span>
+              </div>
             </div>
 
             <div class="grid sm:grid-cols-2 gap-4">
