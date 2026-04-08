@@ -21,6 +21,19 @@ export interface PartnerCarImage {
   displayOrder: number;
 }
 
+export interface PartnerCarComment {
+  id: number;
+  userId: string;
+  userName: string;
+  carId: number;
+  bookingId?: number | null;
+  partnerCarId?: number | null;
+  avatarUrl?: string | null;
+  content: string;
+  rating: number;
+  createdOn: string;
+}
+
 export interface PartnerCarDetails {
   id: number;
   partnerUserId: string;
@@ -44,6 +57,7 @@ export interface PartnerCarDetails {
   doors?: number | null;
   description?: string | null;
   images: PartnerCarImage[];
+  comments: PartnerCarComment[];
 }
 
 export interface PublicPartnerCarDetails {
@@ -73,6 +87,10 @@ export async function getMyPartnerCarDetails(carId: number): Promise<PartnerCarD
     images: (payload.images ?? []).map((image) => ({
       ...image,
       imageUrl: resolveAssetUrl(image.imageUrl) ?? image.imageUrl,
+    })),
+    comments: (payload.comments ?? []).map((comment) => ({
+      ...comment,
+      avatarUrl: resolveAssetUrl(comment.avatarUrl ?? null) ?? comment.avatarUrl,
     })),
   };
 }
