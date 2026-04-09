@@ -1,6 +1,8 @@
 import api from "./axios";
 import { getPartnerPublicProfileByRelatedUserId } from "./partners";
+import { getPublicPartnerCarDetails } from "./partnerCars";
 import type { PaginatedResponse } from "../types/Pagination";
+import type { BookingBusySlot } from "../types/Car";
 import { resolveAssetUrl } from "../utils/resolveAssetUrl";
 import { buildCarTags } from "../utils/carTags";
 
@@ -109,6 +111,15 @@ export interface ModelDetailsPayload {
   tags: string[];
 }
 
+export interface PartnerCarDetailsPayload {
+  car: Awaited<ReturnType<typeof getPublicPartnerCarDetails>>;
+  model: CarModelDetailsDto;
+  carrierName: string;
+  reviews: CarCommentDto[];
+  tags: string[];
+  busySlots: BookingBusySlot[];
+}
+
 export interface MatchCarByModelPayload {
   modelId: number;
   startTime: string;
@@ -143,6 +154,11 @@ function getMaxPrice(cars: PartnerCarSummaryDto[]): number | null {
     .filter((value): value is number => value !== null && value !== undefined);
 
   return prices.length > 0 ? Math.max(...prices) : null;
+}
+
+function isActiveBookingStatus(status: string | null | undefined): boolean {
+  const normalized = (status ?? "").trim().toLowerCase();
+  return normalized === "pending" || normalized === "confirmed" || normalized === "active";
 }
 
 async function resolveCarrierName(relatedUserId: string): Promise<string> {
@@ -307,6 +323,59 @@ export async function getModelDetailsPayload(modelId: number): Promise<ModelDeta
       },
       8,
     ),
+  };
+}
+
+export async function getPartnerCarDetailsPayload(
+  partnerCarId: number,
+): Promise<PartnerCarDetailsPayload> {
+  const car = await getPublicPartnerCarDetails(partnerCarId);
+  const [model, reviews, carrierName] = await Promise.all([
+    getCarModelDetails(car.carModelId),
+    getPartnerCarComments(partnerCarId),
+    resolveCarrierName(car.partnerUserId),
+  ]);
+
+  const busySlots = (car.bookings ?? [])
+    .filter((booking) => isActiveBookingStatus(booking.status))
+    .map((booking) => ({
+      bookingId: booking.id,
+      startTime: booking.startDate,
+      endTime: booking.endDate,
+      status: booking.status ?? null,
+    }))
+    .sort((left, right) => {
+      const leftTime = new Date(left.startTime).getTime();
+      const rightTime = new Date(right.startTime).getTime();
+      return leftTime - rightTime;
+    });
+
+  return {
+    car,
+    model,
+    carrierName,
+    reviews: reviews
+      .map((review) => ({
+        ...review,
+        avatarUrl: resolveAssetUrl(review.avatarUrl) ?? review.avatarUrl,
+      }))
+      .sort((left, right) => {
+        const leftTime = new Date(left.createdOn).getTime();
+        const rightTime = new Date(right.createdOn).getTime();
+        return rightTime - leftTime;
+      }),
+    tags: buildCarTags(
+      {
+        engine: model.engine,
+        transmission: model.transmission,
+        fuelType: model.fuelType,
+        seats: model.seats,
+        doors: model.doors,
+        features: model.features ?? [],
+      },
+      8,
+    ),
+    busySlots,
   };
 }
 

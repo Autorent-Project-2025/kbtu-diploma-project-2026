@@ -349,6 +349,7 @@ const bookingSelection = computed<BookingModelSelection | null>(() => {
   }
 
   return {
+    kind: "model",
     modelId: payload.value.model.id,
     brand: payload.value.model.brand,
     model: payload.value.model.model,

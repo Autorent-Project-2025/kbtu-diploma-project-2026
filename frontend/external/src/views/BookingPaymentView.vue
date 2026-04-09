@@ -474,54 +474,48 @@
                 }}</span>
               </p>
               <p>
-                Рыночная стоимость:
+                Базовая цена за час:
                 <span class="font-semibold text-gray-900 dark:text-white">{{
-                  formatAmount(
-                    pricingBreakdown.marketValueKzt,
-                    pricingBreakdown.currency,
-                  )
+                  formatAmount(basePricePerHour, pricingBreakdown.currency)
                 }}</span>
               </p>
               <p>
-                Ставка за час:
+                Рейтинг:
+                <span class="font-semibold text-gray-900 dark:text-white">{{
+                  formatRating(pricingBreakdown.rating)
+                }}</span>
+                <span class="font-semibold text-gray-900 dark:text-white">
+                  (x{{ formatCoefficient(pricingBreakdown.ratingCoefficient) }})
+                </span>
+              </p>
+              <p>
+                Предварительное бронирование:
+                <span class="font-semibold text-gray-900 dark:text-white">{{
+                  pricingBreakdown.daysBeforeBooking
+                }}
+                  дн. (x{{
+                    formatCoefficient(
+                      pricingBreakdown.advanceBookingCoefficient,
+                    )
+                  }})</span
+                >
+              </p>
+              <p>
+                Коэффициент доступности:
+                <span class="font-semibold text-gray-900 dark:text-white"
+                  >x{{
+                    formatCoefficient(pricingBreakdown.availabilityCoefficient)
+                  }}</span
+                >
+              </p>
+              <p>
+                Итоговая цена за час:
                 <span class="font-semibold text-gray-900 dark:text-white">{{
                   formatAmount(
                     pricingBreakdown.quotedPriceHour,
                     pricingBreakdown.currency,
                   )
                 }}</span>
-              </p>
-              <p>
-                Оплачиваемые часы:
-                <span class="font-semibold text-gray-900 dark:text-white">{{
-                  pricingBreakdown.billableHours
-                }}</span>
-              </p>
-              <p>
-                Итог расчета:
-                <span class="font-semibold text-gray-900 dark:text-white">{{
-                  formatAmount(
-                    pricingBreakdown.quotedTotalPrice,
-                    pricingBreakdown.currency,
-                  )
-                }}</span>
-              </p>
-              <p>
-                Коэффициенты:
-                <span class="font-semibold text-gray-900 dark:text-white">
-                  x{{
-                    formatCoefficient(pricingBreakdown.ratingCoefficient)
-                  }}
-                  рейтинг, x{{
-                    formatCoefficient(
-                      pricingBreakdown.advanceBookingCoefficient,
-                    )
-                  }}
-                  раннее бронирование, x{{
-                    formatCoefficient(pricingBreakdown.availabilityCoefficient)
-                  }}
-                  доступность
-                </span>
               </p>
               <p
                 v-if="pricingBreakdown.isMarketValueStale"
@@ -625,6 +619,18 @@ const submitDisabled = computed(() => {
 const pricingBreakdown = computed(
   () => booking.value?.pricingBreakdown ?? null,
 );
+
+const HOURLY_BASE_FACTOR = 0.0001;
+
+const basePricePerHour = computed(() => {
+  if (!pricingBreakdown.value) {
+    return null;
+  }
+
+  return Number(
+    (pricingBreakdown.value.marketValueKzt * HOURLY_BASE_FACTOR).toFixed(2),
+  );
+});
 
 onMounted(async () => {
   clockTimer = window.setInterval(() => {
@@ -771,6 +777,10 @@ function getBookingGalleryImages(currentBooking: Booking): string[] {
 
 function formatCoefficient(value: number): string {
   return value.toFixed(2);
+}
+
+function formatRating(value: number): string {
+  return value.toFixed(1);
 }
 
 function getPaymentStatusText(status: BookingPaymentState): string {

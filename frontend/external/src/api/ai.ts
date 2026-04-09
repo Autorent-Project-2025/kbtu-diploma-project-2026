@@ -103,6 +103,8 @@ function toNullableNumber(value: NumericLike): number | null {
 function normalizeRecommendationCard(
   car: AiRecommendationCardDto,
 ): AiRecommendationCard {
+  const directPartnerCarRoute = `/cars/partner-cars/${car.partnerCarId}`;
+
   return {
     ...car,
     priceHour: toNullableNumber(car.priceHour),
@@ -113,6 +115,8 @@ function normalizeRecommendationCard(
     businessScore: toNullableNumber(car.businessScore) ?? 0,
     finalScore: toNullableNumber(car.finalScore) ?? 0,
     imageUrl: resolveAssetUrl(car.imageUrl) ?? car.imageUrl,
+    detailsUrl: directPartnerCarRoute,
+    bookingUrl: directPartnerCarRoute,
   };
 }
 

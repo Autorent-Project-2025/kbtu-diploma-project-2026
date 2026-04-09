@@ -64,13 +64,28 @@ export interface PublicPartnerCarDetails {
   id: number;
   partnerUserId: string;
   licensePlate: string;
+  carModelId: number;
+  color?: string | null;
   priceHour?: number | null;
+  priceDay?: number | null;
+  status: number;
+  createdAt: string;
   rating?: number | null;
   ratingsCount: number;
   modelBrand: string;
   modelName: string;
   modelYear: number;
   images: PartnerCarImage[];
+  comments?: PartnerCarComment[];
+  bookings?: Array<{
+    id: number;
+    carId: number;
+    userId: string;
+    startDate: string;
+    endDate: string;
+    price?: number | null;
+    status?: string | null;
+  }>;
 }
 
 export async function getMyPartnerCars(): Promise<PartnerCarSummary[]> {
