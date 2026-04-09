@@ -277,11 +277,20 @@ services:
       OLLAMA_EMBEDDING_MODEL: ${LOCAL_LLM_EMBEDDING_MODEL:-nomic-embed-text}
     entrypoint:
       - /bin/sh
-      - /bootstrap/bootstrap-models.sh
+      - -ec
+    command: |
+      echo "Pulling Ollama model: $$OLLAMA_CHAT_MODEL"
+      curl -fsS "$$OLLAMA_BASE_URL/api/pull" \
+        -H "Content-Type: application/json" \
+        -d "{\"model\":\"$$OLLAMA_CHAT_MODEL\",\"stream\":false}"
+      echo
+      echo "Pulling Ollama model: $$OLLAMA_EMBEDDING_MODEL"
+      curl -fsS "$$OLLAMA_BASE_URL/api/pull" \
+        -H "Content-Type: application/json" \
+        -d "{\"model\":\"$$OLLAMA_EMBEDDING_MODEL\",\"stream\":false}"
+      echo
     networks:
       - backend
-    volumes:
-      - ./ops/ollama/bootstrap-models.sh:/bootstrap/bootstrap-models.sh:ro
 
   ai-search-service:
     build:
