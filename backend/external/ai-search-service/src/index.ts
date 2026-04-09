@@ -1,6 +1,7 @@
 import cors from "cors";
 import express from "express";
 import { authenticateJwt, type AuthenticatedUser } from "./auth/jwtAuth";
+import { normalizeChatMessages } from "./chat/chatMessageNormalization";
 import { getChatHistory, saveChatHistory } from "./chat/chatHistoryRepository";
 import { config } from "./config/env";
 import { observabilityLogger } from "./observability/logger";
@@ -124,7 +125,8 @@ async function main() {
       return;
     }
 
-    const parsedQuery = await parseRecommendationQuery(prompt);
+    const history = normalizeChatMessages(req.body?.messages ?? []);
+    const parsedQuery = await parseRecommendationQuery(prompt, history);
     if (shouldAskClarifyingQuestion(parsedQuery)) {
       res.status(200).json(await composeClarificationResponse(parsedQuery));
       return;

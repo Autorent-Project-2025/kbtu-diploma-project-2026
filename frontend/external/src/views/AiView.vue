@@ -235,6 +235,10 @@ function trimMessages(history: Message[]): Message[] {
   return history.slice(-MAX_PERSISTED_MESSAGES);
 }
 
+function buildRecommendationContext(history: Message[]): Message[] {
+  return history.slice(-8);
+}
+
 function syncCounter() {
   counter.value =
     messages.value.reduce(
@@ -337,6 +341,7 @@ async function sendMessage(content: string) {
       role: "user",
       content,
       cars: [],
+      appliedFilters: null,
     },
   ]);
   await persistHistory();
@@ -344,7 +349,10 @@ async function sendMessage(content: string) {
   isResponding.value = true;
 
   try {
-    const response = await getAiRecommendations(content);
+    const response = await getAiRecommendations(
+      content,
+      buildRecommendationContext(messages.value),
+    );
     messages.value = trimMessages([
       ...messages.value,
       {
@@ -352,6 +360,7 @@ async function sendMessage(content: string) {
         role: "assistant",
         content: response.assistantText,
         cars: response.cars ?? [],
+        appliedFilters: response.appliedFilters,
       },
     ]);
   } catch (error) {
@@ -364,6 +373,7 @@ async function sendMessage(content: string) {
         content:
           "Не удалось получить подборку машин. Попробуйте повторить запрос или немного упростить формулировку.",
         cars: [],
+        appliedFilters: null,
       },
     ]);
   } finally {

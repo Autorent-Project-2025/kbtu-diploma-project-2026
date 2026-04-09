@@ -13,7 +13,9 @@ Schema:
   "maxBudgetPerHour": number | null,
   "passengers": number | null,
   "transmission": string | null,
+  "minRating": number | null,
   "preferredStyles": string[],
+  "excludedStyles": string[],
   "preferredBrands": string[],
   "minYear": number | null,
   "startTime": string | null,
@@ -61,6 +63,12 @@ export async function parseQueryWithOpenAi(prompt: string): Promise<ParsedRecomm
   }
 
   const parsed = JSON.parse(content) as Omit<ParsedRecommendationQuery, "prompt">;
+  const excludedStyles = Array.isArray(parsed.excludedStyles)
+    ? parsed.excludedStyles.map((item) => String(item).trim().toLowerCase()).filter(Boolean)
+        .map((item) => canonicalizeStyleLabel(item))
+        .filter((item): item is string => Boolean(item))
+    : [];
+
   return {
     prompt,
     maxBudgetPerHour:
@@ -70,11 +78,17 @@ export async function parseQueryWithOpenAi(prompt: string): Promise<ParsedRecomm
       typeof parsed.transmission === "string"
         ? canonicalizeTransmissionLabel(parsed.transmission)
         : null,
+    minRating:
+      typeof parsed.minRating === "number" && parsed.minRating >= 0 && parsed.minRating <= 5
+        ? parsed.minRating
+        : null,
     preferredStyles: Array.isArray(parsed.preferredStyles)
       ? parsed.preferredStyles.map((item) => String(item).trim().toLowerCase()).filter(Boolean)
           .map((item) => canonicalizeStyleLabel(item))
           .filter((item): item is string => Boolean(item))
+          .filter((item) => !excludedStyles.includes(item))
       : [],
+    excludedStyles,
     preferredBrands: Array.isArray(parsed.preferredBrands)
       ? parsed.preferredBrands.map((item) => String(item).trim().toLowerCase()).filter(Boolean)
       : [],

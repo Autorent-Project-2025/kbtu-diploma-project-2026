@@ -14,7 +14,9 @@ Schema:
   "maxBudgetPerHour": number | null,
   "passengers": number | null,
   "transmission": string | null,
+  "minRating": number | null,
   "preferredStyles": string[],
+  "excludedStyles": string[],
   "preferredBrands": string[],
   "minYear": number | null,
   "startTime": string | null,
@@ -25,6 +27,7 @@ Allowed style labels: sport, business, family, city, luxury.
 Allowed transmission labels: automatic, manual.
 If a value is not explicitly or reasonably inferable, return null or [].
 Do not invent budget, passenger count, transmission, or dates when they are not explicitly present in the user request.
+If the user asks for rating threshold like "рейтинг больше 4.5", put it into "minRating".
 `;
 
 type OllamaChatResponse = {
@@ -38,6 +41,12 @@ function normalizeQuery(
   prompt: string,
   parsed: Partial<Omit<ParsedRecommendationQuery, "prompt">>,
 ): ParsedRecommendationQuery {
+  const excludedStyles = Array.isArray(parsed.excludedStyles)
+    ? parsed.excludedStyles
+        .map((item) => canonicalizeStyleLabel(String(item)))
+        .filter((item): item is string => Boolean(item))
+    : [];
+
   return {
     prompt,
     maxBudgetPerHour:
@@ -47,10 +56,16 @@ function normalizeQuery(
       typeof parsed.transmission === "string"
         ? canonicalizeTransmissionLabel(parsed.transmission)
         : null,
+    minRating:
+      typeof parsed.minRating === "number" && parsed.minRating >= 0 && parsed.minRating <= 5
+        ? parsed.minRating
+        : null,
+    excludedStyles,
     preferredStyles: Array.isArray(parsed.preferredStyles)
       ? parsed.preferredStyles
           .map((item) => canonicalizeStyleLabel(String(item)))
           .filter((item): item is string => Boolean(item))
+          .filter((item) => !excludedStyles.includes(item))
       : [],
     preferredBrands: Array.isArray(parsed.preferredBrands)
       ? parsed.preferredBrands

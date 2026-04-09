@@ -31,7 +31,9 @@ export interface AiRecommendationQuery {
   maxBudgetPerHour: number | null;
   passengers: number | null;
   transmission: string | null;
+  minRating: number | null;
   preferredStyles: string[];
+  excludedStyles: string[];
   preferredBrands: string[];
   minYear: number | null;
   startTime: string | null;
@@ -51,6 +53,7 @@ export interface AiChatMessage {
   role: "assistant" | "user";
   content: string;
   cars: AiRecommendationCard[];
+  appliedFilters: AiRecommendationQuery | null;
 }
 
 export interface AiChatHistoryResponse {
@@ -113,6 +116,32 @@ function normalizeRecommendationCard(
   };
 }
 
+function normalizeRecommendationQuery(
+  query: Partial<AiRecommendationQuery> | null | undefined,
+  fallbackPrompt = "",
+): AiRecommendationQuery {
+  return {
+    prompt: typeof query?.prompt === "string" ? query.prompt : fallbackPrompt,
+    maxBudgetPerHour: toNullableNumber(query?.maxBudgetPerHour),
+    passengers: toNullableNumber(query?.passengers),
+    transmission: typeof query?.transmission === "string" ? query.transmission : null,
+    minRating: toNullableNumber(query?.minRating),
+    preferredStyles: Array.isArray(query?.preferredStyles)
+      ? query.preferredStyles.map((item) => String(item)).filter(Boolean)
+      : [],
+    excludedStyles: Array.isArray(query?.excludedStyles)
+      ? query.excludedStyles.map((item) => String(item)).filter(Boolean)
+      : [],
+    preferredBrands: Array.isArray(query?.preferredBrands)
+      ? query.preferredBrands.map((item) => String(item)).filter(Boolean)
+      : [],
+    minYear: toNullableNumber(query?.minYear),
+    startTime: typeof query?.startTime === "string" ? query.startTime : null,
+    endTime: typeof query?.endTime === "string" ? query.endTime : null,
+    requiresAvailableOnDates: Boolean(query?.requiresAvailableOnDates),
+  };
+}
+
 function normalizeChatMessage(message: AiChatMessageDto): AiChatMessage {
   return {
     id: typeof message.id === "number" && Number.isFinite(message.id) ? message.id : 0,
@@ -121,17 +150,20 @@ function normalizeChatMessage(message: AiChatMessageDto): AiChatMessage {
     cars: Array.isArray(message.cars)
       ? message.cars.map((car) => normalizeRecommendationCard(car))
       : [],
+    appliedFilters: normalizeRecommendationQuery(message.appliedFilters, message.content),
   };
 }
 
 export async function getAiRecommendations(
   prompt: string,
+  messages: AiChatMessage[] = [],
 ): Promise<AiRecommendationResponse> {
-  const response = await api.post("/ai/recommendations", { prompt });
+  const response = await api.post("/ai/recommendations", { prompt, messages });
   const payload = response.data as AiRecommendationResponseDto;
 
   return {
     ...payload,
+    appliedFilters: normalizeRecommendationQuery(payload.appliedFilters, prompt),
     cars: (payload.cars ?? []).map((car) => normalizeRecommendationCard(car)),
   };
 }

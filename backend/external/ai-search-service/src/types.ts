@@ -3,7 +3,9 @@ export type ParsedRecommendationQuery = {
   maxBudgetPerHour: number | null;
   passengers: number | null;
   transmission: string | null;
+  minRating: number | null;
   preferredStyles: string[];
+  excludedStyles: string[];
   preferredBrands: string[];
   minYear: number | null;
   startTime: string | null;
@@ -73,6 +75,7 @@ export type AiChatMessage = {
   role: "assistant" | "user";
   content: string;
   cars: SearchCandidate[];
+  appliedFilters: ParsedRecommendationQuery | null;
 };
 
 export type AiChatHistoryResponse = {
