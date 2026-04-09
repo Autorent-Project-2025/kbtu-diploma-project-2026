@@ -13,14 +13,69 @@ function normalizePrompt(prompt: string): string {
   return prompt.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
-function isShortOrFollowUpPrompt(normalizedPrompt: string): boolean {
-  const wordsCount = normalizedPrompt.split(" ").filter(Boolean).length;
-  return (
-    wordsCount <= 4 ||
-    /^(не|без|а|но|можно|а можно|теперь|тогда|ещ[её]|подешевле|дешевле|дороже|подороже)(?:\s|$)/u.test(
+function countWords(normalizedPrompt: string): number {
+  return normalizedPrompt.split(" ").filter(Boolean).length;
+}
+
+function isShortPrompt(normalizedPrompt: string): boolean {
+  return countWords(normalizedPrompt) <= 4;
+}
+
+function hasContinuationMarker(normalizedPrompt: string): boolean {
+  return /^(не|без|а|но|можно|а можно|теперь|тогда|ещ[её]|подешевле|дешевле|дороже|подороже)(?:\s|$)/u.test(
+    normalizedPrompt,
+  );
+}
+
+function isFilterOnlyFollowUpPrompt(
+  normalizedPrompt: string,
+  currentQuery: ParsedRecommendationQuery,
+): boolean {
+  if (
+    currentQuery.transmission &&
+    /^(?:с\s+)?(?:автомат|акпп|automatic|механик|мкпп|manual)(?:\s|$)/u.test(normalizedPrompt)
+  ) {
+    return true;
+  }
+
+  if (currentQuery.maxBudgetPerHour != null && /^(?:до|от)\s*\d/u.test(normalizedPrompt)) {
+    return true;
+  }
+
+  if (
+    currentQuery.passengers != null &&
+    /^\d+\s*(?:чел|человек|people|passenger|пассаж|мест|места)(?:\s|$)/u.test(normalizedPrompt)
+  ) {
+    return true;
+  }
+
+  if (
+    currentQuery.minRating != null &&
+    /^(?:рейтинг|rating)(?:\s|$)/u.test(normalizedPrompt)
+  ) {
+    return true;
+  }
+
+  if (
+    currentQuery.minYear != null &&
+    /^(?:(?:от|с|после|не старше|не ниже|начиная с)\s*)?(?:19\d{2}|20\d{2})(?:\s*(?:г|г\.|год|года|year|\+))?$/u.test(
       normalizedPrompt,
-    ) ||
-    /^(с автомат|автомат|с механик|механик|до \d|от \d)/u.test(normalizedPrompt)
+    )
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+function isShortOrFollowUpPrompt(
+  normalizedPrompt: string,
+  currentQuery: ParsedRecommendationQuery,
+): boolean {
+  return (
+    isShortPrompt(normalizedPrompt) ||
+    hasContinuationMarker(normalizedPrompt) ||
+    isFilterOnlyFollowUpPrompt(normalizedPrompt, currentQuery)
   );
 }
 
@@ -50,36 +105,24 @@ function shouldInheritContext(
   }
 
   if (
-    /^(привет|здравствуй|здравствуйте|hello|hi|hey)\b/u.test(normalizedPrompt) ||
-    /^(новый запрос|сначала|забудь|ignore previous|reset)\b/u.test(normalizedPrompt)
+    /^(привет|здравствуй|здравствуйте|hello|hi|hey)(?:\s|$)/u.test(normalizedPrompt) ||
+    /^(новый запрос|сначала|забудь|ignore previous|reset)(?:\s|$)/u.test(normalizedPrompt)
   ) {
     return false;
   }
-
-  const wordsCount = normalizedPrompt.split(" ").filter(Boolean).length;
-  const standaloneSignalCount = [
-    currentQuery.maxBudgetPerHour != null,
-    currentQuery.passengers != null,
-    currentQuery.transmission != null,
-    currentQuery.minRating != null,
-    currentQuery.preferredStyles.length > 0,
-    currentQuery.preferredBrands.length > 0,
-    currentQuery.minYear != null,
-    currentQuery.requiresAvailableOnDates,
-  ].filter(Boolean).length;
-
-  const hasFollowUpMarker =
-    isShortOrFollowUpPrompt(normalizedPrompt);
 
   if (currentQuery.excludedStyles.length > 0) {
     return true;
   }
 
-  if (hasFollowUpMarker) {
+  if (
+    hasContinuationMarker(normalizedPrompt) ||
+    isFilterOnlyFollowUpPrompt(normalizedPrompt, currentQuery)
+  ) {
     return true;
   }
 
-  return wordsCount <= 4 && standaloneSignalCount <= 1;
+  return false;
 }
 
 function mergeWithConversationContext(
@@ -127,7 +170,7 @@ function reconcileWithHeuristics(
 ): ParsedRecommendationQuery {
   const hasYearIntent = hasExplicitYearIntent(modelQuery.prompt);
   const normalizedPrompt = normalizePrompt(modelQuery.prompt);
-  const canExpandWithModel = !isShortOrFollowUpPrompt(normalizedPrompt);
+  const canExpandWithModel = !isShortOrFollowUpPrompt(normalizedPrompt, heuristicQuery);
   const modelPreferredStyles =
     canExpandWithModel &&
     heuristicQuery.preferredStyles.length === 0 &&

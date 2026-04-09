@@ -87,7 +87,7 @@ function parseBudget(prompt: string): number | null {
 
 function parsePassengers(prompt: string): number | null {
   const normalized = normalizePrompt(prompt);
-  const match = normalized.match(/(\d+)\s*(чел|человек|people|passenger|пассаж)/);
+  const match = normalized.match(/(\d+)\s*(чел|человек|people|passenger|пассаж|мест|места)/);
   return match ? Number(match[1]) : null;
 }
 
