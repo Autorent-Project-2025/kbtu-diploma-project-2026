@@ -67,3 +67,14 @@ export type AiRecommendationResponse = {
   totalCandidates: number;
   cars: SearchCandidate[];
 };
+
+export type AiChatMessage = {
+  id: number;
+  role: "assistant" | "user";
+  content: string;
+  cars: SearchCandidate[];
+};
+
+export type AiChatHistoryResponse = {
+  messages: AiChatMessage[];
+};

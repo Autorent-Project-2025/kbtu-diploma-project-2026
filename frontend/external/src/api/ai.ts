@@ -46,6 +46,17 @@ export interface AiRecommendationResponse {
   cars: AiRecommendationCard[];
 }
 
+export interface AiChatMessage {
+  id: number;
+  role: "assistant" | "user";
+  content: string;
+  cars: AiRecommendationCard[];
+}
+
+export interface AiChatHistoryResponse {
+  messages: AiChatMessage[];
+}
+
 type AiRecommendationCardDto = Omit<
   AiRecommendationCard,
   | "priceHour"
@@ -69,6 +80,14 @@ type AiRecommendationResponseDto = Omit<AiRecommendationResponse, "cars"> & {
   cars: AiRecommendationCardDto[];
 };
 
+type AiChatMessageDto = Omit<AiChatMessage, "cars"> & {
+  cars: AiRecommendationCardDto[];
+};
+
+type AiChatHistoryResponseDto = {
+  messages: AiChatMessageDto[];
+};
+
 function toNullableNumber(value: NumericLike): number | null {
   if (value == null || value === "") {
     return null;
@@ -76,6 +95,33 @@ function toNullableNumber(value: NumericLike): number | null {
 
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+function normalizeRecommendationCard(
+  car: AiRecommendationCardDto,
+): AiRecommendationCard {
+  return {
+    ...car,
+    priceHour: toNullableNumber(car.priceHour),
+    priceDay: toNullableNumber(car.priceDay),
+    rating: toNullableNumber(car.rating),
+    lexicalScore: toNullableNumber(car.lexicalScore) ?? 0,
+    vectorScore: toNullableNumber(car.vectorScore) ?? 0,
+    businessScore: toNullableNumber(car.businessScore) ?? 0,
+    finalScore: toNullableNumber(car.finalScore) ?? 0,
+    imageUrl: resolveAssetUrl(car.imageUrl) ?? car.imageUrl,
+  };
+}
+
+function normalizeChatMessage(message: AiChatMessageDto): AiChatMessage {
+  return {
+    id: typeof message.id === "number" && Number.isFinite(message.id) ? message.id : 0,
+    role: message.role === "assistant" ? "assistant" : "user",
+    content: typeof message.content === "string" ? message.content : "",
+    cars: Array.isArray(message.cars)
+      ? message.cars.map((car) => normalizeRecommendationCard(car))
+      : [],
+  };
 }
 
 export async function getAiRecommendations(
@@ -86,16 +132,26 @@ export async function getAiRecommendations(
 
   return {
     ...payload,
-    cars: (payload.cars ?? []).map((car) => ({
-      ...car,
-      priceHour: toNullableNumber(car.priceHour),
-      priceDay: toNullableNumber(car.priceDay),
-      rating: toNullableNumber(car.rating),
-      lexicalScore: toNullableNumber(car.lexicalScore) ?? 0,
-      vectorScore: toNullableNumber(car.vectorScore) ?? 0,
-      businessScore: toNullableNumber(car.businessScore) ?? 0,
-      finalScore: toNullableNumber(car.finalScore) ?? 0,
-      imageUrl: resolveAssetUrl(car.imageUrl) ?? car.imageUrl,
-    })),
+    cars: (payload.cars ?? []).map((car) => normalizeRecommendationCard(car)),
+  };
+}
+
+export async function getAiChatHistory(): Promise<AiChatHistoryResponse> {
+  const response = await api.get("/ai/history");
+  const payload = response.data as AiChatHistoryResponseDto;
+
+  return {
+    messages: (payload.messages ?? []).map((message) => normalizeChatMessage(message)),
+  };
+}
+
+export async function saveAiChatHistory(
+  messages: AiChatMessage[],
+): Promise<AiChatHistoryResponse> {
+  const response = await api.put("/ai/history", { messages });
+  const payload = response.data as AiChatHistoryResponseDto;
+
+  return {
+    messages: (payload.messages ?? []).map((message) => normalizeChatMessage(message)),
   };
 }
