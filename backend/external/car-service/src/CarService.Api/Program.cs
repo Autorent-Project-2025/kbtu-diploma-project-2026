@@ -157,6 +157,8 @@ builder.Services.AddScoped<CarCatalogResolver>();
 builder.Services.AddScoped<ICarRecommendationService, CarRecommendationService>();
 builder.Services.AddScoped<ICarMarketValueSyncService, CarMarketValueSyncService>();
 builder.Services.AddScoped<IPartnerCarDisplayPricingService, PartnerCarDisplayPricingService>();
+builder.Services.AddScoped<ICarSearchIndexEventPublisher, CarSearchIndexEventPublisher>();
+builder.Services.AddSingleton<IRabbitMqPublisher, RabbitMqPublisher>();
 builder.Services.AddHostedService<PartnerCarProvisionConsumer>();
 builder.Services.AddHostedService<MarketValueRefreshDispatcher>();
 

@@ -14,17 +14,20 @@ namespace CarService.Infrastructure.Services
             private readonly IPartnerCarService _partnerCarService;
             private readonly ICarModelService _carModelService;
             private readonly IClientProfileReadClient _clientProfileReadClient;
+            private readonly ICarSearchIndexEventPublisher _carSearchIndexEventPublisher;
 
         public CarCommentService(
             ApplicationDbContext db,
             IPartnerCarService partnerCarService,
             ICarModelService carModelService,
-            IClientProfileReadClient clientProfileReadClient)
+            IClientProfileReadClient clientProfileReadClient,
+            ICarSearchIndexEventPublisher carSearchIndexEventPublisher)
         {
             _db = db;
             _partnerCarService = partnerCarService;
             _carModelService = carModelService;
             _clientProfileReadClient = clientProfileReadClient;
+            _carSearchIndexEventPublisher = carSearchIndexEventPublisher;
         }
 
         public async Task<PagedResult<CarCommentResponseDto>> GetByPartnerCarPaginatedAsync(
@@ -183,6 +186,7 @@ namespace CarService.Infrastructure.Services
             }
 
             await RecalculateRatingsAsync(partnerCar.Id, partnerCar.CarModelId, cancellationToken);
+            await _carSearchIndexEventPublisher.PublishUpsertRequestedAsync(partnerCar.Id, cancellationToken);
 
             var created = MapToDto(entity);
             await EnrichWithAvatarUrlsAsync([created], cancellationToken);
@@ -223,6 +227,7 @@ namespace CarService.Infrastructure.Services
             if (entity.PartnerCarId.HasValue)
             {
                 await RecalculateRatingsAsync(entity.PartnerCarId.Value, entity.CarId, cancellationToken);
+                await _carSearchIndexEventPublisher.PublishUpsertRequestedAsync(entity.PartnerCarId.Value, cancellationToken);
             }
             else
             {
@@ -264,6 +269,7 @@ namespace CarService.Infrastructure.Services
             if (partnerCarId.HasValue)
             {
                 await RecalculateRatingsAsync(partnerCarId.Value, modelId, cancellationToken);
+                await _carSearchIndexEventPublisher.PublishUpsertRequestedAsync(partnerCarId.Value, cancellationToken);
             }
             else
             {
