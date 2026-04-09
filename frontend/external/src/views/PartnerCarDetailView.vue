@@ -1,138 +1,260 @@
 <template>
-  <div class="min-h-screen bg-gray-50 dark:bg-gray-950 pt-24 pb-12 px-4 sm:px-6 lg:px-8 transition-colors duration-300">
-    <div class="max-w-5xl mx-auto space-y-6">
-      <router-link
-        to="/partner/cars"
-        class="inline-flex items-center gap-2 text-primary-600 dark:text-primary-400 font-semibold"
+  <div
+    class="min-h-screen bg-gray-50 dark:bg-gray-950 py-24 px-4 sm:px-6 lg:px-8 transition-colors duration-300"
+  >
+    <div class="max-w-7xl mx-auto space-y-8">
+      <button
+        @click="$router.back()"
+        class="flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
       >
-        ← Назад к моим машинам
-      </router-link>
+        <svg
+          class="w-5 h-5"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M10 19l-7-7m0 0l7-7m-7 7h18"
+          />
+        </svg>
+        <span class="font-medium">Назад к моделям</span>
+      </button>
 
-      <section v-if="loading" class="glass p-8 rounded-3xl border border-gray-200 dark:border-gray-800 shadow-xl">
-        Загрузка...
-      </section>
-
-      <section
-        v-else-if="errorMessage"
-        class="glass p-8 rounded-3xl border border-red-300/70 dark:border-red-500/30 shadow-xl text-red-700 dark:text-red-300"
-      >
-        {{ errorMessage }}
-      </section>
-
-      <template v-else-if="car">
-        <section class="glass p-8 rounded-3xl border border-gray-200 dark:border-gray-800 shadow-xl space-y-4">
-          <h1 class="text-3xl font-extrabold text-gray-900 dark:text-white">
-            {{ car.brand }} {{ car.model }} {{ car.year }}
-          </h1>
-          <div v-if="carTags.length > 0" class="flex flex-wrap gap-2">
-            <span
-              v-for="tag in carTags"
-              :key="`${car.id}-${tag}`"
-              class="px-3 py-1.5 rounded-full bg-white/80 dark:bg-gray-900/70 border border-gray-200 dark:border-gray-800 text-sm font-semibold text-gray-700 dark:text-gray-300"
-            >
-              {{ tag }}
-            </span>
-          </div>
-          <div class="grid md:grid-cols-2 gap-4 text-gray-700 dark:text-gray-300">
-            <p>Гос номер: <b>{{ car.licensePlate }}</b></p>
-            <p>Статус: <b>{{ statusLabel(car.status) }}</b></p>
-            <p>Цена/час: <b>{{ formatMoney(car.priceHour) }}</b></p>
-            <p>Цена/день: <b>{{ formatMoney(car.priceDay) }}</b></p>
-            <p>Рейтинг: <b>{{ car.rating ?? "нет" }}</b></p>
-            <p class="flex items-center gap-2">
-              Файл собственности:
-              <button
-                v-if="car.ownershipFileName"
-                type="button"
-                class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-primary-600 hover:bg-primary-700 text-white text-xs font-semibold transition-colors disabled:opacity-60"
-                :disabled="openingOwnershipDocument"
-                @click="openOwnershipDocument"
-              >
-                {{ openingOwnershipDocument ? "Открытие..." : "Посмотреть документ" }}
-              </button>
-              <b v-else>не указан</b>
-            </p>
-          </div>
-          <p v-if="car.description" class="text-gray-600 dark:text-gray-400">{{ car.description }}</p>
-        </section>
-
-        <section class="glass p-8 rounded-3xl border border-gray-200 dark:border-gray-800 shadow-xl space-y-4">
-          <h2 class="text-2xl font-bold text-gray-900 dark:text-white">Фотографии</h2>
-          <div v-if="car.images.length === 0" class="text-gray-600 dark:text-gray-400">Фотографии отсутствуют.</div>
-          <div v-else class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            <a
-              v-for="image in car.images"
-              :key="image.id"
-              :href="image.imageUrl"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="relative block overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-700"
-            >
-              <img :src="image.imageUrl" alt="car image" class="w-full h-48 object-cover" />
-              <span
-                class="absolute bottom-3 left-3 rounded-full bg-black/70 px-3 py-1 text-xs font-semibold text-white"
-              >
-                {{ getCarImageTypeLabel(image.imageType) }}
-              </span>
-            </a>
-          </div>
-        </section>
-
-        <section class="glass p-8 rounded-3xl border border-gray-200 dark:border-gray-800 shadow-xl space-y-5">
-          <div class="flex items-center justify-between gap-4">
-            <div>
-              <h2 class="text-2xl font-bold text-gray-900 dark:text-white">Отзывы</h2>
-            </div>
-            <div class="text-sm font-semibold text-gray-600 dark:text-gray-300">
-              {{ car.comments.length }} отзыв{{ reviewSuffix(car.comments.length) }}
-            </div>
-          </div>
-
+      <div v-if="loading" class="text-center py-28">
+        <div class="inline-flex flex-col items-center gap-6">
           <div
-            v-if="car.comments.length === 0"
-            class="rounded-2xl border border-dashed border-gray-300 dark:border-gray-700 p-6 text-gray-600 dark:text-gray-400"
-          >
-            Для этой машины ещё не оставляли комментарии.
+            class="w-16 h-16 rounded-full border-4 border-primary-200 dark:border-primary-900 border-t-primary-600 dark:border-t-primary-400 animate-spin"
+          ></div>
+          <p class="text-gray-600 dark:text-gray-400 text-lg font-medium">
+            Загрузка информации о модели...
+          </p>
+        </div>
+      </div>
+
+      <template v-else-if="payload">
+        <section class="grid lg:grid-cols-2 gap-8 items-start">
+          <!-- LEFT: Image gallery -->
+          <div class="space-y-3">
+            <div
+              class="relative aspect-[4/3] rounded-3xl overflow-hidden bg-gradient-to-br from-gray-200 to-gray-300 dark:from-gray-800 dark:to-gray-900 shadow-2xl"
+            >
+              <img
+                v-if="currentImage"
+                :src="currentImage"
+                :alt="`${payload.model.brand} ${payload.model.model}`"
+                class="w-full h-full object-cover"
+              />
+              <div
+                v-else
+                class="w-full h-full flex items-center justify-center text-gray-500 dark:text-gray-400"
+              >
+                Нет изображения
+              </div>
+            </div>
+
+            <div v-if="modelImages.length > 1" class="grid grid-cols-5 gap-2">
+              <button
+                v-for="(img, index) in modelImages.slice(0, 5)"
+                :key="img.id"
+                @click="currentImageIndex = index"
+                :class="[
+                  'relative aspect-square rounded-xl overflow-hidden transition-all',
+                  currentImageIndex === index
+                    ? 'ring-4 ring-primary-500 scale-105'
+                    : 'ring-2 ring-gray-200 dark:ring-gray-700 hover:ring-primary-300',
+                ]"
+              >
+                <img
+                  :src="img.imageUrl"
+                  :alt="`${payload.model.brand} ${payload.model.model}`"
+                  class="w-full h-full object-cover"
+                />
+              </button>
+            </div>
+
+            <!-- Description lives under the photo -->
+            <div
+              class="p-6 bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800"
+            >
+              <h2 class="text-lg font-bold text-gray-900 dark:text-white mb-2">
+                Описание
+              </h2>
+              <p
+                class="text-gray-600 dark:text-gray-400 text-sm leading-relaxed"
+              >
+                {{ payload.model.description || "Описание отсутствует." }}
+              </p>
+            </div>
           </div>
 
-          <div v-else class="space-y-4">
+          <!-- RIGHT: Info, stats, specs, action -->
+          <div class="space-y-5">
+            <div class="space-y-1">
+              <h1 class="text-4xl font-extrabold text-gray-900 dark:text-white">
+                {{ payload.model.brand }} {{ payload.model.model }}
+              </h1>
+              <p class="text-lg text-gray-500 dark:text-gray-400">
+                {{ payload.model.year }} год выпуска
+              </p>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <article
+                class="p-4 bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800"
+              >
+                <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                  Доступно машин
+                </p>
+                <p class="text-2xl font-bold text-gray-900 dark:text-white">
+                  {{ payload.availability?.availableCarsCount ?? 0 }}
+                </p>
+              </article>
+              <article
+                class="p-4 bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800"
+              >
+                <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                  Цена
+                </p>
+                <p
+                  class="text-2xl font-bold text-primary-600 dark:text-primary-400"
+                >
+                  {{ formatPriceRange() }}
+                </p>
+              </article>
+              <article
+                class="p-4 bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800"
+              >
+                <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                  Рейтинг
+                </p>
+                <p class="text-2xl font-bold text-gray-900 dark:text-white">
+                  {{
+                    payload.availability?.averageRating ??
+                    payload.model.rating ??
+                    "нет"
+                  }}
+                </p>
+              </article>
+              <article
+                class="p-4 bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800"
+              >
+                <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                  Отзывы
+                </p>
+                <p class="text-2xl font-bold text-gray-900 dark:text-white">
+                  {{ payload.reviews.length }}
+                </p>
+              </article>
+            </div>
+
+            <div
+              class="p-6 bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800"
+            >
+              <h2
+                class="text-base font-bold text-gray-900 dark:text-white mb-4"
+              >
+                Характеристики
+              </h2>
+              <dl class="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+                <div>
+                  <dt
+                    class="text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wide mb-0.5"
+                  >
+                    Двигатель
+                  </dt>
+                  <dd class="font-semibold text-gray-900 dark:text-white">
+                    {{ payload.model.engine || "—" }}
+                  </dd>
+                </div>
+                <div>
+                  <dt
+                    class="text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wide mb-0.5"
+                  >
+                    Трансмиссия
+                  </dt>
+                  <dd class="font-semibold text-gray-900 dark:text-white">
+                    {{ payload.model.transmission || "—" }}
+                  </dd>
+                </div>
+                <div>
+                  <dt
+                    class="text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wide mb-0.5"
+                  >
+                    Мест
+                  </dt>
+                  <dd class="font-semibold text-gray-900 dark:text-white">
+                    {{ payload.model.seats ?? "—" }}
+                  </dd>
+                </div>
+                <div>
+                  <dt
+                    class="text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wide mb-0.5"
+                  >
+                    Топливо
+                  </dt>
+                  <dd class="font-semibold text-gray-900 dark:text-white">
+                    {{ payload.model.fuelType || "—" }}
+                  </dd>
+                </div>
+                <div>
+                  <dt
+                    class="text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wide mb-0.5"
+                  >
+                    Дверей
+                  </dt>
+                  <dd class="font-semibold text-gray-900 dark:text-white">
+                    {{ payload.model.doors ?? "—" }}
+                  </dd>
+                </div>
+              </dl>
+            </div>
+
+            <button
+              @click="openBookingModal"
+              class="w-full btn-premium py-5 text-lg"
+            >
+              Забронировать
+            </button>
+          </div>
+        </section>
+
+        <section
+          class="p-8 bg-white dark:bg-gray-900 rounded-3xl border border-gray-200 dark:border-gray-800"
+        >
+          <h2 class="text-3xl font-bold text-gray-900 dark:text-white mb-6">
+            Отзывы
+          </h2>
+
+          <div v-if="payload.reviews.length > 0" class="space-y-5">
             <article
-              v-for="comment in car.comments"
-              :key="comment.id"
-              class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-gray-900/70 p-5 space-y-4"
+              v-for="review in payload.reviews"
+              :key="`${review.id}-${review.partnerCarId ?? 0}`"
+              class="p-6 bg-gray-50 dark:bg-gray-800 rounded-2xl space-y-3"
             >
               <div class="flex items-start justify-between gap-4">
-                <div class="flex items-start gap-4 min-w-0">
-                  <div
-                    class="w-12 h-12 shrink-0 rounded-2xl overflow-hidden bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center text-white font-bold shadow-lg"
-                  >
-                    <img
-                      v-if="comment.avatarUrl"
-                      :src="comment.avatarUrl"
-                      :alt="comment.userName"
-                      class="w-full h-full object-cover"
-                    />
-                    <span v-else>{{ getInitials(comment.userName) }}</span>
-                  </div>
-
-                  <div class="min-w-0 space-y-1">
-                    <p class="font-semibold text-gray-900 dark:text-white">
-                      {{ comment.userName }}
-                    </p>
-                    <p class="text-sm text-gray-500 dark:text-gray-400">
-                      {{ formatDateTime(comment.createdOn) }}
-                    </p>
-                  </div>
+                <div class="space-y-1">
+                  <p class="font-semibold text-gray-900 dark:text-white">
+                    {{ review.userName }}
+                  </p>
+                  <p class="text-sm text-gray-500 dark:text-gray-400">
+                    {{ formatDate(review.createdOn) }}
+                  </p>
+                  <p class="text-sm text-primary-700 dark:text-primary-300">
+                    Перевозчик: {{ review.carrierName }}
+                  </p>
                 </div>
 
-                <div class="flex items-center gap-1 shrink-0">
+                <div class="flex items-center gap-1">
                   <svg
-                    v-for="n in 5"
-                    :key="n"
+                    v-for="i in 5"
+                    :key="i"
                     :class="[
                       'w-5 h-5',
-                      n <= comment.rating
-                        ? 'text-amber-400 fill-current'
+                      i <= review.rating
+                        ? 'text-yellow-400 fill-current'
                         : 'text-gray-300 dark:text-gray-600',
                     ]"
                     viewBox="0 0 20 20"
@@ -144,146 +266,241 @@
                 </div>
               </div>
 
-              <p class="text-gray-700 dark:text-gray-300 leading-relaxed">
-                {{ comment.content }}
+              <p class="text-gray-700 dark:text-gray-300">
+                {{ review.content }}
               </p>
             </article>
           </div>
+
+          <div v-else class="py-16 text-center">
+            <p class="text-xl font-bold text-gray-900 dark:text-white">
+              Пока нет отзывов
+            </p>
+            <p class="text-gray-600 dark:text-gray-400 mt-2">
+              Для этой модели еще не оставляли отзывы.
+            </p>
+          </div>
         </section>
       </template>
+
+      <div v-else class="text-center py-28">
+        <p class="text-2xl font-bold text-gray-900 dark:text-white">
+          Модель не найдена
+        </p>
+      </div>
     </div>
+
+    <BookingModal
+      v-if="modalCar"
+      :is-open="isBookingModalOpen"
+      :car="modalCar"
+      :booking-error="bookingError"
+      :suggested-dates="bookingSuggestions"
+      @close="closeBookingModal"
+      @confirm="handleBookingConfirm"
+      @suggestion-click="handleSuggestionClick"
+    />
+
+    <LoginRequiredModal
+      :is-open="showLoginModal"
+      @close="showLoginModal = false"
+      @login="goToLogin"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { useRoute } from "vue-router";
-import { getMyPartnerCarDetails, type PartnerCarDetails } from "../api/partnerCars";
-import { getMyPartnerFileTemporaryLink } from "../api/partners";
+import { useRoute, useRouter } from "vue-router";
+import BookingModal from "../components/BookingModal.vue";
+import LoginRequiredModal from "../components/LoginRequiredModal.vue";
+import { createBooking } from "../api/booking";
+import {
+  getModelDetailsPayload,
+  matchCarByModel,
+  type ModelDetailsPayload,
+} from "../api/cars";
+import { useAuth } from "../composables/useAuth";
 import { useToast } from "../composables/useToast";
-import { getCarImageTypeLabel } from "../utils/carImageType";
-import { formatMoney } from "../utils/formatMoney";
-import { buildCarTags } from "../utils/carTags";
+import type { Car } from "../types/Car";
 
 const route = useRoute();
-const { error } = useToast();
+const router = useRouter();
+const { isAuthenticated } = useAuth();
+const { success, error } = useToast();
+
 const loading = ref(true);
-const errorMessage = ref("");
-const car = ref<PartnerCarDetails | null>(null);
-const openingOwnershipDocument = ref(false);
-const carTags = computed(() =>
-  car.value
-    ? buildCarTags(
-        {
-          engine: car.value.engine,
-          transmission: car.value.transmission,
-          fuelType: car.value.fuelType,
-          seats: car.value.seats,
-          doors: car.value.doors,
-        },
-        8,
-      )
-    : [],
+const matching = ref(false);
+const payload = ref<ModelDetailsPayload | null>(null);
+const currentImageIndex = ref(0);
+
+const isBookingModalOpen = ref(false);
+const showLoginModal = ref(false);
+const bookingError = ref("");
+const bookingSuggestions = ref<string[]>([]);
+
+const modelImages = computed(() => payload.value?.model.images ?? []);
+const currentImage = computed(
+  () => modelImages.value[currentImageIndex.value]?.imageUrl ?? "",
 );
 
-function statusLabel(status: number): string {
-  if (status === 0) return "Доступна";
-  if (status === 1) return "Забронирована";
-  if (status === 2) return "В поездке";
-  if (status === 3) return "На обслуживании";
-  return "Неизвестно";
-}
-
-function openTemporaryLink(url: string) {
-  const openedWindow = window.open(url, "_blank", "noopener,noreferrer");
-  if (!openedWindow) {
-    window.location.href = url;
-  }
-}
-
-async function openOwnershipDocument() {
-  if (!car.value?.ownershipFileName) {
-    error("Документ собственности не найден.");
-    return;
+const modalCar = computed<Car | null>(() => {
+  if (!payload.value) {
+    return null;
   }
 
-  openingOwnershipDocument.value = true;
+  return {
+    id: payload.value.model.id,
+    brand: payload.value.model.brand,
+    model: payload.value.model.model,
+    year: payload.value.model.year,
+    priceHour: payload.value.minPriceHour,
+    priceDay: null,
+    imageUrl: modelImages.value[0]?.imageUrl ?? null,
+    rating:
+      payload.value.availability?.averageRating ??
+      payload.value.model.rating ??
+      null,
+    description: payload.value.model.description ?? null,
+  };
+});
+
+onMounted(async () => {
+  await loadModelDetails();
+});
+
+async function loadModelDetails() {
+  loading.value = true;
   try {
-    const link = await getMyPartnerFileTemporaryLink(car.value.ownershipFileName);
-    openTemporaryLink(link.url);
-  } catch (e: any) {
-    error(
-      e?.response?.data?.error ||
-      e?.response?.data?.message ||
-      e?.response?.data?.detail ||
-      "Не удалось открыть документ собственности."
-    );
+    const modelId = Number(route.params.id);
+    if (Number.isNaN(modelId) || modelId <= 0) {
+      payload.value = null;
+      return;
+    }
+
+    payload.value = await getModelDetailsPayload(modelId);
+    currentImageIndex.value = 0;
+  } catch (e) {
+    console.error("Ошибка загрузки деталей модели:", e);
+    payload.value = null;
+    error("Не удалось загрузить детали модели.");
   } finally {
-    openingOwnershipDocument.value = false;
+    loading.value = false;
   }
 }
 
-function formatDateTime(value: string) {
+function formatPriceRange() {
+  if (!payload.value) {
+    return "по запросу";
+  }
+
+  const min = payload.value.minPriceHour;
+  const max = payload.value.maxPriceHour;
+
+  if (min == null && max == null) {
+    return "по запросу";
+  }
+
+  if (min != null && max != null && min !== max) {
+    return `$${min} - $${max}/час`;
+  }
+
+  const singlePrice = min ?? max;
+  return singlePrice != null ? `$${singlePrice}/час` : "по запросу";
+}
+
+function formatDate(value: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
     return value;
   }
 
   return new Intl.DateTimeFormat("ru-RU", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
+    dateStyle: "medium",
+    timeStyle: "short",
   }).format(date);
 }
 
-function getInitials(name: string): string {
-  const parts = (name ?? "")
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2);
-
-  if (parts.length === 0) {
-    return "?";
-  }
-
-  return parts.map((part) => part[0]?.toUpperCase() ?? "").join("");
-}
-
-function reviewSuffix(count: number): string {
-  const mod10 = count % 10;
-  const mod100 = count % 100;
-
-  if (mod10 === 1 && mod100 !== 11) {
-    return "";
-  }
-
-  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) {
-    return "а";
-  }
-
-  return "ов";
-}
-
-onMounted(async () => {
-  loading.value = true;
-  errorMessage.value = "";
-
-  const id = Number(route.params.id);
-  if (!Number.isFinite(id) || id <= 0) {
-    errorMessage.value = "Некорректный id машины.";
-    loading.value = false;
+function openBookingModal() {
+  if (!isAuthenticated.value) {
+    showLoginModal.value = true;
     return;
   }
 
-  try {
-    car.value = await getMyPartnerCarDetails(id);
-  } catch (e: any) {
-    errorMessage.value = e?.response?.data?.error || "Не удалось загрузить детали машины.";
-  } finally {
-    loading.value = false;
+  bookingError.value = "";
+  bookingSuggestions.value = [];
+  isBookingModalOpen.value = true;
+}
+
+function closeBookingModal() {
+  isBookingModalOpen.value = false;
+  bookingError.value = "";
+  bookingSuggestions.value = [];
+}
+
+function handleSuggestionClick() {
+  bookingError.value = "";
+}
+
+function goToLogin() {
+  showLoginModal.value = false;
+  router.push("/login");
+}
+
+async function handleBookingConfirm(payloadData: {
+  startDate: string;
+  endDate: string;
+  useSubscription: boolean;
+}) {
+  if (!payload.value) {
+    return;
   }
-});
+
+  matching.value = true;
+  bookingError.value = "";
+  bookingSuggestions.value = [];
+
+  try {
+    const matchResult = await matchCarByModel({
+      modelId: payload.value.model.id,
+      startTime: payloadData.startDate,
+      endTime: payloadData.endDate,
+    });
+
+    if (!matchResult.isAvailable || !matchResult.partnerCarId) {
+      bookingError.value = "На выбранные даты машин этой модели нет.";
+      bookingSuggestions.value = (
+        matchResult.suggestedStartTimesUtc ?? []
+      ).slice(0, 5);
+      return;
+    }
+
+    const booking = await createBooking(
+      matchResult.partnerCarId,
+      payloadData.startDate,
+      payloadData.endDate,
+      payloadData.useSubscription,
+    );
+
+    success(
+      payloadData.useSubscription
+        ? `${payload.value.model.brand} ${payload.value.model.model}: бронь создана по подписке.`
+        : `${payload.value.model.brand} ${payload.value.model.model}: бронь создана, завершите оплату.`,
+    );
+
+    closeBookingModal();
+
+    if (payloadData.useSubscription) {
+      await router.push("/bookings");
+    } else {
+      await router.push(`/bookings/${booking.id}/payment`);
+    }
+  } catch (e) {
+    console.error("Ошибка бронирования:", e);
+    bookingError.value = "Не удалось забронировать машину. Попробуйте снова.";
+    error("Не удалось забронировать машину.");
+  } finally {
+    matching.value = false;
+  }
+}
 </script>

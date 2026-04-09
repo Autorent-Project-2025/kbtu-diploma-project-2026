@@ -151,7 +151,7 @@ services:
           "CMD",
           "python",
           "-c",
-          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/healthz')"
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/healthz')",
         ]
       interval: 10s
       timeout: 5s
@@ -277,11 +277,20 @@ services:
       OLLAMA_EMBEDDING_MODEL: ${LOCAL_LLM_EMBEDDING_MODEL:-nomic-embed-text}
     entrypoint:
       - /bin/sh
-      - /bootstrap/bootstrap-models.sh
+      - -ec
+    command: |
+      echo "Pulling Ollama model: $$OLLAMA_CHAT_MODEL"
+      curl -fsS "$$OLLAMA_BASE_URL/api/pull" \
+        -H "Content-Type: application/json" \
+        -d "{\"model\":\"$$OLLAMA_CHAT_MODEL\",\"stream\":false}"
+      echo
+      echo "Pulling Ollama model: $$OLLAMA_EMBEDDING_MODEL"
+      curl -fsS "$$OLLAMA_BASE_URL/api/pull" \
+        -H "Content-Type: application/json" \
+        -d "{\"model\":\"$$OLLAMA_EMBEDDING_MODEL\",\"stream\":false}"
+      echo
     networks:
       - backend
-    volumes:
-      - ./ops/ollama/bootstrap-models.sh:/bootstrap/bootstrap-models.sh:ro
 
   ai-search-service:
     build:
@@ -334,7 +343,7 @@ services:
           "CMD",
           "node",
           "-e",
-          "fetch('http://127.0.0.1:8080/healthz').then((res)=>process.exit(res.ok?0:1)).catch(()=>process.exit(1))"
+          "fetch('http://127.0.0.1:8080/healthz').then((res)=>process.exit(res.ok?0:1)).catch(()=>process.exit(1))",
         ]
       interval: 10s
       timeout: 5s
@@ -725,7 +734,7 @@ services:
           "CMD",
           "node",
           "-e",
-          "fetch('http://127.0.0.1:8080/healthz').then((res)=>process.exit(res.ok?0:1)).catch(()=>process.exit(1))"
+          "fetch('http://127.0.0.1:8080/healthz').then((res)=>process.exit(res.ok?0:1)).catch(()=>process.exit(1))",
         ]
       interval: 10s
       timeout: 5s
@@ -828,7 +837,7 @@ services:
           "CMD",
           "node",
           "-e",
-          "fetch('http://127.0.0.1:8080/healthz').then((res)=>process.exit(res.ok?0:1)).catch(()=>process.exit(1))"
+          "fetch('http://127.0.0.1:8080/healthz').then((res)=>process.exit(res.ok?0:1)).catch(()=>process.exit(1))",
         ]
       interval: 10s
       timeout: 5s
@@ -861,7 +870,7 @@ services:
           "CMD",
           "node",
           "-e",
-          "fetch('http://127.0.0.1:8080/healthz').then((res)=>process.exit(res.ok?0:1)).catch(()=>process.exit(1))"
+          "fetch('http://127.0.0.1:8080/healthz').then((res)=>process.exit(res.ok?0:1)).catch(()=>process.exit(1))",
         ]
       interval: 10s
       timeout: 5s
@@ -930,7 +939,7 @@ services:
           "CMD",
           "node",
           "-e",
-          "fetch('http://127.0.0.1:8080/healthz').then((res)=>process.exit(res.ok?0:1)).catch(()=>process.exit(1))"
+          "fetch('http://127.0.0.1:8080/healthz').then((res)=>process.exit(res.ok?0:1)).catch(()=>process.exit(1))",
         ]
       interval: 10s
       timeout: 5s
@@ -964,7 +973,7 @@ services:
           "CMD",
           "node",
           "-e",
-          "fetch('http://127.0.0.1:5173').then((res)=>process.exit(res.ok?0:1)).catch(()=>process.exit(1))"
+          "fetch('http://127.0.0.1:5173').then((res)=>process.exit(res.ok?0:1)).catch(()=>process.exit(1))",
         ]
       interval: 15s
       timeout: 5s
@@ -995,7 +1004,7 @@ services:
           "CMD",
           "node",
           "-e",
-          "fetch('http://127.0.0.1:5173').then((res)=>process.exit(res.ok?0:1)).catch(()=>process.exit(1))"
+          "fetch('http://127.0.0.1:5173').then((res)=>process.exit(res.ok?0:1)).catch(()=>process.exit(1))",
         ]
       interval: 15s
       timeout: 5s
@@ -1026,7 +1035,7 @@ services:
           "CMD",
           "node",
           "-e",
-          "fetch('http://127.0.0.1:5173').then((res)=>process.exit(res.ok?0:1)).catch(()=>process.exit(1))"
+          "fetch('http://127.0.0.1:5173').then((res)=>process.exit(res.ok?0:1)).catch(()=>process.exit(1))",
         ]
       interval: 15s
       timeout: 5s
