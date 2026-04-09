@@ -15,8 +15,6 @@
         </p>
       </header>
 
-      <SmartRecommendationPanel class="mb-10" />
-
       <section
         class="relative overflow-hidden rounded-[32px] border border-gray-200 dark:border-gray-800 bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.14),_transparent_30%),radial-gradient(circle_at_bottom_right,_rgba(59,130,246,0.14),_transparent_35%),linear-gradient(135deg,_rgba(255,255,255,0.98),_rgba(243,244,246,0.96))] dark:bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.18),_transparent_30%),radial-gradient(circle_at_bottom_right,_rgba(59,130,246,0.18),_transparent_35%),linear-gradient(135deg,_rgba(17,24,39,0.98),_rgba(3,7,18,0.96))] shadow-2xl p-6 sm:p-8"
       >
@@ -276,8 +274,6 @@ import { useToast } from "../composables/useToast";
 import { config } from "../config";
 import type { BookingModelSelection } from "../types/Car";
 import { formatMoney } from "../utils/formatMoney";
-import SmartRecommendationPanel from "../components/SmartRecommendationPanel.vue";
-
 const router = useRouter();
 const { isAuthenticated } = useAuth();
 const { success, error } = useToast();
