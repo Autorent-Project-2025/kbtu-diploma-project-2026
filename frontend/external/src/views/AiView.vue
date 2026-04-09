@@ -28,15 +28,84 @@
             class="flex"
             :class="message.role === 'user' ? 'justify-end' : 'justify-start'"
           >
-            <div
-              class="max-w-[85%] rounded-[28px] px-5 py-4 text-[15px] leading-7 shadow-sm sm:max-w-[80%]"
-              :class="
-                message.role === 'user'
-                  ? 'bg-gray-950 text-white dark:bg-white dark:text-gray-950'
-                  : 'border border-gray-200/80 bg-white/90 text-gray-900 backdrop-blur-xl dark:border-gray-800 dark:bg-gray-900/90 dark:text-gray-100'
-              "
-            >
-              {{ message.content }}
+            <div class="flex max-w-[85%] flex-col gap-3 sm:max-w-[80%]">
+              <div
+                class="rounded-[28px] px-5 py-4 text-[15px] leading-7 shadow-sm"
+                :class="
+                  message.role === 'user'
+                    ? 'bg-gray-950 text-white dark:bg-white dark:text-gray-950'
+                    : 'border border-gray-200/80 bg-white/90 text-gray-900 backdrop-blur-xl dark:border-gray-800 dark:bg-gray-900/90 dark:text-gray-100'
+                "
+              >
+                {{ message.content }}
+              </div>
+
+              <div
+                v-if="message.role === 'assistant' && message.cars.length > 0"
+                class="grid gap-3"
+              >
+                <RouterLink
+                  v-for="car in message.cars"
+                  :key="`${message.id}-${car.partnerCarId}`"
+                  :to="car.detailsUrl"
+                  class="group overflow-hidden rounded-[28px] border border-gray-200/80 bg-white/92 transition-all hover:border-primary-300 hover:shadow-lg hover:shadow-primary-100/50 dark:border-gray-800 dark:bg-gray-900/92 dark:hover:border-primary-700 dark:hover:shadow-black/20"
+                >
+                  <div class="flex min-h-32">
+                    <div class="h-auto w-32 shrink-0 overflow-hidden bg-gray-200 dark:bg-gray-800">
+                      <img
+                        v-if="car.imageUrl"
+                        :src="car.imageUrl"
+                        :alt="car.title"
+                        class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+                      />
+                      <div
+                        v-else
+                        class="flex h-full w-full items-center justify-center text-xs font-medium text-gray-500 dark:text-gray-400"
+                      >
+                        Нет фото
+                      </div>
+                    </div>
+
+                    <div class="flex min-w-0 flex-1 flex-col gap-3 px-4 py-4">
+                      <div class="flex items-start justify-between gap-4">
+                        <div class="min-w-0">
+                          <p class="truncate text-base font-semibold text-gray-950 dark:text-white">
+                            {{ car.title }}
+                          </p>
+                          <p
+                            v-if="car.carrierName"
+                            class="mt-1 truncate text-sm text-gray-500 dark:text-gray-400"
+                          >
+                            {{ car.carrierName }}
+                          </p>
+                        </div>
+
+                        <div class="shrink-0 text-right">
+                          <p class="text-base font-semibold text-primary-700 dark:text-primary-300">
+                            {{ formatPrice(car.priceHour) }}
+                          </p>
+                          <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                            {{ formatRating(car.rating) }}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div
+                        v-if="car.reasons.length > 0"
+                        class="flex flex-wrap gap-2"
+                      >
+                        <span
+                          v-for="reason in car.reasons"
+                          :key="`${car.partnerCarId}-${reason}`"
+                          class="rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300"
+                        >
+                          {{ reason }}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </RouterLink>
+              </div>
             </div>
           </article>
 
@@ -100,11 +169,15 @@
 
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from "vue";
+import { RouterLink } from "vue-router";
+import { getAiRecommendations, type AiRecommendationCard } from "../api/ai";
+import { formatMoney } from "../utils/formatMoney";
 
 type Message = {
   id: number;
   role: "assistant" | "user";
   content: string;
+  cars: AiRecommendationCard[];
 };
 
 const messages = ref<Message[]>([]);
@@ -147,84 +220,54 @@ function sendDraft() {
   }
 
   draft.value = "";
-  sendMessage(content);
+  void sendMessage(content);
 }
 
-function sendMessage(content: string) {
+async function sendMessage(content: string) {
   messages.value.push({
     id: counter.value++,
     role: "user",
     content,
+    cars: [],
   });
 
   isResponding.value = true;
 
-  window.setTimeout(() => {
-    messages.value.push(buildReply(content));
+  try {
+    const response = await getAiRecommendations(content);
+    messages.value.push({
+      id: counter.value++,
+      role: "assistant",
+      content: response.assistantText,
+      cars: response.cars ?? [],
+    });
+  } catch (error) {
+    console.error("AI recommendation request failed:", error);
+    messages.value.push({
+      id: counter.value++,
+      role: "assistant",
+      content:
+        "Не удалось получить подборку машин. Попробуйте повторить запрос или немного упростить формулировку.",
+      cars: [],
+    });
+  } finally {
     isResponding.value = false;
-  }, 450);
+  }
 }
 
-function buildReply(content: string): Message {
-  const normalized = content.toLowerCase();
-
-  if (
-    normalized.includes("сем") ||
-    normalized.includes("багаж") ||
-    normalized.includes("дет")
-  ) {
-    return {
-      id: counter.value++,
-      role: "assistant",
-      content:
-        "Для семьи я бы смотрел на более просторные и практичные варианты: нормальный запас места, комфортную посадку и адекватную цену на весь интервал аренды.",
-    };
+function formatPrice(priceHour: number | null): string {
+  if (priceHour == null) {
+    return "По запросу";
   }
 
-  if (
-    normalized.includes("бизнес") ||
-    normalized.includes("встреч") ||
-    normalized.includes("аэропорт")
-  ) {
-    return {
-      id: counter.value++,
-      role: "assistant",
-      content:
-        "Под деловой сценарий лучше подходят спокойные комфортные седаны: свежий внешний вид, аккуратный салон и без лишней переплаты за слишком яркий вариант.",
-    };
+  return `${formatMoney(priceHour)}/час`;
+}
+
+function formatRating(rating: number | null): string {
+  if (rating == null) {
+    return "Без рейтинга";
   }
 
-  if (
-    normalized.includes("цен") ||
-    normalized.includes("бюдж") ||
-    normalized.includes("сколь")
-  ) {
-    return {
-      id: counter.value++,
-      role: "assistant",
-      content:
-        "Смотрите не только на цену в час. Важнее общий бюджет на поездку, длительность аренды и то, насколько машина подходит под ваш сценарий.",
-    };
-  }
-
-  if (
-    normalized.includes("город") ||
-    normalized.includes("ежеднев") ||
-    normalized.includes("пара")
-  ) {
-    return {
-      id: counter.value++,
-      role: "assistant",
-      content:
-        "Для города обычно лучше работают более компактные и спокойные варианты: проще парковка, понятнее бюджет и меньше переплата за лишний объём.",
-    };
-  }
-
-  return {
-    id: counter.value++,
-    role: "assistant",
-    content:
-      "Опишите задачу в одном предложении: куда едете, сколько человек и какой бюджет. Этого уже достаточно, чтобы сузить выбор.",
-  };
+  return `${rating.toFixed(1)} / 5`;
 }
 </script>

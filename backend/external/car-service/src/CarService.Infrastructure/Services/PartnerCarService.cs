@@ -26,6 +26,7 @@ namespace CarService.Infrastructure.Services
         private readonly CarCatalogResolver _catalogResolver;
         private readonly ICarMarketValueSyncService _carMarketValueSyncService;
         private readonly IPartnerCarDisplayPricingService _partnerCarDisplayPricingService;
+        private readonly ICarSearchIndexEventPublisher _carSearchIndexEventPublisher;
         private readonly MarketValueRefreshOptions _marketValueRefreshOptions;
         private readonly ILogger<PartnerCarService> _logger;
         private readonly ObservabilityLogWriter _observabilityLogWriter;
@@ -36,6 +37,7 @@ namespace CarService.Infrastructure.Services
             CarCatalogResolver catalogResolver,
             ICarMarketValueSyncService carMarketValueSyncService,
             IPartnerCarDisplayPricingService partnerCarDisplayPricingService,
+            ICarSearchIndexEventPublisher carSearchIndexEventPublisher,
             IOptions<MarketValueRefreshOptions> marketValueRefreshOptions,
             ILogger<PartnerCarService> logger,
             ObservabilityLogWriter observabilityLogWriter)
@@ -45,6 +47,7 @@ namespace CarService.Infrastructure.Services
             _catalogResolver = catalogResolver;
             _carMarketValueSyncService = carMarketValueSyncService;
             _partnerCarDisplayPricingService = partnerCarDisplayPricingService;
+            _carSearchIndexEventPublisher = carSearchIndexEventPublisher;
             _marketValueRefreshOptions = marketValueRefreshOptions.Value;
             _logger = logger;
             _observabilityLogWriter = observabilityLogWriter;
@@ -206,6 +209,7 @@ namespace CarService.Infrastructure.Services
             _db.PartnerCars.Add(entity);
             await _db.SaveChangesAsync(cancellationToken);
             await _carMarketValueSyncService.EnsureCarModelMarketValueAsync(entity.CarModelId, cancellationToken);
+            await _carSearchIndexEventPublisher.PublishUpsertRequestedAsync(entity.Id, cancellationToken);
 
             var persistedEntity = await _db.PartnerCars
                 .AsNoTracking()
@@ -371,6 +375,7 @@ namespace CarService.Infrastructure.Services
             _db.PartnerCarImages.AddRange(images);
             await _db.SaveChangesAsync(cancellationToken);
             await _carMarketValueSyncService.EnsureCarModelMarketValueAsync(entity.CarModelId, cancellationToken);
+            await _carSearchIndexEventPublisher.PublishUpsertRequestedAsync(entity.Id, cancellationToken);
 
             var persistedEntity = await _db.PartnerCars
                 .AsNoTracking()
@@ -405,6 +410,7 @@ namespace CarService.Infrastructure.Services
             entity.Status = dto.Status;
 
             await _db.SaveChangesAsync(cancellationToken);
+            await _carSearchIndexEventPublisher.PublishUpsertRequestedAsync(entity.Id, cancellationToken);
 
             return MapToResponse(entity);
         }
@@ -422,8 +428,10 @@ namespace CarService.Infrastructure.Services
                 throw new UnauthorizedAccessException("You are not allowed to delete this partner car.");
             }
 
+            var partnerCarId = entity.Id;
             _db.PartnerCars.Remove(entity);
             await _db.SaveChangesAsync(cancellationToken);
+            await _carSearchIndexEventPublisher.PublishDeletedAsync(partnerCarId, cancellationToken);
             return true;
         }
 
@@ -829,6 +837,7 @@ namespace CarService.Infrastructure.Services
 
             await _db.SaveChangesAsync(cancellationToken);
             await _partnerCarDisplayPricingService.RecalculateForPartnerCarAsync(partnerCarId, cancellationToken);
+            await _carSearchIndexEventPublisher.PublishUpsertRequestedAsync(partnerCarId, cancellationToken);
         }
 
         private static PartnerCarResponseDto MapToResponse(PartnerCar entity)

@@ -1,0 +1,24 @@
+{
+  "name": "autorent-ai-search-service",
+  "version": "1.0.0",
+  "description": "AI-driven hybrid search service for AutoRent",
+  "type": "commonjs",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "npm run build && npm run start",
+    "build": "tsc --project tsconfig.json",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "amqplib": "^0.10.9",
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
+    "postgres": "^3.4.7",
+    "typescript": "^5.9.3"
+  },
+  "devDependencies": {
+    "@types/amqplib": "^0.10.7",
+    "@types/express": "^5.0.6",
+    "@types/node": "^24.6.1"
+  }
+}

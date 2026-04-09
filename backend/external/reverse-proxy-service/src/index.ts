@@ -14,6 +14,7 @@ type ServiceConfig = {
   envKey:
     | "IDENTITY_SERVICE_URL"
     | "CAR_SERVICE_URL"
+    | "AI_SEARCH_SERVICE_URL"
     | "BOOKING_SERVICE_URL"
     | "CLIENT_SERVICE_URL"
     | "PARTNER_SERVICE_URL"
@@ -35,6 +36,7 @@ type GatewayHttpMetric = {
 const services: ServiceConfig[] = [
   { route: "/identity", envKey: "IDENTITY_SERVICE_URL" },
   { route: "/cars", envKey: "CAR_SERVICE_URL" },
+  { route: "/ai", envKey: "AI_SEARCH_SERVICE_URL" },
   { route: "/bookings", envKey: "BOOKING_SERVICE_URL" },
   { route: "/clients", envKey: "CLIENT_SERVICE_URL" },
   { route: "/partners", envKey: "PARTNER_SERVICE_URL" },

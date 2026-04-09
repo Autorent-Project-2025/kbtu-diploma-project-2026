@@ -29,6 +29,16 @@ const fuelTypeMap: Record<string, string> = {
   lpg: "Газ",
 };
 
+const featureLabelMap: Record<string, string> = {
+  sport: "Спортивная",
+  business: "Бизнес",
+  family: "Семейная",
+  city: "Городская",
+  luxury: "Премиум",
+  sedan: "Седан",
+  coupe: "Купе",
+};
+
 function normalizeText(value: string | null | undefined): string | null {
   const normalized = value?.trim();
   return normalized ? normalized : null;
@@ -53,11 +63,16 @@ function normalizeFuelType(value: string | null | undefined): string | null {
 }
 
 function normalizeFeature(feature: FeatureLike): string | null {
-  if (typeof feature === "string") {
-    return normalizeText(feature);
+  const rawValue =
+    typeof feature === "string"
+      ? normalizeText(feature)
+      : normalizeText(feature?.name);
+
+  if (!rawValue) {
+    return null;
   }
 
-  return normalizeText(feature?.name);
+  return featureLabelMap[rawValue.toLowerCase()] ?? rawValue;
 }
 
 export function buildCarTags(source: CarTagSource, maxTags = 6): string[] {
