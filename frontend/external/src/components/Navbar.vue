@@ -47,6 +47,17 @@
             </router-link>
 
             <router-link
+              to="/ai"
+              active-class="text-primary-600 dark:text-primary-400"
+              class="text-gray-700 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 font-medium transition-colors relative group"
+            >
+              <span>ИИ</span>
+              <span
+                class="absolute bottom-0 left-0 w-0 h-0.5 bg-primary-600 dark:bg-primary-400 group-hover:w-full transition-all duration-300"
+              ></span>
+            </router-link>
+
+            <router-link
               v-if="!isAuthenticated"
               to="/apply"
               active-class="text-primary-600 dark:text-primary-400"
@@ -185,6 +196,15 @@
             @click="mobileMenuOpen = false"
           >
             Автомобили
+          </router-link>
+
+          <router-link
+            to="/ai"
+            active-class="bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400"
+            class="block px-4 py-3 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 font-medium transition-colors"
+            @click="mobileMenuOpen = false"
+          >
+            ИИ
           </router-link>
 
           <router-link

@@ -19,6 +19,7 @@ import ProfileRouterView from "../views/ProfileRouterView.vue";
 import ForbiddenView from "../views/ForbiddenView.vue";
 import { auth } from "../store/auth";
 import SubscriptionPlansView from "../views/SubscriptionPlansView.vue";
+import AiView from "../views/AiView.vue";
 
 const routes = [
   {
@@ -54,6 +55,11 @@ const routes = [
   {
     path: "/cars",
     component: CarsView,
+    meta: { requiresAuth: false },
+  },
+  {
+    path: "/ai",
+    component: AiView,
     meta: { requiresAuth: false },
   },
   {
@@ -115,7 +121,7 @@ const routes = [
   {
     path: "/car-recommendations",
     name: "car-recommendations",
-    component: () => import("../views/CarRecommendationView.vue"),
+    redirect: "/ai",
   },
   {
     path: "/cars/:id",

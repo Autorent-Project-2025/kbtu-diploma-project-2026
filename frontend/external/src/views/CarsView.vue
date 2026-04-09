@@ -69,10 +69,10 @@
             </router-link>
 
             <router-link
-              to="/car-recommendations"
+              to="/ai"
               class="px-6 py-3 rounded-2xl border border-gray-300 dark:border-gray-700 text-gray-800 dark:text-gray-200 font-semibold hover:border-emerald-500 dark:hover:border-emerald-500 transition-colors text-center"
             >
-              Smart recommendations
+              AutoRent AI
             </router-link>
           </div>
         </div>
