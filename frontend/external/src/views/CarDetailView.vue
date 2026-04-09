@@ -35,8 +35,9 @@
       </div>
 
       <template v-else-if="payload">
-        <section class="grid lg:grid-cols-2 gap-8">
-          <div class="space-y-4">
+        <section class="grid lg:grid-cols-2 gap-8 items-stretch">
+          <!-- Левая колонка: фото + тумбнейлы + описание + теги -->
+          <div class="flex flex-col space-y-4">
             <div
               class="relative h-96 rounded-3xl overflow-hidden bg-gradient-to-br from-gray-200 to-gray-300 dark:from-gray-800 dark:to-gray-900 shadow-2xl"
             >
@@ -84,9 +85,34 @@
                 </span>
               </button>
             </div>
+
+            <div
+              class="flex-1 p-6 bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800"
+            >
+              <h2 class="text-xl font-bold text-gray-900 dark:text-white mb-3">
+                Описание
+              </h2>
+              <p class="text-gray-700 dark:text-gray-300">
+                {{ payload.model.description || "Описание отсутствует." }}
+              </p>
+
+              <div
+                v-if="payload.tags.length > 0"
+                class="flex flex-wrap gap-2 mt-4 pt-4 border-t border-gray-100 dark:border-gray-800"
+              >
+                <span
+                  v-for="tag in payload.tags"
+                  :key="`${payload.model.id}-${tag}`"
+                  class="px-3 py-1.5 rounded-full bg-gray-100 dark:bg-gray-800 text-sm font-semibold text-gray-700 dark:text-gray-300"
+                >
+                  {{ tag }}
+                </span>
+              </div>
+            </div>
           </div>
 
-          <div class="space-y-6">
+          <!-- Правая колонка: заголовок + статкарточки + характеристики + кнопка -->
+          <div class="flex flex-col space-y-6">
             <div class="space-y-2">
               <h1 class="text-4xl font-extrabold text-gray-900 dark:text-white">
                 {{ payload.model.brand }} {{ payload.model.model }}
@@ -94,15 +120,6 @@
               <p class="text-lg text-gray-600 dark:text-gray-400">
                 {{ payload.model.year }} год выпуска
               </p>
-              <div v-if="payload.tags.length > 0" class="flex flex-wrap gap-2 pt-2">
-                <span
-                  v-for="tag in payload.tags"
-                  :key="`${payload.model.id}-${tag}`"
-                  class="px-3 py-1.5 rounded-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm font-semibold text-gray-700 dark:text-gray-300"
-                >
-                  {{ tag }}
-                </span>
-              </div>
             </div>
 
             <div class="grid sm:grid-cols-2 gap-4">
@@ -151,54 +168,43 @@
             </div>
 
             <div
-              class="p-6 bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800"
+              class="flex-1 p-6 bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800"
             >
-              <h2 class="text-xl font-bold text-gray-900 dark:text-white mb-3">
-                Описание
-              </h2>
-              <p class="text-gray-700 dark:text-gray-300">
-                {{ payload.model.description || "Описание отсутствует." }}
-              </p>
-            </div>
-
-            <div
-              class="p-6 bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800"
-            >
-              <h2 class="text-xl font-bold text-gray-900 dark:text-white mb-3">
+              <h2 class="text-xl font-bold text-gray-900 dark:text-white mb-4">
                 Характеристики
               </h2>
-              <div class="grid grid-cols-2 gap-3 text-sm">
-                <div class="text-gray-600 dark:text-gray-400">
-                  Двигатель:
-                  <span class="font-semibold text-gray-900 dark:text-white">{{
-                    payload.model.engine || "—"
-                  }}</span>
+              <dl class="divide-y divide-gray-100 dark:divide-gray-800">
+                <div class="flex justify-between py-3 text-sm">
+                  <dt class="text-gray-500 dark:text-gray-400">Двигатель</dt>
+                  <dd class="font-semibold text-gray-900 dark:text-white">
+                    {{ payload.model.engine || "—" }}
+                  </dd>
                 </div>
-                <div class="text-gray-600 dark:text-gray-400">
-                  Трансмиссия:
-                  <span class="font-semibold text-gray-900 dark:text-white">{{
-                    payload.model.transmission || "—"
-                  }}</span>
+                <div class="flex justify-between py-3 text-sm">
+                  <dt class="text-gray-500 dark:text-gray-400">Трансмиссия</dt>
+                  <dd class="font-semibold text-gray-900 dark:text-white">
+                    {{ payload.model.transmission || "—" }}
+                  </dd>
                 </div>
-                <div class="text-gray-600 dark:text-gray-400">
-                  Мест:
-                  <span class="font-semibold text-gray-900 dark:text-white">{{
-                    payload.model.seats ?? "—"
-                  }}</span>
+                <div class="flex justify-between py-3 text-sm">
+                  <dt class="text-gray-500 dark:text-gray-400">Мест</dt>
+                  <dd class="font-semibold text-gray-900 dark:text-white">
+                    {{ payload.model.seats ?? "—" }}
+                  </dd>
                 </div>
-                <div class="text-gray-600 dark:text-gray-400">
-                  Топливо:
-                  <span class="font-semibold text-gray-900 dark:text-white">{{
-                    payload.model.fuelType || "—"
-                  }}</span>
+                <div class="flex justify-between py-3 text-sm">
+                  <dt class="text-gray-500 dark:text-gray-400">Топливо</dt>
+                  <dd class="font-semibold text-gray-900 dark:text-white">
+                    {{ payload.model.fuelType || "—" }}
+                  </dd>
                 </div>
-                <div class="text-gray-600 dark:text-gray-400">
-                  Дверей:
-                  <span class="font-semibold text-gray-900 dark:text-white">{{
-                    payload.model.doors ?? "—"
-                  }}</span>
+                <div class="flex justify-between py-3 text-sm">
+                  <dt class="text-gray-500 dark:text-gray-400">Дверей</dt>
+                  <dd class="font-semibold text-gray-900 dark:text-white">
+                    {{ payload.model.doors ?? "—" }}
+                  </dd>
                 </div>
-              </div>
+              </dl>
             </div>
 
             <button
@@ -421,11 +427,7 @@ function formatDate(value: string): string {
 }
 
 function getInitials(name: string): string {
-  const parts = (name ?? "")
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2);
+  const parts = (name ?? "").trim().split(/\s+/).filter(Boolean).slice(0, 2);
 
   if (parts.length === 0) {
     return "?";
