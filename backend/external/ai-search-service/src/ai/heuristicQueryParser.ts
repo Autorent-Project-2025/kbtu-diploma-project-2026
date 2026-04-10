@@ -1,34 +1,137 @@
 import { ParsedRecommendationQuery } from "../types";
-
-const styleDictionary: Array<{ label: string; variants: string[] }> = [
-  {
-    label: "sport",
-    variants: ["sport", "sports", "спортив", "спорт", "спорткар", "купе", "coupe"],
-  },
-  { label: "business", variants: ["business", "бизнес", "делов", "meeting", "airport", "аэропорт"] },
-  { label: "family", variants: ["family", "сем", "дет", "багаж", "children"] },
-  { label: "city", variants: ["city", "город", "urban", "ежеднев", "парковк"] },
-  { label: "luxury", variants: ["luxury", "premium", "люкс", "премиум"] },
-];
-
-const transmissionDictionary: Array<{ label: string; variants: string[] }> = [
-  { label: "automatic", variants: ["automatic", "автомат", "акпп"] },
-  { label: "manual", variants: ["manual", "механик", "мкпп"] },
-];
-
-const brandDictionary = [
-  "toyota",
-  "nissan",
-  "kia",
-  "mazda",
-  "bmw",
-  "mercedes",
-  "lexus",
-  "audi",
-];
+import {
+  BRAND_DICTIONARY,
+  STYLE_DICTIONARY,
+  TRANSMISSION_DICTIONARY,
+} from "../queryTaxonomy";
 
 function normalizePrompt(prompt: string): string {
   return prompt.toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+function padDateTimePart(value: number): string {
+  return String(value).padStart(2, "0");
+}
+
+function isValidDateTime(
+  year: number,
+  month: number,
+  day: number,
+  hour: number,
+  minute: number,
+  second: number,
+): boolean {
+  const candidate = new Date(Date.UTC(year, month - 1, day, hour, minute, second));
+
+  return (
+    candidate.getUTCFullYear() === year &&
+    candidate.getUTCMonth() === month - 1 &&
+    candidate.getUTCDate() === day &&
+    candidate.getUTCHours() === hour &&
+    candidate.getUTCMinutes() === minute &&
+    candidate.getUTCSeconds() === second
+  );
+}
+
+function toLocalIsoDateTime(
+  year: number,
+  month: number,
+  day: number,
+  hour: number,
+  minute: number,
+  second: number,
+): string {
+  return `${year}-${padDateTimePart(month)}-${padDateTimePart(day)}T${padDateTimePart(hour)}:${padDateTimePart(minute)}:${padDateTimePart(second)}`;
+}
+
+function isChronologicalRange(startTime: string, endTime: string): boolean {
+  const startTimestamp = Date.parse(startTime);
+  const endTimestamp = Date.parse(endTime);
+
+  return Number.isFinite(startTimestamp) && Number.isFinite(endTimestamp) && startTimestamp < endTimestamp;
+}
+
+function parseExplicitDateTimeToken(rawValue: string): string | null {
+  const value = rawValue.trim().replace(/\s+/g, " ");
+
+  const isoLikeMatch = value.match(
+    /^(\d{4})[-/.](\d{2})[-/.](\d{2})[ t](\d{2}):(\d{2})(?::(\d{2}))?(z|[+-]\d{2}:\d{2})?$/i,
+  );
+  if (isoLikeMatch) {
+    const year = Number(isoLikeMatch[1]);
+    const month = Number(isoLikeMatch[2]);
+    const day = Number(isoLikeMatch[3]);
+    const hour = Number(isoLikeMatch[4]);
+    const minute = Number(isoLikeMatch[5]);
+    const second = Number(isoLikeMatch[6] ?? "00");
+    const offset = isoLikeMatch[7]?.toUpperCase() ?? "";
+
+    if (!isValidDateTime(year, month, day, hour, minute, second)) {
+      return null;
+    }
+
+    return `${toLocalIsoDateTime(year, month, day, hour, minute, second)}${offset}`;
+  }
+
+  const localizedMatch = value.match(
+    /^(\d{2})\.(\d{2})\.(\d{4})\s+(\d{2}):(\d{2})(?::(\d{2}))?$/,
+  );
+  if (!localizedMatch) {
+    return null;
+  }
+
+  const day = Number(localizedMatch[1]);
+  const month = Number(localizedMatch[2]);
+  const year = Number(localizedMatch[3]);
+  const hour = Number(localizedMatch[4]);
+  const minute = Number(localizedMatch[5]);
+  const second = Number(localizedMatch[6] ?? "00");
+
+  if (!isValidDateTime(year, month, day, hour, minute, second)) {
+    return null;
+  }
+
+  return toLocalIsoDateTime(year, month, day, hour, minute, second);
+}
+
+function parseAvailabilityRange(prompt: string): {
+  startTime: string;
+  endTime: string;
+  requiresAvailableOnDates: boolean;
+} | null {
+  const dateTimeTokenPattern =
+    "(?:\\d{4}[-/.]\\d{2}[-/.]\\d{2}[ T]\\d{2}:\\d{2}(?::\\d{2})?(?:Z|[+-]\\d{2}:\\d{2})?|\\d{2}\\.\\d{2}\\.\\d{4}\\s+\\d{2}:\\d{2}(?::\\d{2})?)";
+  const patterns = [
+    new RegExp(
+      `(?:\\bс\\b|\\bfrom\\b)\\s*(${dateTimeTokenPattern})\\s*(?:\\bпо\\b|\\bдо\\b|\\bto\\b|[-–—])\\s*(${dateTimeTokenPattern})`,
+      "iu",
+    ),
+    new RegExp(
+      `(${dateTimeTokenPattern})\\s*(?:\\bпо\\b|\\bдо\\b|\\bto\\b|[-–—])\\s*(${dateTimeTokenPattern})`,
+      "iu",
+    ),
+  ];
+
+  for (const pattern of patterns) {
+    const match = prompt.match(pattern);
+    if (!match) {
+      continue;
+    }
+
+    const startTime = parseExplicitDateTimeToken(match[1]);
+    const endTime = parseExplicitDateTimeToken(match[2]);
+    if (!startTime || !endTime || !isChronologicalRange(startTime, endTime)) {
+      continue;
+    }
+
+    return {
+      startTime,
+      endTime,
+      requiresAvailableOnDates: true,
+    };
+  }
+
+  return null;
 }
 
 function isVariantNegated(normalizedPrompt: string, variant: string): boolean {
@@ -46,7 +149,7 @@ export function canonicalizeStyleLabel(value: string): string | null {
   }
 
   return (
-    styleDictionary.find(
+    STYLE_DICTIONARY.find(
       (item) =>
         item.label === normalized ||
         item.variants.some((variant) => normalized.includes(variant)),
@@ -61,7 +164,7 @@ export function canonicalizeTransmissionLabel(value: string): string | null {
   }
 
   return (
-    transmissionDictionary.find(
+    TRANSMISSION_DICTIONARY.find(
       (item) =>
         item.label === normalized ||
         item.variants.some((variant) => normalized.includes(variant)),
@@ -157,7 +260,7 @@ function parseMinYear(prompt: string): number | null {
 function parsePreferredStyles(prompt: string): string[] {
   const normalized = normalizePrompt(prompt);
   return [...new Set(
-    styleDictionary
+    STYLE_DICTIONARY
       .filter((item) =>
         item.variants.some(
           (variant) => normalized.includes(variant) && !isVariantNegated(normalized, variant),
@@ -170,7 +273,7 @@ function parsePreferredStyles(prompt: string): string[] {
 function parseExcludedStyles(prompt: string): string[] {
   const normalized = normalizePrompt(prompt);
   return [...new Set(
-    styleDictionary
+    STYLE_DICTIONARY
       .filter((item) => item.variants.some((variant) => isVariantNegated(normalized, variant)))
       .map((item) => item.label),
   )];
@@ -183,7 +286,7 @@ function parseTransmission(prompt: string): string | null {
 
 function parsePreferredBrands(prompt: string): string[] {
   const normalized = normalizePrompt(prompt);
-  return brandDictionary.filter((brand) => normalized.includes(brand));
+  return BRAND_DICTIONARY.filter((brand) => normalized.includes(brand));
 }
 
 export function parseQueryHeuristically(prompt: string): ParsedRecommendationQuery {
@@ -192,6 +295,7 @@ export function parseQueryHeuristically(prompt: string): ParsedRecommendationQue
   const preferredStyles = parsePreferredStyles(normalized).filter(
     (style) => !excludedStyles.includes(style),
   );
+  const availabilityRange = parseAvailabilityRange(prompt);
 
   return {
     prompt,
@@ -203,8 +307,8 @@ export function parseQueryHeuristically(prompt: string): ParsedRecommendationQue
     excludedStyles,
     preferredBrands: parsePreferredBrands(normalized),
     minYear: parseMinYear(normalized),
-    startTime: null,
-    endTime: null,
-    requiresAvailableOnDates: false,
+    startTime: availabilityRange?.startTime ?? null,
+    endTime: availabilityRange?.endTime ?? null,
+    requiresAvailableOnDates: availabilityRange?.requiresAvailableOnDates ?? false,
   };
 }

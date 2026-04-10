@@ -5,6 +5,7 @@ import {
   canonicalizeStyleLabel,
   canonicalizeTransmissionLabel,
 } from "./heuristicQueryParser";
+import { STYLE_LABELS_TEXT, TRANSMISSION_LABELS_TEXT } from "../queryTaxonomy";
 
 const systemPrompt = `
 You extract structured filters for car recommendation search.
@@ -23,8 +24,8 @@ Schema:
   "endTime": string | null,
   "requiresAvailableOnDates": boolean
 }
-Allowed style labels: sport, business, family, city, luxury.
-Allowed transmission labels: automatic, manual.
+Allowed style labels: ${STYLE_LABELS_TEXT}.
+Allowed transmission labels: ${TRANSMISSION_LABELS_TEXT}.
 If a value is not explicitly or reasonably inferable, return null or [].
 Do not invent budget, passenger count, transmission, or dates when they are not explicitly present in the user request.
 If the user asks for rating threshold like "рейтинг больше 4.5", put it into "minRating".

@@ -1,5 +1,4 @@
-import { config } from "../config/env";
-import { postToOllama } from "../llm/ollamaClient";
+import { completeWithPreferredLlm, describeConfiguredLlm } from "../llm/chatCompletion";
 import { observabilityLogger } from "../observability/logger";
 import { AiRecommendationResponse, ParsedRecommendationQuery, SearchCandidate } from "../types";
 
@@ -49,13 +48,6 @@ const carIntentKeywords = [
 function normalizePrompt(prompt: string): string {
   return prompt.trim().toLowerCase().replace(/\s+/g, " ");
 }
-
-type OllamaChatResponse = {
-  message?: {
-    content?: string | null;
-  };
-  response?: string | null;
-};
 
 function hasSearchSignals(query: ParsedRecommendationQuery): boolean {
   return (
@@ -167,12 +159,13 @@ function normalizeAssistantText(content: string): string {
   return content.replace(/\s+/g, " ").trim();
 }
 
-async function generateWithLocalLlm(
+async function generateWithLlm(
   kind: "clarification" | "recommendation",
   query: ParsedRecommendationQuery,
   cars: SearchCandidate[],
 ): Promise<string | null> {
-  if (!config.localLlmBaseUrl) {
+  const llm = describeConfiguredLlm();
+  if (!llm) {
     return null;
   }
 
@@ -246,45 +239,37 @@ Write a short result summary based only on this data.
 `.trim();
 
   try {
-    const payload = await postToOllama<OllamaChatResponse>("/api/chat", {
-      model: config.localLlmChatModel,
-      stream: false,
-      options: {
-        temperature: kind === "clarification" ? 0.7 : 0.45,
-        num_predict: kind === "clarification" ? 60 : 120,
-      },
-      messages: [
-        {
-          role: "system",
-          content: systemPrompt,
-        },
-        {
-          role: "user",
-          content: userPrompt,
-        },
-      ],
+    const payload = await completeWithPreferredLlm({
+      systemPrompt,
+      userPrompt,
+      responseType: "text",
+      temperature: kind === "clarification" ? 0.7 : 0.45,
+      maxOutputTokens: kind === "clarification" ? 60 : 120,
     });
-
-    const content = normalizeAssistantText(
-      payload.message?.content?.trim() || payload.response?.trim() || "",
-    );
-
-    if (!content) {
-      throw new Error("Local LLM answer generation returned empty content.");
+    if (!payload) {
+      return null;
     }
 
-    observabilityLogger.info("local_llm_answer_generation_succeeded", {
+    const content = normalizeAssistantText(payload.content);
+
+    if (!content) {
+      throw new Error("LLM answer generation returned empty content.");
+    }
+
+    observabilityLogger.info("llm_answer_generation_succeeded", {
       kind,
-      model: config.localLlmChatModel,
+      provider: payload.provider,
+      model: payload.model,
       carsCount: cars.length,
     });
 
     return content;
   } catch (error) {
-    observabilityLogger.warn("local_llm_answer_generation_failed_fallback_to_template", {
+    observabilityLogger.warn("llm_answer_generation_failed_fallback_to_template", {
       kind,
       errorMessage: error instanceof Error ? error.message : String(error),
-      model: config.localLlmChatModel,
+      provider: llm.provider,
+      model: llm.model,
     });
     return null;
   }
@@ -294,7 +279,9 @@ export async function composeRecommendationResponse(
   query: ParsedRecommendationQuery,
   cars: SearchCandidate[],
 ): Promise<AiRecommendationResponse> {
-  const assistantText = composeDeterministicRecommendationText(query, cars);
+  const assistantText =
+    (await generateWithLlm("recommendation", query, cars)) ??
+    composeDeterministicRecommendationText(query, cars);
 
   return {
     assistantText,
@@ -308,7 +295,7 @@ export async function composeClarificationResponse(
   query: ParsedRecommendationQuery,
 ): Promise<AiRecommendationResponse> {
   const assistantText =
-    (await generateWithLocalLlm("clarification", query, [])) ??
+    (await generateWithLlm("clarification", query, [])) ??
     composeDeterministicClarificationText();
 
   return {

@@ -2,6 +2,7 @@ import { createEmbedding } from "../embeddings";
 import { sql } from "../db/sql";
 import { isPartnerCarAvailableOnDates } from "../integrations/catalogClient";
 import { ParsedRecommendationQuery, SearchCandidate } from "../types";
+import { rerankCarsWithLlm } from "./llmReranker";
 
 type RawSearchRow = {
   partnerCarId: number;
@@ -287,7 +288,7 @@ export async function searchCars(
   const excludedStyleFilteredCandidates = applyExcludedStyleFilter(styleFilteredCandidates, query);
   const filteredCandidates = applyBudgetFilter(excludedStyleFilteredCandidates, query);
 
-  return filteredCandidates
+  const scoredCandidates = filteredCandidates
     .map((rawRow) => {
       const row = normalizeRow(rawRow);
       const vectorScore = row.vectorDistance == null ? 0 : Math.max(0, 1 - row.vectorDistance);
@@ -318,6 +319,7 @@ export async function searchCars(
         reasons: buildReasons(row, query),
       } satisfies SearchCandidate;
     })
-    .sort((left, right) => right.finalScore - left.finalScore)
-    .slice(0, 6);
+    .sort((left, right) => right.finalScore - left.finalScore);
+
+  return (await rerankCarsWithLlm(query, scoredCandidates)).slice(0, 6);
 }

@@ -195,8 +195,8 @@ function reconcileWithHeuristics(
     maxBudgetPerHour:
       heuristicQuery.maxBudgetPerHour ?? modelQuery.maxBudgetPerHour,
     passengers: heuristicQuery.passengers ?? modelQuery.passengers,
-    transmission: heuristicQuery.transmission,
-    minRating: heuristicQuery.minRating,
+    transmission: heuristicQuery.transmission ?? modelQuery.transmission,
+    minRating: heuristicQuery.minRating ?? modelQuery.minRating,
     preferredStyles: unique([
       ...heuristicQuery.preferredStyles,
       ...modelPreferredStyles,
@@ -207,8 +207,8 @@ function reconcileWithHeuristics(
       ...modelPreferredBrands,
     ]),
     minYear: hasYearIntent ? heuristicQuery.minYear ?? modelQuery.minYear : null,
-    startTime: modelQuery.startTime,
-    endTime: modelQuery.endTime,
+    startTime: heuristicQuery.startTime ?? modelQuery.startTime,
+    endTime: heuristicQuery.endTime ?? modelQuery.endTime,
     requiresAvailableOnDates:
       heuristicQuery.requiresAvailableOnDates || modelQuery.requiresAvailableOnDates,
   };
