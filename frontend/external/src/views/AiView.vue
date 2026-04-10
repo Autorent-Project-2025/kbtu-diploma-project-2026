@@ -91,6 +91,22 @@
                       </div>
 
                       <div
+                        v-if="getCommercialBadges(car.priceHour).length > 0"
+                        class="flex flex-wrap gap-2"
+                      >
+                        <span
+                          v-for="badge in getCommercialBadges(car.priceHour)"
+                          :key="`${car.partnerCarId}-${badge.key}`"
+                          :class="[
+                            'rounded-full border px-3 py-1 text-xs font-semibold',
+                            getCommercialBadgeClasses(badge.key),
+                          ]"
+                        >
+                          {{ badge.label }}
+                        </span>
+                      </div>
+
+                      <div
                         v-if="car.reasons.length > 0"
                         class="flex flex-wrap gap-2"
                       >
@@ -177,6 +193,10 @@ import {
   type AiChatMessage,
 } from "../api/ai";
 import { auth } from "../store/auth";
+import {
+  buildCommercialBadges,
+  getCommercialBadgeClasses,
+} from "../utils/commercialBadges";
 import { formatMoney } from "../utils/formatMoney";
 
 type Message = AiChatMessage;
@@ -396,5 +416,9 @@ function formatRating(rating: number | null): string {
   }
 
   return `${rating.toFixed(1)} / 5`;
+}
+
+function getCommercialBadges(priceHour: number | null) {
+  return buildCommercialBadges({ priceHour }, 1);
 }
 </script>

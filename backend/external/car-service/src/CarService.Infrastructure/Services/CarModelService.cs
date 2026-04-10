@@ -155,6 +155,8 @@ namespace CarService.Infrastructure.Services
                 Seats = dto.Seats,
                 FuelType = NormalizeOptional(dto.FuelType, 50),
                 Doors = dto.Doors,
+                BodyType = NormalizeOptional(dto.BodyType, 50),
+                Horsepower = NormalizePositiveInt(dto.Horsepower, nameof(dto.Horsepower), 3000),
                 Description = NormalizeOptional(dto.Description, 585),
                 RatingsCount = 0,
                 MarketValueStatus = MarketValueStatusConstants.Pending
@@ -195,6 +197,8 @@ namespace CarService.Infrastructure.Services
             entity.Seats = dto.Seats;
             entity.FuelType = NormalizeOptional(dto.FuelType, 50);
             entity.Doors = dto.Doors;
+            entity.BodyType = NormalizeOptional(dto.BodyType, 50);
+            entity.Horsepower = NormalizePositiveInt(dto.Horsepower, nameof(dto.Horsepower), 3000);
             entity.Description = NormalizeOptional(dto.Description, 585);
             entity.MarketValueKzt = null;
             entity.MarketValueFetchedAt = null;
@@ -295,6 +299,8 @@ namespace CarService.Infrastructure.Services
                 Seats = entity.Seats,
                 FuelType = entity.FuelType,
                 Doors = entity.Doors,
+                BodyType = entity.BodyType,
+                Horsepower = entity.Horsepower,
                 Description = entity.Description,
                 Rating = entity.Rating,
                 RatingsCount = entity.RatingsCount,
@@ -322,6 +328,8 @@ namespace CarService.Infrastructure.Services
                 Seats = entity.Seats,
                 FuelType = entity.FuelType,
                 Doors = entity.Doors,
+                BodyType = entity.BodyType,
+                Horsepower = entity.Horsepower,
                 Description = entity.Description,
                 Rating = entity.Rating,
                 RatingsCount = entity.RatingsCount,
@@ -379,6 +387,21 @@ namespace CarService.Infrastructure.Services
             }
 
             return normalized;
+        }
+
+        private static int? NormalizePositiveInt(int? value, string paramName, int maxValue)
+        {
+            if (!value.HasValue)
+            {
+                return null;
+            }
+
+            if (value.Value <= 0 || value.Value > maxValue)
+            {
+                throw new ArgumentException($"{paramName} must be between 1 and {maxValue}.");
+            }
+
+            return value.Value;
         }
 
         private sealed record CarModelAveragePrices(decimal? PriceHour, decimal? PriceDay);

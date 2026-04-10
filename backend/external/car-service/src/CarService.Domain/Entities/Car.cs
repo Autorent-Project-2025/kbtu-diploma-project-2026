@@ -31,6 +31,12 @@ namespace CarService.Domain.Entities
         [Column("doors")]
         public int? Doors { get; set; }
 
+        [Column("body_type")]
+        public string? BodyType { get; set; }
+
+        [Column("horsepower")]
+        public int? Horsepower { get; set; }
+
         [Column("description")]
         public string? Description { get; set; }
 

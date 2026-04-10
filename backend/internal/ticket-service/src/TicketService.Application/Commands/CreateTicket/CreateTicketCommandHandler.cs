@@ -113,6 +113,13 @@ public sealed class CreateTicketCommandHandler
                 command.CarModel,
                 command.CarYear,
                 command.LicensePlate,
+                command.Transmission,
+                command.FuelType,
+                command.Seats,
+                command.Doors,
+                command.BodyType,
+                command.Horsepower,
+                command.SelectedTags,
                 ownershipDocumentFileName,
                 carImages,
                 DateTime.UtcNow);

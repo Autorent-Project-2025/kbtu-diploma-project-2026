@@ -61,11 +61,13 @@
 - `carBrand`, `carModel`, `licensePlate` (обязательны)
 - `ownershipDocumentFile` (PDF, обязателен)
 - `carImageFiles[]` (минимум 1 изображение)
-- `email` (обязателен, используется для уведомлений)
+- `transmission`, `fuelType`, `seats`, `doors`, `bodyType`, `horsepower` (optional structured fields)
+- `selectedTags[]` (optional preset semantic tags)
 
 Важно:
 - endpoint помечен как `AllowAnonymous`, но для `PartnerCar` требуется `Authorization` header:
   - сервис извлекает текущего партнера из `partner-service /me`;
+  - email для уведомлений берется из authenticated user claims;
   - имя/фамилия/телефон владельца подтягиваются автоматически.
 
 ### Approve (`POST /{id}/approve`)
@@ -79,7 +81,10 @@ Body необязателен.
     "carBrand": "Toyota",
     "carModel": "Camry",
     "licensePlate": "123ABC02",
-    "email": "partner@example.com"
+    "fuelType": "petrol",
+    "bodyType": "sedan",
+    "horsepower": 181,
+    "confirmedTags": ["business", "comfort"]
   }
 }
 ```
@@ -93,7 +98,7 @@ Body необязателен.
     "carBrand": "Toyota",
     "carModel": "Camry",
     "licensePlate": "123ABC02",
-    "email": "partner@example.com"
+    "confirmedTags": ["business", "comfort"]
   }
 }
 ```

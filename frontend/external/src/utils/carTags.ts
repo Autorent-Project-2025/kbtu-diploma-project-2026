@@ -30,11 +30,15 @@ const fuelTypeMap: Record<string, string> = {
 };
 
 const featureLabelMap: Record<string, string> = {
+  econom: "Эконом",
+  comfort: "Комфорт",
   sport: "Спортивная",
   business: "Бизнес",
   family: "Семейная",
   city: "Городская",
   luxury: "Премиум",
+  suv: "Внедорожник",
+  electric: "Электро",
   sedan: "Седан",
   coupe: "Купе",
 };

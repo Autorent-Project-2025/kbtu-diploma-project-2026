@@ -93,6 +93,22 @@
               </span>
             </div>
 
+            <div
+              v-if="getCommercialBadges(car.priceHour).length > 0"
+              class="flex flex-wrap gap-2"
+            >
+              <span
+                v-for="badge in getCommercialBadges(car.priceHour)"
+                :key="`${car.id}-${badge.key}`"
+                :class="[
+                  'rounded-full border px-3 py-1 text-xs font-semibold',
+                  getCommercialBadgeClasses(badge.key),
+                ]"
+              >
+                {{ badge.label }}
+              </span>
+            </div>
+
             <div class="flex items-center justify-between">
               <span class="font-semibold">{{ formatPricePerHour(car.priceHour) }}</span>
               <span class="text-sm text-gray-500">Score: {{ car.score }}</span>
@@ -111,6 +127,10 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import api from "../api/axios";
+import {
+  buildCommercialBadges,
+  getCommercialBadgeClasses,
+} from "../utils/commercialBadges";
 import { formatPricePerHour } from "../utils/formatMoney";
 
 type RecommendedCar = {
@@ -150,5 +170,9 @@ async function fetchRecommendations() {
   } finally {
     loading.value = false;
   }
+}
+
+function getCommercialBadges(priceHour: number | null) {
+  return buildCommercialBadges({ priceHour }, 1);
 }
 </script>

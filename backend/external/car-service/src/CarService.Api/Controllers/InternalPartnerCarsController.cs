@@ -58,6 +58,13 @@ namespace CarService.Api.Controllers
                     CarModel = request.CarModel,
                     CarYear = request.CarYear,
                     LicensePlate = request.LicensePlate,
+                    Transmission = request.Transmission,
+                    FuelType = request.FuelType,
+                    Seats = request.Seats,
+                    Doors = request.Doors,
+                    BodyType = request.BodyType,
+                    Horsepower = request.Horsepower,
+                    SemanticTags = request.SemanticTags ?? [],
                     OwnershipFileName = request.OwnershipDocumentFileName,
                     Images = (request.Images ?? [])
                         .Select(image => new PartnerCarProvisionImageDto

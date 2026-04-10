@@ -291,14 +291,12 @@
     </div>
 
     <BookingModal
-      v-if="modalCar"
+      v-if="modalSelection"
       :is-open="isBookingModalOpen"
-      :car="modalCar"
+      :selection="modalSelection"
       :booking-error="bookingError"
-      :suggested-dates="bookingSuggestions"
       @close="closeBookingModal"
       @confirm="handleBookingConfirm"
-      @suggestion-click="handleSuggestionClick"
     />
 
     <LoginRequiredModal
@@ -322,7 +320,7 @@ import {
 } from "../api/cars";
 import { useAuth } from "../composables/useAuth";
 import { useToast } from "../composables/useToast";
-import type { Car } from "../types/Car";
+import type { BookingSelection } from "../types/Car";
 
 const route = useRoute();
 const router = useRouter();
@@ -344,13 +342,14 @@ const currentImage = computed(
   () => modelImages.value[currentImageIndex.value]?.imageUrl ?? "",
 );
 
-const modalCar = computed<Car | null>(() => {
+const modalSelection = computed<BookingSelection | null>(() => {
   if (!payload.value) {
     return null;
   }
 
   return {
-    id: payload.value.model.id,
+    kind: "model",
+    modelId: payload.value.model.id,
     brand: payload.value.model.brand,
     model: payload.value.model.model,
     year: payload.value.model.year,

@@ -11,6 +11,8 @@ namespace CarService.Application.DTOs.CarModels
         public int? Seats { get; set; }
         public string? FuelType { get; set; }
         public int? Doors { get; set; }
+        public string? BodyType { get; set; }
+        public int? Horsepower { get; set; }
         public string? Description { get; set; }
         public decimal? Rating { get; set; }
         public int RatingsCount { get; set; }
