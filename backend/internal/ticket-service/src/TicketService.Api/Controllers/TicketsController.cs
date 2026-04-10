@@ -10,6 +10,7 @@ using TicketService.Application.Commands.RejectTicket;
 using TicketService.Application.Exceptions;
 using TicketService.Application.Interfaces;
 using TicketService.Application.Models;
+using TicketService.Application.Queries.GetAllTickets;
 using TicketService.Application.Queries.GetPendingTickets;
 using TicketService.Application.Queries.GetTicketById;
 using TicketService.Domain.Enums;
@@ -22,6 +23,7 @@ public sealed class TicketsController : ControllerBase
 {
     private readonly CreateTicketCommandHandler _createTicketCommandHandler;
     private readonly GetPendingTicketsQueryHandler _getPendingTicketsQueryHandler;
+    private readonly GetAllTicketsQueryHandler _getAllTicketsQueryHandler;
     private readonly GetTicketByIdQueryHandler _getTicketByIdQueryHandler;
     private readonly ApproveTicketCommandHandler _approveTicketCommandHandler;
     private readonly IssueTicketFineCommandHandler _issueTicketFineCommandHandler;
@@ -31,6 +33,7 @@ public sealed class TicketsController : ControllerBase
     public TicketsController(
         CreateTicketCommandHandler createTicketCommandHandler,
         GetPendingTicketsQueryHandler getPendingTicketsQueryHandler,
+        GetAllTicketsQueryHandler getAllTicketsQueryHandler,
         GetTicketByIdQueryHandler getTicketByIdQueryHandler,
         ApproveTicketCommandHandler approveTicketCommandHandler,
         IssueTicketFineCommandHandler issueTicketFineCommandHandler,
@@ -39,6 +42,7 @@ public sealed class TicketsController : ControllerBase
     {
         _createTicketCommandHandler = createTicketCommandHandler;
         _getPendingTicketsQueryHandler = getPendingTicketsQueryHandler;
+        _getAllTicketsQueryHandler = getAllTicketsQueryHandler;
         _getTicketByIdQueryHandler = getTicketByIdQueryHandler;
         _approveTicketCommandHandler = approveTicketCommandHandler;
         _issueTicketFineCommandHandler = issueTicketFineCommandHandler;
@@ -95,6 +99,14 @@ public sealed class TicketsController : ControllerBase
             cancellationToken);
 
         return Created($"/{result.Ticket.Id}", result.Ticket);
+    }
+
+    [Authorize(Policy = "tickets:view-all")]
+    [HttpGet("all")]
+    public async Task<IActionResult> GetAll(CancellationToken cancellationToken)
+    {
+        var result = await _getAllTicketsQueryHandler.Handle(new GetAllTicketsQuery(), cancellationToken);
+        return Ok(result.Tickets);
     }
 
     [Authorize(Policy = "tickets:view")]

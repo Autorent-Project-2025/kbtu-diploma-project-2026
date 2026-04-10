@@ -20,6 +20,11 @@ export async function getPendingTickets(): Promise<Ticket[]> {
   return (res.data ?? []) as Ticket[];
 }
 
+export async function getAllTickets(): Promise<Ticket[]> {
+  const res = await api.get("/tickets/all");
+  return (res.data ?? []) as Ticket[];
+}
+
 export async function getTicketById(ticketId: string): Promise<Ticket> {
   const res = await api.get(`/tickets/${ticketId}`);
   return res.data as Ticket;

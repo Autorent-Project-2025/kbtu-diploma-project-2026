@@ -31,4 +31,11 @@ public sealed class TicketRepository : ITicketRepository
             .OrderBy(ticket => ticket.CreatedAt)
             .ToArrayAsync(cancellationToken);
     }
+
+    public async Task<IReadOnlyCollection<Ticket>> GetAllAsync(CancellationToken cancellationToken = default)
+    {
+        return await _ticketDbContext.Tickets
+            .OrderByDescending(ticket => ticket.CreatedAt)
+            .ToArrayAsync(cancellationToken);
+    }
 }

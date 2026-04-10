@@ -5,4 +5,5 @@ public static class PermissionConstants
     public const string TicketView = "Ticket.View";
     public const string TicketApprove = "Ticket.Approve";
     public const string TicketReject = "Ticket.Reject";
+    public const string TicketViewAll = "Ticket.ViewAll";
 }

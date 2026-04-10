@@ -9,4 +9,6 @@ public interface ITicketRepository
     Task<Ticket?> GetByIdAsync(Guid ticketId, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyCollection<Ticket>> GetPendingAsync(CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyCollection<Ticket>> GetAllAsync(CancellationToken cancellationToken = default);
 }

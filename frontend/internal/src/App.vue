@@ -1,5 +1,4 @@
 <template>
-  <!-- Auth Labels + Sidebar + content -->
   <div
     v-if="showWorkspace"
     class="min-h-screen bg-gray-50 dark:bg-gray-950 flex"
@@ -24,11 +23,17 @@
 
       <nav class="flex-1 p-4 space-y-1">
         <router-link
-          to="/tickets"
-          exact-active-class="bg-gray-800 text-white border-emerald-500"
-          class="flex items-center gap-3 px-4 py-2.5 rounded-xl border border-transparent text-gray-400 hover:text-white hover:bg-gray-800 transition-colors font-semibold text-sm"
+          v-for="link in visibleNav"
+          :key="link.to"
+          :to="link.to"
+          :class="[
+            'flex items-center gap-3 px-4 py-2.5 rounded-xl border transition-colors font-semibold text-sm',
+            isActive(link.to)
+              ? 'bg-gray-800 text-white border-emerald-500'
+              : 'border-transparent text-gray-400 hover:text-white hover:bg-gray-800',
+          ]"
         >
-          <span>📋</span> Заявки
+          {{ link.label }}
         </router-link>
       </nav>
 
@@ -42,18 +47,15 @@
       </div>
     </aside>
 
-    <!-- Main -->
     <main class="flex-1 min-w-0">
       <router-view />
     </main>
   </div>
 
-  <!-- Страница логина -->
   <div v-else class="min-h-screen bg-gray-50 dark:bg-gray-950">
     <router-view />
   </div>
 
-  <!-- Toast уведомления — всегда поверх -->
   <ToastContainer />
 </template>
 
@@ -63,12 +65,31 @@ import { useRoute, useRouter } from "vue-router";
 import { auth } from "./store/auth";
 import ToastContainer from "./components/ToastContainer.vue";
 
+interface NavLink {
+  to: string;
+  label: string;
+  permission: string;
+}
+
+const navLinks: NavLink[] = [
+  { to: "/tickets", label: "Заявки", permission: "Ticket.View" },
+  { to: "/super", label: "Обзор системы", permission: "Ticket.ViewAll" },
+];
+
 const route = useRoute();
 const router = useRouter();
+
 const isAuthenticated = computed(() => Boolean(auth.token));
 const showWorkspace = computed(
   () => isAuthenticated.value && route.path !== "/login",
 );
+const visibleNav = computed(() =>
+  navLinks.filter((link) => auth.hasPermission(link.permission)),
+);
+
+function isActive(to: string): boolean {
+  return route.path === to || route.path.startsWith(to + "/");
+}
 
 function logout() {
   auth.logout();

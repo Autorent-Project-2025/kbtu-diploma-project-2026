@@ -154,7 +154,7 @@ async function onSubmit() {
       return;
     }
 
-    router.push("/tickets");
+    router.push(auth.hasPermission("Ticket.ViewAll") ? "/super" : "/tickets");
   } catch {
     errorMessage.value = "Ошибка входа. Проверьте email и пароль.";
   } finally {

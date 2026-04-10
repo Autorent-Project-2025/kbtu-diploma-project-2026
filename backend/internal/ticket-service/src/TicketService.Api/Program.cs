@@ -10,6 +10,7 @@ using TicketService.Application.Commands.CreateTicket;
 using TicketService.Application.Commands.IssueTicketFine;
 using TicketService.Application.Commands.RejectTicket;
 using TicketService.Application.Constants;
+using TicketService.Application.Queries.GetAllTickets;
 using TicketService.Application.Queries.GetPendingTickets;
 using TicketService.Application.Queries.GetTicketById;
 using TicketService.Infrastructure;
@@ -77,6 +78,7 @@ if (!string.IsNullOrWhiteSpace(otlpEndpoint))
 
 builder.Services.AddScoped<CreateTicketCommandHandler>();
 builder.Services.AddScoped<GetPendingTicketsQueryHandler>();
+builder.Services.AddScoped<GetAllTicketsQueryHandler>();
 builder.Services.AddScoped<GetTicketByIdQueryHandler>();
 builder.Services.AddScoped<ApproveTicketCommandHandler>();
 builder.Services.AddScoped<IssueTicketFineCommandHandler>();
@@ -142,6 +144,9 @@ builder.Services.AddAuthorization(options =>
 
     options.AddPolicy("tickets:reject", policy =>
         policy.RequireClaim("permissions", PermissionConstants.TicketReject));
+
+    options.AddPolicy("tickets:view-all", policy =>
+        policy.RequireClaim("permissions", PermissionConstants.TicketViewAll));
 });
 
 var app = builder.Build();

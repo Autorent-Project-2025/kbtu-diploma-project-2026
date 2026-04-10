@@ -18,6 +18,7 @@ public static class PermissionConstants
     public const string TicketView = "Ticket.View";
     public const string TicketApprove = "Ticket.Approve";
     public const string TicketReject = "Ticket.Reject";
+    public const string TicketViewAll = "Ticket.ViewAll";
     public const string FileCreate = "File.Create";
     public const string FileRead = "File.Read";
     public const string FileDelete = "File.Delete";
