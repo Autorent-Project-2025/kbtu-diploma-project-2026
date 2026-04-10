@@ -1,3 +1,5 @@
+import { access } from "fs/promises";
+import path from "path";
 import { Bucket, Storage } from "@google-cloud/storage";
 
 import type IFileService from "../interfaces/IFileService";
@@ -10,6 +12,27 @@ import { buildStoredFileName, normalizeFileName } from "../utils/fileName";
 
 const MAX_SIGNED_LINK_TTL_SECONDS = 24 * 60 * 60;
 const DEFAULT_SIGNED_LINK_TTL_SECONDS = 15 * 60;
+const BUNDLED_PUBLIC_DIR = path.resolve(process.cwd(), "public");
+
+const buildPublicUrl = (relativePath: string): string => {
+  const publicBaseUrl = process.env.PUBLIC_BASE_URL?.trim();
+  if (!publicBaseUrl) {
+    return relativePath;
+  }
+
+  const normalizedBaseUrl = publicBaseUrl.replace(/\/+$/, "");
+  const normalizedRelativePath = relativePath.replace(/^\/+/, "");
+  return new URL(normalizedRelativePath, `${normalizedBaseUrl}/`).toString();
+};
+
+const hasBundledPublicFile = async (fileName: string): Promise<boolean> => {
+  try {
+    await access(path.join(BUNDLED_PUBLIC_DIR, fileName));
+    return true;
+  } catch {
+    return false;
+  }
+};
 
 class GoogleCloudStorageService implements IFileService {
   private readonly bucket: Bucket;
@@ -65,14 +88,22 @@ class GoogleCloudStorageService implements IFileService {
   ): Promise<TemporaryFileLinkResult> {
     const fileName = normalizeFileName(inputFileName);
     const fileRef = this.bucket.file(fileName);
+    const effectiveTtlSeconds = this.resolveSignedLinkTtl(ttlSeconds ?? this.defaultSignedLinkTtlSeconds);
+    const expiresAt = new Date(Date.now() + effectiveTtlSeconds * 1000);
     const [exists] = await fileRef.exists();
 
     if (!exists) {
+      if (await hasBundledPublicFile(fileName)) {
+        return {
+          fileName,
+          url: buildPublicUrl(`/public/${encodeURIComponent(fileName)}`),
+          expiresAtUtc: expiresAt.toISOString()
+        };
+      }
+
       throw new Error("File not found");
     }
 
-    const effectiveTtlSeconds = this.resolveSignedLinkTtl(ttlSeconds ?? this.defaultSignedLinkTtlSeconds);
-    const expiresAt = new Date(Date.now() + effectiveTtlSeconds * 1000);
     const [url] = await fileRef.getSignedUrl({
       version: "v4",
       action: "read",
