@@ -148,13 +148,20 @@ async function onSubmit() {
   try {
     await auth.login(email.value, password.value);
 
-    if (!auth.hasPermission("Ticket.View")) {
+    const internalPermissions = [
+      "Ticket.View",
+      "Ticket.ViewAll",
+      "Client.View",
+      "PartnerCar.View",
+      "Booking.View",
+    ];
+    if (!internalPermissions.some((p) => auth.hasPermission(p))) {
       auth.logout();
-      errorMessage.value = "Недостаточно прав для панели менеджера.";
+      errorMessage.value = "Недостаточно прав для внутренней панели.";
       return;
     }
 
-    router.push(auth.hasPermission("Ticket.ViewAll") ? "/super" : "/tickets");
+    router.push("/");
   } catch {
     errorMessage.value = "Ошибка входа. Проверьте email и пароль.";
   } finally {

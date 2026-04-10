@@ -9,6 +9,7 @@ namespace BookingService.Application.Interfaces
         Task<BookingResponseDto> CreateBooking(Guid userId, BookingCreateDto dto);
         Task<IEnumerable<BookingResponseDto>> GetUserBookings(Guid userId);
         Task<PagedResult<BookingResponseDto>> GetUserBookingsPaginated(Guid userId, BookingQueryParams queryParams);
+        Task<PagedResult<BookingResponseDto>> GetAllBookingsPaginated(BookingQueryParams queryParams);
         Task<BookingResponseDto?> GetBooking(int id, Guid userId);
         Task<IReadOnlyCollection<BookingResponseDto>> GetBookingsByPartnerCarId(int partnerCarId, CancellationToken cancellationToken = default);
         Task<IReadOnlyCollection<BookingResponseDto>> GetBookingsByPartnerUserId(Guid partnerUserId, CancellationToken cancellationToken = default);
@@ -31,6 +32,7 @@ namespace BookingService.Application.Interfaces
         Task<IReadOnlyCollection<BookingChargeResponseDto>> GetBookingCharges(int id, Guid userId, CancellationToken cancellationToken = default);
         Task<BookingChargeResponseDto> PayBookingCharge(int id, long chargeId, Guid userId, CancellationToken cancellationToken = default);
         Task<BookingResponseDto?> GetBookingById(int id, CancellationToken cancellationToken = default);
+        Task<bool> CancelBookingByAdmin(int id, CancellationToken cancellationToken = default);
         Task ProcessCompletionReviewApproved(
             int bookingId,
             Guid ticketId,

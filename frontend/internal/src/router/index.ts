@@ -3,7 +3,28 @@ import LoginView from "../views/LoginView.vue";
 import ManagerDetailView from "../views/ManagerDetailView.vue";
 import ManagerTicketsView from "../views/ManagerTicketsView.vue";
 import SuperManagerView from "../views/SuperManagerView.vue";
+import ClientsTableView from "../views/ClientsTableView.vue";
+import ClientEditView from "../views/ClientEditView.vue";
+import CarsTableView from "../views/CarsTableView.vue";
+import CarEditView from "../views/CarEditView.vue";
+import BookingsTableView from "../views/BookingsTableView.vue";
+import BookingDetailView from "../views/BookingDetailView.vue";
 import { auth } from "../store/auth";
+
+const defaultRoutes: { path: string; permission: string }[] = [
+  { path: "/super", permission: "Ticket.ViewAll" },
+  { path: "/tickets", permission: "Ticket.View" },
+  { path: "/clients", permission: "Client.View" },
+  { path: "/cars", permission: "PartnerCar.View" },
+  { path: "/bookings", permission: "Booking.View" },
+];
+
+function resolveHome(): string {
+  for (const r of defaultRoutes) {
+    if (auth.hasPermission(r.permission)) return r.path;
+  }
+  return "/login";
+}
 
 const router = createRouter({
   history: createWebHistory(),
@@ -12,8 +33,7 @@ const router = createRouter({
       path: "/",
       redirect: () => {
         if (!localStorage.getItem("token")) return "/login";
-        if (auth.hasPermission("Ticket.ViewAll")) return "/super";
-        return "/tickets";
+        return resolveHome();
       },
     },
     {
@@ -34,6 +54,36 @@ const router = createRouter({
       path: "/super/managers/:id",
       component: ManagerDetailView,
       meta: { requiresAuth: true, requiredPermission: "Ticket.ViewAll" },
+    },
+    {
+      path: "/clients",
+      component: ClientsTableView,
+      meta: { requiresAuth: true, requiredPermission: "Client.View" },
+    },
+    {
+      path: "/clients/:id",
+      component: ClientEditView,
+      meta: { requiresAuth: true, requiredPermission: "Client.View" },
+    },
+    {
+      path: "/cars",
+      component: CarsTableView,
+      meta: { requiresAuth: true, requiredPermission: "PartnerCar.View" },
+    },
+    {
+      path: "/cars/:id",
+      component: CarEditView,
+      meta: { requiresAuth: true, requiredPermission: "PartnerCar.View" },
+    },
+    {
+      path: "/bookings",
+      component: BookingsTableView,
+      meta: { requiresAuth: true, requiredPermission: "Booking.View" },
+    },
+    {
+      path: "/bookings/:id",
+      component: BookingDetailView,
+      meta: { requiresAuth: true, requiredPermission: "Booking.View" },
     },
     {
       path: "/:pathMatch(.*)*",
@@ -60,7 +110,7 @@ router.beforeEach((to, from, next) => {
   }
 
   if (requiredPermission && !auth.hasPermission(requiredPermission)) {
-    next(token ? (auth.hasPermission("Ticket.ViewAll") ? "/super" : "/tickets") : "/login");
+    next(token ? resolveHome() : "/login");
     return;
   }
 

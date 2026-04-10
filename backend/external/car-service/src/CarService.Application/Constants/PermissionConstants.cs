@@ -9,6 +9,7 @@ namespace CarService.Application.Constants
         public const string PartnerCarCreate = "PartnerCar.Create";
         public const string PartnerCarUpdate = "PartnerCar.Update";
         public const string PartnerCarDelete = "PartnerCar.Delete";
+        public const string PartnerCarView = "PartnerCar.View";
         public const string PartnerCarViewOwn = "PartnerCar.ViewOwn";
 
         public const string CarCommentCreate = "CarComment.Create";

@@ -32,4 +32,8 @@ public static class PermissionConstants
     public const string PartnerCreate = "Partner.Create";
     public const string PartnerUpdate = "Partner.Update";
     public const string PartnerDelete = "Partner.Delete";
+    public const string BookingView = "Booking.View";
+    public const string BookingUpdate = "Booking.Update";
+    public const string BookingDelete = "Booking.Delete";
+    public const string PartnerCarView = "PartnerCar.View";
 }

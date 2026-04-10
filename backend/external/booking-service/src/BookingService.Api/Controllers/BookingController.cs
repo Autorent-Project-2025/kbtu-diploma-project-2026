@@ -47,6 +47,14 @@ namespace BookingService.Api.Controllers
             return CreatedAtAction(nameof(Get), new { id = booking.Id }, booking);
         }
 
+        [HttpGet("all")]
+        [Authorize(Policy = "bookings:view")]
+        public async Task<IActionResult> AllBookings([FromQuery] BookingQueryParams queryParams)
+        {
+            var bookings = await _bookingService.GetAllBookingsPaginated(queryParams);
+            return Ok(bookings);
+        }
+
         [HttpGet("my")]
         public async Task<IActionResult> MyBookings([FromQuery] BookingQueryParams queryParams)
         {
@@ -78,6 +86,32 @@ namespace BookingService.Api.Controllers
             }
 
             return Ok(booking);
+        }
+
+        [HttpGet("all/{id:int}")]
+        [Authorize(Policy = "bookings:view")]
+        public async Task<IActionResult> GetById(int id, CancellationToken cancellationToken)
+        {
+            var booking = await _bookingService.GetBookingById(id, cancellationToken);
+            if (booking == null)
+            {
+                return NotFound(new { error = "Booking not found" });
+            }
+
+            return Ok(booking);
+        }
+
+        [HttpPost("all/{id:int}/cancel")]
+        [Authorize(Policy = "bookings:update")]
+        public async Task<IActionResult> AdminCancel(int id, CancellationToken cancellationToken)
+        {
+            var result = await _bookingService.CancelBookingByAdmin(id, cancellationToken);
+            if (!result)
+            {
+                return NotFound(new { error = "Booking not found" });
+            }
+
+            return Ok(new CommonResponseDto { Message = "Booking canceled" });
         }
 
         [HttpPost("{id:int}/cancel")]

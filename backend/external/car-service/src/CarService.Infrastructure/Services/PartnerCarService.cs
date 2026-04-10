@@ -467,7 +467,7 @@ namespace CarService.Infrastructure.Services
         }
 
         public async Task<PartnerCarResponseDto?> UpdateAsync(
-            Guid currentUserId,
+            Guid? currentUserId,
             int id,
             PartnerCarUpdateDto dto,
             CancellationToken cancellationToken = default)
@@ -481,7 +481,7 @@ namespace CarService.Infrastructure.Services
                 return null;
             }
 
-            if (entity.PartnerUserId != currentUserId)
+            if (currentUserId.HasValue && entity.PartnerUserId != currentUserId.Value)
             {
                 throw new UnauthorizedAccessException("You are not allowed to update this partner car.");
             }
@@ -496,7 +496,7 @@ namespace CarService.Infrastructure.Services
             return MapToResponse(entity);
         }
 
-        public async Task<bool> DeleteAsync(Guid currentUserId, int id, CancellationToken cancellationToken = default)
+        public async Task<bool> DeleteAsync(Guid? currentUserId, int id, CancellationToken cancellationToken = default)
         {
             var entity = await _db.PartnerCars.FirstOrDefaultAsync(partnerCar => partnerCar.Id == id, cancellationToken);
             if (entity is null)
@@ -504,7 +504,7 @@ namespace CarService.Infrastructure.Services
                 return false;
             }
 
-            if (entity.PartnerUserId != currentUserId)
+            if (currentUserId.HasValue && entity.PartnerUserId != currentUserId.Value)
             {
                 throw new UnauthorizedAccessException("You are not allowed to delete this partner car.");
             }

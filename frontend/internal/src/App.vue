@@ -74,6 +74,9 @@ interface NavLink {
 const navLinks: NavLink[] = [
   { to: "/tickets", label: "Заявки", permission: "Ticket.View" },
   { to: "/super", label: "Обзор системы", permission: "Ticket.ViewAll" },
+  { to: "/clients", label: "Клиенты", permission: "Client.View" },
+  { to: "/cars", label: "Машины", permission: "PartnerCar.View" },
+  { to: "/bookings", label: "Бронирования", permission: "Booking.View" },
 ];
 
 const route = useRoute();

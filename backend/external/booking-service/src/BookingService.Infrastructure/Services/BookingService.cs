@@ -209,6 +209,39 @@ namespace BookingService.Infrastructure.Services
             };
         }
 
+        public async Task<PagedResult<BookingResponseDto>> GetAllBookingsPaginated(BookingQueryParams queryParams)
+        {
+            ArgumentNullException.ThrowIfNull(queryParams);
+
+            var sortBy = NormalizeSortBy(queryParams.SortBy);
+            var isDescending = string.Equals(queryParams.SortOrder, "desc", StringComparison.OrdinalIgnoreCase);
+
+            IQueryable<Booking> query = _db.Bookings.AsNoTracking();
+
+            query = sortBy switch
+            {
+                "starttime" => isDescending ? query.OrderByDescending(b => b.StartTime) : query.OrderBy(b => b.StartTime),
+                "endtime" => isDescending ? query.OrderByDescending(b => b.EndTime) : query.OrderBy(b => b.EndTime),
+                _ => isDescending ? query.OrderByDescending(b => b.Id) : query.OrderBy(b => b.Id)
+            };
+
+            var totalCount = await query.CountAsync();
+
+            var bookings = await query
+                .Skip((queryParams.Page - 1) * queryParams.PageSize)
+                .Take(queryParams.PageSize)
+                .SelectToBookingResponseDto()
+                .ToListAsync();
+
+            return new PagedResult<BookingResponseDto>
+            {
+                Items = bookings,
+                TotalCount = totalCount,
+                Page = queryParams.Page,
+                PageSize = queryParams.PageSize
+            };
+        }
+
         public async Task<BookingResponseDto?> GetBooking(int id, Guid userId)
         {
             if (id <= 0)
@@ -683,6 +716,22 @@ namespace BookingService.Infrastructure.Services
                 .Where(booking => booking.Id == id)
                 .SelectToBookingResponseDto()
                 .FirstOrDefaultAsync(cancellationToken);
+        }
+
+        public async Task<bool> CancelBookingByAdmin(int id, CancellationToken cancellationToken = default)
+        {
+            var booking = await _db.Bookings
+                .FirstOrDefaultAsync(b => b.Id == id, cancellationToken);
+
+            if (booking == null)
+                return false;
+
+            if (booking.Status == BookingStatus.Completed ||
+                booking.Status == BookingStatus.Canceled)
+                return false;
+
+            await PersistStatusTransitionWithPaymentOutbox(booking, BookingStatus.Canceled);
+            return true;
         }
 
         public async Task ProcessCompletionReviewApproved(
