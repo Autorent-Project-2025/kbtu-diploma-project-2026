@@ -58,6 +58,15 @@ public sealed class TicketConfiguration : IEntityTypeConfiguration<Ticket>
         builder.Ignore(ticket => ticket.CarModel);
         builder.Ignore(ticket => ticket.CarYear);
         builder.Ignore(ticket => ticket.LicensePlate);
+        builder.Ignore(ticket => ticket.Transmission);
+        builder.Ignore(ticket => ticket.FuelType);
+        builder.Ignore(ticket => ticket.Seats);
+        builder.Ignore(ticket => ticket.Doors);
+        builder.Ignore(ticket => ticket.BodyType);
+        builder.Ignore(ticket => ticket.Horsepower);
+        builder.Ignore(ticket => ticket.SelectedTags);
+        builder.Ignore(ticket => ticket.SuggestedTags);
+        builder.Ignore(ticket => ticket.ConfirmedTags);
         builder.Ignore(ticket => ticket.OwnershipDocumentFileName);
         builder.Ignore(ticket => ticket.CarImages);
         builder.Ignore(ticket => ticket.BookingId);
@@ -161,6 +170,15 @@ public sealed class TicketConfiguration : IEntityTypeConfiguration<Ticket>
                 CarModel = carModel ?? string.Empty,
                 CarYear = carYear,
                 LicensePlate = licensePlate ?? string.Empty,
+                Transmission = GetOptionalString(root, "transmission"),
+                FuelType = GetOptionalString(root, "fuelType"),
+                Seats = GetOptionalInt(root, "seats"),
+                Doors = GetOptionalInt(root, "doors"),
+                BodyType = GetOptionalString(root, "bodyType"),
+                Horsepower = GetOptionalInt(root, "horsepower"),
+                SelectedTags = GetStringArray(root, "selectedTags"),
+                SuggestedTags = GetStringArray(root, "suggestedTags"),
+                ConfirmedTags = GetStringArray(root, "confirmedTags"),
                 OwnershipDocumentFileName = ownershipDocumentFileName ?? string.Empty,
                 CarImages = GetPartnerCarImages(root),
                 DecisionReason = decisionReason,
@@ -229,6 +247,22 @@ public sealed class TicketConfiguration : IEntityTypeConfiguration<Ticket>
         }
 
         return images;
+    }
+
+    private static IReadOnlyCollection<string> GetStringArray(JsonElement root, string propertyName)
+    {
+        if (!root.TryGetProperty(propertyName, out var value) || value.ValueKind != JsonValueKind.Array)
+        {
+            return [];
+        }
+
+        return value
+            .EnumerateArray()
+            .Where(item => item.ValueKind == JsonValueKind.String)
+            .Select(item => item.GetString())
+            .Where(item => !string.IsNullOrWhiteSpace(item))
+            .Cast<string>()
+            .ToArray();
     }
 
     private static Guid? GetOptionalGuid(JsonElement root, string propertyName)

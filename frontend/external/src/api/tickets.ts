@@ -63,11 +63,17 @@ export async function createPartnerTicket(
 }
 
 export interface CreatePartnerCarTicketPayload {
-  email: string;
   carBrand: string;
   carModel: string;
   carYear: number;
   licensePlate: string;
+  transmission?: string | null;
+  fuelType?: string | null;
+  seats?: number | null;
+  doors?: number | null;
+  bodyType?: string | null;
+  horsepower?: number | null;
+  selectedTags?: string[];
   ownershipDocumentFile: File;
   carImageFiles: File[];
 }
@@ -77,11 +83,31 @@ export async function createPartnerCarTicket(
 ): Promise<Ticket> {
   const formData = new FormData();
   formData.append("ticketType", "PartnerCar");
-  formData.append("email", payload.email);
   formData.append("carBrand", payload.carBrand);
   formData.append("carModel", payload.carModel);
   formData.append("carYear", String(payload.carYear));
   formData.append("licensePlate", payload.licensePlate);
+  if (payload.transmission) {
+    formData.append("transmission", payload.transmission);
+  }
+  if (payload.fuelType) {
+    formData.append("fuelType", payload.fuelType);
+  }
+  if (payload.seats != null) {
+    formData.append("seats", String(payload.seats));
+  }
+  if (payload.doors != null) {
+    formData.append("doors", String(payload.doors));
+  }
+  if (payload.bodyType) {
+    formData.append("bodyType", payload.bodyType);
+  }
+  if (payload.horsepower != null) {
+    formData.append("horsepower", String(payload.horsepower));
+  }
+  for (const tag of payload.selectedTags ?? []) {
+    formData.append("selectedTags", tag);
+  }
   formData.append("ownershipDocumentFile", payload.ownershipDocumentFile);
 
   for (const file of payload.carImageFiles) {

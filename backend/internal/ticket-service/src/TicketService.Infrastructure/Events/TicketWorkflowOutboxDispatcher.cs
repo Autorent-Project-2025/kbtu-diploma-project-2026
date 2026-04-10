@@ -311,6 +311,13 @@ public sealed class TicketWorkflowOutboxDispatcher : BackgroundService
                             RequireField(ticket.CarModel, nameof(ticket.CarModel)),
                             RequireYear(ticket.CarYear, nameof(ticket.CarYear)),
                             RequireField(ticket.LicensePlate, nameof(ticket.LicensePlate)),
+                            ticket.Transmission,
+                            ticket.FuelType,
+                            ticket.Seats,
+                            ticket.Doors,
+                            ticket.BodyType,
+                            ticket.Horsepower,
+                            ResolveProvisionSemanticTags(ticket),
                             RequireField(ticket.OwnershipDocumentFileName, nameof(ticket.OwnershipDocumentFileName)),
                             ticket.CarImages.Select(image => new PartnerCarProvisionRequestedImage(image.ImageId, image.ImageUrl)).ToArray()),
                         cancellationToken);
@@ -609,6 +616,19 @@ public sealed class TicketWorkflowOutboxDispatcher : BackgroundService
         }
 
         return value.Value;
+    }
+
+    private static IReadOnlyCollection<string> ResolveProvisionSemanticTags(Ticket ticket)
+    {
+        var source = ticket.ConfirmedTags.Count > 0
+            ? ticket.ConfirmedTags
+            : ticket.SelectedTags.Concat(ticket.SuggestedTags).ToArray();
+
+        return source
+            .Where(tag => !string.IsNullOrWhiteSpace(tag))
+            .Select(tag => tag.Trim().ToLowerInvariant())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
     }
 
     private static decimal RequireChargeAmount(decimal? value, string fieldName)

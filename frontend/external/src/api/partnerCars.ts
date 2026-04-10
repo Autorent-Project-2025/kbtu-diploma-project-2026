@@ -75,6 +75,7 @@ export interface PublicPartnerCarDetails {
   modelBrand: string;
   modelName: string;
   modelYear: number;
+  commercialBadgeKeys: string[];
   images: PartnerCarImage[];
   comments?: PartnerCarComment[];
   bookings?: Array<{

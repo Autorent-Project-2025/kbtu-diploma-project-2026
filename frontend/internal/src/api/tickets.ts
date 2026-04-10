@@ -6,7 +6,13 @@ export interface PartnerCarReviewPayload {
   carModel?: string;
   carYear?: number;
   licensePlate?: string;
-  email?: string;
+  transmission?: string | null;
+  fuelType?: string | null;
+  seats?: number | null;
+  doors?: number | null;
+  bodyType?: string | null;
+  horsepower?: number | null;
+  confirmedTags?: string[];
 }
 
 export async function getPendingTickets(): Promise<Ticket[]> {

@@ -117,6 +117,7 @@ export interface PartnerCarDetailsPayload {
   carrierName: string;
   reviews: CarCommentDto[];
   tags: string[];
+  commercialBadgeKeys: string[];
   busySlots: BookingBusySlot[];
 }
 
@@ -375,6 +376,7 @@ export async function getPartnerCarDetailsPayload(
       },
       8,
     ),
+    commercialBadgeKeys: car.commercialBadgeKeys ?? [],
     busySlots,
   };
 }
@@ -384,4 +386,23 @@ export async function matchCarByModel(
 ): Promise<MatchCarByModelResult> {
   const response = await api.post("/cars/match", payload);
   return toCamelCase(response.data) as MatchCarByModelResult;
+}
+
+export interface PriceEstimateResult {
+  marketValueKzt: number;
+  priceHour: number;
+  priceDay: number;
+  confidence: string;
+  sampleCount: number;
+}
+
+export async function getCarPriceEstimate(
+  brand: string,
+  model: string,
+  year: number,
+): Promise<PriceEstimateResult> {
+  const response = await api.get("/cars/price-estimate", {
+    params: { brand, model, year },
+  });
+  return toCamelCase(response.data) as PriceEstimateResult;
 }

@@ -265,27 +265,172 @@
                 </p>
               </div>
               <div class="grid sm:grid-cols-2 gap-4">
-                <div
-                  v-for="field in carFormFields"
-                  :key="field.id"
-                  class="space-y-1.5"
-                >
-                  <label
-                    :for="field.id"
-                    class="block text-xs font-bold uppercase tracking-[0.1em] text-gray-500 dark:text-gray-400"
-                    >{{ field.label }}</label
-                  >
+                <div class="space-y-1.5">
+                  <label for="carBrand" class="block text-xs font-bold uppercase tracking-[0.1em] text-gray-500 dark:text-gray-400">Марка</label>
                   <input
-                    :id="field.id"
-                    v-model="
-                      partnerCarForm[field.key as keyof typeof partnerCarForm]
-                    "
-                    :type="field.type || 'text'"
-                    :min="field.min"
-                    :max="field.max"
-                    :step="field.step"
+                    id="carBrand"
+                    v-model="partnerCarForm.carBrand"
+                    type="text"
                     class="w-full px-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-colors"
                   />
+                </div>
+                <div class="space-y-1.5">
+                  <label for="carModel" class="block text-xs font-bold uppercase tracking-[0.1em] text-gray-500 dark:text-gray-400">Модель</label>
+                  <input
+                    id="carModel"
+                    v-model="partnerCarForm.carModel"
+                    type="text"
+                    class="w-full px-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-colors"
+                  />
+                </div>
+                <div class="space-y-1.5">
+                  <label for="carYear" class="block text-xs font-bold uppercase tracking-[0.1em] text-gray-500 dark:text-gray-400">Год</label>
+                  <input
+                    id="carYear"
+                    v-model.number="partnerCarForm.carYear"
+                    type="number"
+                    min="1886"
+                    :max="maxAllowedCarYear"
+                    class="w-full px-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-colors"
+                  />
+                </div>
+                <div class="space-y-1.5">
+                  <label for="licensePlate" class="block text-xs font-bold uppercase tracking-[0.1em] text-gray-500 dark:text-gray-400">Госномер</label>
+                  <input
+                    id="licensePlate"
+                    v-model="partnerCarForm.licensePlate"
+                    type="text"
+                    class="w-full px-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-colors"
+                  />
+                </div>
+                <div class="space-y-1.5">
+                  <label for="transmission" class="block text-xs font-bold uppercase tracking-[0.1em] text-gray-500 dark:text-gray-400">Коробка</label>
+                  <select
+                    id="transmission"
+                    v-model="partnerCarForm.transmission"
+                    class="w-full px-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-colors"
+                  >
+                    <option value="">Не указано</option>
+                    <option v-for="option in transmissionOptions" :key="option.value" :value="option.value">
+                      {{ option.label }}
+                    </option>
+                  </select>
+                </div>
+                <div class="space-y-1.5">
+                  <label for="fuelType" class="block text-xs font-bold uppercase tracking-[0.1em] text-gray-500 dark:text-gray-400">Топливо</label>
+                  <select
+                    id="fuelType"
+                    v-model="partnerCarForm.fuelType"
+                    class="w-full px-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-colors"
+                  >
+                    <option value="">Не указано</option>
+                    <option v-for="option in fuelTypeOptions" :key="option.value" :value="option.value">
+                      {{ option.label }}
+                    </option>
+                  </select>
+                </div>
+                <div class="space-y-1.5">
+                  <label for="bodyType" class="block text-xs font-bold uppercase tracking-[0.1em] text-gray-500 dark:text-gray-400">Кузов</label>
+                  <select
+                    id="bodyType"
+                    v-model="partnerCarForm.bodyType"
+                    class="w-full px-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-colors"
+                  >
+                    <option value="">Не указано</option>
+                    <option v-for="option in bodyTypeOptions" :key="option.value" :value="option.value">
+                      {{ option.label }}
+                    </option>
+                  </select>
+                </div>
+                <div class="space-y-1.5">
+                  <label for="horsepower" class="block text-xs font-bold uppercase tracking-[0.1em] text-gray-500 dark:text-gray-400">Л.с.</label>
+                  <input
+                    id="horsepower"
+                    v-model.number="partnerCarForm.horsepower"
+                    type="number"
+                    min="1"
+                    max="3000"
+                    class="w-full px-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-colors"
+                  />
+                </div>
+                <div class="space-y-1.5">
+                  <label for="seats" class="block text-xs font-bold uppercase tracking-[0.1em] text-gray-500 dark:text-gray-400">Мест</label>
+                  <input
+                    id="seats"
+                    v-model.number="partnerCarForm.seats"
+                    type="number"
+                    min="1"
+                    max="20"
+                    class="w-full px-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-colors"
+                  />
+                </div>
+                <div class="space-y-1.5">
+                  <label for="doors" class="block text-xs font-bold uppercase tracking-[0.1em] text-gray-500 dark:text-gray-400">Дверей</label>
+                  <input
+                    id="doors"
+                    v-model.number="partnerCarForm.doors"
+                    type="number"
+                    min="1"
+                    max="6"
+                    class="w-full px-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-colors"
+                  />
+                </div>
+              </div>
+
+              <div class="space-y-2">
+                <h4 class="text-xs font-bold uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">
+                  Теги партнёра
+                </h4>
+                <div v-if="partnerSelectedTagLabels.length > 0" class="flex flex-wrap gap-2">
+                  <span
+                    v-for="tag in partnerSelectedTagLabels"
+                    :key="tag"
+                    class="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                  >
+                    {{ tag }}
+                  </span>
+                </div>
+                <p v-else class="text-sm text-gray-400 dark:text-gray-500">
+                  Партнёр не выбрал теги вручную.
+                </p>
+              </div>
+
+              <div class="space-y-2">
+                <h4 class="text-xs font-bold uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">
+                  Автоподсказки системы
+                </h4>
+                <div v-if="suggestedTagLabels.length > 0" class="flex flex-wrap gap-2">
+                  <span
+                    v-for="tag in suggestedTagLabels"
+                    :key="tag"
+                    class="inline-flex items-center rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300"
+                  >
+                    {{ tag }}
+                  </span>
+                </div>
+                <p v-else class="text-sm text-gray-400 dark:text-gray-500">
+                  Пока нет системных подсказок по текущим характеристикам.
+                </p>
+              </div>
+
+              <div class="space-y-2">
+                <h4 class="text-xs font-bold uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">
+                  Подтверждённые теги
+                </h4>
+                <div class="grid sm:grid-cols-2 gap-3">
+                  <label
+                    v-for="option in semanticTagOptions"
+                    :key="option.value"
+                    class="flex items-center gap-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-3 text-sm text-gray-700 dark:text-gray-200"
+                  >
+                    <input
+                      v-model="partnerCarForm.confirmedTags"
+                      type="checkbox"
+                      :value="option.value"
+                      class="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                    />
+                    <span>{{ option.label }}</span>
+                  </label>
                 </div>
               </div>
             </section>
@@ -556,6 +701,14 @@ import type {
   PartnerCarTicketImageData,
   Ticket,
 } from "../types/Ticket";
+import {
+  bodyTypeOptions,
+  fuelTypeOptions,
+  getSemanticTagLabel,
+  semanticTagOptions,
+  suggestSemanticTags,
+  transmissionOptions,
+} from "../utils/partnerCarSemanticTags";
 
 const tickets = ref<Ticket[]>([]);
 const selectedTicket = ref<Ticket | null>(null);
@@ -568,38 +721,19 @@ const { success: toastSuccess, error: toastError } = useToast();
 const lastUpdatedAt = ref<string>("");
 const maxAllowedCarYear = new Date().getUTCFullYear() + 1;
 
-type PartnerCarFormField = {
-  id: string;
-  key: "carBrand" | "carModel" | "carYear" | "licensePlate" | "email";
-  label: string;
-  type?: string;
-  min?: string;
-  max?: string;
-  step?: string;
-};
-
 const partnerCarForm = reactive({
   carBrand: "",
   carModel: "",
   carYear: null as number | null,
   licensePlate: "",
-  email: "",
+  transmission: "",
+  fuelType: "",
+  seats: null as number | null,
+  doors: null as number | null,
+  bodyType: "",
+  horsepower: null as number | null,
+  confirmedTags: [] as string[],
 });
-
-const carFormFields: PartnerCarFormField[] = [
-  { id: "carBrand", key: "carBrand", label: "Марка" },
-  { id: "carModel", key: "carModel", label: "Модель" },
-  {
-    id: "carYear",
-    key: "carYear",
-    label: "Год",
-    type: "number",
-    min: "1886",
-    max: String(maxAllowedCarYear),
-  },
-  { id: "licensePlate", key: "licensePlate", label: "Госномер" },
-  { id: "contactEmail", key: "email", label: "Email партнёра", type: "email" },
-];
 
 const partnerCarImages = computed<PartnerCarTicketImageData[]>(() => {
   if (!selectedTicket.value || !isPartnerCarTicket(selectedTicket.value))
@@ -634,6 +768,24 @@ const completionTicketPhotos = computed<BookingCompletionTicketPhotoData[]>(() =
 
   return [];
 });
+
+const partnerSelectedTagLabels = computed(() => {
+  if (!selectedTicket.value || !isPartnerCarTicket(selectedTicket.value)) {
+    return [];
+  }
+
+  const data = selectedTicket.value.data as PartnerCarTicketData | undefined;
+  return (data?.selectedTags ?? []).map((tag) => getSemanticTagLabel(tag));
+});
+
+const suggestedTagLabels = computed(() =>
+  suggestSemanticTags({
+    fuelType: partnerCarForm.fuelType,
+    bodyType: partnerCarForm.bodyType,
+    seats: partnerCarForm.seats,
+    horsepower: partnerCarForm.horsepower,
+  }).map((tag) => getSemanticTagLabel(tag)),
+);
 
 const ticketStats = computed(() => {
   let client = 0,
@@ -782,6 +934,24 @@ function formatDate(value: string) {
   }).format(date);
 }
 
+function validateOptionalInteger(
+  value: number | null,
+  min: number,
+  max: number,
+  label: string,
+): boolean {
+  if (value == null) {
+    return true;
+  }
+
+  if (!Number.isInteger(value) || value < min || value > max) {
+    toastError(`${label} должно быть в диапазоне ${min}-${max}.`);
+    return false;
+  }
+
+  return true;
+}
+
 function syncPartnerCarForm(ticket: Ticket | null) {
   if (!ticket || !isPartnerCarTicket(ticket)) {
     Object.assign(partnerCarForm, {
@@ -789,7 +959,13 @@ function syncPartnerCarForm(ticket: Ticket | null) {
       carModel: "",
       carYear: null,
       licensePlate: "",
-      email: "",
+      transmission: "",
+      fuelType: "",
+      seats: null,
+      doors: null,
+      bodyType: "",
+      horsepower: null,
+      confirmedTags: [],
     });
     return;
   }
@@ -803,7 +979,16 @@ function syncPartnerCarForm(ticket: Ticket | null) {
     data?.licensePlate ??
     ""
   ).trim();
-  partnerCarForm.email = (ticket.email ?? "").trim();
+  partnerCarForm.transmission = (data?.transmission ?? "").trim();
+  partnerCarForm.fuelType = (data?.fuelType ?? "").trim();
+  partnerCarForm.seats = data?.seats ?? null;
+  partnerCarForm.doors = data?.doors ?? null;
+  partnerCarForm.bodyType = (data?.bodyType ?? "").trim();
+  partnerCarForm.horsepower = data?.horsepower ?? null;
+  const initialConfirmedTags = data?.confirmedTags?.length
+    ? data.confirmedTags
+    : [...new Set([...(data?.selectedTags ?? []), ...(data?.suggestedTags ?? [])])];
+  partnerCarForm.confirmedTags = [...initialConfirmedTags];
 }
 
 function buildPartnerCarPayload(): PartnerCarReviewPayload | null | undefined {
@@ -813,28 +998,45 @@ function buildPartnerCarPayload(): PartnerCarReviewPayload | null | undefined {
   const carModel = partnerCarForm.carModel.trim();
   const carYear = Number(partnerCarForm.carYear);
   const licensePlate = partnerCarForm.licensePlate.trim();
-  const email = partnerCarForm.email.trim();
 
   if (
     !carBrand ||
     !carModel ||
     !licensePlate ||
-    !email ||
     !Number.isInteger(carYear)
   ) {
-    toastError("Заполните марку, модель, год, госномер и email.");
+    toastError("Заполните марку, модель, год и госномер.");
     return null;
   }
   if (carYear < 1886 || carYear > maxAllowedCarYear) {
     toastError(`Год машины должен быть в диапазоне 1886-${maxAllowedCarYear}.`);
     return null;
   }
+
+  if (!validateOptionalInteger(partnerCarForm.seats, 1, 20, "Количество мест")) {
+    return null;
+  }
+
+  if (!validateOptionalInteger(partnerCarForm.doors, 1, 6, "Количество дверей")) {
+    return null;
+  }
+
+  if (!validateOptionalInteger(partnerCarForm.horsepower, 1, 3000, "Мощность")) {
+    return null;
+  }
+
   return {
     carBrand,
     carModel,
     carYear,
     licensePlate,
-    email,
+    transmission: partnerCarForm.transmission || null,
+    fuelType: partnerCarForm.fuelType || null,
+    seats: partnerCarForm.seats,
+    doors: partnerCarForm.doors,
+    bodyType: partnerCarForm.bodyType || null,
+    horsepower: partnerCarForm.horsepower,
+    confirmedTags: [...partnerCarForm.confirmedTags],
   };
 }
 

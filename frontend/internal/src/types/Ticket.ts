@@ -47,6 +47,15 @@ export interface PartnerCarTicketData extends TicketDataBase {
   carModel: string;
   carYear?: number | null;
   licensePlate: string;
+  transmission?: string | null;
+  fuelType?: string | null;
+  seats?: number | null;
+  doors?: number | null;
+  bodyType?: string | null;
+  horsepower?: number | null;
+  selectedTags?: string[];
+  suggestedTags?: string[];
+  confirmedTags?: string[];
   ownershipDocumentFileName: string;
   carImages: PartnerCarTicketImageData[];
 }

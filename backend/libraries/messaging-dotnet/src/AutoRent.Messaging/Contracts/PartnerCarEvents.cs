@@ -8,6 +8,13 @@ public sealed record PartnerCarProvisionRequested(
     string CarModel,
     int CarYear,
     string LicensePlate,
+    string? Transmission,
+    string? FuelType,
+    int? Seats,
+    int? Doors,
+    string? BodyType,
+    int? Horsepower,
+    IReadOnlyCollection<string> SemanticTags,
     string OwnershipDocumentFileName,
     IReadOnlyCollection<PartnerCarProvisionRequestedImage> Images);
 

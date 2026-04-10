@@ -1,0 +1,27 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Frontend build output
+frontend/**/dist/
+
+# .NET build output
+**/bin/
+**/obj/
+
+# Lock files
+package-lock.json
+**/package-lock.json
+
+# IDE / editor
+**/.vs/
+**/.idea/
+**/.vscode/
+
+# Logs
+**/*.log
+**/logs/
+
+# OS
+.DS_Store
+Thumbs.db

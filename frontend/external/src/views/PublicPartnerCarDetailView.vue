@@ -115,9 +115,22 @@
                 </p>
               </div>
 
-              <div v-if="payload.tags.length > 0" class="flex flex-wrap gap-2 pt-1">
+              <div v-if="commercialBadges.length > 0" class="flex flex-wrap gap-2 pt-1">
                 <span
-                  v-for="tag in payload.tags"
+                  v-for="badge in commercialBadges"
+                  :key="`${payload.car.id}-${badge.key}`"
+                  :class="[
+                    'rounded-full border px-3 py-1.5 text-sm font-semibold',
+                    getCommercialBadgeClasses(badge.key),
+                  ]"
+                >
+                  {{ badge.label }}
+                </span>
+              </div>
+
+              <div v-if="visibleTags.length > 0" class="flex flex-wrap gap-2 pt-1">
+                <span
+                  v-for="tag in visibleTags"
                   :key="`${payload.car.id}-${tag}`"
                   class="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-sm font-semibold text-gray-700 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"
                 >
@@ -311,6 +324,10 @@ import { useAuth } from "../composables/useAuth";
 import { useToast } from "../composables/useToast";
 import type { BookingPartnerCarSelection } from "../types/Car";
 import { getCarImageTypeLabel } from "../utils/carImageType";
+import {
+  buildBadgesFromKeys,
+  getCommercialBadgeClasses,
+} from "../utils/commercialBadges";
 import { formatMoney } from "../utils/formatMoney";
 
 const route = useRoute();
@@ -347,6 +364,26 @@ const carTitle = computed(() => {
   }
 
   return `${payload.value.model.brand} ${payload.value.model.model} ${payload.value.model.year}`;
+});
+
+const commercialBadges = computed(() => {
+  if (!payload.value) {
+    return [];
+  }
+
+  return buildBadgesFromKeys(payload.value.commercialBadgeKeys);
+});
+
+const visibleTags = computed(() => {
+  if (!payload.value) {
+    return [];
+  }
+
+  const badgeKeySet = new Set(payload.value.commercialBadgeKeys);
+
+  return payload.value.tags.filter(
+    (tag) => !badgeKeySet.has(tag.trim().toLowerCase()),
+  );
 });
 
 const bookingSelection = computed<BookingPartnerCarSelection | null>(() => {

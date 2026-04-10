@@ -4,6 +4,17 @@ namespace TicketService.Domain.Entities;
 
 public sealed class Ticket
 {
+    private static readonly HashSet<string> AllowedSemanticTags = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "econom",
+        "comfort",
+        "business",
+        "sport",
+        "suv",
+        "electric",
+        "family"
+    };
+
     public Guid Id { get; private set; }
     public TicketType TicketType { get; private set; }
     public TicketStatus Status { get; private set; }
@@ -26,6 +37,15 @@ public sealed class Ticket
     public string? CarModel => Data is PartnerCarTicketData partnerCarData ? partnerCarData.CarModel : null;
     public int? CarYear => Data is PartnerCarTicketData partnerCarData ? partnerCarData.CarYear : null;
     public string? LicensePlate => Data is PartnerCarTicketData partnerCarData ? partnerCarData.LicensePlate : null;
+    public string? Transmission => Data is PartnerCarTicketData partnerCarData ? partnerCarData.Transmission : null;
+    public string? FuelType => Data is PartnerCarTicketData partnerCarData ? partnerCarData.FuelType : null;
+    public int? Seats => Data is PartnerCarTicketData partnerCarData ? partnerCarData.Seats : null;
+    public int? Doors => Data is PartnerCarTicketData partnerCarData ? partnerCarData.Doors : null;
+    public string? BodyType => Data is PartnerCarTicketData partnerCarData ? partnerCarData.BodyType : null;
+    public int? Horsepower => Data is PartnerCarTicketData partnerCarData ? partnerCarData.Horsepower : null;
+    public IReadOnlyCollection<string> SelectedTags => Data is PartnerCarTicketData partnerCarData ? partnerCarData.SelectedTags : [];
+    public IReadOnlyCollection<string> SuggestedTags => Data is PartnerCarTicketData partnerCarData ? partnerCarData.SuggestedTags : [];
+    public IReadOnlyCollection<string> ConfirmedTags => Data is PartnerCarTicketData partnerCarData ? partnerCarData.ConfirmedTags : [];
     public string? OwnershipDocumentFileName => Data is PartnerCarTicketData partnerCarData ? partnerCarData.OwnershipDocumentFileName : null;
     public IReadOnlyCollection<PartnerCarTicketImageData> CarImages => Data is PartnerCarTicketData partnerCarData
         ? partnerCarData.CarImages
@@ -64,6 +84,13 @@ public sealed class Ticket
         string? carModel,
         int? carYear,
         string? licensePlate,
+        string? transmission,
+        string? fuelType,
+        int? seats,
+        int? doors,
+        string? bodyType,
+        int? horsepower,
+        IReadOnlyCollection<string>? selectedTags,
         string? ownershipDocumentFileName,
         IReadOnlyCollection<PartnerCarTicketImageData>? carImages,
         DateTime createdAt)
@@ -89,6 +116,13 @@ public sealed class Ticket
             carModel,
             carYear,
             licensePlate,
+            transmission,
+            fuelType,
+            seats,
+            doors,
+            bodyType,
+            horsepower,
+            selectedTags,
             ownershipDocumentFileName,
             carImages,
             Email);
@@ -147,7 +181,13 @@ public sealed class Ticket
         string? carModel,
         int? carYear,
         string? licensePlate,
-        string? email)
+        string? transmission,
+        string? fuelType,
+        int? seats,
+        int? doors,
+        string? bodyType,
+        int? horsepower,
+        IReadOnlyCollection<string>? confirmedTags)
     {
         EnsurePendingStatus();
 
@@ -156,26 +196,35 @@ public sealed class Ticket
             throw new InvalidOperationException("Partner car review fields can be updated only for partner car tickets.");
         }
 
-        var shouldUpdateData =
-            carBrand is not null ||
-            carModel is not null ||
-            carYear is not null ||
-            licensePlate is not null;
-        if (shouldUpdateData)
-        {
-            Data = partnerCarData with
-            {
-                CarBrand = carBrand is null ? partnerCarData.CarBrand : NormalizeCarBrand(carBrand),
-                CarModel = carModel is null ? partnerCarData.CarModel : NormalizeCarModel(carModel),
-                CarYear = carYear is null ? partnerCarData.CarYear : NormalizeCarYear(carYear),
-                LicensePlate = licensePlate is null ? partnerCarData.LicensePlate : NormalizeLicensePlate(licensePlate)
-            };
-        }
+        var nextCarBrand = carBrand is null ? partnerCarData.CarBrand : NormalizeCarBrand(carBrand);
+        var nextCarModel = carModel is null ? partnerCarData.CarModel : NormalizeCarModel(carModel);
+        var nextCarYear = carYear is null ? partnerCarData.CarYear : NormalizeCarYear(carYear);
+        var nextLicensePlate = licensePlate is null ? partnerCarData.LicensePlate : NormalizeLicensePlate(licensePlate);
+        var nextTransmission = transmission is null ? partnerCarData.Transmission : NormalizeTransmission(transmission);
+        var nextFuelType = fuelType is null ? partnerCarData.FuelType : NormalizeFuelType(fuelType);
+        var nextSeats = seats is null ? partnerCarData.Seats : NormalizeSeats(seats);
+        var nextDoors = doors is null ? partnerCarData.Doors : NormalizeDoors(doors);
+        var nextBodyType = bodyType is null ? partnerCarData.BodyType : NormalizeBodyType(bodyType);
+        var nextHorsepower = horsepower is null ? partnerCarData.Horsepower : NormalizeHorsepower(horsepower);
+        var nextSuggestedTags = SuggestSemanticTags(nextFuelType, nextSeats, nextBodyType, nextHorsepower);
 
-        if (email is not null)
+        Data = partnerCarData with
         {
-            SetEmail(email);
-        }
+            CarBrand = nextCarBrand,
+            CarModel = nextCarModel,
+            CarYear = nextCarYear,
+            LicensePlate = nextLicensePlate,
+            Transmission = nextTransmission,
+            FuelType = nextFuelType,
+            Seats = nextSeats,
+            Doors = nextDoors,
+            BodyType = nextBodyType,
+            Horsepower = nextHorsepower,
+            SuggestedTags = nextSuggestedTags,
+            ConfirmedTags = confirmedTags is null
+                ? partnerCarData.ConfirmedTags
+                : NormalizeSemanticTags(confirmedTags, nameof(confirmedTags))
+        };
     }
 
     public void Approve(Guid managerId, DateTime reviewedAt)
@@ -269,6 +318,13 @@ public sealed class Ticket
         string? carModel,
         int? carYear,
         string? licensePlate,
+        string? transmission,
+        string? fuelType,
+        int? seats,
+        int? doors,
+        string? bodyType,
+        int? horsepower,
+        IReadOnlyCollection<string>? selectedTags,
         string? ownershipDocumentFileName,
         IReadOnlyCollection<PartnerCarTicketImageData>? carImages,
         string normalizedEmail)
@@ -329,6 +385,19 @@ public sealed class Ticket
             CarModel = NormalizeCarModel(carModel),
             CarYear = NormalizeCarYear(carYear),
             LicensePlate = NormalizeLicensePlate(licensePlate),
+            Transmission = NormalizeTransmission(transmission),
+            FuelType = NormalizeFuelType(fuelType),
+            Seats = NormalizeSeats(seats),
+            Doors = NormalizeDoors(doors),
+            BodyType = NormalizeBodyType(bodyType),
+            Horsepower = NormalizeHorsepower(horsepower),
+            SelectedTags = NormalizeSemanticTags(selectedTags, nameof(selectedTags)),
+            SuggestedTags = SuggestSemanticTags(
+                NormalizeFuelType(fuelType),
+                NormalizeSeats(seats),
+                NormalizeBodyType(bodyType),
+                NormalizeHorsepower(horsepower)),
+            ConfirmedTags = [],
             OwnershipDocumentFileName = NormalizeOwnershipDocumentFileName(ownershipDocumentFileName),
             CarImages = NormalizePartnerCarImages(carImages),
             DecisionReason = null,
@@ -472,6 +541,176 @@ public sealed class Ticket
     private static string NormalizeLicensePlate(string? licensePlate)
     {
         return NormalizeRequired(licensePlate, nameof(licensePlate), 20).ToUpperInvariant();
+    }
+
+    private static string? NormalizeTransmission(string? transmission)
+    {
+        var normalized = NormalizeOptional(transmission, nameof(transmission), 50);
+        return normalized?.ToLowerInvariant();
+    }
+
+    private static string? NormalizeFuelType(string? fuelType)
+    {
+        var normalized = NormalizeOptional(fuelType, nameof(fuelType), 50);
+        return normalized?.ToLowerInvariant();
+    }
+
+    private static int? NormalizeSeats(int? seats)
+    {
+        if (!seats.HasValue)
+        {
+            return null;
+        }
+
+        if (seats.Value <= 0 || seats.Value > 20)
+        {
+            throw new ArgumentException("seats must be between 1 and 20.", nameof(seats));
+        }
+
+        return seats.Value;
+    }
+
+    private static int? NormalizeDoors(int? doors)
+    {
+        if (!doors.HasValue)
+        {
+            return null;
+        }
+
+        if (doors.Value <= 0 || doors.Value > 6)
+        {
+            throw new ArgumentException("doors must be between 1 and 6.", nameof(doors));
+        }
+
+        return doors.Value;
+    }
+
+    private static string? NormalizeBodyType(string? bodyType)
+    {
+        var normalized = NormalizeOptional(bodyType, nameof(bodyType), 50);
+        if (normalized is null)
+        {
+            return null;
+        }
+
+        return normalized.Trim().ToLowerInvariant() switch
+        {
+            "внедорожник" => "suv",
+            "кроссовер" => "crossover",
+            "минивэн" => "minivan",
+            _ => normalized.ToLowerInvariant()
+        };
+    }
+
+    private static int? NormalizeHorsepower(int? horsepower)
+    {
+        if (!horsepower.HasValue)
+        {
+            return null;
+        }
+
+        if (horsepower.Value <= 0 || horsepower.Value > 3000)
+        {
+            throw new ArgumentException("horsepower must be between 1 and 3000.", nameof(horsepower));
+        }
+
+        return horsepower.Value;
+    }
+
+    private static IReadOnlyCollection<string> NormalizeSemanticTags(
+        IReadOnlyCollection<string>? tags,
+        string paramName)
+    {
+        if (tags is null || tags.Count == 0)
+        {
+            return [];
+        }
+
+        var normalized = new List<string>(tags.Count);
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var tag in tags)
+        {
+            var normalizedTag = NormalizeSemanticTag(tag, paramName);
+            if (seen.Add(normalizedTag))
+            {
+                normalized.Add(normalizedTag);
+            }
+        }
+
+        if (normalized.Count > AllowedSemanticTags.Count)
+        {
+            throw new ArgumentException($"No more than {AllowedSemanticTags.Count} semantic tags are allowed.", paramName);
+        }
+
+        return normalized;
+    }
+
+    private static string NormalizeSemanticTag(string? tag, string paramName)
+    {
+        var normalized = NormalizeRequired(tag, paramName, 50).ToLowerInvariant();
+        normalized = normalized switch
+        {
+            "эконом" => "econom",
+            "комфорт" => "comfort",
+            "бизнес" => "business",
+            "спортивная" => "sport",
+            "внедорожник" => "suv",
+            "электро" => "electric",
+            "семейная" => "family",
+            _ => normalized
+        };
+
+        if (!AllowedSemanticTags.Contains(normalized))
+        {
+            throw new ArgumentException($"Unsupported semantic tag '{tag}'.", paramName);
+        }
+
+        return normalized;
+    }
+
+    private static IReadOnlyCollection<string> SuggestSemanticTags(
+        string? fuelType,
+        int? seats,
+        string? bodyType,
+        int? horsepower)
+    {
+        var suggested = new List<string>();
+
+        void Add(string tag)
+        {
+            if (!suggested.Contains(tag, StringComparer.OrdinalIgnoreCase))
+            {
+                suggested.Add(tag);
+            }
+        }
+
+        if (string.Equals(fuelType, "electric", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(fuelType, "ev", StringComparison.OrdinalIgnoreCase))
+        {
+            Add("electric");
+        }
+
+        if (string.Equals(bodyType, "suv", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(bodyType, "crossover", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(bodyType, "offroad", StringComparison.OrdinalIgnoreCase))
+        {
+            Add("suv");
+        }
+
+        if (horsepower.HasValue && horsepower.Value >= 250)
+        {
+            Add("sport");
+        }
+
+        if ((seats.HasValue && seats.Value >= 5) ||
+            string.Equals(bodyType, "minivan", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(bodyType, "suv", StringComparison.OrdinalIgnoreCase))
+        {
+            Add("family");
+        }
+
+        return suggested;
     }
 
     private static decimal NormalizePrice(decimal? value, string paramName)

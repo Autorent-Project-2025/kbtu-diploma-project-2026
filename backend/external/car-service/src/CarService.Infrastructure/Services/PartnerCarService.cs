@@ -21,6 +21,22 @@ namespace CarService.Infrastructure.Services
 {
     public sealed class PartnerCarService : IPartnerCarService
     {
+        private static readonly HashSet<string> AllowedSemanticTags = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "econom",
+            "comfort",
+            "business",
+            "sport",
+            "suv",
+            "electric",
+            "family"
+        };
+
+        private const decimal EconomPriceHourMax = 4000m;
+        private const decimal PremiumPriceHourMin = 8000m;
+        private const decimal DealDiscountRatio = 0.9m;
+        private const decimal DealMinSavings = 500m;
+
         private readonly ApplicationDbContext _db;
         private readonly IBookingReadClient _bookingReadClient;
         private readonly CarCatalogResolver _catalogResolver;
@@ -114,6 +130,11 @@ namespace CarService.Infrastructure.Services
                 return null;
             }
 
+            var referencePriceHour = await _db.PartnerCars
+                .AsNoTracking()
+                .Where(pc => pc.CarModelId == entity.CarModelId && pc.PriceHour.HasValue)
+                .AverageAsync(pc => (decimal?)pc.PriceHour, cancellationToken);
+
             var bookings = await _bookingReadClient.GetBookingsByCarIdAsync(id, cancellationToken);
 
             return new PartnerCarDetailsDto
@@ -133,6 +154,7 @@ namespace CarService.Infrastructure.Services
                 ModelBrand = entity.CarModel.Brand.Name,
                 ModelName = entity.CarModel.ModelLookup.Name,
                 ModelYear = entity.CarModel.Year,
+                CommercialBadgeKeys = ComputeCommercialBadgeKeys(entity.PriceHour, referencePriceHour),
                 Images = entity.Images
                     .OrderBy(image => image.DisplayOrder)
                     .ThenBy(image => image.Id)
@@ -235,6 +257,13 @@ namespace CarService.Infrastructure.Services
             var normalizedModel = NormalizeRequired(dto.CarModel, nameof(dto.CarModel), 255);
             var normalizedYear = NormalizeCarYear(dto.CarYear, nameof(dto.CarYear));
             var normalizedLicensePlate = NormalizeRequired(dto.LicensePlate, nameof(dto.LicensePlate), 20).ToUpperInvariant();
+            var normalizedTransmission = NormalizeOptional(dto.Transmission, 50)?.ToLowerInvariant();
+            var normalizedFuelType = NormalizeOptional(dto.FuelType, 50)?.ToLowerInvariant();
+            var normalizedSeats = NormalizePositiveInt(dto.Seats, nameof(dto.Seats), 20);
+            var normalizedDoors = NormalizePositiveInt(dto.Doors, nameof(dto.Doors), 6);
+            var normalizedBodyType = NormalizeOptional(dto.BodyType, 50)?.ToLowerInvariant();
+            var normalizedHorsepower = NormalizePositiveInt(dto.Horsepower, nameof(dto.Horsepower), 3000);
+            var normalizedSemanticTags = NormalizeSemanticTags(dto.SemanticTags, nameof(dto.SemanticTags));
             var normalizedOwnershipFileName = NormalizeRequired(dto.OwnershipFileName, nameof(dto.OwnershipFileName), 255);
             var normalizedImages = (dto.Images ?? [])
                 .Select((image, index) => new NormalizedProvisionImage(
@@ -278,7 +307,6 @@ namespace CarService.Infrastructure.Services
                 cancellationToken);
 
             var model = await _db.CarModels
-                .AsNoTracking()
                 .Where(carModel =>
                     carModel.BrandId == brand.Id &&
                     carModel.ModelId == modelLookup.Id &&
@@ -303,6 +331,12 @@ namespace CarService.Infrastructure.Services
                     BrandId = brand.Id,
                     ModelId = modelLookup.Id,
                     Year = normalizedYear,
+                    Transmission = normalizedTransmission,
+                    Seats = normalizedSeats,
+                    FuelType = normalizedFuelType,
+                    Doors = normalizedDoors,
+                    BodyType = normalizedBodyType,
+                    Horsepower = normalizedHorsepower,
                     RatingsCount = 0
                 };
 
@@ -321,6 +355,53 @@ namespace CarService.Infrastructure.Services
                 await _db.SaveChangesAsync(cancellationToken);
                 model = createdModel;
             }
+            else
+            {
+                var modelWasChanged = false;
+
+                if (string.IsNullOrWhiteSpace(model.Transmission) && normalizedTransmission is not null)
+                {
+                    model.Transmission = normalizedTransmission;
+                    modelWasChanged = true;
+                }
+
+                if (string.IsNullOrWhiteSpace(model.FuelType) && normalizedFuelType is not null)
+                {
+                    model.FuelType = normalizedFuelType;
+                    modelWasChanged = true;
+                }
+
+                if (!model.Seats.HasValue && normalizedSeats.HasValue)
+                {
+                    model.Seats = normalizedSeats;
+                    modelWasChanged = true;
+                }
+
+                if (!model.Doors.HasValue && normalizedDoors.HasValue)
+                {
+                    model.Doors = normalizedDoors;
+                    modelWasChanged = true;
+                }
+
+                if (string.IsNullOrWhiteSpace(model.BodyType) && normalizedBodyType is not null)
+                {
+                    model.BodyType = normalizedBodyType;
+                    modelWasChanged = true;
+                }
+
+                if (!model.Horsepower.HasValue && normalizedHorsepower.HasValue)
+                {
+                    model.Horsepower = normalizedHorsepower;
+                    modelWasChanged = true;
+                }
+
+                if (modelWasChanged)
+                {
+                    await _db.SaveChangesAsync(cancellationToken);
+                }
+            }
+
+            await SyncSemanticTagsAsync(model.Id, normalizedSemanticTags, cancellationToken);
 
             var entity = new PartnerCar
             {
@@ -615,6 +696,8 @@ namespace CarService.Infrastructure.Services
                 Seats = entity.CarModel.Seats,
                 FuelType = entity.CarModel.FuelType,
                 Doors = entity.CarModel.Doors,
+                BodyType = entity.CarModel.BodyType,
+                Horsepower = entity.CarModel.Horsepower,
                 Description = entity.CarModel.Description,
                 Images = entity.Images
                     .OrderBy(image => image.DisplayOrder)
@@ -840,6 +923,38 @@ namespace CarService.Infrastructure.Services
             await _carSearchIndexEventPublisher.PublishUpsertRequestedAsync(partnerCarId, cancellationToken);
         }
 
+        private static IReadOnlyCollection<string> ComputeCommercialBadgeKeys(
+            decimal? priceHour,
+            decimal? referencePriceHour = null,
+            int maxBadges = 2)
+        {
+            if (!priceHour.HasValue || priceHour.Value <= 0)
+            {
+                return [];
+            }
+
+            var price = priceHour.Value;
+            var badges = new List<string>(2);
+
+            if (referencePriceHour.HasValue && referencePriceHour.Value > 0
+                && price <= referencePriceHour.Value * DealDiscountRatio
+                && referencePriceHour.Value - price >= DealMinSavings)
+            {
+                badges.Add("deal");
+            }
+
+            if (price <= EconomPriceHourMax)
+            {
+                badges.Add("econom");
+            }
+            else if (price >= PremiumPriceHourMin)
+            {
+                badges.Add("premium");
+            }
+
+            return maxBadges >= badges.Count ? badges : badges.Take(maxBadges).ToList();
+        }
+
         private static PartnerCarResponseDto MapToResponse(PartnerCar entity)
         {
             return new PartnerCarResponseDto
@@ -858,7 +973,8 @@ namespace CarService.Infrastructure.Services
                 RatingsCount = entity.RatingsCount,
                 ModelBrand = entity.CarModel.Brand.Name,
                 ModelName = entity.CarModel.ModelLookup.Name,
-                ModelYear = entity.CarModel.Year
+                ModelYear = entity.CarModel.Year,
+                CommercialBadgeKeys = ComputeCommercialBadgeKeys(entity.PriceHour)
             };
         }
 
@@ -919,6 +1035,132 @@ namespace CarService.Infrastructure.Services
             }
 
             return normalized;
+        }
+
+        private static int? NormalizePositiveInt(int? value, string paramName, int maxValue)
+        {
+            if (!value.HasValue)
+            {
+                return null;
+            }
+
+            if (value.Value <= 0 || value.Value > maxValue)
+            {
+                throw new ArgumentException($"{paramName} must be between 1 and {maxValue}.", paramName);
+            }
+
+            return value.Value;
+        }
+
+        private static IReadOnlyCollection<string> NormalizeSemanticTags(
+            IReadOnlyCollection<string>? tags,
+            string paramName)
+        {
+            if (tags is null || tags.Count == 0)
+            {
+                return [];
+            }
+
+            var normalized = new List<string>(tags.Count);
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var tag in tags)
+            {
+                var normalizedTag = NormalizeSemanticTag(tag, paramName);
+                if (seen.Add(normalizedTag))
+                {
+                    normalized.Add(normalizedTag);
+                }
+            }
+
+            return normalized;
+        }
+
+        private static string NormalizeSemanticTag(string? tag, string paramName)
+        {
+            var normalized = NormalizeRequired(tag, paramName, 50).ToLowerInvariant();
+            normalized = normalized switch
+            {
+                "эконом" => "econom",
+                "комфорт" => "comfort",
+                "бизнес" => "business",
+                "спортивная" => "sport",
+                "внедорожник" => "suv",
+                "электро" => "electric",
+                "семейная" => "family",
+                _ => normalized
+            };
+
+            if (!AllowedSemanticTags.Contains(normalized))
+            {
+                throw new ArgumentException($"Unsupported semantic tag '{tag}'.", paramName);
+            }
+
+            return normalized;
+        }
+
+        private async Task SyncSemanticTagsAsync(
+            int modelId,
+            IReadOnlyCollection<string> semanticTags,
+            CancellationToken cancellationToken)
+        {
+            if (semanticTags.Count == 0)
+            {
+                return;
+            }
+
+            var normalizedTags = semanticTags
+                .Select(tag => tag.ToLowerInvariant())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+
+            var existingFeatures = await _db.Features
+                .Where(feature => normalizedTags.Contains(feature.Name.ToLower()))
+                .ToListAsync(cancellationToken);
+
+            var existingFeatureNames = existingFeatures
+                .Select(feature => feature.Name)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            var missingFeatures = normalizedTags
+                .Where(tag => !existingFeatureNames.Contains(tag))
+                .Select(tag => new Feature
+                {
+                    Name = tag,
+                    CreatedOn = DateTime.UtcNow
+                })
+                .ToArray();
+
+            if (missingFeatures.Length > 0)
+            {
+                _db.Features.AddRange(missingFeatures);
+                await _db.SaveChangesAsync(cancellationToken);
+                existingFeatures.AddRange(missingFeatures);
+            }
+
+            var featureIds = existingFeatures.Select(feature => feature.Id).ToArray();
+            var existingLinks = await _db.CarFeatures
+                .Where(link => link.CarId == modelId && featureIds.Contains(link.FeatureId))
+                .Select(link => link.FeatureId)
+                .ToListAsync(cancellationToken);
+
+            var existingLinkIds = existingLinks.ToHashSet();
+            var linksToCreate = featureIds
+                .Where(featureId => !existingLinkIds.Contains(featureId))
+                .Select(featureId => new CarFeature
+                {
+                    CarId = modelId,
+                    FeatureId = featureId
+                })
+                .ToArray();
+
+            if (linksToCreate.Length == 0)
+            {
+                return;
+            }
+
+            _db.CarFeatures.AddRange(linksToCreate);
+            await _db.SaveChangesAsync(cancellationToken);
         }
 
         private static void EnsureMatchingProvision(

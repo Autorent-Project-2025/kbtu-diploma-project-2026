@@ -88,6 +88,12 @@ public sealed class ApproveTicketCommandHandler
             partnerCarData.CarModel,
             partnerCarData.CarYear,
             partnerCarData.LicensePlate,
-            partnerCarData.Email);
+            partnerCarData.Transmission,
+            partnerCarData.FuelType,
+            partnerCarData.Seats,
+            partnerCarData.Doors,
+            partnerCarData.BodyType,
+            partnerCarData.Horsepower,
+            partnerCarData.ConfirmedTags);
     }
 }
