@@ -16,14 +16,14 @@
 
         <!-- Filters -->
         <div
-          class="flex flex-wrap gap-3 rounded-3xl border border-white/10 bg-white/60 p-3 shadow-xl backdrop-blur-md dark:bg-gray-900/70 dark:border-gray-800"
+          class="flex gap-3 overflow-x-auto rounded-3xl border border-white/10 bg-white/60 p-3 shadow-xl backdrop-blur-md dark:bg-gray-900/70 dark:border-gray-800 scrollbar-hide"
         >
           <button
             v-for="filter in filters"
             :key="filter.value"
             @click="currentFilter = filter.value"
             :class="[
-              'px-5 py-2.5 rounded-xl font-extrabold text-sm transition-all',
+              'px-5 py-2.5 rounded-xl font-extrabold text-sm transition-all flex-shrink-0',
               currentFilter === filter.value
                 ? 'bg-primary-600 text-white shadow-lg shadow-primary-500/50'
                 : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700',
@@ -257,7 +257,14 @@
                     {{ getPrimaryActionLabel(b) }}
                   </component>
 
-                  <div class="relative">
+                  <div
+                    v-if="
+                      canCancel(b) ||
+                      b.canLeaveComment ||
+                      canOpenCompletionDetails(b)
+                    "
+                    class="relative"
+                  >
                     <button
                       type="button"
                       @click="toggleActionMenu(b.id)"
