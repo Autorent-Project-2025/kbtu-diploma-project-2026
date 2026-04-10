@@ -33,10 +33,7 @@ app.get("/healthz", (_req, res) => {
   res.status(200).json({ status: "ok" });
 });
 app.use("/api", createApiRouter({ filesController, rawFileBodyParser }));
-
-if (!useWebStorage) {
-  app.use("/public", createPublicRouter());
-}
+app.use("/public", createPublicRouter());
 
 app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
   const bodyParserError = error as { type?: string; status?: number };
