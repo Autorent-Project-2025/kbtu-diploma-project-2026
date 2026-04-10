@@ -62,7 +62,9 @@ function hasSearchSignals(query: ParsedRecommendationQuery): boolean {
     query.maxBudgetPerHour != null ||
     query.passengers != null ||
     query.transmission != null ||
+    query.minRating != null ||
     query.preferredStyles.length > 0 ||
+    query.excludedStyles.length > 0 ||
     query.preferredBrands.length > 0 ||
     query.minYear != null ||
     query.requiresAvailableOnDates
@@ -127,6 +129,10 @@ function composeDeterministicRecommendationText(
     summaryParts.push(`отфильтровал по коробке ${query.transmission}`);
   }
 
+  if (query.minRating != null) {
+    summaryParts.push(`учёл рейтинг от ${query.minRating.toFixed(1)}`);
+  }
+
   if (query.passengers != null) {
     summaryParts.push(`проверил вместимость от ${query.passengers} мест`);
   }
@@ -176,7 +182,7 @@ You are AutoRent AI assistant.
 Reply in Russian.
 Write exactly one short natural reply to the user's latest message.
 The user has not yet provided enough constraints for a car search.
-Politely guide them to provide criteria like budget, type of car, transmission, seats, or dates.
+Politely guide them to provide criteria like budget, type of car, transmission, seats, dates, or rating threshold.
 Ask only about supported criteria.
 Do not ask about city, location, brand availability, or anything outside the provided criteria.
 Keep it concise, practical, and conversational.
@@ -204,12 +210,14 @@ Known extracted filters:
 ${JSON.stringify({
   maxBudgetPerHour: query.maxBudgetPerHour,
   passengers: query.passengers,
-  transmission: query.transmission,
-  preferredStyles: query.preferredStyles,
-  preferredBrands: query.preferredBrands,
-  minYear: query.minYear,
-  startTime: query.startTime,
-  endTime: query.endTime,
+        transmission: query.transmission,
+        minRating: query.minRating,
+        preferredStyles: query.preferredStyles,
+        excludedStyles: query.excludedStyles,
+        preferredBrands: query.preferredBrands,
+        minYear: query.minYear,
+        startTime: query.startTime,
+        endTime: query.endTime,
 }, null, 2)}
 
 Write a short reply that asks for missing car-selection criteria.
@@ -221,12 +229,14 @@ Extracted filters:
 ${JSON.stringify({
   maxBudgetPerHour: query.maxBudgetPerHour,
   passengers: query.passengers,
-  transmission: query.transmission,
-  preferredStyles: query.preferredStyles,
-  preferredBrands: query.preferredBrands,
-  minYear: query.minYear,
-  startTime: query.startTime,
-  endTime: query.endTime,
+        transmission: query.transmission,
+        minRating: query.minRating,
+        preferredStyles: query.preferredStyles,
+        excludedStyles: query.excludedStyles,
+        preferredBrands: query.preferredBrands,
+        minYear: query.minYear,
+        startTime: query.startTime,
+        endTime: query.endTime,
 }, null, 2)}
 
 Top cars:

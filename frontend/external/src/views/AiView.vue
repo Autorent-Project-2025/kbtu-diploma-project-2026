@@ -170,15 +170,19 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from "vue";
 import { RouterLink } from "vue-router";
-import { getAiRecommendations, type AiRecommendationCard } from "../api/ai";
+import {
+  getAiChatHistory,
+  getAiRecommendations,
+  saveAiChatHistory,
+  type AiChatMessage,
+} from "../api/ai";
+import { auth } from "../store/auth";
 import { formatMoney } from "../utils/formatMoney";
 
-type Message = {
-  id: number;
-  role: "assistant" | "user";
-  content: string;
-  cars: AiRecommendationCard[];
-};
+type Message = AiChatMessage;
+
+const GUEST_CHAT_STORAGE_KEY = "autorent_ai_chat_guest_v1";
+const MAX_PERSISTED_MESSAGES = 40;
 
 const messages = ref<Message[]>([]);
 const draft = ref("");
@@ -206,6 +210,112 @@ watch(
   },
 );
 
+watch(
+  () => auth.token,
+  () => {
+    void restoreHistory();
+  },
+  { immediate: true },
+);
+
+function getAuthenticatedUserId(): string | null {
+  const token = auth.token || localStorage.getItem("token");
+  if (!token) {
+    return null;
+  }
+
+  if (!auth.checkTokenValidity()) {
+    return null;
+  }
+
+  return auth.getUserId();
+}
+
+function trimMessages(history: Message[]): Message[] {
+  return history.slice(-MAX_PERSISTED_MESSAGES);
+}
+
+function buildRecommendationContext(history: Message[]): Message[] {
+  return history.slice(-8);
+}
+
+function syncCounter() {
+  counter.value =
+    messages.value.reduce(
+      (maxId, message) => Math.max(maxId, Number.isFinite(message.id) ? message.id : 0),
+      0,
+    ) + 1;
+}
+
+function hydrateMessages(history: Message[]) {
+  messages.value = trimMessages(
+    history.filter(
+      (message) =>
+        (message.role === "assistant" || message.role === "user") &&
+        typeof message.content === "string",
+    ),
+  );
+  syncCounter();
+}
+
+function readGuestHistory(): Message[] {
+  const rawValue = localStorage.getItem(GUEST_CHAT_STORAGE_KEY);
+  if (!rawValue) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(rawValue) as { messages?: Message[] };
+    return Array.isArray(parsed.messages) ? parsed.messages : [];
+  } catch (error) {
+    console.error("Failed to parse guest AI chat history:", error);
+    return [];
+  }
+}
+
+function writeGuestHistory(history: Message[]) {
+  localStorage.setItem(
+    GUEST_CHAT_STORAGE_KEY,
+    JSON.stringify({
+      messages: trimMessages(history),
+    }),
+  );
+}
+
+async function restoreHistory() {
+  const userId = getAuthenticatedUserId();
+
+  if (!userId) {
+    hydrateMessages(readGuestHistory());
+    return;
+  }
+
+  try {
+    const response = await getAiChatHistory();
+    hydrateMessages(response.messages);
+  } catch (error) {
+    console.error("Failed to load AI chat history:", error);
+    hydrateMessages([]);
+  }
+}
+
+async function persistHistory() {
+  const snapshot = trimMessages(messages.value);
+  const userId = getAuthenticatedUserId();
+
+  if (!userId) {
+    writeGuestHistory(snapshot);
+    return;
+  }
+
+  try {
+    const response = await saveAiChatHistory(snapshot);
+    hydrateMessages(response.messages);
+  } catch (error) {
+    console.error("Failed to save AI chat history:", error);
+  }
+}
+
 function handleComposerKeydown(event: KeyboardEvent) {
   if (event.key === "Enter" && !event.shiftKey) {
     event.preventDefault();
@@ -224,33 +334,50 @@ function sendDraft() {
 }
 
 async function sendMessage(content: string) {
-  messages.value.push({
-    id: counter.value++,
-    role: "user",
-    content,
-    cars: [],
-  });
+  messages.value = trimMessages([
+    ...messages.value,
+    {
+      id: counter.value++,
+      role: "user",
+      content,
+      cars: [],
+      appliedFilters: null,
+    },
+  ]);
+  await persistHistory();
 
   isResponding.value = true;
 
   try {
-    const response = await getAiRecommendations(content);
-    messages.value.push({
-      id: counter.value++,
-      role: "assistant",
-      content: response.assistantText,
-      cars: response.cars ?? [],
-    });
+    const response = await getAiRecommendations(
+      content,
+      buildRecommendationContext(messages.value),
+    );
+    messages.value = trimMessages([
+      ...messages.value,
+      {
+        id: counter.value++,
+        role: "assistant",
+        content: response.assistantText,
+        cars: response.cars ?? [],
+        appliedFilters: response.appliedFilters,
+      },
+    ]);
   } catch (error) {
     console.error("AI recommendation request failed:", error);
-    messages.value.push({
-      id: counter.value++,
-      role: "assistant",
-      content:
-        "Не удалось получить подборку машин. Попробуйте повторить запрос или немного упростить формулировку.",
-      cars: [],
-    });
+    messages.value = trimMessages([
+      ...messages.value,
+      {
+        id: counter.value++,
+        role: "assistant",
+        content:
+          "Не удалось получить подборку машин. Попробуйте повторить запрос или немного упростить формулировку.",
+        cars: [],
+        appliedFilters: null,
+      },
+    ]);
   } finally {
+    await persistHistory();
     isResponding.value = false;
   }
 }

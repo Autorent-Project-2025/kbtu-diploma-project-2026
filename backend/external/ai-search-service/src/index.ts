@@ -1,5 +1,8 @@
 import cors from "cors";
 import express from "express";
+import { authenticateJwt, type AuthenticatedUser } from "./auth/jwtAuth";
+import { normalizeChatMessages } from "./chat/chatMessageNormalization";
+import { getChatHistory, saveChatHistory } from "./chat/chatHistoryRepository";
 import { config } from "./config/env";
 import { observabilityLogger } from "./observability/logger";
 import { ensureSchemaReachable, reindexEverything, reindexPartnerCar } from "./indexing/searchIndexer";
@@ -122,7 +125,8 @@ async function main() {
       return;
     }
 
-    const parsedQuery = await parseRecommendationQuery(prompt);
+    const history = normalizeChatMessages(req.body?.messages ?? []);
+    const parsedQuery = await parseRecommendationQuery(prompt, history);
     if (shouldAskClarifyingQuestion(parsedQuery)) {
       res.status(200).json(await composeClarificationResponse(parsedQuery));
       return;
@@ -130,6 +134,16 @@ async function main() {
 
     const cars = await searchCars(prompt, parsedQuery);
     res.status(200).json(await composeRecommendationResponse(parsedQuery, cars));
+  });
+
+  app.get("/history", authenticateJwt, async (_req, res) => {
+    const authenticatedUser = res.locals.authenticatedUser as AuthenticatedUser;
+    res.status(200).json(await getChatHistory(authenticatedUser.subject));
+  });
+
+  app.put("/history", authenticateJwt, async (req, res) => {
+    const authenticatedUser = res.locals.authenticatedUser as AuthenticatedUser;
+    res.status(200).json(await saveChatHistory(authenticatedUser.subject, req.body?.messages));
   });
 
   app.post("/internal/reindex", async (_req, res) => {

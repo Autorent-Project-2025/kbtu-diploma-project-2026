@@ -31,6 +31,14 @@ function normalizePrompt(prompt: string): string {
   return prompt.toLowerCase().replace(/\s+/g, " ").trim();
 }
 
+function isVariantNegated(normalizedPrompt: string, variant: string): boolean {
+  return (
+    normalizedPrompt.includes(`не ${variant}`) ||
+    normalizedPrompt.includes(`без ${variant}`) ||
+    normalizedPrompt.includes(`кроме ${variant}`)
+  );
+}
+
 export function canonicalizeStyleLabel(value: string): string | null {
   const normalized = normalizePrompt(value);
   if (!normalized) {
@@ -79,8 +87,38 @@ function parseBudget(prompt: string): number | null {
 
 function parsePassengers(prompt: string): number | null {
   const normalized = normalizePrompt(prompt);
-  const match = normalized.match(/(\d+)\s*(чел|человек|people|passenger|пассаж)/);
+  const match = normalized.match(/(\d+)\s*(чел|человек|people|passenger|пассаж|мест|места)/);
   return match ? Number(match[1]) : null;
+}
+
+function parseMinRating(prompt: string): number | null {
+  const normalized = normalizePrompt(prompt).replace(/,/g, ".");
+  const hasRatingKeyword = /(рейтинг|rating|оценк|зв[её]зд|stars?)/u.test(normalized);
+  if (!hasRatingKeyword) {
+    return null;
+  }
+
+  const comparisonMatch = normalized.match(
+    /(?:от|выше(?: чем)?|больше(?: чем)?|не меньше|свыше|above|over|at least|>=?)\s*(\d(?:\.\d+)?)/u,
+  );
+  if (comparisonMatch) {
+    const parsed = Number(comparisonMatch[1]);
+    return parsed >= 0 && parsed <= 5 ? parsed : null;
+  }
+
+  const plusMatch = normalized.match(/(\d(?:\.\d+)?)\s*\+/u);
+  if (plusMatch) {
+    const parsed = Number(plusMatch[1]);
+    return parsed >= 0 && parsed <= 5 ? parsed : null;
+  }
+
+  const bareMatch = normalized.match(/(\d(?:\.\d+)?)/u);
+  if (bareMatch) {
+    const parsed = Number(bareMatch[1]);
+    return parsed >= 0 && parsed <= 5 ? parsed : null;
+  }
+
+  return null;
 }
 
 export function hasExplicitYearIntent(prompt: string): boolean {
@@ -120,8 +158,21 @@ function parsePreferredStyles(prompt: string): string[] {
   const normalized = normalizePrompt(prompt);
   return [...new Set(
     styleDictionary
-      .map((item) => canonicalizeStyleLabel(item.variants.find((variant) => normalized.includes(variant)) ?? ""))
-      .filter((item): item is string => Boolean(item)),
+      .filter((item) =>
+        item.variants.some(
+          (variant) => normalized.includes(variant) && !isVariantNegated(normalized, variant),
+        ),
+      )
+      .map((item) => item.label),
+  )];
+}
+
+function parseExcludedStyles(prompt: string): string[] {
+  const normalized = normalizePrompt(prompt);
+  return [...new Set(
+    styleDictionary
+      .filter((item) => item.variants.some((variant) => isVariantNegated(normalized, variant)))
+      .map((item) => item.label),
   )];
 }
 
@@ -137,13 +188,19 @@ function parsePreferredBrands(prompt: string): string[] {
 
 export function parseQueryHeuristically(prompt: string): ParsedRecommendationQuery {
   const normalized = normalizePrompt(prompt);
+  const excludedStyles = parseExcludedStyles(normalized);
+  const preferredStyles = parsePreferredStyles(normalized).filter(
+    (style) => !excludedStyles.includes(style),
+  );
 
   return {
     prompt,
     maxBudgetPerHour: parseBudget(normalized),
     passengers: parsePassengers(normalized),
     transmission: parseTransmission(normalized),
-    preferredStyles: parsePreferredStyles(normalized),
+    minRating: parseMinRating(normalized),
+    preferredStyles,
+    excludedStyles,
     preferredBrands: parsePreferredBrands(normalized),
     minYear: parseMinYear(normalized),
     startTime: null,

@@ -10,6 +10,7 @@ import BookingPaymentView from "../views/BookingPaymentView.vue";
 import BookingCompletionView from "../views/BookingCompletionView.vue";
 import NotFoundView from "../views/NotFoundView.vue";
 import CarDetailView from "@/views/CarDetailView.vue";
+import PublicPartnerCarDetailView from "../views/PublicPartnerCarDetailView.vue";
 import PartnerProfileView from "../views/PartnerProfileView.vue";
 import PartnerCarsView from "../views/PartnerCarsView.vue";
 import PartnerCarDetailView from "../views/PartnerCarDetailView.vue";
@@ -127,6 +128,12 @@ const routes = [
     path: "/cars/:id",
     name: "CarDetail",
     component: CarDetailView,
+    meta: { requiresAuth: false },
+  },
+  {
+    path: "/cars/partner-cars/:id",
+    name: "PublicPartnerCarDetail",
+    component: PublicPartnerCarDetailView,
     meta: { requiresAuth: false },
   },
   {

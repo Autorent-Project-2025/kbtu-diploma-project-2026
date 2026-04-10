@@ -35,6 +35,10 @@ export interface BookingPricePreview {
   isMarketValueStale: boolean;
 }
 
+export interface PartnerCarAvailability {
+  available: boolean;
+}
+
 interface BookingApiDto {
   id: number;
   partnerCarId: number;
@@ -325,6 +329,22 @@ export async function getBookingPricePreview(
   });
 
   return response.data as BookingPricePreview;
+}
+
+export async function getPartnerCarAvailability(
+  partnerCarId: number,
+  startTime: string,
+  endTime: string,
+): Promise<PartnerCarAvailability> {
+  const response = await api.get("/bookings/available", {
+    params: {
+      partnerCarId,
+      startTime,
+      endTime,
+    },
+  });
+
+  return response.data as PartnerCarAvailability;
 }
 
 export async function getBooking(bookingId: number): Promise<Booking> {

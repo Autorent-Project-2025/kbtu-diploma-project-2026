@@ -86,6 +86,10 @@ function buildReasons(row: RankedSearchRow, query: ParsedRecommendationQuery): s
     reasons.push("совпадает по стилю");
   }
 
+  if (query.minRating != null && row.rating != null && row.rating >= query.minRating) {
+    reasons.push("подходит по рейтингу");
+  }
+
   if (query.passengers != null && row.seats != null && row.seats >= query.passengers) {
     reasons.push("подходит по количеству мест");
   }
@@ -120,6 +124,10 @@ function computeBusinessScore(row: RankedSearchRow, query: ParsedRecommendationQ
     score += 0.15;
   }
 
+  if (query.minRating != null && row.rating != null && row.rating >= query.minRating) {
+    score += 0.2;
+  }
+
   if (query.preferredStyles.some((style) => row.tags.includes(style))) {
     score += 0.2;
   }
@@ -135,12 +143,27 @@ function computeBusinessScore(row: RankedSearchRow, query: ParsedRecommendationQ
   return Math.min(score, 1);
 }
 
+function buildRetrievalPrompt(prompt: string, query: ParsedRecommendationQuery): string {
+  const parts = [
+    prompt.trim(),
+    ...query.preferredStyles,
+    ...query.preferredBrands,
+    query.transmission,
+    query.minRating != null ? `${query.minRating} star rating or higher` : null,
+    query.passengers != null ? `${query.passengers} seats` : null,
+    query.maxBudgetPerHour != null ? `${query.maxBudgetPerHour} kzt per hour` : null,
+    ...query.excludedStyles.map((style) => `not ${style}`),
+  ].filter((part): part is string => Boolean(part && part.trim()));
+
+  return parts.join(" ").trim() || prompt.trim() || "car";
+}
+
 async function fetchCandidates(
-  prompt: string,
+  retrievalPrompt: string,
   embedding: number[],
   query: ParsedRecommendationQuery,
 ): Promise<RawSearchRow[]> {
-  const lexicalQuery = prompt.trim() || "car";
+  const lexicalQuery = retrievalPrompt.trim() || "car";
   const rows = await sql<RawSearchRow[]>`
     with ranked_documents as (
       select
@@ -169,6 +192,7 @@ async function fetchCandidates(
         and (${query.passengers ?? null}::int is null or seats is null or seats >= ${query.passengers ?? null})
         and (${query.minYear ?? null}::int is null or year >= ${query.minYear ?? null})
         and (${query.transmission ?? null}::text is null or lower(coalesce(transmission, '')) = ${query.transmission ?? null})
+        and (${query.minRating ?? null}::numeric is null or (rating is not null and rating >= ${query.minRating ?? null}))
         and (
           cardinality(${sql.array(query.preferredBrands, 25)}) = 0
           or lower(brand) = any(${sql.array(query.preferredBrands, 25)})
@@ -222,6 +246,19 @@ function applyPreferredStyleFilter(
   return matchedRows.length > 0 ? matchedRows : rows;
 }
 
+function applyExcludedStyleFilter(
+  rows: RawSearchRow[],
+  query: ParsedRecommendationQuery,
+): RawSearchRow[] {
+  if (query.excludedStyles.length === 0) {
+    return rows;
+  }
+
+  return rows.filter(
+    (row) => !query.excludedStyles.some((style) => row.tags?.includes(style)),
+  );
+}
+
 function applyBudgetFilter(
   rows: RawSearchRow[],
   query: ParsedRecommendationQuery,
@@ -242,11 +279,13 @@ export async function searchCars(
   prompt: string,
   query: ParsedRecommendationQuery,
 ): Promise<SearchCandidate[]> {
-  const embedding = await createEmbedding(prompt);
-  const candidates = await fetchCandidates(prompt, embedding, query);
+  const retrievalPrompt = buildRetrievalPrompt(prompt, query);
+  const embedding = await createEmbedding(retrievalPrompt);
+  const candidates = await fetchCandidates(retrievalPrompt, embedding, query);
   const availableCandidates = await applyAvailabilityFilter(candidates, query);
   const styleFilteredCandidates = applyPreferredStyleFilter(availableCandidates, query);
-  const filteredCandidates = applyBudgetFilter(styleFilteredCandidates, query);
+  const excludedStyleFilteredCandidates = applyExcludedStyleFilter(styleFilteredCandidates, query);
+  const filteredCandidates = applyBudgetFilter(excludedStyleFilteredCandidates, query);
 
   return filteredCandidates
     .map((rawRow) => {
