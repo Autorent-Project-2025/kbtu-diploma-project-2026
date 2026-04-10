@@ -3,6 +3,7 @@ import LoginView from "../views/LoginView.vue";
 import ManagerDetailView from "../views/ManagerDetailView.vue";
 import ManagerTicketsView from "../views/ManagerTicketsView.vue";
 import SuperManagerView from "../views/SuperManagerView.vue";
+import AdminControlView from "../views/AdminControlView.vue";
 import ClientsTableView from "../views/ClientsTableView.vue";
 import ClientEditView from "../views/ClientEditView.vue";
 import CarsTableView from "../views/CarsTableView.vue";
@@ -12,6 +13,7 @@ import BookingDetailView from "../views/BookingDetailView.vue";
 import { auth } from "../store/auth";
 
 const defaultRoutes: { path: string; permission: string }[] = [
+  { path: "/admin", permission: "User.View" },
   { path: "/super", permission: "Ticket.ViewAll" },
   { path: "/tickets", permission: "Ticket.View" },
   { path: "/clients", permission: "Client.View" },
@@ -39,6 +41,11 @@ const router = createRouter({
     {
       path: "/login",
       component: LoginView,
+    },
+    {
+      path: "/admin",
+      component: AdminControlView,
+      meta: { requiresAuth: true, requiredPermission: "User.View" },
     },
     {
       path: "/tickets",

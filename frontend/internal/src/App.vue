@@ -72,6 +72,7 @@ interface NavLink {
 }
 
 const navLinks: NavLink[] = [
+  { to: "/admin", label: "Control Center", permission: "User.View" },
   { to: "/tickets", label: "Заявки", permission: "Ticket.View" },
   { to: "/super", label: "Обзор системы", permission: "Ticket.ViewAll" },
   { to: "/clients", label: "Клиенты", permission: "Client.View" },
