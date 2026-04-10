@@ -4,6 +4,7 @@ import {
   canonicalizeStyleLabel,
   canonicalizeTransmissionLabel,
 } from "./heuristicQueryParser";
+import { STYLE_LABELS_TEXT, TRANSMISSION_LABELS_TEXT } from "../queryTaxonomy";
 
 const systemPrompt = `
 You extract structured filters for car recommendation search.
@@ -18,13 +19,17 @@ Schema:
   "excludedStyles": string[],
   "preferredBrands": string[],
   "minYear": number | null,
+  "maxYear": number | null,
   "startTime": string | null,
   "endTime": string | null,
   "requiresAvailableOnDates": boolean
 }
-Allowed style labels: sport, business, family, city, luxury.
-Allowed transmission labels: automatic, manual.
+Allowed style labels: ${STYLE_LABELS_TEXT}.
+Allowed transmission labels: ${TRANSMISSION_LABELS_TEXT}.
 If a value is not explicitly or reasonably inferable, return null or [].
+Use "minYear" for requests like "от 2020 года", "2020+" or "не старше 2020".
+Use "maxYear" for requests like "до 2020 года", "по 2020 год" or "не новее 2020".
+Do not put year values into "maxBudgetPerHour".
 `;
 
 export async function parseQueryWithOpenAi(prompt: string): Promise<ParsedRecommendationQuery> {
@@ -93,6 +98,7 @@ export async function parseQueryWithOpenAi(prompt: string): Promise<ParsedRecomm
       ? parsed.preferredBrands.map((item) => String(item).trim().toLowerCase()).filter(Boolean)
       : [],
     minYear: typeof parsed.minYear === "number" ? parsed.minYear : null,
+    maxYear: typeof parsed.maxYear === "number" ? parsed.maxYear : null,
     startTime: typeof parsed.startTime === "string" && parsed.startTime.trim() ? parsed.startTime : null,
     endTime: typeof parsed.endTime === "string" && parsed.endTime.trim() ? parsed.endTime : null,
     requiresAvailableOnDates: Boolean(parsed.requiresAvailableOnDates),

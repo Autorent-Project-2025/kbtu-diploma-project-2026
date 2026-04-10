@@ -1,5 +1,5 @@
 import { config } from "../config/env";
-import { postToOllama } from "../llm/ollamaClient";
+import { completeWithPreferredLlm, describeConfiguredLlm } from "../llm/chatCompletion";
 import { observabilityLogger } from "../observability/logger";
 import { AiRecommendationResponse, ParsedRecommendationQuery, SearchCandidate } from "../types";
 
@@ -50,12 +50,57 @@ function normalizePrompt(prompt: string): string {
   return prompt.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
-type OllamaChatResponse = {
-  message?: {
-    content?: string | null;
-  };
-  response?: string | null;
-};
+function tokenizePrompt(normalizedPrompt: string): string[] {
+  return normalizedPrompt
+    .split(/[\s,.!?;:()"'`«»]+/g)
+    .map((token) => token.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, ""))
+    .filter(Boolean);
+}
+
+const genericPromptTokens = new Set([
+  "а",
+  "и",
+  "или",
+  "есть",
+  "ли",
+  "что",
+  "какие",
+  "какая",
+  "какой",
+  "какое",
+  "можно",
+  "нужно",
+  "мне",
+  "могу",
+  "хочу",
+  "посоветуй",
+  "посоветуешь",
+  "подбери",
+  "подберите",
+  "покажи",
+  "найди",
+  "варианты",
+  "вариант",
+  "машина",
+  "машину",
+  "машины",
+  "авто",
+  "автомобиль",
+  "автомобили",
+  "car",
+  "cars",
+  "show",
+  "find",
+  "need",
+  "want",
+  "please",
+]);
+
+function hasSpecificSearchToken(normalizedPrompt: string): boolean {
+  return tokenizePrompt(normalizedPrompt).some(
+    (token) => token.length >= 3 && !genericPromptTokens.has(token),
+  );
+}
 
 function hasSearchSignals(query: ParsedRecommendationQuery): boolean {
   return (
@@ -67,6 +112,7 @@ function hasSearchSignals(query: ParsedRecommendationQuery): boolean {
     query.excludedStyles.length > 0 ||
     query.preferredBrands.length > 0 ||
     query.minYear != null ||
+    query.maxYear != null ||
     query.requiresAvailableOnDates
   );
 }
@@ -95,6 +141,11 @@ export function shouldAskClarifyingQuestion(
   const hasCarIntentKeyword = carIntentKeywords.some((keyword) =>
     normalizedPrompt.includes(keyword),
   );
+  const hasSpecificToken = hasSpecificSearchToken(normalizedPrompt);
+
+  if (hasSpecificToken) {
+    return false;
+  }
 
   return words.length <= 3 && !hasCarIntentKeyword;
 }
@@ -104,6 +155,21 @@ function composeDeterministicRecommendationText(
   cars: SearchCandidate[],
 ): string {
   if (cars.length === 0) {
+    const requestedStyle = query.preferredStyles[0] ?? null;
+    const styleLabel = requestedStyle ? `в стиле ${requestedStyle}` : "по этому запросу";
+
+    if (query.maxBudgetPerHour != null && requestedStyle) {
+      return `Не нашлось машин ${styleLabel} до ${query.maxBudgetPerHour} ₸/час. Попробуйте увеличить бюджет или смягчить требования к стилю.`;
+    }
+
+    if (requestedStyle) {
+      return `Не нашлось машин ${styleLabel}. Попробуйте расширить запрос или убрать жёсткое ограничение по стилю.`;
+    }
+
+    if (query.maxBudgetPerHour != null) {
+      return `Не нашлось машин до ${query.maxBudgetPerHour} ₸/час. Попробуйте немного увеличить бюджет или убрать часть ограничений.`;
+    }
+
     return "Подходящих машин по этому запросу сейчас не нашлось. Попробуйте смягчить бюджет, убрать жёсткие ограничения или уточнить сценарий поездки.";
   }
 
@@ -137,6 +203,14 @@ function composeDeterministicRecommendationText(
     summaryParts.push(`проверил вместимость от ${query.passengers} мест`);
   }
 
+  if (query.minYear != null && query.maxYear != null) {
+    summaryParts.push(`учёл год выпуска от ${query.minYear} до ${query.maxYear}`);
+  } else if (query.minYear != null) {
+    summaryParts.push(`учёл год выпуска от ${query.minYear}`);
+  } else if (query.maxYear != null) {
+    summaryParts.push(`учёл год выпуска до ${query.maxYear}`);
+  }
+
   const summary = summaryParts.length > 0 ? `${summaryParts.join(", ")}. ` : "";
   return `Нашёл ${cars.length} наиболее подходящих машин. ${summary}Ниже варианты с лучшим совпадением по смыслу запроса, бюджету и рейтингу.`;
 }
@@ -167,124 +241,189 @@ function normalizeAssistantText(content: string): string {
   return content.replace(/\s+/g, " ").trim();
 }
 
-async function generateWithLocalLlm(
-  kind: "clarification" | "recommendation",
+function countMatches(text: string, pattern: RegExp): number {
+  return text.match(pattern)?.length ?? 0;
+}
+
+function looksRussianEnough(content: string): boolean {
+  const cyrillicCount = countMatches(content, /[А-Яа-яЁё]/g);
+  const latinCount = countMatches(content, /[A-Za-z]/g);
+
+  if (cyrillicCount < 6) {
+    return false;
+  }
+
+  return cyrillicCount >= latinCount;
+}
+
+function hasInvalidRecommendationArtifacts(content: string): boolean {
+  return (
+    /\$/.test(content) ||
+    /\bper hour\b/i.test(content) ||
+    /\bbased on\b/i.test(content) ||
+    /\bprovided filters\b/i.test(content) ||
+    /\bmeet the criteria\b/i.test(content) ||
+    /^\s*[-*•]/m.test(content)
+  );
+}
+
+function countSentences(content: string): number {
+  const matches = content.match(/[.!?]+/g);
+  return matches?.length ?? 1;
+}
+
+function assertRecommendationSummaryIsAcceptable(content: string) {
+  if (!looksRussianEnough(content)) {
+    throw new Error("LLM recommendation summary is not Russian enough.");
+  }
+
+  if (hasInvalidRecommendationArtifacts(content)) {
+    throw new Error("LLM recommendation summary contains invalid artifacts.");
+  }
+
+  if (countSentences(content) > 2) {
+    throw new Error("LLM recommendation summary is too long.");
+  }
+}
+
+type RecommendationSummaryPayload = {
+  assistantText?: string;
+  referencedPartnerCarIds?: number[];
+};
+
+function normalizeReferencedPartnerCarIds(
+  referencedPartnerCarIds: unknown,
+  cars: SearchCandidate[],
+): number[] {
+  if (!Array.isArray(referencedPartnerCarIds)) {
+    return [];
+  }
+
+  const knownIds = new Set(cars.map((car) => car.partnerCarId));
+  const result: number[] = [];
+  const seenIds = new Set<number>();
+
+  for (const rawId of referencedPartnerCarIds) {
+    const partnerCarId = Number(rawId);
+    if (!Number.isInteger(partnerCarId) || seenIds.has(partnerCarId) || !knownIds.has(partnerCarId)) {
+      continue;
+    }
+
+    seenIds.add(partnerCarId);
+    result.push(partnerCarId);
+  }
+
+  return result;
+}
+
+async function generateRecommendationSummaryWithLlm(
   query: ParsedRecommendationQuery,
   cars: SearchCandidate[],
 ): Promise<string | null> {
-  if (!config.localLlmBaseUrl) {
+  if (!config.llmRecommendationSummaryEnabled || cars.length === 0) {
     return null;
   }
 
-  const systemPrompt = kind === "clarification"
-    ? `
+  const llm = describeConfiguredLlm();
+  if (!llm) {
+    return null;
+  }
+
+  const systemPrompt = `
 You are AutoRent AI assistant.
-Reply in Russian.
-Write exactly one short natural reply to the user's latest message.
-The user has not yet provided enough constraints for a car search.
-Politely guide them to provide criteria like budget, type of car, transmission, seats, dates, or rating threshold.
-Ask only about supported criteria.
-Do not ask about city, location, brand availability, or anything outside the provided criteria.
-Keep it concise, practical, and conversational.
-Maximum 22 words.
-Do not use bullet points or markdown.
-Do not mention internal filters or JSON.
-Vary phrasing naturally and react to the user's exact wording.
-`.trim()
-    : `
-You are AutoRent AI assistant.
-Reply in Russian.
-Write one or two concise natural sentences.
-You already have a deterministic ranked list of cars.
-Summarize the result without inventing facts.
-You may mention up to two car names from the provided list.
-Do not use bullet points or markdown.
-Do not mention vector search, embeddings, internal filters, or technical details.
+Return only valid JSON.
+Reply in Russian and use Cyrillic in assistantText.
+Summarize the already-ranked recommendation result in one or two concise natural sentences.
+Stay grounded strictly in the provided filters and candidate cars.
+You may mention at most two car titles from the provided list.
+Do not invent facts, brands, availability, missing data, prices, or counts.
+Do not use bullet points, markdown, or English explanatory phrases.
+Do not write phrases like "Based on the user's request" or "meet the criteria".
+If a price is mentioned, keep the provided format unchanged.
+Schema:
+{
+  "assistantText": string,
+  "referencedPartnerCarIds": number[]
+}
 `.trim();
 
-  const userPrompt = kind === "clarification"
-    ? `
-User message: ${query.prompt}
-
-Known extracted filters:
-${JSON.stringify({
-  maxBudgetPerHour: query.maxBudgetPerHour,
-  passengers: query.passengers,
-        transmission: query.transmission,
-        minRating: query.minRating,
-        preferredStyles: query.preferredStyles,
-        excludedStyles: query.excludedStyles,
-        preferredBrands: query.preferredBrands,
-        minYear: query.minYear,
-        startTime: query.startTime,
-        endTime: query.endTime,
-}, null, 2)}
-
-Write a short reply that asks for missing car-selection criteria.
-`.trim()
-    : `
-User message: ${query.prompt}
+  const userPrompt = `
+User message:
+${query.prompt}
 
 Extracted filters:
 ${JSON.stringify({
   maxBudgetPerHour: query.maxBudgetPerHour,
   passengers: query.passengers,
-        transmission: query.transmission,
-        minRating: query.minRating,
-        preferredStyles: query.preferredStyles,
-        excludedStyles: query.excludedStyles,
-        preferredBrands: query.preferredBrands,
-        minYear: query.minYear,
-        startTime: query.startTime,
-        endTime: query.endTime,
+  transmission: query.transmission,
+  minRating: query.minRating,
+  preferredStyles: query.preferredStyles,
+  excludedStyles: query.excludedStyles,
+  preferredBrands: query.preferredBrands,
+  minYear: query.minYear,
+  maxYear: query.maxYear,
+  startTime: query.startTime,
+  endTime: query.endTime,
+  requiresAvailableOnDates: query.requiresAvailableOnDates,
 }, null, 2)}
 
 Top cars:
-${formatCarsForPrompt(cars)}
-
-Write a short result summary based only on this data.
+${JSON.stringify(
+  cars.slice(0, 4).map((car, index) => ({
+    rank: index + 1,
+    partnerCarId: car.partnerCarId,
+    title: car.title,
+    priceHourLabel: car.priceHour != null ? `${car.priceHour} ₸/час` : "цена не указана",
+    ratingLabel: car.rating != null ? `рейтинг ${car.rating}` : "без рейтинга",
+    carrierName: car.carrierName,
+    reasons: car.reasons,
+  })),
+  null,
+  2,
+)}
 `.trim();
 
   try {
-    const payload = await postToOllama<OllamaChatResponse>("/api/chat", {
-      model: config.localLlmChatModel,
-      stream: false,
-      options: {
-        temperature: kind === "clarification" ? 0.7 : 0.45,
-        num_predict: kind === "clarification" ? 60 : 120,
-      },
-      messages: [
-        {
-          role: "system",
-          content: systemPrompt,
-        },
-        {
-          role: "user",
-          content: userPrompt,
-        },
-      ],
+    const completion = await completeWithPreferredLlm({
+      systemPrompt,
+      userPrompt,
+      responseType: "json",
+      temperature: 0.2,
+      maxOutputTokens: 160,
+      timeoutMs: config.llmRecommendationSummaryTimeoutMs,
     });
 
-    const content = normalizeAssistantText(
-      payload.message?.content?.trim() || payload.response?.trim() || "",
-    );
-
-    if (!content) {
-      throw new Error("Local LLM answer generation returned empty content.");
+    if (!completion) {
+      return null;
     }
 
-    observabilityLogger.info("local_llm_answer_generation_succeeded", {
-      kind,
-      model: config.localLlmChatModel,
+    const payload = JSON.parse(completion.content) as RecommendationSummaryPayload;
+    const assistantText = normalizeAssistantText(String(payload.assistantText ?? ""));
+    if (!assistantText) {
+      throw new Error("LLM recommendation summary payload is empty.");
+    }
+
+    assertRecommendationSummaryIsAcceptable(assistantText);
+
+    const referencedPartnerCarIds = normalizeReferencedPartnerCarIds(
+      payload.referencedPartnerCarIds,
+      cars.slice(0, 4),
+    );
+
+    observabilityLogger.info("llm_recommendation_summary_succeeded", {
+      provider: completion.provider,
+      model: completion.model,
       carsCount: cars.length,
+      referencedPartnerCarIds,
     });
 
-    return content;
+    return assistantText;
   } catch (error) {
-    observabilityLogger.warn("local_llm_answer_generation_failed_fallback_to_template", {
-      kind,
+    observabilityLogger.warn("llm_recommendation_summary_failed_fallback_to_deterministic", {
+      provider: llm.provider,
+      model: llm.model,
       errorMessage: error instanceof Error ? error.message : String(error),
-      model: config.localLlmChatModel,
+      carsCount: cars.length,
     });
     return null;
   }
@@ -294,7 +433,9 @@ export async function composeRecommendationResponse(
   query: ParsedRecommendationQuery,
   cars: SearchCandidate[],
 ): Promise<AiRecommendationResponse> {
-  const assistantText = composeDeterministicRecommendationText(query, cars);
+  const assistantText =
+    (await generateRecommendationSummaryWithLlm(query, cars)) ??
+    composeDeterministicRecommendationText(query, cars);
 
   return {
     assistantText,
@@ -307,9 +448,7 @@ export async function composeRecommendationResponse(
 export async function composeClarificationResponse(
   query: ParsedRecommendationQuery,
 ): Promise<AiRecommendationResponse> {
-  const assistantText =
-    (await generateWithLocalLlm("clarification", query, [])) ??
-    composeDeterministicClarificationText();
+  const assistantText = composeDeterministicClarificationText();
 
   return {
     assistantText,

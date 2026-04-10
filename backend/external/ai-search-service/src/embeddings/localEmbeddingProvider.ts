@@ -1,15 +1,5 @@
 import { config } from "../config/env";
-
-const tokenSynonyms: Record<string, string[]> = {
-  sport: ["sport", "sports", "спортив", "спорт", "спорткар", "rx7", "supra", "coupe", "купе"],
-  business: ["business", "бизнес", "делов", "meeting", "airport", "aeroport"],
-  family: ["family", "сем", "children", "дет", "багаж", "trunk"],
-  city: ["city", "город", "urban", "ежеднев", "парковк"],
-  luxury: ["luxury", "premium", "люкс", "премиум"],
-  automatic: ["automatic", "автомат", "акпп"],
-  manual: ["manual", "механик", "мкпп"],
-  budget: ["budget", "бюджет", "cheap", "деш", "эконом"],
-};
+import { LOCAL_EMBEDDING_TOKEN_SYNONYMS } from "../queryTaxonomy";
 
 function normalizeToken(token: string): string {
   return token.trim().toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "");
@@ -35,7 +25,7 @@ function expandSemanticTokens(tokens: string[]): string[] {
   const expanded = [...tokens];
 
   for (const token of tokens) {
-    for (const [semanticToken, variants] of Object.entries(tokenSynonyms)) {
+    for (const [semanticToken, variants] of Object.entries(LOCAL_EMBEDDING_TOKEN_SYNONYMS)) {
       if (variants.some((variant) => token.includes(variant))) {
         expanded.push(semanticToken);
       }

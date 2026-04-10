@@ -76,6 +76,14 @@ export const config = {
     process.env.LOCAL_LLM_TIMEOUT_SECONDS,
     90,
   ),
+  llmRecommendationSummaryEnabled: parseBoolean(
+    process.env.LLM_RECOMMENDATION_SUMMARY_ENABLED,
+    false,
+  ),
+  llmRecommendationSummaryTimeoutMs: parsePositiveInteger(
+    process.env.LLM_RECOMMENDATION_SUMMARY_TIMEOUT_MS,
+    2500,
+  ),
   openAiApiKey: process.env.OPENAI_API_KEY?.trim() || null,
   openAiBaseUrl: required("OPENAI_BASE_URL", "https://api.openai.com/v1"),
   openAiChatModel: required("OPENAI_CHAT_MODEL", "gpt-4.1-mini"),

@@ -2,6 +2,8 @@ import { createEmbedding } from "../embeddings";
 import { sql } from "../db/sql";
 import { isPartnerCarAvailableOnDates } from "../integrations/catalogClient";
 import { ParsedRecommendationQuery, SearchCandidate } from "../types";
+import { rerankCarsWithLlm } from "./llmReranker";
+import { hasExplicitPreferredStyleIntent } from "../ai/heuristicQueryParser";
 
 type RawSearchRow = {
   partnerCarId: number;
@@ -94,6 +96,13 @@ function buildReasons(row: RankedSearchRow, query: ParsedRecommendationQuery): s
     reasons.push("подходит по количеству мест");
   }
 
+  if (
+    (query.minYear != null && row.year >= query.minYear) ||
+    (query.maxYear != null && row.year <= query.maxYear)
+  ) {
+    reasons.push("подходит по году выпуска");
+  }
+
   if (row.rating != null && row.rating >= 4.5) {
     reasons.push("высокий рейтинг");
   }
@@ -136,6 +145,10 @@ function computeBusinessScore(row: RankedSearchRow, query: ParsedRecommendationQ
     score += 0.1;
   }
 
+  if (query.maxYear != null && row.year <= query.maxYear) {
+    score += 0.1;
+  }
+
   if (row.rating != null) {
     score += Math.min(row.rating / 5, 1) * 0.15;
   }
@@ -152,6 +165,8 @@ function buildRetrievalPrompt(prompt: string, query: ParsedRecommendationQuery):
     query.minRating != null ? `${query.minRating} star rating or higher` : null,
     query.passengers != null ? `${query.passengers} seats` : null,
     query.maxBudgetPerHour != null ? `${query.maxBudgetPerHour} kzt per hour` : null,
+    query.minYear != null ? `year from ${query.minYear}` : null,
+    query.maxYear != null ? `year up to ${query.maxYear}` : null,
     ...query.excludedStyles.map((style) => `not ${style}`),
   ].filter((part): part is string => Boolean(part && part.trim()));
 
@@ -191,6 +206,7 @@ async function fetchCandidates(
       where (${query.maxBudgetPerHour ?? null}::numeric is null or price_hour is null or price_hour <= ${query.maxBudgetPerHour ?? null} * 1.25)
         and (${query.passengers ?? null}::int is null or seats is null or seats >= ${query.passengers ?? null})
         and (${query.minYear ?? null}::int is null or year >= ${query.minYear ?? null})
+        and (${query.maxYear ?? null}::int is null or year <= ${query.maxYear ?? null})
         and (${query.transmission ?? null}::text is null or lower(coalesce(transmission, '')) = ${query.transmission ?? null})
         and (${query.minRating ?? null}::numeric is null or (rating is not null and rating >= ${query.minRating ?? null}))
         and (
@@ -243,7 +259,15 @@ function applyPreferredStyleFilter(
     query.preferredStyles.some((style) => row.tags?.includes(style)),
   );
 
-  return matchedRows.length > 0 ? matchedRows : rows;
+  if (matchedRows.length > 0) {
+    return matchedRows;
+  }
+
+  if (hasExplicitPreferredStyleIntent(query.prompt, query.preferredStyles)) {
+    return [];
+  }
+
+  return rows;
 }
 
 function applyExcludedStyleFilter(
@@ -287,7 +311,7 @@ export async function searchCars(
   const excludedStyleFilteredCandidates = applyExcludedStyleFilter(styleFilteredCandidates, query);
   const filteredCandidates = applyBudgetFilter(excludedStyleFilteredCandidates, query);
 
-  return filteredCandidates
+  const scoredCandidates = filteredCandidates
     .map((rawRow) => {
       const row = normalizeRow(rawRow);
       const vectorScore = row.vectorDistance == null ? 0 : Math.max(0, 1 - row.vectorDistance);
@@ -318,6 +342,7 @@ export async function searchCars(
         reasons: buildReasons(row, query),
       } satisfies SearchCandidate;
     })
-    .sort((left, right) => right.finalScore - left.finalScore)
-    .slice(0, 6);
+    .sort((left, right) => right.finalScore - left.finalScore);
+
+  return (await rerankCarsWithLlm(query, scoredCandidates)).slice(0, 6);
 }
