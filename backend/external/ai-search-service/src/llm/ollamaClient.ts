@@ -11,13 +11,11 @@ function ensureBaseUrl(): string {
 export async function postToOllama<TResponse>(
   path: string,
   payload: Record<string, unknown>,
+  timeoutMs = config.localLlmTimeoutSeconds * 1000,
 ): Promise<TResponse> {
   const baseUrl = ensureBaseUrl();
   const controller = new AbortController();
-  const timeoutHandle = setTimeout(
-    () => controller.abort(),
-    config.localLlmTimeoutSeconds * 1000,
-  );
+  const timeoutHandle = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     const response = await fetch(`${baseUrl}${path}`, {

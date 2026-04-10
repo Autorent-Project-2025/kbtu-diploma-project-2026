@@ -20,6 +20,7 @@ Schema:
   "excludedStyles": string[],
   "preferredBrands": string[],
   "minYear": number | null,
+  "maxYear": number | null,
   "startTime": string | null,
   "endTime": string | null,
   "requiresAvailableOnDates": boolean
@@ -29,6 +30,9 @@ Allowed transmission labels: ${TRANSMISSION_LABELS_TEXT}.
 If a value is not explicitly or reasonably inferable, return null or [].
 Do not invent budget, passenger count, transmission, or dates when they are not explicitly present in the user request.
 If the user asks for rating threshold like "рейтинг больше 4.5", put it into "minRating".
+Use "minYear" for requests like "от 2020 года", "2020+" or "не старше 2020".
+Use "maxYear" for requests like "до 2020 года", "по 2020 год" or "не новее 2020".
+Do not put year values into "maxBudgetPerHour".
 `;
 
 type OllamaChatResponse = {
@@ -74,6 +78,7 @@ function normalizeQuery(
           .filter(Boolean)
       : [],
     minYear: typeof parsed.minYear === "number" ? parsed.minYear : null,
+    maxYear: typeof parsed.maxYear === "number" ? parsed.maxYear : null,
     startTime:
       typeof parsed.startTime === "string" && parsed.startTime.trim()
         ? parsed.startTime.trim()

@@ -142,6 +142,25 @@ function isVariantNegated(normalizedPrompt: string, variant: string): boolean {
   );
 }
 
+export function hasExplicitPreferredStyleIntent(
+  prompt: string,
+  preferredStyles: string[],
+): boolean {
+  const normalizedPrompt = normalizePrompt(prompt);
+
+  return preferredStyles.some((style) => {
+    const styleEntry = STYLE_DICTIONARY.find((item) => item.label === style);
+    if (!styleEntry) {
+      return false;
+    }
+
+    return styleEntry.variants.some(
+      (variant) =>
+        normalizedPrompt.includes(variant) && !isVariantNegated(normalizedPrompt, variant),
+    );
+  });
+}
+
 export function canonicalizeStyleLabel(value: string): string | null {
   const normalized = normalizePrompt(value);
   if (!normalized) {
@@ -175,14 +194,21 @@ export function canonicalizeTransmissionLabel(value: string): string | null {
 function parseBudget(prompt: string): number | null {
   const normalized = normalizePrompt(prompt);
   const compact = normalized.replace(/\s+/g, "");
-  const thousandMatch = compact.match(/до(\d+(?:[.,]\d+)?)тыс/);
-  if (thousandMatch) {
-    return Math.round(Number(thousandMatch[1].replace(",", ".")) * 1000);
+  const thousandMatches = compact.matchAll(/до(\d+(?:[.,]\d+)?)тыс/gu);
+  for (const match of thousandMatches) {
+    return Math.round(Number(match[1].replace(",", ".")) * 1000);
   }
 
-  const currencyMatch = compact.match(/до(\d{3,6})/);
-  if (currencyMatch) {
-    return Number(currencyMatch[1]);
+  const currencyMatches = compact.matchAll(/до(\d{3,6})(?:₸|тенге|kzt|тг|tg)?/gu);
+  for (const match of currencyMatches) {
+    const matchStart = match.index ?? 0;
+    const matchEnd = matchStart + match[0].length;
+    const trailingText = compact.slice(matchEnd);
+    if (/^(?:г|г\.|год|года|year)/u.test(trailingText)) {
+      continue;
+    }
+
+    return Number(match[1]);
   }
 
   return null;
@@ -228,7 +254,7 @@ export function hasExplicitYearIntent(prompt: string): boolean {
   const normalized = normalizePrompt(prompt);
   return (
     /(?:\b(19\d{2}|20\d{2})\s*(?:г|г\.|год|года|year)\b)/.test(normalized) ||
-    /(?:\b(?:от|с|после|не старше|не ниже|начиная с)\b[^\d]{0,12}(19\d{2}|20\d{2}))/u.test(
+    /(?:\b(?:от|с|после|не старше|не ниже|начиная с|до|по|не новее|не позже|не позднее)\b[^\d]{0,12}(19\d{2}|20\d{2}))/u.test(
       normalized,
     ) ||
     /\b(19\d{2}|20\d{2})\s*\+\b/.test(normalized)
@@ -242,9 +268,30 @@ function parseMinYear(prompt: string): number | null {
   }
 
   const patterns = [
-    /\b(19\d{2}|20\d{2})\s*(?:г|г\.|год|года|year)\b/,
-    /\b(?:от|с|после|не старше|не ниже|начиная с)\b[^\d]{0,12}(19\d{2}|20\d{2})/u,
+    /\b(?:от|с|после|не старше|не ниже|начиная с)\b[^\d]{0,12}(19\d{2}|20\d{2})(?:\s*(?:г|г\.|год|года|year))?\b/u,
     /\b(19\d{2}|20\d{2})\s*\+\b/,
+    /\b(19\d{2}|20\d{2})(?:\s*(?:г|г\.|год|года|year))?\s*(?:и\s*)?(?:новее|newer)\b/u,
+  ];
+
+  for (const pattern of patterns) {
+    const match = normalized.match(pattern);
+    if (match) {
+      return Number(match[1]);
+    }
+  }
+
+  return null;
+}
+
+function parseMaxYear(prompt: string): number | null {
+  const normalized = normalizePrompt(prompt);
+  if (!hasExplicitYearIntent(normalized)) {
+    return null;
+  }
+
+  const patterns = [
+    /\b(?:до|по|не новее|не позже|не позднее)\b[^\d]{0,12}(19\d{2}|20\d{2})(?:\s*(?:г|г\.|год|года|year))?\b/u,
+    /\b(19\d{2}|20\d{2})(?:\s*(?:г|г\.|год|года|year))?\s*(?:или\s*)?(?:старше|older|earlier)\b/u,
   ];
 
   for (const pattern of patterns) {
@@ -307,6 +354,7 @@ export function parseQueryHeuristically(prompt: string): ParsedRecommendationQue
     excludedStyles,
     preferredBrands: parsePreferredBrands(normalized),
     minYear: parseMinYear(normalized),
+    maxYear: parseMaxYear(normalized),
     startTime: availabilityRange?.startTime ?? null,
     endTime: availabilityRange?.endTime ?? null,
     requiresAvailableOnDates: availabilityRange?.requiresAvailableOnDates ?? false,

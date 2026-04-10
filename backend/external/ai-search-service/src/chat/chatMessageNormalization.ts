@@ -97,6 +97,7 @@ export function normalizeParsedRecommendationQuery(
         .filter(Boolean),
     ),
     minYear: toFiniteNumber(query.minYear),
+    maxYear: toFiniteNumber(query.maxYear),
     startTime: toStringValue(query.startTime, 128),
     endTime: toStringValue(query.endTime, 128),
     requiresAvailableOnDates: Boolean(query.requiresAvailableOnDates),

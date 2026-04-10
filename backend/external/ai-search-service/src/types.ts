@@ -8,6 +8,7 @@ export type ParsedRecommendationQuery = {
   excludedStyles: string[];
   preferredBrands: string[];
   minYear: number | null;
+  maxYear: number | null;
   startTime: string | null;
   endTime: string | null;
   requiresAvailableOnDates: boolean;

@@ -3,6 +3,7 @@ import { observabilityLogger } from "../observability/logger";
 import { ParsedRecommendationQuery, SearchCandidate } from "../types";
 
 const MAX_CANDIDATES_TO_RERANK = 10;
+const LLM_RERANK_TIMEOUT_MS = 3500;
 
 type RerankResponse = {
   rankedPartnerCarIds?: number[];
@@ -17,7 +18,7 @@ function buildRerankPrompt(
 You rerank car recommendations for AutoRent.
 Return only valid JSON.
 Choose the best overall order for the provided candidates based on the user query and extracted filters.
-Respect explicit constraints first: budget, seats, transmission, rating, dates, excluded styles, preferred brands, year.
+   Respect explicit constraints first: budget, seats, transmission, rating, dates, excluded styles, preferred brands, minYear, maxYear.
 Then optimize for overall scenario fit and user intent.
 Do not invent candidate facts.
 Return this schema:
@@ -41,6 +42,7 @@ ${JSON.stringify({
   excludedStyles: query.excludedStyles,
   preferredBrands: query.preferredBrands,
   minYear: query.minYear,
+  maxYear: query.maxYear,
   startTime: query.startTime,
   endTime: query.endTime,
   requiresAvailableOnDates: query.requiresAvailableOnDates,
@@ -124,6 +126,7 @@ export async function rerankCarsWithLlm(
       responseType: "json",
       temperature: 0,
       maxOutputTokens: 200,
+      timeoutMs: LLM_RERANK_TIMEOUT_MS,
     });
 
     if (!completion) {

@@ -38,7 +38,11 @@ function isFilterOnlyFollowUpPrompt(
     return true;
   }
 
-  if (currentQuery.maxBudgetPerHour != null && /^(?:до|от)\s*\d/u.test(normalizedPrompt)) {
+  if (
+    currentQuery.maxBudgetPerHour != null &&
+    /^(?:до|от)\s*\d/u.test(normalizedPrompt) &&
+    !hasExplicitYearIntent(normalizedPrompt)
+  ) {
     return true;
   }
 
@@ -59,6 +63,15 @@ function isFilterOnlyFollowUpPrompt(
   if (
     currentQuery.minYear != null &&
     /^(?:(?:от|с|после|не старше|не ниже|начиная с)\s*)?(?:19\d{2}|20\d{2})(?:\s*(?:г|г\.|год|года|year|\+))?$/u.test(
+      normalizedPrompt,
+    )
+  ) {
+    return true;
+  }
+
+  if (
+    currentQuery.maxYear != null &&
+    /^(?:(?:до|по|не новее|не позже|не позднее)\s*)?(?:19\d{2}|20\d{2})(?:\s*(?:г|г\.|год|года|year))?$/u.test(
       normalizedPrompt,
     )
   ) {
@@ -143,6 +156,7 @@ function mergeWithConversationContext(
     ...previousQuery.excludedStyles,
     ...currentQuery.excludedStyles,
   ]).filter((style) => !preferredStyles.includes(style));
+  const hasCurrentYearIntent = hasExplicitYearIntent(currentQuery.prompt);
 
   return {
     prompt: currentQuery.prompt,
@@ -156,7 +170,12 @@ function mergeWithConversationContext(
       currentQuery.preferredBrands.length > 0
         ? currentQuery.preferredBrands
         : previousQuery.preferredBrands,
-    minYear: currentQuery.minYear ?? previousQuery.minYear,
+    minYear: hasCurrentYearIntent
+      ? currentQuery.minYear
+      : currentQuery.minYear ?? previousQuery.minYear,
+    maxYear: hasCurrentYearIntent
+      ? currentQuery.maxYear
+      : currentQuery.maxYear ?? previousQuery.maxYear,
     startTime: currentQuery.startTime ?? previousQuery.startTime,
     endTime: currentQuery.endTime ?? previousQuery.endTime,
     requiresAvailableOnDates:
@@ -207,6 +226,7 @@ function reconcileWithHeuristics(
       ...modelPreferredBrands,
     ]),
     minYear: hasYearIntent ? heuristicQuery.minYear ?? modelQuery.minYear : null,
+    maxYear: hasYearIntent ? heuristicQuery.maxYear ?? modelQuery.maxYear : null,
     startTime: heuristicQuery.startTime ?? modelQuery.startTime,
     endTime: heuristicQuery.endTime ?? modelQuery.endTime,
     requiresAvailableOnDates:
@@ -233,6 +253,8 @@ export async function parseRecommendationQuery(
         minRating: reconciled.minRating,
         preferredStyles: reconciled.preferredStyles,
         excludedStyles: reconciled.excludedStyles,
+        minYear: reconciled.minYear,
+        maxYear: reconciled.maxYear,
       });
       resolvedQuery = reconciled;
     } catch (error) {
@@ -273,6 +295,8 @@ export async function parseRecommendationQuery(
     mergedExcludedStyles: mergedQuery.excludedStyles,
     maxBudgetPerHour: mergedQuery.maxBudgetPerHour,
     minRating: mergedQuery.minRating,
+    minYear: mergedQuery.minYear,
+    maxYear: mergedQuery.maxYear,
   });
 
   return mergedQuery;

@@ -9,6 +9,7 @@ type CompletionOptions = {
   responseType: ResponseType;
   temperature?: number;
   maxOutputTokens?: number;
+  timeoutMs?: number;
 };
 
 type CompletionProvider = "local" | "openai";
@@ -95,7 +96,7 @@ async function completeWithLocalLlm(
         content: options.userPrompt.trim(),
       },
     ],
-  });
+  }, options.timeoutMs);
 
   const content = payload.message?.content?.trim() || payload.response?.trim() || "";
   if (!content) {
@@ -112,50 +113,61 @@ async function completeWithLocalLlm(
 async function completeWithOpenAi(
   options: CompletionOptions,
 ): Promise<LlmCompletionResult> {
-  const response = await fetch(`${config.openAiBaseUrl.replace(/\/$/, "")}/chat/completions`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${config.openAiApiKey}`,
-    },
-    body: JSON.stringify({
+  const controller = new AbortController();
+  const timeoutHandle = setTimeout(
+    () => controller.abort(),
+    options.timeoutMs ?? config.localLlmTimeoutSeconds * 1000,
+  );
+
+  try {
+    const response = await fetch(`${config.openAiBaseUrl.replace(/\/$/, "")}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${config.openAiApiKey}`,
+      },
+      body: JSON.stringify({
+        model: config.openAiChatModel,
+        temperature: options.temperature ?? 0,
+        max_tokens: options.maxOutputTokens ?? 160,
+        ...(options.responseType === "json"
+          ? { response_format: { type: "json_object" } }
+          : {}),
+        messages: [
+          {
+            role: "system",
+            content: options.systemPrompt.trim(),
+          },
+          {
+            role: "user",
+            content: options.userPrompt.trim(),
+          },
+        ],
+      }),
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      throw new Error(`OpenAI chat request failed with status ${response.status}.`);
+    }
+
+    const payload = (await response.json()) as {
+      choices?: Array<{ message?: { content?: string | null } }>;
+    };
+
+    const content = payload.choices?.[0]?.message?.content?.trim() || "";
+    if (!content) {
+      throw new Error("OpenAI completion returned empty content.");
+    }
+
+    return {
+      content: normalizeContent(content, options.responseType),
       model: config.openAiChatModel,
-      temperature: options.temperature ?? 0,
-      max_tokens: options.maxOutputTokens ?? 160,
-      ...(options.responseType === "json"
-        ? { response_format: { type: "json_object" } }
-        : {}),
-      messages: [
-        {
-          role: "system",
-          content: options.systemPrompt.trim(),
-        },
-        {
-          role: "user",
-          content: options.userPrompt.trim(),
-        },
-      ],
-    }),
-  });
-
-  if (!response.ok) {
-    throw new Error(`OpenAI chat request failed with status ${response.status}.`);
+      provider: "openai",
+    };
+  } finally {
+    clearTimeout(timeoutHandle);
   }
-
-  const payload = (await response.json()) as {
-    choices?: Array<{ message?: { content?: string | null } }>;
-  };
-
-  const content = payload.choices?.[0]?.message?.content?.trim() || "";
-  if (!content) {
-    throw new Error("OpenAI completion returned empty content.");
-  }
-
-  return {
-    content: normalizeContent(content, options.responseType),
-    model: config.openAiChatModel,
-    provider: "openai",
-  };
 }
 
 export async function completeWithPreferredLlm(
