@@ -19,10 +19,21 @@ public class ClientService : IClientService
         _imageStorageClient = imageStorageClient;
     }
 
-    public async Task<IReadOnlyCollection<ClientResponseDto>> GetAllAsync(CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyCollection<ClientResponseDto>> GetAllAsync(string? search = null, CancellationToken cancellationToken = default)
     {
-        return await _db.Clients
-            .AsNoTracking()
+        IQueryable<Client> query = _db.Clients.AsNoTracking();
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var q = search.Trim().ToLower();
+            query = query.Where(c =>
+                c.FirstName.ToLower().Contains(q) ||
+                c.LastName.ToLower().Contains(q) ||
+                c.PhoneNumber.ToLower().Contains(q) ||
+                c.RelatedUserId.ToLower().Contains(q));
+        }
+
+        return await query
             .OrderByDescending(client => client.CreatedOn)
             .ThenByDescending(client => client.Id)
             .SelectToClientResponseDto()

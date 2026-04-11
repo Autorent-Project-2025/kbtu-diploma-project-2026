@@ -73,14 +73,15 @@ export interface BookingsFilter {
   userId?: string;
   partnerUserId?: string;
   partnerCarId?: number;
+  search?: string;
 }
 
 export async function getAllBookings(
   filter: BookingsFilter = {},
 ): Promise<BookingsPagedResult> {
-  const { page = 1, pageSize = 20, sortBy, sortOrder, status, userId, partnerUserId, partnerCarId } = filter;
+  const { page = 1, pageSize = 20, sortBy, sortOrder, status, userId, partnerUserId, partnerCarId, search } = filter;
   const res = await api.get("/bookings/all", {
-    params: { page, pageSize, sortBy, sortOrder, status, userId, partnerUserId, partnerCarId },
+    params: { page, pageSize, sortBy, sortOrder, status, userId, partnerUserId, partnerCarId, search },
   });
   return res.data as BookingsPagedResult;
 }
@@ -95,6 +96,6 @@ export async function cancelBooking(id: number): Promise<void> {
 }
 
 export async function getBookingCharges(bookingId: number): Promise<BookingChargeDto[]> {
-  const res = await api.get(`/bookings/${bookingId}/charges`);
+  const res = await api.get(`/bookings/all/${bookingId}/charges`);
   return (res.data ?? []) as BookingChargeDto[];
 }

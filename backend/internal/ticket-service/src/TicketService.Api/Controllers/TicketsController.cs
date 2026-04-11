@@ -103,9 +103,9 @@ public sealed class TicketsController : ControllerBase
 
     [Authorize(Policy = "tickets:view-all")]
     [HttpGet("all")]
-    public async Task<IActionResult> GetAll(CancellationToken cancellationToken)
+    public async Task<IActionResult> GetAll([FromQuery] string? search, CancellationToken cancellationToken)
     {
-        var result = await _getAllTicketsQueryHandler.Handle(new GetAllTicketsQuery(), cancellationToken);
+        var result = await _getAllTicketsQueryHandler.Handle(new GetAllTicketsQuery(search), cancellationToken);
         return Ok(result.Tickets);
     }
 

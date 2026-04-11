@@ -101,6 +101,14 @@ namespace BookingService.Api.Controllers
             return Ok(booking);
         }
 
+        [HttpGet("all/{id:int}/charges")]
+        [Authorize(Policy = "bookings:view")]
+        public async Task<IActionResult> GetAllCharges(int id, CancellationToken cancellationToken)
+        {
+            var charges = await _bookingService.GetAllBookingCharges(id, cancellationToken);
+            return Ok(charges);
+        }
+
         [HttpPost("all/{id:int}/cancel")]
         [Authorize(Policy = "bookings:update")]
         public async Task<IActionResult> AdminCancel(int id, CancellationToken cancellationToken)

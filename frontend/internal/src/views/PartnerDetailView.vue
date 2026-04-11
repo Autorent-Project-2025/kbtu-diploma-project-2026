@@ -588,6 +588,14 @@
               </p>
               <p v-else class="text-gray-400 dark:text-gray-600 italic text-sm">Файл не загружен</p>
             </div>
+            <button
+              v-if="partner.contractFileName"
+              @click="openDocument(partner.contractFileName!)"
+              :disabled="docLoading"
+              class="flex-shrink-0 px-4 py-2 rounded-xl border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400 text-xs font-semibold hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors disabled:opacity-40"
+            >
+              Открыть
+            </button>
           </div>
 
           <!-- Identity document -->
@@ -604,11 +612,15 @@
               </p>
               <p v-else class="text-gray-400 dark:text-gray-600 italic text-sm">Файл не загружен</p>
             </div>
+            <button
+              v-if="partner.ownerIdentityFileName"
+              @click="openDocument(partner.ownerIdentityFileName!)"
+              :disabled="docLoading"
+              class="flex-shrink-0 px-4 py-2 rounded-xl border border-violet-200 dark:border-violet-800 text-violet-700 dark:text-violet-400 text-xs font-semibold hover:bg-violet-50 dark:hover:bg-violet-900/20 transition-colors disabled:opacity-40"
+            >
+              Открыть
+            </button>
           </div>
-
-          <p class="text-xs text-gray-400 dark:text-gray-600 italic">
-            Скачивание файлов доступно только самому партнёру через мобильное приложение.
-          </p>
         </div>
       </template>
     </template>
@@ -623,6 +635,7 @@ import {
   getPartnerWallet,
   getPartnerLedger,
   getPartnerPayouts,
+  getPartnerFileTemporaryLink,
   type PartnerDto,
   type PartnerWalletDto,
   type LedgerEntryDto,
@@ -651,6 +664,7 @@ const carsLoading = ref(false);
 const bookingsLoading = ref(false);
 const walletLoading = ref(false);
 const financeLoading = ref(false);
+const docLoading = ref(false);
 
 const partner = ref<PartnerDto | null>(null);
 const wallet = ref<PartnerWalletDto | null>(null);
@@ -695,6 +709,19 @@ function ledgerTypeBadge(type: string): string {
     Fee: "bg-orange-100 text-orange-700 dark:bg-orange-500/20 dark:text-orange-300",
   };
   return map[type] ?? "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400";
+}
+
+async function openDocument(fileName: string) {
+  if (!partner.value) return;
+  docLoading.value = true;
+  try {
+    const link = await getPartnerFileTemporaryLink(partner.value.id, fileName);
+    window.open(link.url, "_blank");
+  } catch {
+    toast.error("Не удалось получить ссылку на документ");
+  } finally {
+    docLoading.value = false;
+  }
 }
 
 // ── Data loaders ───────────────────────────────────────────────────────

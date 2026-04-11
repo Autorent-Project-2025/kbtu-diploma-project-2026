@@ -92,6 +92,15 @@ namespace CarService.Infrastructure.Services
                 query = query.Where(partnerCar => partnerCar.PartnerUserId == queryParams.PartnerUserId.Value);
             }
 
+            if (!string.IsNullOrWhiteSpace(queryParams.Search))
+            {
+                var q = queryParams.Search.Trim().ToLower();
+                query = query.Where(partnerCar =>
+                    partnerCar.LicensePlate.ToLower().Contains(q) ||
+                    partnerCar.CarModel.Brand.Name.ToLower().Contains(q) ||
+                    partnerCar.CarModel.ModelLookup.Name.ToLower().Contains(q));
+            }
+
             query = query
                 .OrderByDescending(partnerCar => partnerCar.CreatedAt)
                 .ThenByDescending(partnerCar => partnerCar.Id);

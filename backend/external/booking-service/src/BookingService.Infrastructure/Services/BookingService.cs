@@ -218,6 +218,37 @@ namespace BookingService.Infrastructure.Services
 
             IQueryable<Booking> query = _db.Bookings.AsNoTracking();
 
+            if (!string.IsNullOrWhiteSpace(queryParams.Status) &&
+                Enum.TryParse<BookingStatus>(queryParams.Status, true, out var statusFilter))
+            {
+                query = query.Where(b => b.Status == statusFilter);
+            }
+
+            if (queryParams.UserId.HasValue)
+            {
+                query = query.Where(b => b.UserId == queryParams.UserId.Value);
+            }
+
+            if (queryParams.PartnerUserId.HasValue)
+            {
+                query = query.Where(b => b.PartnerUserId == queryParams.PartnerUserId.Value);
+            }
+
+            if (queryParams.PartnerCarId.HasValue)
+            {
+                query = query.Where(b => b.PartnerCarId == queryParams.PartnerCarId.Value);
+            }
+
+            if (!string.IsNullOrWhiteSpace(queryParams.Search))
+            {
+                var q = queryParams.Search.Trim().ToLower();
+                var isIdSearch = int.TryParse(queryParams.Search.Trim(), out var searchId);
+                query = query.Where(b =>
+                    (isIdSearch && b.Id == searchId) ||
+                    (b.CarBrand != null && b.CarBrand.ToLower().Contains(q)) ||
+                    (b.CarModel != null && b.CarModel.ToLower().Contains(q)));
+            }
+
             query = sortBy switch
             {
                 "starttime" => isDescending ? query.OrderByDescending(b => b.StartTime) : query.OrderBy(b => b.StartTime),
@@ -662,6 +693,28 @@ namespace BookingService.Infrastructure.Services
 
             return charges
                 .Where(charge => charge.UserId == booking.UserId)
+                .OrderBy(charge => charge.CreatedAt)
+                .Select(MapBookingCharge)
+                .ToArray();
+        }
+
+        public async Task<IReadOnlyCollection<BookingChargeResponseDto>> GetAllBookingCharges(
+            int id,
+            CancellationToken cancellationToken = default)
+        {
+            if (id <= 0)
+            {
+                throw new ArgumentException("Booking id must be greater than zero.", nameof(id));
+            }
+
+            var booking = await _db.Bookings
+                .AsNoTracking()
+                .FirstOrDefaultAsync(b => b.Id == id, cancellationToken)
+                ?? throw new KeyNotFoundException("Booking not found.");
+
+            var charges = await _paymentSyncClient.GetBookingChargesAsync(booking.Id, cancellationToken);
+
+            return charges
                 .OrderBy(charge => charge.CreatedAt)
                 .Select(MapBookingCharge)
                 .ToArray();

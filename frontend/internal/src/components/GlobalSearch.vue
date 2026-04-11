@@ -107,6 +107,8 @@ import { getClients } from "../api/clients";
 import { getPartners } from "../api/partners";
 import { getPartnerCars } from "../api/cars";
 import { getAllBookings } from "../api/bookings";
+import { getAllTickets } from "../api/tickets";
+import { auth } from "../store/auth";
 
 interface SearchResult {
   type: string;
@@ -128,6 +130,7 @@ const searching = ref(false);
 const results = ref<SearchResult[]>([]);
 
 let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+let searchCounter = 0;
 
 watch(open, async (val) => {
   if (val) {
@@ -149,107 +152,110 @@ watch(query, (val) => {
 });
 
 async function search(q: string) {
+  const thisSearch = ++searchCounter;
   searching.value = true;
   const found: SearchResult[] = [];
-  const lowerQ = q.toLowerCase();
 
   try {
-    const [clients, partners, carsResult, bookingsResult] = await Promise.allSettled([
-      getClients(),
-      getPartners(),
-      getPartnerCars({ page: 1, pageSize: 50 }),
-      getAllBookings({ page: 1, pageSize: 50 }),
-    ]);
+    const promises: Promise<unknown>[] = [
+      getClients(q),
+      getPartners(q),
+      getPartnerCars({ page: 1, pageSize: 5, search: q }),
+      getAllBookings({ page: 1, pageSize: 5, search: q }),
+    ];
 
-    // Search clients
+    if (auth.hasPermission("Ticket.ViewAll")) {
+      promises.push(getAllTickets(q));
+    }
+
+    const settled = await Promise.allSettled(promises);
+    if (thisSearch !== searchCounter) return;
+
+    // Clients
+    const clients = settled[0];
     if (clients.status === "fulfilled") {
-      for (const c of clients.value) {
-        if (
-          c.firstName?.toLowerCase().includes(lowerQ) ||
-          c.lastName?.toLowerCase().includes(lowerQ) ||
-          c.phoneNumber?.toLowerCase().includes(lowerQ) ||
-          String(c.id).includes(q) ||
-          c.relatedUserId?.toLowerCase().includes(lowerQ)
-        ) {
-          found.push({
-            type: "client",
-            id: c.id,
-            title: `${c.firstName} ${c.lastName}`,
-            subtitle: c.phoneNumber || c.relatedUserId,
-            badge: (c.firstName?.[0] ?? "") + (c.lastName?.[0] ?? ""),
-            badgeCss: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
-            typeLabel: "Клиент",
-            route: `/clients/${c.id}`,
-          });
-        }
+      for (const c of (clients.value as ReturnType<typeof getClients> extends Promise<infer R> ? R : never).slice(0, 5)) {
+        found.push({
+          type: "client",
+          id: c.id,
+          title: `${c.firstName} ${c.lastName}`,
+          subtitle: c.phoneNumber || c.relatedUserId,
+          badge: (c.firstName?.[0] ?? "") + (c.lastName?.[0] ?? ""),
+          badgeCss: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
+          typeLabel: "Клиент",
+          route: `/clients/${c.id}`,
+        });
       }
     }
 
-    // Search partners
+    // Partners
+    const partners = settled[1];
     if (partners.status === "fulfilled") {
-      for (const p of partners.value) {
-        if (
-          p.ownerFirstName?.toLowerCase().includes(lowerQ) ||
-          p.ownerLastName?.toLowerCase().includes(lowerQ) ||
-          p.phoneNumber?.toLowerCase().includes(lowerQ) ||
-          String(p.id).includes(q)
-        ) {
-          found.push({
-            type: "partner",
-            id: p.id,
-            title: `${p.ownerFirstName} ${p.ownerLastName}`,
-            subtitle: p.phoneNumber || `ID: ${p.id}`,
-            badge: (p.ownerFirstName?.[0] ?? "") + (p.ownerLastName?.[0] ?? ""),
-            badgeCss: "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400",
-            typeLabel: "Партнёр",
-            route: `/partners/${p.id}`,
-          });
-        }
+      for (const p of (partners.value as ReturnType<typeof getPartners> extends Promise<infer R> ? R : never).slice(0, 5)) {
+        found.push({
+          type: "partner",
+          id: p.id,
+          title: `${p.ownerFirstName} ${p.ownerLastName}`,
+          subtitle: p.phoneNumber || `ID: ${p.id}`,
+          badge: (p.ownerFirstName?.[0] ?? "") + (p.ownerLastName?.[0] ?? ""),
+          badgeCss: "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400",
+          typeLabel: "Партнёр",
+          route: `/partners/${p.id}`,
+        });
       }
     }
 
-    // Search cars
+    // Cars
+    const carsResult = settled[2];
     if (carsResult.status === "fulfilled") {
-      for (const car of carsResult.value.items) {
-        if (
-          car.licensePlate?.toLowerCase().includes(lowerQ) ||
-          car.modelBrand?.toLowerCase().includes(lowerQ) ||
-          car.modelName?.toLowerCase().includes(lowerQ) ||
-          String(car.id).includes(q)
-        ) {
-          found.push({
-            type: "car",
-            id: car.id,
-            title: `${car.modelBrand} ${car.modelName} (${car.modelYear})`,
-            subtitle: car.licensePlate,
-            badge: "A",
-            badgeCss: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
-            typeLabel: "Машина",
-            route: `/cars/${car.id}`,
-          });
-        }
+      const carsData = carsResult.value as { items: Array<{ id: number; modelBrand: string; modelName: string; modelYear: number; licensePlate: string }> };
+      for (const car of carsData.items) {
+        found.push({
+          type: "car",
+          id: car.id,
+          title: `${car.modelBrand} ${car.modelName} (${car.modelYear})`,
+          subtitle: car.licensePlate,
+          badge: "A",
+          badgeCss: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
+          typeLabel: "Машина",
+          route: `/cars/${car.id}`,
+        });
       }
     }
 
-    // Search bookings
+    // Bookings
+    const bookingsResult = settled[3];
     if (bookingsResult.status === "fulfilled") {
-      for (const b of bookingsResult.value.items) {
-        if (
-          String(b.id).includes(q) ||
-          b.carBrand?.toLowerCase().includes(lowerQ) ||
-          b.carModel?.toLowerCase().includes(lowerQ) ||
-          b.userId?.toLowerCase().includes(lowerQ) ||
-          b.partnerUserId?.toLowerCase().includes(lowerQ)
-        ) {
+      const bookingsData = bookingsResult.value as { items: Array<{ id: number; carBrand: string; carModel: string }> };
+      for (const b of bookingsData.items) {
+        found.push({
+          type: "booking",
+          id: b.id,
+          title: `Бронирование #${b.id}`,
+          subtitle: `${b.carBrand} ${b.carModel}`,
+          badge: "#",
+          badgeCss: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
+          typeLabel: "Бронирование",
+          route: `/bookings/${b.id}`,
+        });
+      }
+    }
+
+    // Tickets
+    if (settled.length > 4) {
+      const ticketsResult = settled[4];
+      if (ticketsResult.status === "fulfilled") {
+        const tickets = ticketsResult.value as Array<{ id: string; fullName?: string; email?: string; phoneNumber?: string; ticketType?: string; status?: string }>;
+        for (const t of tickets.slice(0, 5)) {
           found.push({
-            type: "booking",
-            id: b.id,
-            title: `Бронирование #${b.id}`,
-            subtitle: `${b.carBrand} ${b.carModel}`,
-            badge: "#",
-            badgeCss: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
-            typeLabel: "Бронирование",
-            route: `/bookings/${b.id}`,
+            type: "ticket",
+            id: t.id,
+            title: t.fullName || `Заявка ${t.id.slice(0, 8)}...`,
+            subtitle: t.email || t.phoneNumber || t.ticketType || "",
+            badge: "T",
+            badgeCss: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
+            typeLabel: "Заявка",
+            route: `/tickets`,
           });
         }
       }
@@ -258,8 +264,10 @@ async function search(q: string) {
     // Silently fail partial searches
   }
 
-  results.value = found.slice(0, 15);
-  searching.value = false;
+  if (thisSearch === searchCounter) {
+    results.value = found.slice(0, 15);
+    searching.value = false;
+  }
 }
 
 function navigateTo(r: SearchResult) {

@@ -51,6 +51,7 @@ export interface PartnerCarsFilter {
   status?: number;
   partnerUserId?: string;
   carModelId?: number;
+  search?: string;
 }
 
 export interface PartnerCarUpdatePayload {
@@ -62,9 +63,9 @@ export interface PartnerCarUpdatePayload {
 export async function getPartnerCars(
   filter: PartnerCarsFilter = {},
 ): Promise<PartnerCarsPagedResult> {
-  const { page = 1, pageSize = 20, status, partnerUserId, carModelId } = filter;
+  const { page = 1, pageSize = 20, status, partnerUserId, carModelId, search } = filter;
   const res = await api.get("/cars/partner-cars", {
-    params: { page, pageSize, status, partnerUserId, carModelId },
+    params: { page, pageSize, status, partnerUserId, carModelId, search },
   });
   return res.data as PartnerCarsPagedResult;
 }

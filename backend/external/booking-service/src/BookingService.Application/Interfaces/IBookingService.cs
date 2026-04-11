@@ -30,6 +30,7 @@ namespace BookingService.Application.Interfaces
         Task<BookingCarCommentSubmissionResponseDto> SubmitCarComment(int id, Guid userId, BookingCarCommentCreateDto dto, CancellationToken cancellationToken = default);
         Task<bool> CompleteBooking(int id, Guid userId);
         Task<IReadOnlyCollection<BookingChargeResponseDto>> GetBookingCharges(int id, Guid userId, CancellationToken cancellationToken = default);
+        Task<IReadOnlyCollection<BookingChargeResponseDto>> GetAllBookingCharges(int id, CancellationToken cancellationToken = default);
         Task<BookingChargeResponseDto> PayBookingCharge(int id, long chargeId, Guid userId, CancellationToken cancellationToken = default);
         Task<BookingResponseDto?> GetBookingById(int id, CancellationToken cancellationToken = default);
         Task<bool> CancelBookingByAdmin(int id, CancellationToken cancellationToken = default);

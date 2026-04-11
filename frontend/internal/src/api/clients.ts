@@ -29,8 +29,8 @@ export interface ClientUpdatePayload {
   avatarImageId?: string;
 }
 
-export async function getClients(): Promise<ClientDto[]> {
-  const res = await api.get("/clients");
+export async function getClients(search?: string): Promise<ClientDto[]> {
+  const res = await api.get("/clients", { params: { search } });
   return (res.data ?? []) as ClientDto[];
 }
 

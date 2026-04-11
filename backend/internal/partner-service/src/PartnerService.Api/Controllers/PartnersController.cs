@@ -31,9 +31,9 @@ public sealed class PartnersController : ControllerBase
 
     [HttpGet]
     [Authorize(Policy = "partners:view")]
-    public async Task<IActionResult> GetAll(CancellationToken cancellationToken)
+    public async Task<IActionResult> GetAll([FromQuery] string? search, CancellationToken cancellationToken)
     {
-        var partners = await _partnerService.GetAllAsync(cancellationToken);
+        var partners = await _partnerService.GetAllAsync(search, cancellationToken);
         return Ok(partners);
     }
 
@@ -191,6 +191,28 @@ public sealed class PartnersController : ControllerBase
 
         var payout = await _partnerPaymentClient.CancelPayoutAsync(payoutId, request.Reason, cancellationToken);
         return Ok(payout);
+    }
+
+    [HttpGet("{id:int}/files/temporary-link")]
+    [Authorize(Policy = "partners:view")]
+    public async Task<IActionResult> GetPartnerFileTemporaryLink(
+        int id,
+        [FromQuery] string? fileName,
+        CancellationToken cancellationToken)
+    {
+        var partner = await _partnerService.GetByIdAsync(id, cancellationToken);
+        if (partner is null)
+        {
+            return NotFound(new { error = "Partner not found" });
+        }
+
+        if (string.IsNullOrWhiteSpace(fileName))
+        {
+            return BadRequest(new { error = "fileName is required." });
+        }
+
+        var payload = await _fileStorageClient.GetTemporaryLinkAsync(fileName, cancellationToken: cancellationToken);
+        return Ok(payload);
     }
 
     [HttpGet("{id:int}/wallet")]

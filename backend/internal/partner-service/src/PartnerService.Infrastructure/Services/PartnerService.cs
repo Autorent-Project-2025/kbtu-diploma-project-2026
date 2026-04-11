@@ -16,10 +16,21 @@ public class PartnerService : IPartnerService
         _db = db;
     }
 
-    public async Task<IReadOnlyCollection<PartnerResponseDto>> GetAllAsync(CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyCollection<PartnerResponseDto>> GetAllAsync(string? search = null, CancellationToken cancellationToken = default)
     {
-        return await _db.Partners
-            .AsNoTracking()
+        IQueryable<Partner> query = _db.Partners.AsNoTracking();
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var q = search.Trim().ToLower();
+            query = query.Where(p =>
+                p.OwnerFirstName.ToLower().Contains(q) ||
+                p.OwnerLastName.ToLower().Contains(q) ||
+                p.PhoneNumber.ToLower().Contains(q) ||
+                p.RelatedUserId.ToLower().Contains(q));
+        }
+
+        return await query
             .OrderByDescending(partner => partner.CreatedOn)
             .ThenByDescending(partner => partner.Id)
             .SelectToPartnerResponseDto()

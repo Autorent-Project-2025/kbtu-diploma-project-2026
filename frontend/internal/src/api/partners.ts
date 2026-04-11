@@ -40,8 +40,8 @@ export interface PayoutDto {
   updatedAt?: string;
 }
 
-export async function getPartners(): Promise<PartnerDto[]> {
-  const res = await api.get("/partners");
+export async function getPartners(search?: string): Promise<PartnerDto[]> {
+  const res = await api.get("/partners", { params: { search } });
   return (res.data ?? []) as PartnerDto[];
 }
 
@@ -63,4 +63,20 @@ export async function getPartnerLedger(partnerId: number, take = 50): Promise<Le
 export async function getPartnerPayouts(partnerId: number, take = 50): Promise<PayoutDto[]> {
   const res = await api.get(`/partners/${partnerId}/payouts`, { params: { take } });
   return (res.data ?? []) as PayoutDto[];
+}
+
+export interface FileTemporaryLinkDto {
+  fileName: string;
+  url: string;
+  expiresAtUtc: string;
+}
+
+export async function getPartnerFileTemporaryLink(
+  partnerId: number,
+  fileName: string,
+): Promise<FileTemporaryLinkDto> {
+  const res = await api.get(`/partners/${partnerId}/files/temporary-link`, {
+    params: { fileName },
+  });
+  return res.data as FileTemporaryLinkDto;
 }

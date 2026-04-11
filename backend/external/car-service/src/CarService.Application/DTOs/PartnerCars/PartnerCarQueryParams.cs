@@ -8,5 +8,6 @@ namespace CarService.Application.DTOs.PartnerCars
         public int? CarModelId { get; set; }
         public PartnerCarStatus? Status { get; set; }
         public Guid? PartnerUserId { get; set; }
+        public string? Search { get; set; }
     }
 }
