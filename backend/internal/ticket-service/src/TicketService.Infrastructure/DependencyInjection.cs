@@ -74,6 +74,7 @@ public static class DependencyInjection
         services.AddDbContext<TicketDbContext>(options => options.UseNpgsql(connectionString));
         services.AddScoped<ITicketUnitOfWork>(serviceProvider => serviceProvider.GetRequiredService<TicketDbContext>());
         services.AddScoped<ITicketRepository, TicketRepository>();
+        services.AddScoped<IComplaintRepository, ComplaintRepository>();
         services.AddScoped<ITicketEventPublisher, TicketEventPublisher>();
         services.AddSingleton<IRabbitMqPublisher, RabbitMqPublisher>();
         services.AddHostedService<TicketWorkflowOutboxDispatcher>();
@@ -121,6 +122,20 @@ public static class DependencyInjection
         .AddConfiguredResilience(httpClientResilienceOptions);
 
         services.AddHttpClient<IBookingCompletionWorkflowClient, BookingCompletionWorkflowClient>((serviceProvider, client) =>
+        {
+            var options = serviceProvider.GetRequiredService<IOptions<BookingServiceOptions>>().Value;
+            if (string.IsNullOrWhiteSpace(options.BaseUrl))
+            {
+                throw new InvalidOperationException("BookingService:BaseUrl configuration is required.");
+            }
+
+            client.BaseAddress = new Uri(NormalizeBaseUrl(options.BaseUrl));
+            client.Timeout = Timeout.InfiniteTimeSpan;
+        })
+        .AddHttpMessageHandler<ObservabilityHttpClientHandler>()
+        .AddConfiguredResilience(httpClientResilienceOptions);
+
+        services.AddHttpClient<IBookingReadClient, BookingReadClient>((serviceProvider, client) =>
         {
             var options = serviceProvider.GetRequiredService<IOptions<BookingServiceOptions>>().Value;
             if (string.IsNullOrWhiteSpace(options.BaseUrl))

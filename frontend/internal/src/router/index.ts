@@ -12,6 +12,8 @@ import CarsTableView from "../views/CarsTableView.vue";
 import CarDetailView from "../views/CarDetailView.vue";
 import BookingsTableView from "../views/BookingsTableView.vue";
 import BookingDetailView from "../views/BookingDetailView.vue";
+import ComplaintsQueueView from "../views/ComplaintsQueueView.vue";
+import ComplaintDetailView from "../views/ComplaintDetailView.vue";
 import FinanceView from "../views/FinanceView.vue";
 import { auth } from "../store/auth";
 
@@ -21,6 +23,7 @@ const defaultRoutes: { path: string; permission: string }[] = [
   { path: "/partners", permission: "Partner.View" },
   { path: "/cars", permission: "PartnerCar.View" },
   { path: "/bookings", permission: "Booking.View" },
+  { path: "/complaints", permission: "Complaint.View" },
   { path: "/finance", permission: "Partner.View" },
   { path: "/super", permission: "Ticket.ViewAll" },
   { path: "/admin", permission: "User.View" },
@@ -91,6 +94,16 @@ const router = createRouter({
       path: "/bookings/:id",
       component: BookingDetailView,
       meta: { requiresAuth: true, requiredPermission: "Booking.View" },
+    },
+    {
+      path: "/complaints",
+      component: ComplaintsQueueView,
+      meta: { requiresAuth: true, requiredPermission: "Complaint.View" },
+    },
+    {
+      path: "/complaints/:id",
+      component: ComplaintDetailView,
+      meta: { requiresAuth: true, requiredPermission: "Complaint.View" },
     },
     {
       path: "/finance",

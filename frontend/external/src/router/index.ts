@@ -21,6 +21,7 @@ import ForbiddenView from "../views/ForbiddenView.vue";
 import { auth } from "../store/auth";
 import SubscriptionPlansView from "../views/SubscriptionPlansView.vue";
 import AiView from "../views/AiView.vue";
+import MyComplaintsView from "../views/MyComplaintsView.vue";
 
 const routes = [
   {
@@ -76,6 +77,12 @@ const routes = [
   {
     path: "/bookings/:id/complete",
     component: BookingCompletionView,
+    meta: { requiresAuth: true },
+  },
+  {
+    path: "/complaints",
+    name: "MyComplaints",
+    component: MyComplaintsView,
     meta: { requiresAuth: true },
   },
 

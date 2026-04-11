@@ -315,6 +315,13 @@
                               : "Отменить бронирование"
                           }}
                         </button>
+                        <button
+                          v-if="canFileComplaint(b)"
+                          @click="openComplaintFromMenu(b)"
+                          class="flex w-full items-center rounded-xl px-3 py-2.5 text-left text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition"
+                        >
+                          Подать жалобу
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -393,6 +400,15 @@
       @close="closeReviewModal"
       @submit="handleReviewSubmit"
     />
+
+    <CreateComplaintModal
+      v-if="bookingToComplain"
+      :is-open="showComplaintModal"
+      :booking-id="bookingToComplain.id"
+      :is-partner="isPartnerUser"
+      @close="closeComplaintModal"
+      @submit="handleComplaintSubmit"
+    />
   </div>
 </template>
 
@@ -417,6 +433,8 @@ import {
 import { useToast } from "../composables/useToast";
 import CancelBookingModal from "../components/CancelBookingModal.vue";
 import ReviewModal from "../components/ReviewModal.vue";
+import CreateComplaintModal from "../components/CreateComplaintModal.vue";
+import { auth } from "../store/auth";
 
 interface BookingWithComputedStatus extends Booking {
   computedStatus: ReturnType<typeof computeBookingStatus>;
@@ -440,6 +458,9 @@ const bookingToReview = ref<BookingWithComputedStatus | null>(null);
 const showReviewModal = ref(false);
 const reviewSubmittingId = ref<number | null>(null);
 const openActionMenuId = ref<number | null>(null);
+const bookingToComplain = ref<BookingWithComputedStatus | null>(null);
+const showComplaintModal = ref(false);
+const isPartnerUser = computed(() => auth.isActorType("partner"));
 const { success, error } = useToast();
 
 // Filters configuration
@@ -594,6 +615,39 @@ function openReviewFromMenu(booking: BookingWithComputedStatus) {
 function cancelFromMenu(booking: BookingWithComputedStatus) {
   closeActionMenu();
   confirmCancel(booking);
+}
+
+function canFileComplaint(booking: BookingWithComputedStatus): boolean {
+  const status = booking.status;
+  if (
+    status === "active" ||
+    status === "awaitingReview" ||
+    status === "completed"
+  ) {
+    return true;
+  }
+  if (status === "canceled" && booking.tripStartedAt) {
+    return true;
+  }
+  return false;
+}
+
+function openComplaintFromMenu(booking: BookingWithComputedStatus) {
+  closeActionMenu();
+  bookingToComplain.value = booking;
+  showComplaintModal.value = true;
+}
+
+function closeComplaintModal() {
+  showComplaintModal.value = false;
+  setTimeout(() => {
+    bookingToComplain.value = null;
+  }, 300);
+}
+
+function handleComplaintSubmit() {
+  closeComplaintModal();
+  success("Жалоба успешно отправлена");
 }
 
 onMounted(async () => {
