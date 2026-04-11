@@ -19,12 +19,38 @@ export interface PartnerCarDto {
   commercialBadgeKeys: string[];
 }
 
+export interface CarImageDto {
+  id: number;
+  imageUrl: string;
+  isPrimary?: boolean;
+  sortOrder?: number;
+}
+
+export interface CarCommentDto {
+  id: number;
+  userId: string;
+  userName?: string;
+  partnerCarId: number;
+  bookingId?: number;
+  rating: number;
+  content: string;
+  createdAt: string;
+}
+
 export interface PartnerCarsPagedResult {
   items: PartnerCarDto[];
   totalCount: number;
   page: number;
   pageSize: number;
   totalPages: number;
+}
+
+export interface PartnerCarsFilter {
+  page?: number;
+  pageSize?: number;
+  status?: number;
+  partnerUserId?: string;
+  carModelId?: number;
 }
 
 export interface PartnerCarUpdatePayload {
@@ -34,11 +60,11 @@ export interface PartnerCarUpdatePayload {
 }
 
 export async function getPartnerCars(
-  page = 1,
-  pageSize = 20,
+  filter: PartnerCarsFilter = {},
 ): Promise<PartnerCarsPagedResult> {
+  const { page = 1, pageSize = 20, status, partnerUserId, carModelId } = filter;
   const res = await api.get("/cars/partner-cars", {
-    params: { page, pageSize },
+    params: { page, pageSize, status, partnerUserId, carModelId },
   });
   return res.data as PartnerCarsPagedResult;
 }
@@ -46,6 +72,25 @@ export async function getPartnerCars(
 export async function getPartnerCar(id: number): Promise<PartnerCarDto> {
   const res = await api.get(`/cars/partner-cars/${id}`);
   return res.data as PartnerCarDto;
+}
+
+export async function getPartnerCarImages(partnerCarId: number): Promise<CarImageDto[]> {
+  const res = await api.get(`/cars/images/partner-cars/${partnerCarId}`);
+  return (res.data ?? []) as CarImageDto[];
+}
+
+export async function getPartnerCarComments(
+  partnerCarId: number,
+  page = 1,
+  pageSize = 20,
+): Promise<CarCommentDto[]> {
+  const res = await api.get(`/cars/comments/partner-cars/${partnerCarId}`, {
+    params: { page, pageSize },
+  });
+  const data = res.data;
+  if (Array.isArray(data)) return data as CarCommentDto[];
+  if (data?.items) return data.items as CarCommentDto[];
+  return [];
 }
 
 export async function updatePartnerCar(

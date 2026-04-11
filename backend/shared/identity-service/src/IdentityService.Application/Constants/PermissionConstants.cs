@@ -36,4 +36,5 @@ public static class PermissionConstants
     public const string BookingUpdate = "Booking.Update";
     public const string BookingDelete = "Booking.Delete";
     public const string PartnerCarView = "PartnerCar.View";
+    public const string ClientBlock = "Client.Block";
 }

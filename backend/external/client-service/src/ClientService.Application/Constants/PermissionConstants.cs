@@ -6,4 +6,5 @@ public static class PermissionConstants
     public const string ClientCreate = "Client.Create";
     public const string ClientUpdate = "Client.Update";
     public const string ClientDelete = "Client.Delete";
+    public const string ClientBlock = "Client.Block";
 }

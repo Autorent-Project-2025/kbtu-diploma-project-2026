@@ -1,60 +1,53 @@
 <template>
   <div class="min-h-screen bg-gray-50 dark:bg-gray-950 py-8 px-6 space-y-6">
-    <!-- Hero header -->
-    <header
-      class="relative overflow-hidden rounded-[28px] border border-gray-200 dark:border-gray-800 bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.18),_transparent_38%),radial-gradient(circle_at_bottom_right,_rgba(59,130,246,0.16),_transparent_40%),linear-gradient(135deg,_rgba(255,255,255,0.96),_rgba(243,244,246,0.92))] dark:bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.22),_transparent_35%),radial-gradient(circle_at_bottom_right,_rgba(59,130,246,0.22),_transparent_40%),linear-gradient(135deg,_rgba(17,24,39,0.98),_rgba(3,7,18,0.96))] shadow-2xl p-8"
-    >
-      <div
-        class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6"
-      >
-        <div class="space-y-3">
-          <p
-            class="text-xs font-bold uppercase tracking-[0.3em] text-emerald-600 dark:text-emerald-400"
-          >
-            Internal Panel
-          </p>
-          <h1 class="text-4xl font-extrabold text-gray-900 dark:text-white">
-            Рабочая очередь
-          </h1>
-          <p class="text-gray-600 dark:text-gray-400">
-            Проверяйте новые регистрации, открывайте документы и принимайте
-            решение по каждой заявке.
-          </p>
-        </div>
-
-        <!-- Stats strip -->
-        <div class="flex flex-wrap gap-3 items-center">
-          <div
-            class="flex rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow overflow-hidden"
-          >
-            <div
-              v-for="(stat, i) in statsStrip"
-              :key="stat.label"
-              :class="[
-                'px-5 py-3 text-center',
-                i > 0 ? 'border-l border-gray-200 dark:border-gray-800' : '',
-              ]"
-            >
-              <p class="text-2xl font-extrabold text-gray-900 dark:text-white">
-                {{ stat.value }}
-              </p>
-              <p
-                class="text-xs text-gray-500 dark:text-gray-400 font-semibold uppercase tracking-wider mt-0.5"
-              >
-                {{ stat.label }}
-              </p>
-            </div>
+    <!-- Header -->
+    <div class="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 rounded-2xl">
+      <div class="max-w-7xl mx-auto px-6 py-6">
+        <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+          <div class="space-y-1">
+            <p class="text-xs font-bold uppercase tracking-[0.3em] text-emerald-600 dark:text-emerald-400">
+              Operations CRM
+            </p>
+            <h1 class="text-2xl font-extrabold text-gray-900 dark:text-white">
+              Рабочая очередь
+            </h1>
+            <p class="text-sm text-gray-500 dark:text-gray-400">
+              Проверяйте новые регистрации, открывайте документы и принимайте решение по каждой заявке.
+            </p>
           </div>
-          <button
-            @click="loadPending"
-            :disabled="loading"
-            class="px-5 py-3 rounded-2xl border border-gray-300 dark:border-gray-700 text-gray-800 dark:text-gray-100 font-semibold hover:border-emerald-500 transition-colors disabled:opacity-60"
-          >
-            Обновить
-          </button>
+
+          <!-- Stats strip -->
+          <div class="flex flex-wrap gap-3 items-center">
+            <div
+              class="flex rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow overflow-hidden"
+            >
+              <div
+                v-for="(stat, i) in statsStrip"
+                :key="stat.label"
+                :class="[
+                  'px-5 py-3 text-center',
+                  i > 0 ? 'border-l border-gray-200 dark:border-gray-800' : '',
+                ]"
+              >
+                <p class="text-2xl font-extrabold text-gray-900 dark:text-white">
+                  {{ stat.value }}
+                </p>
+                <p class="text-xs text-gray-500 dark:text-gray-400 font-semibold uppercase tracking-wider mt-0.5">
+                  {{ stat.label }}
+                </p>
+              </div>
+            </div>
+            <button
+              @click="loadPending"
+              :disabled="loading"
+              class="px-5 py-3 rounded-2xl border border-gray-300 dark:border-gray-700 text-gray-800 dark:text-gray-100 font-semibold hover:border-emerald-500 transition-colors disabled:opacity-60"
+            >
+              Обновить
+            </button>
+          </div>
         </div>
       </div>
-    </header>
+    </div>
 
     <!-- Уведомления через toast-систему -->
 
@@ -94,7 +87,7 @@
             v-if="lastUpdatedAt"
             class="text-xs text-gray-400 dark:text-gray-500 mt-1"
           >
-            Обновлено {{ formatDate(lastUpdatedAt) }}
+            Обновлено {{ formatDateTime(lastUpdatedAt) }}
           </p>
         </div>
 
@@ -116,7 +109,7 @@
                   <div
                     class="w-9 h-9 flex-shrink-0 rounded-xl bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 flex items-center justify-center text-xs font-bold"
                   >
-                    {{ getInitials(ticket.fullName) }}
+                    {{ userInitials(ticket.fullName) }}
                   </div>
                   <div class="min-w-0">
                     <p
@@ -142,7 +135,7 @@
                 class="flex justify-between mt-2 pl-12 text-xs text-gray-400 dark:text-gray-500"
               >
                 <span>{{ ticket.phoneNumber }}</span>
-                <span>{{ formatDate(ticket.createdAt) }}</span>
+                <span>{{ formatDateTime(ticket.createdAt) }}</span>
               </div>
             </button>
           </li>
@@ -162,7 +155,7 @@
             <div
               class="w-12 h-12 flex-shrink-0 rounded-2xl bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 flex items-center justify-center text-base font-extrabold"
             >
-              {{ getInitials(selectedTicket.fullName) }}
+              {{ userInitials(selectedTicket.fullName) }}
             </div>
             <div>
               <h2 class="text-2xl font-extrabold text-gray-900 dark:text-white">
@@ -183,7 +176,7 @@
                 statusLabel(selectedTicket.status)
               }}</span>
             </p>
-            <p>Создана: {{ formatDate(selectedTicket.createdAt) }}</p>
+            <p>Создана: {{ formatDateTime(selectedTicket.createdAt) }}</p>
           </div>
         </div>
 
@@ -701,6 +694,7 @@ import type {
   PartnerCarTicketImageData,
   Ticket,
 } from "../types/Ticket";
+import { formatDateTime, userInitials } from "../utils/formatters";
 import {
   bodyTypeOptions,
   fuelTypeOptions,
@@ -717,7 +711,7 @@ const rejectReason = ref("");
 const fineAmount = ref("");
 const loading = ref(false);
 const actionLoading = ref(false);
-const { success: toastSuccess, error: toastError } = useToast();
+const toast = useToast();
 const lastUpdatedAt = ref<string>("");
 const maxAllowedCarYear = new Date().getUTCFullYear() + 1;
 
@@ -897,12 +891,6 @@ function getTicketTypeBadgeClass(ticketType: number) {
   return "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300";
 }
 
-function getInitials(value: string) {
-  const parts = value.trim().split(/\s+/).filter(Boolean).slice(0, 2);
-  if (parts.length === 0) return "AR";
-  return parts.map((p) => p[0]?.toUpperCase() ?? "").join("");
-}
-
 function isClientTicket(ticket: Ticket) {
   return ticket.ticketType === 1;
 }
@@ -925,15 +913,6 @@ function completionPhotoLabel(slot: string) {
   return slot;
 }
 
-function formatDate(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat("ru-RU", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(date);
-}
-
 function validateOptionalInteger(
   value: number | null,
   min: number,
@@ -945,7 +924,7 @@ function validateOptionalInteger(
   }
 
   if (!Number.isInteger(value) || value < min || value > max) {
-    toastError(`${label} должно быть в диапазоне ${min}-${max}.`);
+    toast.error(`${label} должно быть в диапазоне ${min}-${max}.`);
     return false;
   }
 
@@ -1005,11 +984,11 @@ function buildPartnerCarPayload(): PartnerCarReviewPayload | null | undefined {
     !licensePlate ||
     !Number.isInteger(carYear)
   ) {
-    toastError("Заполните марку, модель, год и госномер.");
+    toast.error("Заполните марку, модель, год и госномер.");
     return null;
   }
   if (carYear < 1886 || carYear > maxAllowedCarYear) {
-    toastError(`Год машины должен быть в диапазоне 1886-${maxAllowedCarYear}.`);
+    toast.error(`Год машины должен быть в диапазоне 1886-${maxAllowedCarYear}.`);
     return null;
   }
 
@@ -1064,7 +1043,7 @@ async function loadPending() {
       : fallback.id;
     await selectTicket(nextId);
   } catch (e: any) {
-    toastError(e?.response?.data?.error || "Не удалось получить список заявок.");
+    toast.error(e?.response?.data?.error || "Не удалось получить список заявок.");
   } finally {
     loading.value = false;
   }
@@ -1077,7 +1056,7 @@ async function selectTicket(ticketId: string) {
     selectedTicket.value = await getTicketById(ticketId);
     syncPartnerCarForm(selectedTicket.value);
   } catch (e: any) {
-    toastError(e?.response?.data?.error || "Не удалось загрузить заявку.");
+    toast.error(e?.response?.data?.error || "Не удалось загрузить заявку.");
   }
 }
 
@@ -1088,10 +1067,10 @@ async function approveSelected() {
     const payload = buildPartnerCarPayload();
     if (payload === null) return;
     await approveTicket(selectedTicket.value.id, payload);
-    toastSuccess("✓ Заявка одобрена");
+    toast.success("✓ Заявка одобрена");
     await loadPending();
   } catch (e: any) {
-    toastError(e?.response?.data?.error || "Не удалось одобрить заявку.");
+    toast.error(e?.response?.data?.error || "Не удалось одобрить заявку.");
   } finally {
     actionLoading.value = false;
   }
@@ -1100,7 +1079,7 @@ async function approveSelected() {
 async function rejectSelected() {
   if (!selectedTicket.value || actionLoading.value) return;
   if (!rejectReason.value.trim()) {
-    toastError("Укажите причину отказа.");
+    toast.error("Укажите причину отказа.");
     return;
   }
   actionLoading.value = true;
@@ -1112,10 +1091,10 @@ async function rejectSelected() {
       rejectReason.value.trim(),
       payload,
     );
-    toastSuccess("✕ Заявка отклонена", 4000);
+    toast.success("✕ Заявка отклонена", 4000);
     await loadPending();
   } catch (e: any) {
-    toastError(e?.response?.data?.error || "Не удалось отклонить заявку.");
+    toast.error(e?.response?.data?.error || "Не удалось отклонить заявку.");
   } finally {
     actionLoading.value = false;
   }
@@ -1125,18 +1104,18 @@ async function issueFineSelected() {
   if (!selectedTicket.value || actionLoading.value) return;
   const amount = Number(fineAmount.value);
   if (!Number.isFinite(amount) || amount <= 0) {
-    toastError("Укажите корректную сумму штрафа.");
+    toast.error("Укажите корректную сумму штрафа.");
     return;
   }
 
   actionLoading.value = true;
   try {
     await issueTicketFine(selectedTicket.value.id, amount);
-    toastSuccess("Штраф выставлен");
+    toast.success("Штраф выставлен");
     fineAmount.value = "";
     await loadPending();
   } catch (e: any) {
-    toastError(e?.response?.data?.error || "Не удалось выставить штраф.");
+    toast.error(e?.response?.data?.error || "Не удалось выставить штраф.");
   } finally {
     actionLoading.value = false;
   }
@@ -1167,7 +1146,7 @@ async function openDocument(
     );
     window.open(link.url, "_blank", "noopener,noreferrer");
   } catch (e: any) {
-    toastError(e?.response?.data?.error || "Не удалось получить ссылку на документ.");
+    toast.error(e?.response?.data?.error || "Не удалось получить ссылку на документ.");
   } finally {
     actionLoading.value = false;
   }

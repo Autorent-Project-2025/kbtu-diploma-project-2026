@@ -193,6 +193,33 @@ public sealed class PartnersController : ControllerBase
         return Ok(payout);
     }
 
+    [HttpGet("{id:int}/wallet")]
+    [Authorize(Policy = "partners:view")]
+    public async Task<IActionResult> GetPartnerWallet(int id, CancellationToken cancellationToken)
+    {
+        var partnerUserId = await ResolvePartnerUserIdByPartnerIdAsync(id, cancellationToken);
+        var wallet = await _partnerPaymentClient.GetWalletAsync(partnerUserId, cancellationToken);
+        return Ok(wallet);
+    }
+
+    [HttpGet("{id:int}/ledger")]
+    [Authorize(Policy = "partners:view")]
+    public async Task<IActionResult> GetPartnerLedger(int id, [FromQuery] int take = 50, CancellationToken cancellationToken = default)
+    {
+        var partnerUserId = await ResolvePartnerUserIdByPartnerIdAsync(id, cancellationToken);
+        var ledger = await _partnerPaymentClient.GetLedgerAsync(partnerUserId, take, cancellationToken);
+        return Ok(ledger);
+    }
+
+    [HttpGet("{id:int}/payouts")]
+    [Authorize(Policy = "partners:view")]
+    public async Task<IActionResult> GetPartnerPayouts(int id, [FromQuery] int take = 50, CancellationToken cancellationToken = default)
+    {
+        var partnerUserId = await ResolvePartnerUserIdByPartnerIdAsync(id, cancellationToken);
+        var payouts = await _partnerPaymentClient.GetPayoutsAsync(partnerUserId, take, cancellationToken);
+        return Ok(payouts);
+    }
+
     [AllowAnonymous]
     [HttpGet("public/by-related-user/{relatedUserId}")]
     public async Task<IActionResult> GetPublicByRelatedUserId(string relatedUserId, CancellationToken cancellationToken)
@@ -256,6 +283,22 @@ public sealed class PartnersController : ControllerBase
         }
 
         return userId;
+    }
+
+    private async Task<Guid> ResolvePartnerUserIdByPartnerIdAsync(int partnerId, CancellationToken cancellationToken)
+    {
+        var partner = await _partnerService.GetByIdAsync(partnerId, cancellationToken);
+        if (partner is null)
+        {
+            throw new KeyNotFoundException("Partner not found.");
+        }
+
+        if (!Guid.TryParse(partner.RelatedUserId, out var partnerUserId) || partnerUserId == Guid.Empty)
+        {
+            throw new InvalidOperationException($"Partner {partnerId} has an invalid RelatedUserId.");
+        }
+
+        return partnerUserId;
     }
 
     private async Task<Guid> ResolveCurrentPartnerUserIdAsync(CancellationToken cancellationToken)

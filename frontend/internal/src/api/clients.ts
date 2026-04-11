@@ -50,3 +50,13 @@ export async function updateClient(
 export async function deleteClient(id: number): Promise<void> {
   await api.delete(`/clients/${id}`);
 }
+
+export async function blockClient(relatedUserId: string, reason?: string): Promise<ClientDto> {
+  const res = await api.post(`/clients/by-user/${relatedUserId}/booking-access/block`, { reason });
+  return res.data as ClientDto;
+}
+
+export async function unblockClient(relatedUserId: string): Promise<ClientDto> {
+  const res = await api.post(`/clients/by-user/${relatedUserId}/booking-access/unblock`);
+  return res.data as ClientDto;
+}

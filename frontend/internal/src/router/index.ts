@@ -5,20 +5,25 @@ import ManagerTicketsView from "../views/ManagerTicketsView.vue";
 import SuperManagerView from "../views/SuperManagerView.vue";
 import AdminControlView from "../views/AdminControlView.vue";
 import ClientsTableView from "../views/ClientsTableView.vue";
-import ClientEditView from "../views/ClientEditView.vue";
+import ClientDetailView from "../views/ClientDetailView.vue";
+import PartnersTableView from "../views/PartnersTableView.vue";
+import PartnerDetailView from "../views/PartnerDetailView.vue";
 import CarsTableView from "../views/CarsTableView.vue";
-import CarEditView from "../views/CarEditView.vue";
+import CarDetailView from "../views/CarDetailView.vue";
 import BookingsTableView from "../views/BookingsTableView.vue";
 import BookingDetailView from "../views/BookingDetailView.vue";
+import FinanceView from "../views/FinanceView.vue";
 import { auth } from "../store/auth";
 
 const defaultRoutes: { path: string; permission: string }[] = [
-  { path: "/admin", permission: "User.View" },
-  { path: "/super", permission: "Ticket.ViewAll" },
   { path: "/tickets", permission: "Ticket.View" },
   { path: "/clients", permission: "Client.View" },
+  { path: "/partners", permission: "Partner.View" },
   { path: "/cars", permission: "PartnerCar.View" },
   { path: "/bookings", permission: "Booking.View" },
+  { path: "/finance", permission: "Partner.View" },
+  { path: "/super", permission: "Ticket.ViewAll" },
+  { path: "/admin", permission: "User.View" },
 ];
 
 function resolveHome(): string {
@@ -43,14 +48,54 @@ const router = createRouter({
       component: LoginView,
     },
     {
-      path: "/admin",
-      component: AdminControlView,
-      meta: { requiresAuth: true, requiredPermission: "User.View" },
-    },
-    {
       path: "/tickets",
       component: ManagerTicketsView,
       meta: { requiresAuth: true, requiredPermission: "Ticket.View" },
+    },
+    {
+      path: "/clients",
+      component: ClientsTableView,
+      meta: { requiresAuth: true, requiredPermission: "Client.View" },
+    },
+    {
+      path: "/clients/:id",
+      component: ClientDetailView,
+      meta: { requiresAuth: true, requiredPermission: "Client.View" },
+    },
+    {
+      path: "/partners",
+      component: PartnersTableView,
+      meta: { requiresAuth: true, requiredPermission: "Partner.View" },
+    },
+    {
+      path: "/partners/:id",
+      component: PartnerDetailView,
+      meta: { requiresAuth: true, requiredPermission: "Partner.View" },
+    },
+    {
+      path: "/cars",
+      component: CarsTableView,
+      meta: { requiresAuth: true, requiredPermission: "PartnerCar.View" },
+    },
+    {
+      path: "/cars/:id",
+      component: CarDetailView,
+      meta: { requiresAuth: true, requiredPermission: "PartnerCar.View" },
+    },
+    {
+      path: "/bookings",
+      component: BookingsTableView,
+      meta: { requiresAuth: true, requiredPermission: "Booking.View" },
+    },
+    {
+      path: "/bookings/:id",
+      component: BookingDetailView,
+      meta: { requiresAuth: true, requiredPermission: "Booking.View" },
+    },
+    {
+      path: "/finance",
+      component: FinanceView,
+      meta: { requiresAuth: true, requiredPermission: "Partner.View" },
     },
     {
       path: "/super",
@@ -63,34 +108,9 @@ const router = createRouter({
       meta: { requiresAuth: true, requiredPermission: "Ticket.ViewAll" },
     },
     {
-      path: "/clients",
-      component: ClientsTableView,
-      meta: { requiresAuth: true, requiredPermission: "Client.View" },
-    },
-    {
-      path: "/clients/:id",
-      component: ClientEditView,
-      meta: { requiresAuth: true, requiredPermission: "Client.View" },
-    },
-    {
-      path: "/cars",
-      component: CarsTableView,
-      meta: { requiresAuth: true, requiredPermission: "PartnerCar.View" },
-    },
-    {
-      path: "/cars/:id",
-      component: CarEditView,
-      meta: { requiresAuth: true, requiredPermission: "PartnerCar.View" },
-    },
-    {
-      path: "/bookings",
-      component: BookingsTableView,
-      meta: { requiresAuth: true, requiredPermission: "Booking.View" },
-    },
-    {
-      path: "/bookings/:id",
-      component: BookingDetailView,
-      meta: { requiresAuth: true, requiredPermission: "Booking.View" },
+      path: "/admin",
+      component: AdminControlView,
+      meta: { requiresAuth: true, requiredPermission: "User.View" },
     },
     {
       path: "/:pathMatch(.*)*",
