@@ -15,6 +15,7 @@ public sealed class TicketDbContext : DbContext, ITicketUnitOfWork
     public DbSet<TicketWorkflowOutboxMessage> TicketWorkflowOutboxMessages => Set<TicketWorkflowOutboxMessage>();
     public DbSet<Complaint> Complaints => Set<Complaint>();
     public DbSet<ComplaintAttachment> ComplaintAttachments => Set<ComplaintAttachment>();
+    public DbSet<ComplaintBookingAccessRequest> ComplaintBookingAccessRequests => Set<ComplaintBookingAccessRequest>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

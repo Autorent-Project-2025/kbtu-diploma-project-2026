@@ -10,4 +10,8 @@ public static class PermissionConstants
     public const string ComplaintView = "Complaint.View";
     public const string ComplaintReview = "Complaint.Review";
     public const string ComplaintResolve = "Complaint.Resolve";
+
+    public const string AccessRequestReview = "AccessRequest.Review";
+
+    public const string BookingView = "Booking.View";
 }

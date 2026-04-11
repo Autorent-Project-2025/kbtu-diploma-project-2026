@@ -14,6 +14,8 @@ import BookingsTableView from "../views/BookingsTableView.vue";
 import BookingDetailView from "../views/BookingDetailView.vue";
 import ComplaintsQueueView from "../views/ComplaintsQueueView.vue";
 import ComplaintDetailView from "../views/ComplaintDetailView.vue";
+import BookingReviewView from "../views/BookingReviewView.vue";
+import AccessRequestsView from "../views/AccessRequestsView.vue";
 import FinanceView from "../views/FinanceView.vue";
 import { auth } from "../store/auth";
 
@@ -101,9 +103,19 @@ const router = createRouter({
       meta: { requiresAuth: true, requiredPermission: "Complaint.View" },
     },
     {
+      path: "/complaints/access-requests",
+      component: AccessRequestsView,
+      meta: { requiresAuth: true, requiredPermission: "AccessRequest.Review" },
+    },
+    {
       path: "/complaints/:id",
       component: ComplaintDetailView,
       meta: { requiresAuth: true, requiredPermission: "Complaint.View" },
+    },
+    {
+      path: "/complaints/:complaintId/booking-review",
+      component: BookingReviewView,
+      meta: { requiresAuth: true, requiredPermission: "Complaint.Review" },
     },
     {
       path: "/finance",

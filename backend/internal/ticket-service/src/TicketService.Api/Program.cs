@@ -9,6 +9,14 @@ using TicketService.Application.Commands.ApproveTicket;
 using TicketService.Application.Commands.CreateTicket;
 using TicketService.Application.Commands.IssueTicketFine;
 using TicketService.Application.Commands.RejectTicket;
+using TicketService.Application.AccessRequests.Commands.ApproveAccessRequest;
+using TicketService.Application.AccessRequests.Commands.CreateAccessRequest;
+using TicketService.Application.AccessRequests.Commands.RejectAccessRequest;
+using TicketService.Application.AccessRequests.Commands.RevokeAccessRequest;
+using TicketService.Application.AccessRequests.Queries.GetAccessRequestById;
+using TicketService.Application.AccessRequests.Queries.GetAccessRequestForComplaint;
+using TicketService.Application.AccessRequests.Queries.GetAccessRequests;
+using TicketService.Application.AccessRequests.Queries.GetBookingReview;
 using TicketService.Application.Complaints.Commands.AddManagerNote;
 using TicketService.Application.Complaints.Commands.CreateComplaint;
 using TicketService.Application.Complaints.Commands.RejectComplaint;
@@ -107,6 +115,15 @@ builder.Services.AddScoped<GetMyComplaintByIdQueryHandler>();
 builder.Services.AddScoped<GetAllComplaintsQueryHandler>();
 builder.Services.AddScoped<GetComplaintByIdQueryHandler>();
 
+builder.Services.AddScoped<CreateAccessRequestCommandHandler>();
+builder.Services.AddScoped<ApproveAccessRequestCommandHandler>();
+builder.Services.AddScoped<RejectAccessRequestCommandHandler>();
+builder.Services.AddScoped<RevokeAccessRequestCommandHandler>();
+builder.Services.AddScoped<GetAccessRequestsQueryHandler>();
+builder.Services.AddScoped<GetAccessRequestByIdQueryHandler>();
+builder.Services.AddScoped<GetAccessRequestForComplaintQueryHandler>();
+builder.Services.AddScoped<GetBookingReviewQueryHandler>();
+
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
 builder.Services.AddCors(options =>
 {
@@ -179,6 +196,9 @@ builder.Services.AddAuthorization(options =>
 
     options.AddPolicy("complaints:resolve", policy =>
         policy.RequireClaim("permissions", PermissionConstants.ComplaintResolve));
+
+    options.AddPolicy("access-requests:review", policy =>
+        policy.RequireClaim("permissions", PermissionConstants.AccessRequestReview));
 });
 
 var app = builder.Build();

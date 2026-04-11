@@ -75,6 +75,7 @@ public static class DependencyInjection
         services.AddScoped<ITicketUnitOfWork>(serviceProvider => serviceProvider.GetRequiredService<TicketDbContext>());
         services.AddScoped<ITicketRepository, TicketRepository>();
         services.AddScoped<IComplaintRepository, ComplaintRepository>();
+        services.AddScoped<IAccessRequestRepository, AccessRequestRepository>();
         services.AddScoped<ITicketEventPublisher, TicketEventPublisher>();
         services.AddSingleton<IRabbitMqPublisher, RabbitMqPublisher>();
         services.AddHostedService<TicketWorkflowOutboxDispatcher>();
