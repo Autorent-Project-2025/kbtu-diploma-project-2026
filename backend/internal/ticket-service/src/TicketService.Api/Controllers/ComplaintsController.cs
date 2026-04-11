@@ -3,16 +3,25 @@ using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 using TicketService.Api.Contracts.Complaints;
 using TicketService.Application.Complaints.Commands.AddManagerNote;
+using TicketService.Application.Complaints.Commands.ApproveReopenRequest;
+using TicketService.Application.Complaints.Commands.CancelComplaintBooking;
 using TicketService.Application.Complaints.Commands.CreateComplaint;
+using TicketService.Application.Complaints.Commands.EscalateComplaint;
+using TicketService.Application.Complaints.Commands.WaiveComplaintCharge;
+using TicketService.Application.Complaints.Queries.GetComplaintActionLogs;
+using TicketService.Application.Complaints.Commands.CreateReopenRequest;
 using TicketService.Application.Complaints.Commands.RejectComplaint;
+using TicketService.Application.Complaints.Commands.RejectReopenRequest;
 using TicketService.Application.Complaints.Commands.RequestInfo;
 using TicketService.Application.Complaints.Commands.RespondToInfoRequest;
 using TicketService.Application.Complaints.Commands.ResolveComplaint;
 using TicketService.Application.Complaints.Commands.TakeComplaint;
 using TicketService.Application.Complaints.Queries.GetAllComplaints;
+using TicketService.Application.Complaints.Queries.GetComplaintByBooking;
 using TicketService.Application.Complaints.Queries.GetComplaintById;
 using TicketService.Application.Complaints.Queries.GetMyComplaintById;
 using TicketService.Application.Complaints.Queries.GetMyComplaints;
+using TicketService.Application.Complaints.Queries.GetReopenRequests;
 using TicketService.Application.Exceptions;
 using TicketService.Application.Interfaces;
 using TicketService.Application.Models;
@@ -35,6 +44,15 @@ public sealed class ComplaintsController : ControllerBase
     private readonly GetMyComplaintByIdQueryHandler _getMyComplaintByIdHandler;
     private readonly GetAllComplaintsQueryHandler _getAllComplaintsHandler;
     private readonly GetComplaintByIdQueryHandler _getComplaintByIdHandler;
+    private readonly GetComplaintByBookingQueryHandler _getComplaintByBookingHandler;
+    private readonly CreateReopenRequestCommandHandler _createReopenRequestHandler;
+    private readonly ApproveReopenRequestCommandHandler _approveReopenRequestHandler;
+    private readonly RejectReopenRequestCommandHandler _rejectReopenRequestHandler;
+    private readonly GetReopenRequestsQueryHandler _getReopenRequestsHandler;
+    private readonly CancelComplaintBookingCommandHandler _cancelBookingHandler;
+    private readonly WaiveComplaintChargeCommandHandler _waiveChargeHandler;
+    private readonly EscalateComplaintCommandHandler _escalateHandler;
+    private readonly GetComplaintActionLogsQueryHandler _getActionLogsHandler;
     private readonly IFileStorageClient _fileStorageClient;
 
     public ComplaintsController(
@@ -49,6 +67,15 @@ public sealed class ComplaintsController : ControllerBase
         GetMyComplaintByIdQueryHandler getMyComplaintByIdHandler,
         GetAllComplaintsQueryHandler getAllComplaintsHandler,
         GetComplaintByIdQueryHandler getComplaintByIdHandler,
+        GetComplaintByBookingQueryHandler getComplaintByBookingHandler,
+        CreateReopenRequestCommandHandler createReopenRequestHandler,
+        ApproveReopenRequestCommandHandler approveReopenRequestHandler,
+        RejectReopenRequestCommandHandler rejectReopenRequestHandler,
+        GetReopenRequestsQueryHandler getReopenRequestsHandler,
+        CancelComplaintBookingCommandHandler cancelBookingHandler,
+        WaiveComplaintChargeCommandHandler waiveChargeHandler,
+        EscalateComplaintCommandHandler escalateHandler,
+        GetComplaintActionLogsQueryHandler getActionLogsHandler,
         IFileStorageClient fileStorageClient)
     {
         _createComplaintHandler = createComplaintHandler;
@@ -62,6 +89,15 @@ public sealed class ComplaintsController : ControllerBase
         _getMyComplaintByIdHandler = getMyComplaintByIdHandler;
         _getAllComplaintsHandler = getAllComplaintsHandler;
         _getComplaintByIdHandler = getComplaintByIdHandler;
+        _getComplaintByBookingHandler = getComplaintByBookingHandler;
+        _createReopenRequestHandler = createReopenRequestHandler;
+        _approveReopenRequestHandler = approveReopenRequestHandler;
+        _rejectReopenRequestHandler = rejectReopenRequestHandler;
+        _getReopenRequestsHandler = getReopenRequestsHandler;
+        _cancelBookingHandler = cancelBookingHandler;
+        _waiveChargeHandler = waiveChargeHandler;
+        _escalateHandler = escalateHandler;
+        _getActionLogsHandler = getActionLogsHandler;
         _fileStorageClient = fileStorageClient;
     }
 
@@ -150,6 +186,43 @@ public sealed class ComplaintsController : ControllerBase
         var link = await _fileStorageClient.GetTemporaryLinkAsync(
             attachment.FileName, cancellationToken: cancellationToken);
         return Ok(link);
+    }
+
+    [Authorize]
+    [HttpGet("my/by-booking/{bookingId:int}")]
+    public async Task<IActionResult> GetMyByBooking(int bookingId, CancellationToken cancellationToken)
+    {
+        var userId = ResolveUserId();
+        var result = await _getComplaintByBookingHandler.Handle(
+            new GetComplaintByBookingQuery(bookingId, userId), cancellationToken);
+        return result.Complaint is not null ? Ok(result.Complaint) : NotFound();
+    }
+
+    [Authorize]
+    [HttpPost("my/{id:guid}/reopen-request")]
+    public async Task<IActionResult> CreateReopenRequest(
+        Guid id,
+        [FromBody] Contracts.Complaints.CreateReopenRequestRequest request,
+        CancellationToken cancellationToken)
+    {
+        var userId = ResolveUserId();
+        var result = await _createReopenRequestHandler.Handle(
+            new CreateReopenRequestCommand(id, userId, request.Reason), cancellationToken);
+        return Created($"/complaints/my/{id}/reopen-requests/{result.ReopenRequest.Id}", result.ReopenRequest);
+    }
+
+    [Authorize]
+    [HttpGet("my/{id:guid}/reopen-requests")]
+    public async Task<IActionResult> GetMyReopenRequests(Guid id, CancellationToken cancellationToken)
+    {
+        var userId = ResolveUserId();
+        // Verify ownership
+        await _getMyComplaintByIdHandler.Handle(
+            new GetMyComplaintByIdQuery(id, userId), cancellationToken);
+
+        var result = await _getReopenRequestsHandler.Handle(
+            new GetReopenRequestsQuery(id), cancellationToken);
+        return Ok(result.ReopenRequests);
     }
 
     // ── Internal endpoints (JWT + permission policies) ──
@@ -267,6 +340,94 @@ public sealed class ComplaintsController : ControllerBase
         return Ok(result.Complaint);
     }
 
+    [Authorize(Policy = "complaints:view")]
+    [HttpGet("all/{id:guid}/reopen-requests")]
+    public async Task<IActionResult> GetReopenRequests(Guid id, CancellationToken cancellationToken)
+    {
+        var result = await _getReopenRequestsHandler.Handle(
+            new GetReopenRequestsQuery(id), cancellationToken);
+        return Ok(result.ReopenRequests);
+    }
+
+    [Authorize(Policy = "complaints:resolve")]
+    [HttpPost("all/reopen-requests/{requestId:guid}/approve")]
+    public async Task<IActionResult> ApproveReopenRequest(
+        Guid requestId,
+        [FromBody] Contracts.Complaints.ReviewReopenRequestRequest request,
+        CancellationToken cancellationToken)
+    {
+        var managerId = ResolveUserId();
+        var result = await _approveReopenRequestHandler.Handle(
+            new ApproveReopenRequestCommand(requestId, managerId, request.Note), cancellationToken);
+        return Ok(result);
+    }
+
+    [Authorize(Policy = "complaints:resolve")]
+    [HttpPost("all/reopen-requests/{requestId:guid}/reject")]
+    public async Task<IActionResult> RejectReopenRequest(
+        Guid requestId,
+        [FromBody] Contracts.Complaints.ReviewReopenRequestRequest request,
+        CancellationToken cancellationToken)
+    {
+        var managerId = ResolveUserId();
+        var result = await _rejectReopenRequestHandler.Handle(
+            new RejectReopenRequestCommand(requestId, managerId, request.Note), cancellationToken);
+        return Ok(result.ReopenRequest);
+    }
+
+    // ── Manager action endpoints ──
+
+    [Authorize(Policy = "complaints:action:cancel-booking")]
+    [HttpPost("all/{id:guid}/actions/cancel-booking")]
+    public async Task<IActionResult> CancelBooking(
+        Guid id,
+        [FromBody] CancelComplaintBookingRequest request,
+        CancellationToken cancellationToken)
+    {
+        var managerId = ResolveUserId();
+        var result = await _cancelBookingHandler.Handle(
+            new CancelComplaintBookingCommand(id, managerId, request.Reason),
+            cancellationToken);
+        return Ok(result.Complaint);
+    }
+
+    [Authorize(Policy = "complaints:action:waive-charge")]
+    [HttpPost("all/{id:guid}/actions/waive-charge")]
+    public async Task<IActionResult> WaiveCharge(
+        Guid id,
+        [FromBody] WaiveComplaintChargeRequest request,
+        CancellationToken cancellationToken)
+    {
+        var managerId = ResolveUserId();
+        var result = await _waiveChargeHandler.Handle(
+            new WaiveComplaintChargeCommand(id, managerId, request.ChargeId, request.Reason),
+            cancellationToken);
+        return Ok(result.Complaint);
+    }
+
+    [Authorize(Policy = "complaints:action:escalate")]
+    [HttpPost("all/{id:guid}/actions/escalate")]
+    public async Task<IActionResult> Escalate(
+        Guid id,
+        [FromBody] EscalateComplaintRequest request,
+        CancellationToken cancellationToken)
+    {
+        var managerId = ResolveUserId();
+        var result = await _escalateHandler.Handle(
+            new EscalateComplaintCommand(id, managerId, request.Reason),
+            cancellationToken);
+        return Ok(result.Complaint);
+    }
+
+    [Authorize(Policy = "complaints:view")]
+    [HttpGet("all/{id:guid}/action-logs")]
+    public async Task<IActionResult> GetActionLogs(Guid id, CancellationToken cancellationToken)
+    {
+        var result = await _getActionLogsHandler.Handle(
+            new GetComplaintActionLogsQuery(id), cancellationToken);
+        return Ok(result.ActionLogs);
+    }
+
     // ── Helpers ──
 
     private Guid ResolveUserId()
@@ -317,16 +478,20 @@ public sealed class ComplaintsController : ControllerBase
         };
     }
 
-    private static ComplaintResolutionType ParseResolutionType(string? value)
+    private static ComplaintResolutionType? ParseResolutionType(string? value)
     {
-        return (value?.Trim().ToLowerInvariant()) switch
+        var normalized = value?.Trim();
+        if (string.IsNullOrWhiteSpace(normalized))
+            return null;
+
+        return normalized.ToLowerInvariant() switch
         {
-            "in_favor_of_reporter" or "infavorofreporter" => ComplaintResolutionType.InFavorOfReporter,
-            "in_favor_of_counterparty" or "infavorofcounterparty" => ComplaintResolutionType.InFavorOfCounterparty,
-            "compromise_reached" or "compromisereached" => ComplaintResolutionType.CompromiseReached,
-            "no_action_required" or "noactionrequired" => ComplaintResolutionType.NoActionRequired,
+            "1" or "in_favor_of_reporter" or "infavorofreporter" => ComplaintResolutionType.InFavorOfReporter,
+            "2" or "in_favor_of_counterparty" or "infavorofcounterparty" => ComplaintResolutionType.InFavorOfCounterparty,
+            "3" or "compromise_reached" or "compromisereached" => ComplaintResolutionType.CompromiseReached,
+            "4" or "no_action_required" or "noactionrequired" => ComplaintResolutionType.NoActionRequired,
             _ => throw new ValidationException(
-                "resolutionType must be one of: in_favor_of_reporter, in_favor_of_counterparty, compromise_reached, no_action_required.")
+                "resolutionType must be empty or one of: in_favor_of_reporter, in_favor_of_counterparty, compromise_reached, no_action_required.")
         };
     }
 

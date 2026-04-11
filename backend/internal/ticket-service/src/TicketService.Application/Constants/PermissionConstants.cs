@@ -13,5 +13,9 @@ public static class PermissionConstants
 
     public const string AccessRequestReview = "AccessRequest.Review";
 
+    public const string ComplaintActionCancelBooking = "Complaint.Action.CancelBooking";
+    public const string ComplaintActionWaiveCharge = "Complaint.Action.WaiveCharge";
+    public const string ComplaintActionEscalate = "Complaint.Action.Escalate";
+
     public const string BookingView = "Booking.View";
 }

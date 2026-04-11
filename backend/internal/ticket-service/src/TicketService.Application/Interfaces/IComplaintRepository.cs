@@ -24,4 +24,20 @@ public interface IComplaintRepository
         int bookingId,
         Guid reporterUserId,
         CancellationToken cancellationToken = default);
+
+    Task<bool> ExistsForBookingAndReporterAsync(
+        int bookingId,
+        Guid reporterUserId,
+        CancellationToken cancellationToken = default);
+
+    Task<Complaint?> GetByBookingAndReporterAsync(
+        int bookingId,
+        Guid reporterUserId,
+        CancellationToken cancellationToken = default);
+
+    Task AddActionLogAsync(ComplaintActionLog actionLog, CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyCollection<ComplaintActionLog>> GetActionLogsAsync(
+        Guid complaintId,
+        CancellationToken cancellationToken = default);
 }

@@ -18,16 +18,25 @@ using TicketService.Application.AccessRequests.Queries.GetAccessRequestForCompla
 using TicketService.Application.AccessRequests.Queries.GetAccessRequests;
 using TicketService.Application.AccessRequests.Queries.GetBookingReview;
 using TicketService.Application.Complaints.Commands.AddManagerNote;
+using TicketService.Application.Complaints.Commands.CancelComplaintBooking;
+using TicketService.Application.Complaints.Commands.EscalateComplaint;
+using TicketService.Application.Complaints.Commands.WaiveComplaintCharge;
+using TicketService.Application.Complaints.Queries.GetComplaintActionLogs;
+using TicketService.Application.Complaints.Commands.ApproveReopenRequest;
 using TicketService.Application.Complaints.Commands.CreateComplaint;
+using TicketService.Application.Complaints.Commands.CreateReopenRequest;
 using TicketService.Application.Complaints.Commands.RejectComplaint;
+using TicketService.Application.Complaints.Commands.RejectReopenRequest;
 using TicketService.Application.Complaints.Commands.RequestInfo;
 using TicketService.Application.Complaints.Commands.RespondToInfoRequest;
 using TicketService.Application.Complaints.Commands.ResolveComplaint;
 using TicketService.Application.Complaints.Commands.TakeComplaint;
 using TicketService.Application.Complaints.Queries.GetAllComplaints;
+using TicketService.Application.Complaints.Queries.GetComplaintByBooking;
 using TicketService.Application.Complaints.Queries.GetComplaintById;
 using TicketService.Application.Complaints.Queries.GetMyComplaintById;
 using TicketService.Application.Complaints.Queries.GetMyComplaints;
+using TicketService.Application.Complaints.Queries.GetReopenRequests;
 using TicketService.Application.Constants;
 using TicketService.Application.Queries.GetAllTickets;
 using TicketService.Application.Queries.GetPendingTickets;
@@ -114,6 +123,16 @@ builder.Services.AddScoped<GetMyComplaintsQueryHandler>();
 builder.Services.AddScoped<GetMyComplaintByIdQueryHandler>();
 builder.Services.AddScoped<GetAllComplaintsQueryHandler>();
 builder.Services.AddScoped<GetComplaintByIdQueryHandler>();
+builder.Services.AddScoped<GetComplaintByBookingQueryHandler>();
+builder.Services.AddScoped<CreateReopenRequestCommandHandler>();
+builder.Services.AddScoped<ApproveReopenRequestCommandHandler>();
+builder.Services.AddScoped<RejectReopenRequestCommandHandler>();
+builder.Services.AddScoped<GetReopenRequestsQueryHandler>();
+
+builder.Services.AddScoped<CancelComplaintBookingCommandHandler>();
+builder.Services.AddScoped<WaiveComplaintChargeCommandHandler>();
+builder.Services.AddScoped<EscalateComplaintCommandHandler>();
+builder.Services.AddScoped<GetComplaintActionLogsQueryHandler>();
 
 builder.Services.AddScoped<CreateAccessRequestCommandHandler>();
 builder.Services.AddScoped<ApproveAccessRequestCommandHandler>();
@@ -199,6 +218,15 @@ builder.Services.AddAuthorization(options =>
 
     options.AddPolicy("access-requests:review", policy =>
         policy.RequireClaim("permissions", PermissionConstants.AccessRequestReview));
+
+    options.AddPolicy("complaints:action:cancel-booking", policy =>
+        policy.RequireClaim("permissions", PermissionConstants.ComplaintActionCancelBooking));
+
+    options.AddPolicy("complaints:action:waive-charge", policy =>
+        policy.RequireClaim("permissions", PermissionConstants.ComplaintActionWaiveCharge));
+
+    options.AddPolicy("complaints:action:escalate", policy =>
+        policy.RequireClaim("permissions", PermissionConstants.ComplaintActionEscalate));
 });
 
 var app = builder.Build();

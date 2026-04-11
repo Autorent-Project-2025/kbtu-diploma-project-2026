@@ -4,3 +4,4 @@ export { partnerApprovedTemplate } from "./partnerApprovedTemplate.ts";
 export { partnerRejectedTemplate } from "./partnerRejectedTemplate.ts";
 export { partnerCarApprovedTemplate } from "./partnerCarApprovedTemplate.ts";
 export { partnerCarRejectedTemplate } from "./partnerCarRejectedTemplate.ts";
+export { chatNewMessageTemplate } from "./chatNewMessageTemplate.ts";

@@ -16,6 +16,8 @@ public sealed class TicketDbContext : DbContext, ITicketUnitOfWork
     public DbSet<Complaint> Complaints => Set<Complaint>();
     public DbSet<ComplaintAttachment> ComplaintAttachments => Set<ComplaintAttachment>();
     public DbSet<ComplaintBookingAccessRequest> ComplaintBookingAccessRequests => Set<ComplaintBookingAccessRequest>();
+    public DbSet<ComplaintReopenRequest> ComplaintReopenRequests => Set<ComplaintReopenRequest>();
+    public DbSet<ComplaintActionLog> ComplaintActionLogs => Set<ComplaintActionLog>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -295,6 +295,46 @@ public sealed class PaymentLedgerService : IPaymentLedgerService
         return MapToBookingChargeResponseDto(charge);
     }
 
+    public async Task<BookingChargeResponseDto> CancelBookingChargeAsync(
+        long chargeId,
+        string? reason = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (chargeId <= 0)
+        {
+            throw new ArgumentException("Charge id must be greater than zero.", nameof(chargeId));
+        }
+
+        var charge = await _db.BookingCharges.FirstOrDefaultAsync(item => item.Id == chargeId, cancellationToken);
+        if (charge is null)
+        {
+            throw new KeyNotFoundException($"Booking charge {chargeId} was not found.");
+        }
+
+        if (charge.Status == BookingChargeStatus.Canceled)
+        {
+            return MapToBookingChargeResponseDto(charge);
+        }
+
+        if (charge.Status == BookingChargeStatus.Paid)
+        {
+            throw new InvalidOperationException("Paid booking charge cannot be canceled. Use refund flow instead.");
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        charge.Status = BookingChargeStatus.Canceled;
+        charge.CanceledAt = now;
+        charge.UpdatedAt = now;
+
+        if (!string.IsNullOrWhiteSpace(reason))
+        {
+            charge.Description = $"{charge.Description} | Canceled: {reason.Trim()}".Trim(' ', '|');
+        }
+
+        await _db.SaveChangesAsync(cancellationToken);
+        return MapToBookingChargeResponseDto(charge);
+    }
+
     public async Task<IReadOnlyCollection<BookingChargeResponseDto>> GetBookingChargesAsync(
         int bookingId,
         CancellationToken cancellationToken = default)

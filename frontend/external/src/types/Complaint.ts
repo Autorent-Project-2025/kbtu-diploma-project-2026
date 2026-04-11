@@ -33,6 +33,18 @@ export interface ComplaintAttachment {
   createdAt: string;
 }
 
+export interface ReopenRequest {
+  id: string;
+  complaintId: string;
+  requestedByUserId: string;
+  reason: string;
+  status: number; // 1=Pending, 2=Approved, 3=Rejected
+  reviewedByManagerId: string | null;
+  reviewedAt: string | null;
+  decisionNote: string | null;
+  createdAt: string;
+}
+
 export interface BookingSnapshot {
   bookingId: number;
   status: string;

@@ -78,4 +78,43 @@ public sealed class ComplaintRepository : IComplaintRepository
                 && c.Status != ComplaintStatus.Rejected,
             cancellationToken);
     }
+
+    public Task<bool> ExistsForBookingAndReporterAsync(
+        int bookingId,
+        Guid reporterUserId,
+        CancellationToken cancellationToken = default)
+    {
+        return _dbContext.Complaints.AnyAsync(
+            c => c.BookingId == bookingId
+                && c.CreatedByUserId == reporterUserId,
+            cancellationToken);
+    }
+
+    public Task<Complaint?> GetByBookingAndReporterAsync(
+        int bookingId,
+        Guid reporterUserId,
+        CancellationToken cancellationToken = default)
+    {
+        return _dbContext.Complaints
+            .Include(c => c.Attachments)
+            .Where(c => c.BookingId == bookingId && c.CreatedByUserId == reporterUserId)
+            .OrderByDescending(c => c.CreatedAt)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    public async Task AddActionLogAsync(ComplaintActionLog actionLog, CancellationToken cancellationToken = default)
+    {
+        await _dbContext.ComplaintActionLogs.AddAsync(actionLog, cancellationToken);
+    }
+
+    public async Task<IReadOnlyCollection<ComplaintActionLog>> GetActionLogsAsync(
+        Guid complaintId,
+        CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.ComplaintActionLogs
+            .AsNoTracking()
+            .Where(l => l.ComplaintId == complaintId)
+            .OrderByDescending(l => l.CreatedAt)
+            .ToArrayAsync(cancellationToken);
+    }
 }

@@ -8,6 +8,7 @@ import {
   partnerApprovedTemplate,
   partnerRejectedTemplate,
   rejectedTemplate,
+  chatNewMessageTemplate,
 } from "../mailer/templates/index.ts";
 
 type Mailer = ReturnType<typeof createMailer>;
@@ -50,6 +51,16 @@ type PartnerCarRejectedEmailRequested = PartnerCarApprovedEmailRequested & {
   reason?: string;
 };
 
+type ChatNewMessageEmailRequested = {
+  conversationId: string;
+  contextType: string;
+  contextId: string;
+  to: string;
+  recipientName: string;
+  senderName: string;
+  messagePreview: string;
+};
+
 const EXCHANGE_NAME = process.env.RABBITMQ_EXCHANGE?.trim() || "autorent.events";
 const QUEUE_NAME = "email-service.notifications";
 const RECONNECT_DELAY_MS = 5000;
@@ -61,6 +72,7 @@ const ROUTING_KEYS = [
   "ticket.email.partner-rejected",
   "ticket.email.partner-car-approved",
   "ticket.email.partner-car-rejected",
+  "chat.email.new-message",
 ];
 
 function parsePositiveInt(value: string | undefined, fallback: number): number {
@@ -223,6 +235,25 @@ async function sendTemplateEmail(mailer: Mailer, routingKey: string, payload: un
         carModel: requireString(typedPayload.carModel, "payload.carModel"),
         licensePlate: requireString(typedPayload.licensePlate, "payload.licensePlate"),
         reason: optionalString(typedPayload.reason),
+      });
+
+      await mailer.sendMail({
+        to: requireString(typedPayload.to, "payload.to"),
+        subject: template.subject,
+        text: template.text,
+        html: template.html,
+      });
+      return;
+    }
+
+    case "chat.email.new-message": {
+      const typedPayload = payload as ChatNewMessageEmailRequested;
+      const template = chatNewMessageTemplate({
+        recipientName: requireString(typedPayload.recipientName, "payload.recipientName"),
+        senderName: requireString(typedPayload.senderName, "payload.senderName"),
+        contextType: requireString(typedPayload.contextType, "payload.contextType"),
+        contextId: requireString(typedPayload.contextId, "payload.contextId"),
+        messagePreview: requireString(typedPayload.messagePreview, "payload.messagePreview"),
       });
 
       await mailer.sendMail({

@@ -1,8 +1,6 @@
 using TicketService.Application.Exceptions;
 using TicketService.Application.Interfaces;
 using TicketService.Application.Models;
-using TicketService.Domain.Entities;
-using TicketService.Domain.Enums;
 
 namespace TicketService.Application.Complaints.Commands.RespondToInfoRequest;
 
@@ -10,16 +8,16 @@ public sealed class RespondToInfoRequestCommandHandler
 {
     private readonly IComplaintRepository _complaintRepository;
     private readonly ITicketUnitOfWork _unitOfWork;
-    private readonly IFileStorageClient _fileStorageClient;
+    private readonly IChatServiceClient _chatServiceClient;
 
     public RespondToInfoRequestCommandHandler(
         IComplaintRepository complaintRepository,
         ITicketUnitOfWork unitOfWork,
-        IFileStorageClient fileStorageClient)
+        IChatServiceClient chatServiceClient)
     {
         _complaintRepository = complaintRepository;
         _unitOfWork = unitOfWork;
-        _fileStorageClient = fileStorageClient;
+        _chatServiceClient = chatServiceClient;
     }
 
     public async Task<RespondToInfoRequestResult> Handle(
@@ -39,23 +37,26 @@ public sealed class RespondToInfoRequestCommandHandler
             throw new ValidationException("You can only respond to your own complaint.");
 
         complaint.RespondToInfoRequest(command.ReporterUserId, command.Message);
-
-        if (command.Attachments is { Count: > 0 })
-        {
-            foreach (var file in command.Attachments.Take(5))
-            {
-                var fileName = await _fileStorageClient.UploadFileAsync(file, cancellationToken);
-                complaint.AddAttachment(new ComplaintAttachment(
-                    complaint.Id,
-                    fileName,
-                    file.FileName,
-                    file.ContentType,
-                    command.ReporterUserId,
-                    AttachmentPhase.InfoResponse));
-            }
-        }
-
         await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        // Send response notification to chat conversation
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                var conversationId = await _chatServiceClient.GetConversationIdByContextAsync(
+                    "complaint", complaint.Id.ToString(), cancellationToken);
+                if (conversationId is not null)
+                {
+                    await _chatServiceClient.SendSystemMessageAsync(
+                        conversationId,
+                        $"Заявитель предоставил дополнительную информацию: {command.Message}",
+                        internalOnly: false,
+                        cancellationToken);
+                }
+            }
+            catch { /* non-blocking */ }
+        });
 
         return new RespondToInfoRequestResult(complaint.ToDto());
     }

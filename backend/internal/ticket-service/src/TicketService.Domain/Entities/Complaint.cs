@@ -41,6 +41,11 @@ public sealed class Complaint
     public DateTime? RejectedAt { get; private set; }
     public Guid? RejectedBy { get; private set; }
 
+    public bool IsEscalated { get; private set; }
+    public DateTime? EscalatedAt { get; private set; }
+    public Guid? EscalatedBy { get; private set; }
+    public string? EscalationReason { get; private set; }
+
     public BookingSnapshotData SnapshotData { get; private set; } = new();
 
     public DateTime CreatedAt { get; private set; }
@@ -116,15 +121,9 @@ public sealed class Complaint
         EnsureAssignedManager(managerId);
         EnsureStatus(ComplaintStatus.InReview, "Info can only be requested when complaint is in review.");
 
-        if (InfoRequestText is not null)
-            throw new InvalidOperationException("Info has already been requested for this complaint.");
-
-        var normalizedMessage = NormalizeRequired(message, nameof(message), 4000);
+        NormalizeRequired(message, nameof(message), 4000);
 
         Status = ComplaintStatus.AwaitingResponse;
-        InfoRequestText = normalizedMessage;
-        InfoRequestAt = DateTime.UtcNow;
-        InfoRequestBy = managerId;
         UpdatedAt = DateTime.UtcNow;
     }
 
@@ -137,14 +136,9 @@ public sealed class Complaint
 
         EnsureStatus(ComplaintStatus.AwaitingResponse, "Response can only be submitted when info is requested.");
 
-        if (InfoResponseText is not null)
-            throw new InvalidOperationException("Info response has already been submitted.");
-
-        var normalizedMessage = NormalizeRequired(message, nameof(message), 4000);
+        NormalizeRequired(message, nameof(message), 4000);
 
         Status = ComplaintStatus.InReview;
-        InfoResponseText = normalizedMessage;
-        InfoResponseAt = DateTime.UtcNow;
         UpdatedAt = DateTime.UtcNow;
     }
 
@@ -154,21 +148,18 @@ public sealed class Complaint
         EnsureAssignedManager(managerId);
         EnsureNotTerminal();
 
-        var normalizedNote = NormalizeRequired(note, nameof(note), 4000);
+        NormalizeRequired(note, nameof(note), 4000);
 
-        ManagerNote = normalizedNote;
-        ManagerNoteAt = DateTime.UtcNow;
-        ManagerNoteBy = managerId;
         UpdatedAt = DateTime.UtcNow;
     }
 
-    public void Resolve(Guid managerId, ComplaintResolutionType resolutionType, string resolutionNote)
+    public void Resolve(Guid managerId, ComplaintResolutionType? resolutionType, string resolutionNote)
     {
         EnsureManagerId(managerId);
         EnsureAssignedManager(managerId);
         EnsureStatus(ComplaintStatus.InReview, "Only complaints in review can be resolved.");
 
-        if (!Enum.IsDefined(resolutionType))
+        if (resolutionType.HasValue && !Enum.IsDefined(resolutionType.Value))
             throw new ArgumentException("Resolution type is invalid.", nameof(resolutionType));
 
         var normalizedNote = NormalizeRequired(resolutionNote, nameof(resolutionNote), 4000);
@@ -196,6 +187,37 @@ public sealed class Complaint
         RejectedAt = now;
         RejectedBy = managerId;
         UpdatedAt = now;
+    }
+
+    public void Escalate(Guid managerId, string reason)
+    {
+        EnsureManagerId(managerId);
+        EnsureNotTerminal();
+
+        if (IsEscalated)
+            throw new InvalidOperationException("Complaint is already escalated.");
+
+        var normalizedReason = NormalizeRequired(reason, nameof(reason), 4000);
+        var now = DateTime.UtcNow;
+
+        IsEscalated = true;
+        EscalatedAt = now;
+        EscalatedBy = managerId;
+        EscalationReason = normalizedReason;
+        Priority = ComplaintPriority.Urgent;
+        UpdatedAt = now;
+    }
+
+    public void Reopen(Guid managerId)
+    {
+        EnsureManagerId(managerId);
+
+        if (Status is not (ComplaintStatus.Resolved or ComplaintStatus.Rejected))
+            throw new InvalidOperationException("Only resolved or rejected complaints can be reopened.");
+
+        Status = ComplaintStatus.InReview;
+        AssignedToManagerId = managerId;
+        UpdatedAt = DateTime.UtcNow;
     }
 
     private static void ValidateReporterTargetCombination(

@@ -370,8 +370,14 @@ async function handleSubmit() {
 
     await createComplaint(formData);
     emit("submit");
-  } catch (error) {
-    console.error("Failed to create complaint:", error);
+  } catch (err: any) {
+    const status = err?.response?.status;
+    const detail = err?.response?.data?.detail || err?.response?.data?.error || "";
+    if (status === 409) {
+      errors.value.category = "Обращение по этому бронированию уже существует. Откройте его из раздела обращений.";
+    } else {
+      errors.value.description = detail || "Не удалось отправить жалобу. Попробуйте позже.";
+    }
   } finally {
     isSubmitting.value = false;
   }

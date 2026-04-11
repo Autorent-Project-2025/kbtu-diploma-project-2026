@@ -1,5 +1,5 @@
 import api from "./axios";
-import type { Complaint } from "../types/Complaint";
+import type { Complaint, ReopenRequest } from "../types/Complaint";
 
 export interface ComplaintsFilter {
   status?: number;
@@ -41,16 +41,65 @@ export async function addManagerNote(id: string, note: string): Promise<Complain
 
 export async function resolveComplaint(
   id: string,
-  resolutionType: string,
   resolutionNote: string,
 ): Promise<Complaint> {
-  const res = await api.post(`/tickets/complaints/all/${id}/resolve`, { resolutionType, resolutionNote });
+  const res = await api.post(`/tickets/complaints/all/${id}/resolve`, { resolutionNote });
   return res.data as Complaint;
 }
 
 export async function rejectComplaint(id: string, reason: string): Promise<Complaint> {
   const res = await api.post(`/tickets/complaints/all/${id}/reject`, { reason });
   return res.data as Complaint;
+}
+
+export async function getReopenRequests(complaintId: string): Promise<ReopenRequest[]> {
+  const res = await api.get(`/tickets/complaints/all/${complaintId}/reopen-requests`);
+  return (res.data ?? []) as ReopenRequest[];
+}
+
+export async function approveReopenRequest(requestId: string, note?: string): Promise<void> {
+  await api.post(`/tickets/complaints/all/reopen-requests/${requestId}/approve`, { note });
+}
+
+export async function rejectReopenRequest(requestId: string, note?: string): Promise<void> {
+  await api.post(`/tickets/complaints/all/reopen-requests/${requestId}/reject`, { note });
+}
+
+// ── Manager action endpoints ──
+
+export async function cancelComplaintBooking(id: string, reason: string): Promise<Complaint> {
+  const res = await api.post(`/tickets/complaints/all/${id}/actions/cancel-booking`, { reason });
+  return res.data as Complaint;
+}
+
+export async function waiveComplaintCharge(
+  id: string,
+  chargeId: number,
+  reason: string,
+): Promise<Complaint> {
+  const res = await api.post(`/tickets/complaints/all/${id}/actions/waive-charge`, { chargeId, reason });
+  return res.data as Complaint;
+}
+
+export async function escalateComplaint(id: string, reason: string): Promise<Complaint> {
+  const res = await api.post(`/tickets/complaints/all/${id}/actions/escalate`, { reason });
+  return res.data as Complaint;
+}
+
+export interface ComplaintActionLog {
+  id: string;
+  complaintId: string;
+  actionType: string;
+  performedBy: string;
+  comment?: string | null;
+  targetEntityType?: string | null;
+  targetEntityId?: string | null;
+  createdAt: string;
+}
+
+export async function getComplaintActionLogs(id: string): Promise<ComplaintActionLog[]> {
+  const res = await api.get(`/tickets/complaints/all/${id}/action-logs`);
+  return (res.data ?? []) as ComplaintActionLog[];
 }
 
 export async function getComplaintAttachmentLink(

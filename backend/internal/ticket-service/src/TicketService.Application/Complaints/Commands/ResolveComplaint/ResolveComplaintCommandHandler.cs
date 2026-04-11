@@ -8,13 +8,16 @@ public sealed class ResolveComplaintCommandHandler
 {
     private readonly IComplaintRepository _complaintRepository;
     private readonly ITicketUnitOfWork _unitOfWork;
+    private readonly IChatServiceClient _chatServiceClient;
 
     public ResolveComplaintCommandHandler(
         IComplaintRepository complaintRepository,
-        ITicketUnitOfWork unitOfWork)
+        ITicketUnitOfWork unitOfWork,
+        IChatServiceClient chatServiceClient)
     {
         _complaintRepository = complaintRepository;
         _unitOfWork = unitOfWork;
+        _chatServiceClient = chatServiceClient;
     }
 
     public async Task<ResolveComplaintResult> Handle(
@@ -32,6 +35,15 @@ public sealed class ResolveComplaintCommandHandler
 
         complaint.Resolve(command.ManagerId, command.ResolutionType, command.ResolutionNote);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        var conversationId = await _chatServiceClient.GetConversationIdByContextAsync(
+            "complaint", command.ComplaintId.ToString(), cancellationToken);
+
+        if (conversationId is not null)
+        {
+            await _chatServiceClient.CloseConversationAsync(
+                conversationId, "Жалоба решена", cancellationToken);
+        }
 
         return new ResolveComplaintResult(complaint.ToDto());
     }

@@ -17,17 +17,20 @@ public sealed class CreateComplaintCommandHandler
     private readonly ITicketUnitOfWork _unitOfWork;
     private readonly IBookingReadClient _bookingReadClient;
     private readonly IFileStorageClient _fileStorageClient;
+    private readonly IChatServiceClient _chatServiceClient;
 
     public CreateComplaintCommandHandler(
         IComplaintRepository complaintRepository,
         ITicketUnitOfWork unitOfWork,
         IBookingReadClient bookingReadClient,
-        IFileStorageClient fileStorageClient)
+        IFileStorageClient fileStorageClient,
+        IChatServiceClient chatServiceClient)
     {
         _complaintRepository = complaintRepository;
         _unitOfWork = unitOfWork;
         _bookingReadClient = bookingReadClient;
         _fileStorageClient = fileStorageClient;
+        _chatServiceClient = chatServiceClient;
     }
 
     public async Task<CreateComplaintResult> Handle(
@@ -46,10 +49,10 @@ public sealed class CreateComplaintCommandHandler
         ValidateBookingOwnership(command.CreatedByUserId, command.ReporterActorType, booking);
         ValidateBookingStatus(booking);
 
-        var exists = await _complaintRepository.ExistsActiveForBookingAndReporterAsync(
+        var exists = await _complaintRepository.ExistsForBookingAndReporterAsync(
             command.BookingId, command.CreatedByUserId, cancellationToken);
         if (exists)
-            throw new ConflictException("An active complaint already exists for this booking.");
+            throw new ConflictException("A complaint already exists for this booking. Use the reopen request to continue.");
 
         var snapshot = BuildSnapshot(command.ReporterActorType, booking);
 
@@ -80,6 +83,21 @@ public sealed class CreateComplaintCommandHandler
 
         await _complaintRepository.AddAsync(complaint, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        var actorType = command.ReporterActorType == ReporterActorType.Client ? "client" : "partner";
+        await _chatServiceClient.CreateConversationAsync(
+            "complaint",
+            complaint.Id.ToString(),
+            "ticket-service",
+            [new ChatParticipant(
+                command.CreatedByUserId.ToString(),
+                actorType,
+                "reporter",
+                CanRead: true,
+                CanWrite: true,
+                CanSendInternal: false)],
+            "Жалоба создана",
+            cancellationToken);
 
         return new CreateComplaintResult(complaint.ToDto());
     }

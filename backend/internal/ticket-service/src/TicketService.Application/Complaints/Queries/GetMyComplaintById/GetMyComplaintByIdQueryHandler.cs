@@ -1,3 +1,4 @@
+using TicketService.Application.Complaints.Services;
 using TicketService.Application.Exceptions;
 using TicketService.Application.Interfaces;
 using TicketService.Application.Models;
@@ -7,10 +8,14 @@ namespace TicketService.Application.Complaints.Queries.GetMyComplaintById;
 public sealed class GetMyComplaintByIdQueryHandler
 {
     private readonly IComplaintRepository _complaintRepository;
+    private readonly ComplaintChatMigrationService _chatMigration;
 
-    public GetMyComplaintByIdQueryHandler(IComplaintRepository complaintRepository)
+    public GetMyComplaintByIdQueryHandler(
+        IComplaintRepository complaintRepository,
+        ComplaintChatMigrationService chatMigration)
     {
         _complaintRepository = complaintRepository;
+        _chatMigration = chatMigration;
     }
 
     public async Task<GetMyComplaintByIdResult> Handle(
@@ -28,6 +33,9 @@ public sealed class GetMyComplaintByIdQueryHandler
 
         if (complaint.CreatedByUserId != query.ReporterUserId)
             throw new NotFoundException($"Complaint '{query.ComplaintId}' was not found.");
+
+        // Ensure conversation exists before returning (needed so frontend can fetch it)
+        await _chatMigration.EnsureConversationExistsAsync(complaint, cancellationToken);
 
         return new GetMyComplaintByIdResult(complaint.ToDto());
     }

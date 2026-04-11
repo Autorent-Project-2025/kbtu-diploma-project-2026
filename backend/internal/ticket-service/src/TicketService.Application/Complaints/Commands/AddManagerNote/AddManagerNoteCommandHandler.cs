@@ -8,13 +8,16 @@ public sealed class AddManagerNoteCommandHandler
 {
     private readonly IComplaintRepository _complaintRepository;
     private readonly ITicketUnitOfWork _unitOfWork;
+    private readonly IChatServiceClient _chatServiceClient;
 
     public AddManagerNoteCommandHandler(
         IComplaintRepository complaintRepository,
-        ITicketUnitOfWork unitOfWork)
+        ITicketUnitOfWork unitOfWork,
+        IChatServiceClient chatServiceClient)
     {
         _complaintRepository = complaintRepository;
         _unitOfWork = unitOfWork;
+        _chatServiceClient = chatServiceClient;
     }
 
     public async Task<AddManagerNoteResult> Handle(
@@ -32,6 +35,25 @@ public sealed class AddManagerNoteCommandHandler
 
         complaint.AddManagerNote(command.ManagerId, command.Note);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        // Send manager note as internal-only message to chat conversation
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                var conversationId = await _chatServiceClient.GetConversationIdByContextAsync(
+                    "complaint", complaint.Id.ToString(), cancellationToken);
+                if (conversationId is not null)
+                {
+                    await _chatServiceClient.SendSystemMessageAsync(
+                        conversationId,
+                        $"Заметка менеджера: {command.Note}",
+                        internalOnly: true,
+                        cancellationToken);
+                }
+            }
+            catch { /* non-blocking */ }
+        });
 
         return new AddManagerNoteResult(complaint.ToDto());
     }

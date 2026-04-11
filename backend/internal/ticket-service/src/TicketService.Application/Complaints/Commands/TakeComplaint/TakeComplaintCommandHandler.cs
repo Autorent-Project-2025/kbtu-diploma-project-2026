@@ -8,13 +8,16 @@ public sealed class TakeComplaintCommandHandler
 {
     private readonly IComplaintRepository _complaintRepository;
     private readonly ITicketUnitOfWork _unitOfWork;
+    private readonly IChatServiceClient _chatServiceClient;
 
     public TakeComplaintCommandHandler(
         IComplaintRepository complaintRepository,
-        ITicketUnitOfWork unitOfWork)
+        ITicketUnitOfWork unitOfWork,
+        IChatServiceClient chatServiceClient)
     {
         _complaintRepository = complaintRepository;
         _unitOfWork = unitOfWork;
+        _chatServiceClient = chatServiceClient;
     }
 
     public async Task<TakeComplaintResult> Handle(
@@ -32,6 +35,21 @@ public sealed class TakeComplaintCommandHandler
 
         complaint.Take(command.ManagerId);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        var conversationId = await _chatServiceClient.GetConversationIdByContextAsync(
+            "complaint", command.ComplaintId.ToString(), cancellationToken);
+
+        if (conversationId is not null)
+        {
+            await _chatServiceClient.AddParticipantAsync(conversationId,
+                new ChatParticipant(
+                    command.ManagerId.ToString(), "manager", "manager",
+                    CanRead: true, CanWrite: true, CanSendInternal: true),
+                cancellationToken);
+
+            await _chatServiceClient.SendSystemMessageAsync(
+                conversationId, "Менеджер взял жалобу в работу", ct: cancellationToken);
+        }
 
         return new TakeComplaintResult(complaint.ToDto());
     }

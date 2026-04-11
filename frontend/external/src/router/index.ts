@@ -22,6 +22,7 @@ import { auth } from "../store/auth";
 import SubscriptionPlansView from "../views/SubscriptionPlansView.vue";
 import AiView from "../views/AiView.vue";
 import MyComplaintsView from "../views/MyComplaintsView.vue";
+import ComplaintDetailView from "../views/ComplaintDetailView.vue";
 
 const routes = [
   {
@@ -83,6 +84,12 @@ const routes = [
     path: "/complaints",
     name: "MyComplaints",
     component: MyComplaintsView,
+    meta: { requiresAuth: true },
+  },
+  {
+    path: "/complaints/:id",
+    name: "ComplaintDetail",
+    component: ComplaintDetailView,
     meta: { requiresAuth: true },
   },
 

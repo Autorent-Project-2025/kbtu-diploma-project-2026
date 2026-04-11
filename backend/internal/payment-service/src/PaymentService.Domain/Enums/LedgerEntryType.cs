@@ -11,5 +11,6 @@ public enum LedgerEntryType
     PayoutReservedCredit,
     PayoutReservedRelease,
     PayoutReservedRollback,
-    PayoutAvailableReturn
+    PayoutAvailableReturn,
+    BookingChargeCanceled
 }

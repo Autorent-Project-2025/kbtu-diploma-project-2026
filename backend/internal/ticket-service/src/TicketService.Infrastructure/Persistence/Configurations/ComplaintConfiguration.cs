@@ -55,6 +55,11 @@ public sealed class ComplaintConfiguration : IEntityTypeConfiguration<Complaint>
         builder.Property(c => c.RejectedAt).HasColumnName("rejected_at");
         builder.Property(c => c.RejectedBy).HasColumnName("rejected_by");
 
+        builder.Property(c => c.IsEscalated).HasColumnName("is_escalated").HasDefaultValue(false).IsRequired();
+        builder.Property(c => c.EscalatedAt).HasColumnName("escalated_at");
+        builder.Property(c => c.EscalatedBy).HasColumnName("escalated_by");
+        builder.Property(c => c.EscalationReason).HasColumnName("escalation_reason").HasMaxLength(4000);
+
         var snapshotConverter = new ValueConverter<BookingSnapshotData, string>(
             v => JsonSerializer.Serialize(v, SerializerOptions),
             v => JsonSerializer.Deserialize<BookingSnapshotData>(v, SerializerOptions) ?? new BookingSnapshotData());

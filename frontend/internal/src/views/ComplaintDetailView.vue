@@ -30,6 +30,12 @@
               <span class="px-3 py-1 rounded-full bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400 text-sm font-bold">
                 {{ categoryLabels[complaint.category] ?? "Другое" }}
               </span>
+              <span
+                v-if="complaint.isEscalated"
+                class="px-3 py-1 rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 text-sm font-bold"
+              >
+                Эскалирована
+              </span>
             </div>
           </div>
         </div>
@@ -54,286 +60,401 @@
 
     <template v-else-if="complaint">
 
-      <!-- Context cards -->
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <!-- Booking snapshot -->
-        <div class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow p-5 space-y-3">
-          <p class="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">Бронирование</p>
-          <div class="flex gap-3">
-            <div
-              v-if="complaint.snapshotData.coverImageUrl"
-              class="shrink-0 w-20 h-14 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-800"
-            >
-              <img :src="complaint.snapshotData.coverImageUrl" class="w-full h-full object-cover" />
+      <!-- Two-column layout: info left, chat right -->
+      <div class="flex flex-col lg:flex-row gap-6 items-start">
+
+        <!-- LEFT COLUMN: complaint info -->
+        <div class="w-full lg:w-1/2 space-y-6 min-w-0">
+
+          <!-- Context cards -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <!-- Booking snapshot -->
+            <div class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow p-5 space-y-3">
+              <p class="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">Бронирование</p>
+              <div class="flex gap-3">
+                <div
+                  v-if="complaint.snapshotData.coverImageUrl"
+                  class="shrink-0 w-20 h-14 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-800"
+                >
+                  <img :src="complaint.snapshotData.coverImageUrl" class="w-full h-full object-cover" />
+                </div>
+                <div class="min-w-0">
+                  <p class="text-sm font-bold text-gray-900 dark:text-white">
+                    {{ complaint.snapshotData.carBrand }} {{ complaint.snapshotData.carModel }}
+                  </p>
+                  <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                    {{ formatDateTime(complaint.snapshotData.startTime) }} → {{ formatDateTime(complaint.snapshotData.endTime) }}
+                  </p>
+                  <p v-if="complaint.snapshotData.totalPrice != null" class="text-xs font-semibold text-gray-700 dark:text-gray-300 mt-0.5">
+                    {{ formatPrice(complaint.snapshotData.totalPrice) }}
+                  </p>
+                </div>
+              </div>
+              <!-- Booking access link -->
+              <template v-if="hasBookingView">
+                <EntityLink :to="`/bookings/${complaint.bookingId}`">
+                  Бронирование #{{ complaint.bookingId }}
+                </EntityLink>
+              </template>
+              <template v-else>
+                <div class="space-y-2">
+                  <p class="text-xs text-gray-500 dark:text-gray-400">
+                    Бронирование #{{ complaint.bookingId }}
+                  </p>
+
+                  <!-- No request yet -->
+                  <button
+                    v-if="!accessRequest"
+                    @click="showAccessRequestModal = true"
+                    class="text-sm font-semibold text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 transition-colors"
+                  >
+                    Запросить доступ к бронированию
+                  </button>
+
+                  <!-- Pending -->
+                  <p
+                    v-else-if="accessRequest.status === 1"
+                    class="text-sm font-semibold text-blue-600 dark:text-blue-400"
+                  >
+                    Запрос на доступ отправлен
+                  </p>
+
+                  <!-- Approved -->
+                  <router-link
+                    v-else-if="accessRequest.status === 2 && !isGrantExpired"
+                    :to="`/complaints/${complaint.id}/booking-review`"
+                    class="inline-flex items-center gap-1.5 text-sm font-semibold text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 transition-colors"
+                  >
+                    Открыть review бронирования
+                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+                    </svg>
+                  </router-link>
+
+                  <!-- Expired -->
+                  <p
+                    v-else-if="accessRequest.status === 2 && isGrantExpired"
+                    class="text-sm font-semibold text-gray-500 dark:text-gray-400"
+                  >
+                    Срок доступа истёк
+                  </p>
+
+                  <!-- Rejected -->
+                  <p
+                    v-else-if="accessRequest.status === 3"
+                    class="text-sm font-semibold text-red-600 dark:text-red-400"
+                  >
+                    Доступ отклонён
+                    <span v-if="accessRequest.decisionNote" class="font-normal text-xs block mt-0.5 text-gray-500 dark:text-gray-400">
+                      {{ accessRequest.decisionNote }}
+                    </span>
+                  </p>
+
+                  <!-- Revoked -->
+                  <p
+                    v-else-if="accessRequest.status === 5"
+                    class="text-sm font-semibold text-gray-500 dark:text-gray-400"
+                  >
+                    Доступ отозван
+                  </p>
+                </div>
+              </template>
             </div>
-            <div class="min-w-0">
-              <p class="text-sm font-bold text-gray-900 dark:text-white">
-                {{ complaint.snapshotData.carBrand }} {{ complaint.snapshotData.carModel }}
-              </p>
-              <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                {{ formatDateTime(complaint.snapshotData.startTime) }} → {{ formatDateTime(complaint.snapshotData.endTime) }}
-              </p>
-              <p v-if="complaint.snapshotData.totalPrice != null" class="text-xs font-semibold text-gray-700 dark:text-gray-300 mt-0.5">
-                {{ formatPrice(complaint.snapshotData.totalPrice) }}
-              </p>
-            </div>
-          </div>
-          <!-- Booking access link -->
-          <template v-if="hasBookingView">
-            <EntityLink :to="`/bookings/${complaint.bookingId}`">
-              Бронирование #{{ complaint.bookingId }}
-            </EntityLink>
-          </template>
-          <template v-else>
-            <div class="space-y-2">
+
+            <!-- Reporter -->
+            <div class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow p-5 space-y-3">
+              <p class="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">Заявитель</p>
+              <p class="text-sm font-bold text-gray-900 dark:text-white">{{ complaint.snapshotData.reporterFullName }}</p>
               <p class="text-xs text-gray-500 dark:text-gray-400">
-                Бронирование #{{ complaint.bookingId }}
+                Тип: {{ reporterLabels[complaint.reporterActorType] ?? "—" }}
               </p>
+              <div>
+                <p class="text-xs text-gray-400 dark:text-gray-500 mb-0.5">User ID</p>
+                <p class="font-mono text-xs text-gray-700 dark:text-gray-300 break-all leading-relaxed">
+                  {{ complaint.createdByUserId }}
+                </p>
+              </div>
+            </div>
+          </div>
 
-              <!-- No request yet -->
-              <button
-                v-if="!accessRequest"
-                @click="showAccessRequestModal = true"
-                class="text-sm font-semibold text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 transition-colors"
-              >
-                Запросить доступ к бронированию
-              </button>
-
-              <!-- Pending -->
-              <p
-                v-else-if="accessRequest.status === 1"
-                class="text-sm font-semibold text-blue-600 dark:text-blue-400"
-              >
-                Запрос на доступ отправлен
-              </p>
-
-              <!-- Approved -->
-              <router-link
-                v-else-if="accessRequest.status === 2 && !isGrantExpired"
-                :to="`/complaints/${complaint.id}/booking-review`"
-                class="inline-flex items-center gap-1.5 text-sm font-semibold text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 transition-colors"
-              >
-                Открыть review бронирования
-                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
-                </svg>
-              </router-link>
-
-              <!-- Expired -->
-              <p
-                v-else-if="accessRequest.status === 2 && isGrantExpired"
-                class="text-sm font-semibold text-gray-500 dark:text-gray-400"
-              >
-                Срок доступа истёк
-              </p>
-
-              <!-- Rejected -->
-              <p
-                v-else-if="accessRequest.status === 3"
-                class="text-sm font-semibold text-red-600 dark:text-red-400"
-              >
-                Доступ отклонён
-                <span v-if="accessRequest.decisionNote" class="font-normal text-xs block mt-0.5 text-gray-500 dark:text-gray-400">
-                  {{ accessRequest.decisionNote }}
-                </span>
-              </p>
-
-              <!-- Revoked -->
-              <p
-                v-else-if="accessRequest.status === 5"
-                class="text-sm font-semibold text-gray-500 dark:text-gray-400"
-              >
-                Доступ отозван
+          <!-- Counterparty (full width in left col) -->
+          <div class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow p-5 space-y-3">
+            <p class="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">Контрагент</p>
+            <p class="text-sm font-bold text-gray-900 dark:text-white">{{ complaint.snapshotData.counterpartyName }}</p>
+            <p class="text-xs text-gray-500 dark:text-gray-400">
+              Тип: {{ targetLabels[complaint.targetType] ?? "—" }}
+            </p>
+            <div>
+              <p class="text-xs text-gray-400 dark:text-gray-500 mb-0.5">User ID</p>
+              <p class="font-mono text-xs text-gray-700 dark:text-gray-300 break-all leading-relaxed">
+                {{ complaint.snapshotData.counterpartyUserId }}
               </p>
             </div>
-          </template>
-        </div>
-
-        <!-- Reporter -->
-        <div class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow p-5 space-y-3">
-          <p class="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">Заявитель</p>
-          <p class="text-sm font-bold text-gray-900 dark:text-white">{{ complaint.snapshotData.reporterFullName }}</p>
-          <p class="text-xs text-gray-500 dark:text-gray-400">
-            Тип: {{ reporterLabels[complaint.reporterActorType] ?? "—" }}
-          </p>
-          <div>
-            <p class="text-xs text-gray-400 dark:text-gray-500 mb-0.5">User ID</p>
-            <p class="font-mono text-xs text-gray-700 dark:text-gray-300 break-all leading-relaxed">
-              {{ complaint.createdByUserId }}
-            </p>
           </div>
-        </div>
 
-        <!-- Counterparty -->
-        <div class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow p-5 space-y-3">
-          <p class="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">Контрагент</p>
-          <p class="text-sm font-bold text-gray-900 dark:text-white">{{ complaint.snapshotData.counterpartyName }}</p>
-          <p class="text-xs text-gray-500 dark:text-gray-400">
-            Тип: {{ targetLabels[complaint.targetType] ?? "—" }}
-          </p>
-          <div>
-            <p class="text-xs text-gray-400 dark:text-gray-500 mb-0.5">User ID</p>
-            <p class="font-mono text-xs text-gray-700 dark:text-gray-300 break-all leading-relaxed">
-              {{ complaint.snapshotData.counterpartyUserId }}
-            </p>
+          <!-- Description -->
+          <div class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-xl p-8">
+            <h2 class="text-lg font-bold text-gray-900 dark:text-white mb-4">Описание</h2>
+            <p class="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap leading-relaxed">{{ complaint.description }}</p>
           </div>
-        </div>
-      </div>
 
-      <!-- Description -->
-      <div class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-xl p-8">
-        <h2 class="text-lg font-bold text-gray-900 dark:text-white mb-4">Описание</h2>
-        <p class="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap leading-relaxed">{{ complaint.description }}</p>
-      </div>
-
-      <!-- Attachments (creation phase) -->
-      <div
-        v-if="creationAttachments.length > 0"
-        class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-xl p-8"
-      >
-        <h2 class="text-lg font-bold text-gray-900 dark:text-white mb-4">Вложения</h2>
-        <ul class="space-y-2">
-          <li v-for="att in creationAttachments" :key="att.id" class="flex items-center gap-3">
-            <svg class="w-4 h-4 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-            </svg>
-            <button
-              @click="downloadAttachment(att.id, att.originalFileName)"
-              class="text-sm text-emerald-600 dark:text-emerald-400 hover:underline font-medium"
-            >
-              {{ att.originalFileName }}
-            </button>
-            <span class="text-xs text-gray-400">{{ att.fileType }}</span>
-          </li>
-        </ul>
-      </div>
-
-      <!-- Info Request / Response -->
-      <div
-        v-if="complaint.infoRequestText"
-        class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-xl p-8 space-y-4"
-      >
-        <h2 class="text-lg font-bold text-gray-900 dark:text-white">Запрос информации</h2>
-        <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800/50 rounded-xl p-4">
-          <p class="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 mb-1">Запрос от менеджера</p>
-          <p class="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{{ complaint.infoRequestText }}</p>
-          <p v-if="complaint.infoRequestAt" class="text-xs text-gray-400 mt-2">{{ formatDateTime(complaint.infoRequestAt) }}</p>
-        </div>
-        <div v-if="complaint.infoResponseText" class="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/50 rounded-xl p-4">
-          <p class="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 mb-1">Ответ заявителя</p>
-          <p class="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{{ complaint.infoResponseText }}</p>
-          <p v-if="complaint.infoResponseAt" class="text-xs text-gray-400 mt-2">{{ formatDateTime(complaint.infoResponseAt) }}</p>
-        </div>
-        <!-- Response attachments -->
-        <div v-if="responseAttachments.length > 0" class="pt-2">
-          <p class="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-2">Вложения к ответу</p>
-          <ul class="space-y-2">
-            <li v-for="att in responseAttachments" :key="att.id" class="flex items-center gap-3">
-              <svg class="w-4 h-4 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-              </svg>
+          <!-- Attachments (creation phase) -->
+          <div
+            v-if="creationAttachments.length > 0"
+            class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-xl p-8"
+          >
+            <h2 class="text-lg font-bold text-gray-900 dark:text-white mb-4">Вложения</h2>
+            <div v-if="creationImageAttachments.length > 0" class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
               <button
-                @click="downloadAttachment(att.id, att.originalFileName)"
-                class="text-sm text-emerald-600 dark:text-emerald-400 hover:underline font-medium"
+                v-for="att in creationImageAttachments"
+                :key="att.id"
+                type="button"
+                @click="openComplaintAttachmentPreview(att)"
+                class="overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-left transition-all hover:border-emerald-300 hover:shadow-md dark:hover:border-emerald-500/40"
               >
-                {{ att.originalFileName }}
+                <img
+                  v-if="complaintAttachmentPreviewUrls[att.id]"
+                  :src="complaintAttachmentPreviewUrls[att.id]"
+                  :alt="att.originalFileName"
+                  class="h-48 w-full object-cover"
+                  loading="lazy"
+                />
+                <div
+                  v-else
+                  class="h-48 w-full flex items-center justify-center bg-gray-100 dark:bg-gray-800 text-xs font-medium text-gray-400 dark:text-gray-500"
+                >
+                  Загрузка изображения...
+                </div>
+                <div class="flex items-center justify-between gap-3 px-4 py-3">
+                  <span class="truncate text-sm font-medium text-gray-700 dark:text-gray-300">{{ att.originalFileName }}</span>
+                  <span class="text-[11px] font-semibold uppercase tracking-wide text-emerald-600 dark:text-emerald-400">Открыть</span>
+                </div>
               </button>
-              <span class="text-xs text-gray-400">{{ att.fileType }}</span>
-            </li>
-          </ul>
+            </div>
+            <ul class="space-y-2">
+              <li v-for="att in creationFileAttachments" :key="att.id" class="flex items-center gap-3">
+                <svg class="w-4 h-4 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                </svg>
+                <button
+                  @click="downloadAttachment(att.id, att.originalFileName)"
+                  class="text-sm text-emerald-600 dark:text-emerald-400 hover:underline font-medium"
+                >
+                  {{ att.originalFileName }}
+                </button>
+                <span class="text-xs text-gray-400">{{ att.fileType }}</span>
+              </li>
+            </ul>
+          </div>
+
+          <!-- Actions panel -->
+          <div
+            v-if="complaint.status === 1 || complaint.status === 2 || complaint.status === 3"
+            class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-xl p-8"
+          >
+            <h2 class="text-lg font-bold text-gray-900 dark:text-white mb-4">Действия</h2>
+
+            <!-- Status=New -->
+            <div v-if="complaint.status === 1">
+              <button
+                @click="onTake"
+                :disabled="actionLoading"
+                class="px-5 py-2.5 rounded-2xl bg-emerald-600 text-white font-semibold hover:bg-emerald-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {{ actionLoading ? "Обработка..." : "Взять в работу" }}
+              </button>
+            </div>
+
+            <!-- Status=InReview -->
+            <div v-if="complaint.status === 2" class="flex flex-wrap gap-3">
+              <button
+                @click="showResolveModal = true"
+                class="px-5 py-2.5 rounded-2xl bg-emerald-600 text-white font-semibold hover:bg-emerald-700 transition-colors"
+              >
+                Решить
+              </button>
+              <button
+                @click="showRejectModal = true"
+                class="px-5 py-2.5 rounded-2xl border border-red-300 dark:border-red-500/30 text-red-600 dark:text-red-400 font-semibold bg-white/60 dark:bg-transparent hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+              >
+                Отклонить
+              </button>
+            </div>
+
+            <!-- Status=AwaitingResponse -->
+            <div v-if="complaint.status === 3">
+              <p class="text-sm text-orange-600 dark:text-orange-400 font-semibold">
+                Ожидание ответа от заявителя
+              </p>
+            </div>
+          </div>
+
+          <!-- Manager Actions -->
+          <div
+            v-if="complaint.assignedToManagerId && complaint.status !== 4 && complaint.status !== 5"
+            class="rounded-2xl border border-indigo-200 dark:border-indigo-800/50 bg-white dark:bg-gray-900 shadow-xl p-8"
+          >
+            <h2 class="text-lg font-bold text-gray-900 dark:text-white mb-4">Действия менеджера</h2>
+            <div class="space-y-3">
+
+              <!-- Cancel Booking -->
+              <div v-if="canCancelBooking" class="flex items-center justify-between gap-3">
+                <div>
+                  <p class="text-sm font-semibold text-gray-900 dark:text-white">Отменить бронирование</p>
+                  <p class="text-xs text-gray-500 dark:text-gray-400">Бронирование #{{ complaint.bookingId }} ({{ complaint.snapshotData.status }})</p>
+                </div>
+                <button
+                  @click="showCancelBookingModal = true"
+                  class="px-4 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-xl transition-colors shrink-0"
+                >
+                  Отменить
+                </button>
+              </div>
+              <div v-else-if="bookingNotCancelable" class="flex items-center gap-3">
+                <div>
+                  <p class="text-sm font-semibold text-gray-400 dark:text-gray-500">Отменить бронирование</p>
+                  <p class="text-xs text-gray-400 dark:text-gray-500">Бронирование уже {{ bookingNotCancelableReason }}</p>
+                </div>
+              </div>
+
+              <!-- Waive Charge -->
+              <div v-if="complaint.chargeId" class="flex items-center justify-between gap-3">
+                <div>
+                  <p class="text-sm font-semibold text-gray-900 dark:text-white">Аннулировать начисление</p>
+                  <p class="text-xs text-gray-500 dark:text-gray-400">Начисление #{{ complaint.chargeId }}</p>
+                </div>
+                <button
+                  @click="showWaiveChargeModal = true"
+                  class="px-4 py-2 text-sm font-semibold text-amber-600 dark:text-amber-400 border border-amber-300 dark:border-amber-700 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded-xl transition-colors shrink-0"
+                >
+                  Аннулировать
+                </button>
+              </div>
+
+              <!-- Escalate -->
+              <div v-if="!complaint.isEscalated" class="flex items-center justify-between gap-3">
+                <div>
+                  <p class="text-sm font-semibold text-gray-900 dark:text-white">Эскалировать</p>
+                  <p class="text-xs text-gray-500 dark:text-gray-400">Передать жалобу суперменеджеру</p>
+                </div>
+                <button
+                  @click="showEscalateModal = true"
+                  class="px-4 py-2 text-sm font-semibold text-purple-600 dark:text-purple-400 border border-purple-300 dark:border-purple-700 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-xl transition-colors shrink-0"
+                >
+                  Эскалировать
+                </button>
+              </div>
+              <div v-else class="flex items-center gap-3">
+                <div>
+                  <p class="text-sm font-semibold text-purple-600 dark:text-purple-400">Эскалирована</p>
+                  <p class="text-xs text-gray-500 dark:text-gray-400">
+                    {{ complaint.escalationReason }}
+                    <span v-if="complaint.escalatedAt" class="ml-1 text-gray-400">
+                      ({{ formatDateTime(complaint.escalatedAt) }})
+                    </span>
+                  </p>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- Resolution -->
+          <div
+            v-if="complaint.status === 4"
+            class="rounded-2xl border border-emerald-200 dark:border-emerald-800/50 bg-emerald-50 dark:bg-emerald-900/20 shadow-xl p-8"
+          >
+            <h2 class="text-lg font-bold text-emerald-700 dark:text-emerald-400 mb-4">Решение</h2>
+            <p v-if="complaint.resolutionType != null" class="text-sm font-semibold text-gray-900 dark:text-white mb-2">
+              {{ resolutionLabels[complaint.resolutionType] ?? "—" }}
+            </p>
+            <p v-if="complaint.resolutionNote" class="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{{ complaint.resolutionNote }}</p>
+            <p v-if="complaint.resolvedAt" class="text-xs text-gray-400 mt-2">{{ formatDateTime(complaint.resolvedAt) }}</p>
+          </div>
+
+          <!-- Rejection -->
+          <div
+            v-if="complaint.status === 5"
+            class="rounded-2xl border border-red-200 dark:border-red-800/50 bg-red-50 dark:bg-red-900/20 shadow-xl p-8"
+          >
+            <h2 class="text-lg font-bold text-red-700 dark:text-red-400 mb-4">Отклонена</h2>
+            <p v-if="complaint.rejectionReason" class="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{{ complaint.rejectionReason }}</p>
+            <p v-if="complaint.rejectedAt" class="text-xs text-gray-400 mt-2">{{ formatDateTime(complaint.rejectedAt) }}</p>
+          </div>
+
+          <!-- Reopen Requests -->
+          <div
+            v-if="reopenRequests.length > 0"
+            class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-xl p-8"
+          >
+            <h2 class="text-lg font-bold text-gray-900 dark:text-white mb-4">Запросы на повторное открытие</h2>
+            <div class="space-y-3">
+              <div
+                v-for="req in reopenRequests"
+                :key="req.id"
+                class="rounded-xl border p-4"
+                :class="{
+                  'border-amber-200 dark:border-amber-800/50 bg-amber-50 dark:bg-amber-900/10': req.status === 1,
+                  'border-emerald-200 dark:border-emerald-800/50 bg-emerald-50 dark:bg-emerald-900/10': req.status === 2,
+                  'border-red-200 dark:border-red-800/50 bg-red-50 dark:bg-red-900/10': req.status === 3,
+                }"
+              >
+                <div class="flex items-start justify-between gap-3 mb-2">
+                  <div>
+                    <span
+                      class="inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-bold uppercase tracking-wide"
+                      :class="{
+                        'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400': req.status === 1,
+                        'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400': req.status === 2,
+                        'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400': req.status === 3,
+                      }"
+                    >
+                      {{ reopenStatusLabels[req.status] ?? '—' }}
+                    </span>
+                    <span class="text-xs text-gray-400 dark:text-gray-500 ml-2">{{ formatDateTime(req.createdAt) }}</span>
+                  </div>
+                  <!-- Approve/Reject buttons for pending requests -->
+                  <div v-if="req.status === 1" class="flex gap-2 shrink-0">
+                    <button
+                      @click="onApproveReopen(req.id)"
+                      :disabled="actionLoading"
+                      class="px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 transition-colors disabled:opacity-60"
+                    >
+                      Одобрить
+                    </button>
+                    <button
+                      @click="startRejectReopen(req.id)"
+                      :disabled="actionLoading"
+                      class="px-3 py-1.5 rounded-lg text-xs font-bold text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-60"
+                    >
+                      Отклонить
+                    </button>
+                  </div>
+                </div>
+                <p class="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{{ req.reason }}</p>
+                <p v-if="req.decisionNote" class="text-xs text-gray-500 dark:text-gray-400 mt-2 italic">{{ req.decisionNote }}</p>
+              </div>
+            </div>
+          </div>
+
         </div>
-      </div>
 
-      <!-- Manager Note -->
-      <div
-        v-if="complaint.managerNote"
-        class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-xl p-8"
-      >
-        <h2 class="text-lg font-bold text-gray-900 dark:text-white mb-4">Заметка менеджера</h2>
-        <p class="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{{ complaint.managerNote }}</p>
-        <p v-if="complaint.managerNoteAt" class="text-xs text-gray-400 mt-2">{{ formatDateTime(complaint.managerNoteAt) }}</p>
-      </div>
-
-      <!-- Resolution -->
-      <div
-        v-if="complaint.status === 4 && complaint.resolutionType != null"
-        class="rounded-2xl border border-emerald-200 dark:border-emerald-800/50 bg-emerald-50 dark:bg-emerald-900/20 shadow-xl p-8"
-      >
-        <h2 class="text-lg font-bold text-emerald-700 dark:text-emerald-400 mb-4">Решение</h2>
-        <p class="text-sm font-semibold text-gray-900 dark:text-white mb-2">
-          {{ resolutionLabels[complaint.resolutionType] ?? "—" }}
-        </p>
-        <p v-if="complaint.resolutionNote" class="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{{ complaint.resolutionNote }}</p>
-        <p v-if="complaint.resolvedAt" class="text-xs text-gray-400 mt-2">{{ formatDateTime(complaint.resolvedAt) }}</p>
-      </div>
-
-      <!-- Rejection -->
-      <div
-        v-if="complaint.status === 5"
-        class="rounded-2xl border border-red-200 dark:border-red-800/50 bg-red-50 dark:bg-red-900/20 shadow-xl p-8"
-      >
-        <h2 class="text-lg font-bold text-red-700 dark:text-red-400 mb-4">Отклонена</h2>
-        <p v-if="complaint.rejectionReason" class="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{{ complaint.rejectionReason }}</p>
-        <p v-if="complaint.rejectedAt" class="text-xs text-gray-400 mt-2">{{ formatDateTime(complaint.rejectedAt) }}</p>
-      </div>
-
-      <!-- Actions panel -->
-      <div
-        v-if="complaint.status === 1 || complaint.status === 2 || complaint.status === 3"
-        class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-xl p-8"
-      >
-        <h2 class="text-lg font-bold text-gray-900 dark:text-white mb-4">Действия</h2>
-
-        <!-- Status=New -->
-        <div v-if="complaint.status === 1">
-          <button
-            @click="onTake"
-            :disabled="actionLoading"
-            class="px-5 py-2.5 rounded-2xl bg-emerald-600 text-white font-semibold hover:bg-emerald-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-          >
-            {{ actionLoading ? "Обработка..." : "Взять в работу" }}
-          </button>
+        <!-- RIGHT COLUMN: chat (sticky on desktop) -->
+        <div class="w-full lg:w-1/2 lg:sticky lg:top-8 min-w-0">
+          <ChatPanel
+            :context-type="'complaint'"
+            :context-id="complaint.id"
+            height="calc(100vh - 120px)"
+            :complaint-state="complaintState"
+            :refresh-context="refreshComplaintForChat"
+          />
         </div>
 
-        <!-- Status=InReview -->
-        <div v-if="complaint.status === 2" class="flex flex-wrap gap-3">
-          <button
-            @click="showRequestInfoModal = true"
-            class="px-5 py-2.5 rounded-2xl border border-blue-300 dark:border-blue-500/30 text-blue-600 dark:text-blue-400 font-semibold bg-white/60 dark:bg-transparent hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
-          >
-            Запросить информацию
-          </button>
-          <button
-            @click="showNoteModal = true"
-            class="px-5 py-2.5 rounded-2xl border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 font-semibold bg-white/60 dark:bg-transparent hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
-          >
-            Добавить заметку
-          </button>
-          <button
-            @click="showResolveModal = true"
-            class="px-5 py-2.5 rounded-2xl bg-emerald-600 text-white font-semibold hover:bg-emerald-700 transition-colors"
-          >
-            Решить
-          </button>
-          <button
-            @click="showRejectModal = true"
-            class="px-5 py-2.5 rounded-2xl border border-red-300 dark:border-red-500/30 text-red-600 dark:text-red-400 font-semibold bg-white/60 dark:bg-transparent hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-          >
-            Отклонить
-          </button>
-        </div>
-
-        <!-- Status=AwaitingResponse -->
-        <div v-if="complaint.status === 3">
-          <p class="text-sm text-orange-600 dark:text-orange-400 font-semibold">
-            Ожидание ответа от заявителя
-          </p>
-        </div>
       </div>
 
     </template>
 
-    <!-- Request Info Modal -->
+    <!-- Reject Reopen Modal -->
     <Teleport to="body">
       <Transition
         enter-active-class="transition duration-200"
@@ -344,74 +465,31 @@
         leave-to-class="opacity-0"
       >
         <div
-          v-if="showRequestInfoModal"
+          v-if="showRejectReopenModal"
           class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
-          @click.self="showRequestInfoModal = false"
+          @click.self="showRejectReopenModal = false"
         >
           <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 p-6 w-full max-w-md mx-4">
-            <h3 class="text-lg font-bold text-gray-900 dark:text-white mb-2">Запросить информацию</h3>
+            <h3 class="text-lg font-bold text-gray-900 dark:text-white mb-2">Отклонить запрос на открытие</h3>
             <textarea
-              v-model="requestInfoText"
-              rows="4"
-              placeholder="Опишите, какая информация необходима..."
-              class="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm text-gray-900 dark:text-white p-3 focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none"
+              v-model="rejectReopenNote"
+              rows="3"
+              placeholder="Причина отклонения (необязательно)..."
+              class="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm text-gray-900 dark:text-white p-3 focus:outline-none focus:ring-2 focus:ring-red-500 resize-none"
             />
             <div class="flex justify-end gap-3 mt-4">
               <button
-                @click="showRequestInfoModal = false"
-                class="px-4 py-2 text-sm font-semibold text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white rounded-xl border border-gray-200 dark:border-gray-700 hover:border-gray-300 transition-colors"
+                @click="showRejectReopenModal = false"
+                class="px-4 py-2 text-sm font-semibold text-gray-600 dark:text-gray-400 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-gray-300 transition-colors"
               >
                 Отмена
               </button>
               <button
-                @click="onRequestInfo"
-                :disabled="actionLoading || !requestInfoText.trim()"
-                class="px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                @click="onRejectReopen"
+                :disabled="actionLoading"
+                class="px-4 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-xl transition-colors disabled:opacity-60"
               >
-                {{ actionLoading ? "Отправка..." : "Отправить" }}
-              </button>
-            </div>
-          </div>
-        </div>
-      </Transition>
-    </Teleport>
-
-    <!-- Note Modal -->
-    <Teleport to="body">
-      <Transition
-        enter-active-class="transition duration-200"
-        enter-from-class="opacity-0"
-        enter-to-class="opacity-100"
-        leave-active-class="transition duration-150"
-        leave-from-class="opacity-100"
-        leave-to-class="opacity-0"
-      >
-        <div
-          v-if="showNoteModal"
-          class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
-          @click.self="showNoteModal = false"
-        >
-          <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 p-6 w-full max-w-md mx-4">
-            <h3 class="text-lg font-bold text-gray-900 dark:text-white mb-2">Добавить заметку</h3>
-            <textarea
-              v-model="noteText"
-              rows="4"
-              placeholder="Заметка менеджера..."
-              class="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm text-gray-900 dark:text-white p-3 focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none"
-            />
-            <div class="flex justify-end gap-3 mt-4">
-              <button
-                @click="showNoteModal = false"
-                class="px-4 py-2 text-sm font-semibold text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white rounded-xl border border-gray-200 dark:border-gray-700 hover:border-gray-300 transition-colors"
-              >
-                Отмена
-              </button>
-              <button
-                @click="onAddNote"
-                :disabled="actionLoading || !noteText.trim()"
-                class="px-4 py-2 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-              >
-                {{ actionLoading ? "Сохранение..." : "Сохранить" }}
+                {{ actionLoading ? 'Отправка...' : 'Отклонить' }}
               </button>
             </div>
           </div>
@@ -438,24 +516,11 @@
             <h3 class="text-lg font-bold text-gray-900 dark:text-white mb-4">Решить жалобу</h3>
             <div class="space-y-4">
               <div>
-                <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Тип решения</label>
-                <select
-                  v-model="resolveType"
-                  class="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm text-gray-900 dark:text-white p-3 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                >
-                  <option value="">Выберите...</option>
-                  <option value="1">В пользу заявителя</option>
-                  <option value="2">В пользу контрагента</option>
-                  <option value="3">Компромисс</option>
-                  <option value="4">Действий не требуется</option>
-                </select>
-              </div>
-              <div>
-                <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Примечание</label>
+                <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Комментарий</label>
                 <textarea
                   v-model="resolveNote"
                   rows="3"
-                  placeholder="Описание решения..."
+                  placeholder="Комментарий к закрытию..."
                   class="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm text-gray-900 dark:text-white p-3 focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none"
                 />
               </div>
@@ -469,7 +534,7 @@
               </button>
               <button
                 @click="onResolve"
-                :disabled="actionLoading || !resolveType || !resolveNote.trim()"
+                :disabled="actionLoading || !resolveNote.trim()"
                 class="px-4 py-2 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 {{ actionLoading ? "Сохранение..." : "Решить" }}
@@ -570,6 +635,144 @@
       </Transition>
     </Teleport>
 
+    <!-- Cancel Booking Modal -->
+    <Teleport to="body">
+      <Transition
+        enter-active-class="transition duration-200"
+        enter-from-class="opacity-0"
+        enter-to-class="opacity-100"
+        leave-active-class="transition duration-150"
+        leave-from-class="opacity-100"
+        leave-to-class="opacity-0"
+      >
+        <div
+          v-if="showCancelBookingModal"
+          class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+          @click.self="showCancelBookingModal = false"
+        >
+          <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 p-6 w-full max-w-md mx-4">
+            <h3 class="text-lg font-bold text-gray-900 dark:text-white mb-2">Отменить бронирование</h3>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">
+              Бронирование #{{ complaint?.bookingId }} будет отменено. Это действие необратимо.
+            </p>
+            <textarea
+              v-model="cancelBookingReason"
+              rows="3"
+              placeholder="Причина отмены бронирования..."
+              class="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm text-gray-900 dark:text-white p-3 focus:outline-none focus:ring-2 focus:ring-red-500 resize-none"
+            />
+            <div class="flex justify-end gap-3 mt-4">
+              <button
+                @click="showCancelBookingModal = false"
+                class="px-4 py-2 text-sm font-semibold text-gray-600 dark:text-gray-400 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-gray-300 transition-colors"
+              >
+                Отмена
+              </button>
+              <button
+                @click="onCancelBooking"
+                :disabled="actionLoading || !cancelBookingReason.trim()"
+                class="px-4 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-xl transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {{ actionLoading ? "Обработка..." : "Отменить бронирование" }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
+    <!-- Waive Charge Modal -->
+    <Teleport to="body">
+      <Transition
+        enter-active-class="transition duration-200"
+        enter-from-class="opacity-0"
+        enter-to-class="opacity-100"
+        leave-active-class="transition duration-150"
+        leave-from-class="opacity-100"
+        leave-to-class="opacity-0"
+      >
+        <div
+          v-if="showWaiveChargeModal"
+          class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+          @click.self="showWaiveChargeModal = false"
+        >
+          <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 p-6 w-full max-w-md mx-4">
+            <h3 class="text-lg font-bold text-gray-900 dark:text-white mb-2">Аннулировать начисление</h3>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">
+              Начисление #{{ complaint?.chargeId }} будет аннулировано. Аннулировать можно только pending-начисления.
+            </p>
+            <textarea
+              v-model="waiveChargeReason"
+              rows="3"
+              placeholder="Причина аннулирования..."
+              class="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm text-gray-900 dark:text-white p-3 focus:outline-none focus:ring-2 focus:ring-amber-500 resize-none"
+            />
+            <div class="flex justify-end gap-3 mt-4">
+              <button
+                @click="showWaiveChargeModal = false"
+                class="px-4 py-2 text-sm font-semibold text-gray-600 dark:text-gray-400 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-gray-300 transition-colors"
+              >
+                Отмена
+              </button>
+              <button
+                @click="onWaiveCharge"
+                :disabled="actionLoading || !waiveChargeReason.trim()"
+                class="px-4 py-2 text-sm font-semibold text-white bg-amber-600 hover:bg-amber-700 rounded-xl transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {{ actionLoading ? "Обработка..." : "Аннулировать" }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
+    <!-- Escalate Modal -->
+    <Teleport to="body">
+      <Transition
+        enter-active-class="transition duration-200"
+        enter-from-class="opacity-0"
+        enter-to-class="opacity-100"
+        leave-active-class="transition duration-150"
+        leave-from-class="opacity-100"
+        leave-to-class="opacity-0"
+      >
+        <div
+          v-if="showEscalateModal"
+          class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+          @click.self="showEscalateModal = false"
+        >
+          <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 p-6 w-full max-w-md mx-4">
+            <h3 class="text-lg font-bold text-gray-900 dark:text-white mb-2">Эскалировать жалобу</h3>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">
+              Жалоба будет передана суперменеджеру. Приоритет будет повышен до "Срочный".
+            </p>
+            <textarea
+              v-model="escalateReason"
+              rows="3"
+              placeholder="Причина эскалации..."
+              class="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm text-gray-900 dark:text-white p-3 focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
+            />
+            <div class="flex justify-end gap-3 mt-4">
+              <button
+                @click="showEscalateModal = false"
+                class="px-4 py-2 text-sm font-semibold text-gray-600 dark:text-gray-400 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-gray-300 transition-colors"
+              >
+                Отмена
+              </button>
+              <button
+                @click="onEscalate"
+                :disabled="actionLoading || !escalateReason.trim()"
+                class="px-4 py-2 text-sm font-semibold text-white bg-purple-600 hover:bg-purple-700 rounded-xl transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {{ actionLoading ? "Обработка..." : "Эскалировать" }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
   </div>
 </template>
 
@@ -579,19 +782,25 @@ import { useRoute } from "vue-router";
 import {
   getComplaintById,
   takeComplaint,
-  requestInfo,
-  addManagerNote,
   resolveComplaint,
   rejectComplaint,
   getComplaintAttachmentLink,
+  getReopenRequests,
+  approveReopenRequest,
+  rejectReopenRequest,
+  cancelComplaintBooking,
+  waiveComplaintCharge,
+  escalateComplaint,
 } from "../api/complaints";
-import type { Complaint } from "../types/Complaint";
+import type { Complaint, ComplaintAttachment, ReopenRequest } from "../types/Complaint";
 import type { AccessRequest } from "../types/AccessRequest";
 import { createAccessRequest, getMyAccessRequest } from "../api/accessRequests";
 import { formatDateTime, formatPrice } from "../utils/formatters";
 import { useToast } from "../composables/useToast";
 import { auth } from "../store/auth";
 import EntityLink from "../components/EntityLink.vue";
+import ChatPanel from "../components/ChatPanel.vue";
+import { isImageMimeType, resolveAttachmentPreviewUrl } from "../utils/attachmentPreview";
 
 const route = useRoute();
 const toast = useToast();
@@ -601,23 +810,67 @@ const notFound = ref(false);
 const actionLoading = ref(false);
 const complaint = ref<Complaint | null>(null);
 
+// Reopen requests
+const reopenRequests = ref<ReopenRequest[]>([]);
+const showRejectReopenModal = ref(false);
+const rejectReopenNote = ref("");
+const rejectReopenTargetId = ref<string | null>(null);
+
+// Complaint state for ChatPanel
+const complaintState = computed<"not-taken" | "taken" | "closed">(() => {
+  if (!complaint.value) return "not-taken";
+  if (complaint.value.status === 4 || complaint.value.status === 5) return "closed";
+  if (complaint.value.status === 1) return "not-taken";
+  return "taken";
+});
+
+const reopenStatusLabels: Record<number, string> = {
+  1: "Ожидает",
+  2: "Одобрен",
+  3: "Отклонён",
+};
+
 // Modal states
-const showRequestInfoModal = ref(false);
-const showNoteModal = ref(false);
 const showResolveModal = ref(false);
 const showRejectModal = ref(false);
 
 // Modal form data
-const requestInfoText = ref("");
-const noteText = ref("");
-const resolveType = ref("");
 const resolveNote = ref("");
 const rejectReason = ref("");
+
+// Manager action modal states
+const showCancelBookingModal = ref(false);
+const showWaiveChargeModal = ref(false);
+const showEscalateModal = ref(false);
+const cancelBookingReason = ref("");
+const waiveChargeReason = ref("");
+const escalateReason = ref("");
+
+// Computed: can booking be canceled?
+const canCancelBooking = computed(() => {
+  if (!complaint.value) return false;
+  const status = complaint.value.snapshotData.status?.toLowerCase();
+  return status === "pending" || status === "confirmed";
+});
+const bookingNotCancelable = computed(() => {
+  if (!complaint.value) return false;
+  return !canCancelBooking.value;
+});
+const bookingNotCancelableReason = computed(() => {
+  if (!complaint.value) return "";
+  const status = complaint.value.snapshotData.status?.toLowerCase();
+  if (status === "completed") return "завершено";
+  if (status === "canceled") return "отменено";
+  if (status === "active") return "активно (в процессе аренды)";
+  if (status === "awaitingreview") return "ожидает проверки";
+  return "";
+});
 
 // Access request state
 const showAccessRequestModal = ref(false);
 const accessRequestReason = ref("");
 const accessRequest = ref<AccessRequest | null>(null);
+const complaintAttachmentPreviewUrls = ref<Record<string, string>>({});
 const hasBookingView = computed(() => auth.hasPermission("Booking.View"));
 const isGrantExpired = computed(() => {
   if (!accessRequest.value?.expiresAt) return true;
@@ -689,10 +942,26 @@ function priorityBadge(priority: number): string {
 const creationAttachments = computed(() =>
   complaint.value?.attachments.filter((a) => a.attachmentPhase === 1) ?? [],
 );
+const creationImageAttachments = computed(() =>
+  creationAttachments.value.filter((attachment) => isImageMimeType(attachment.fileType)),
+);
+const creationFileAttachments = computed(() =>
+  creationAttachments.value.filter((attachment) => !isImageMimeType(attachment.fileType)),
+);
 
 const responseAttachments = computed(() =>
   complaint.value?.attachments.filter((a) => a.attachmentPhase === 2) ?? [],
 );
+
+// Re-fetch complaint to trigger backend EnsureConversationExists
+async function refreshComplaintForChat(): Promise<void> {
+  const id = route.params.id as string;
+  if (!id) return;
+  try {
+    complaint.value = await getComplaintById(id);
+    void preloadComplaintAttachmentPreviews(complaint.value);
+  } catch { /* ignore */ }
+}
 
 // Data loading
 async function loadComplaint() {
@@ -705,14 +974,22 @@ async function loadComplaint() {
   loading.value = true;
   try {
     complaint.value = await getComplaintById(id);
+    void preloadComplaintAttachmentPreviews(complaint.value);
+
+    // Load reopen requests and access request in parallel
+    const promises: Promise<void>[] = [];
+
+    promises.push(
+      getReopenRequests(id).then((r) => { reopenRequests.value = r; }).catch(() => {}),
+    );
 
     if (!hasBookingView.value) {
-      try {
-        accessRequest.value = await getMyAccessRequest(id);
-      } catch {
-        // No access request yet — that's fine
-      }
+      promises.push(
+        getMyAccessRequest(id).then((r) => { accessRequest.value = r; }).catch(() => {}),
+      );
     }
+
+    await Promise.all(promises);
   } catch {
     notFound.value = true;
   } finally {
@@ -734,47 +1011,15 @@ async function onTake() {
   }
 }
 
-async function onRequestInfo() {
-  if (actionLoading.value || !complaint.value) return;
-  actionLoading.value = true;
-  try {
-    complaint.value = await requestInfo(complaint.value.id, requestInfoText.value.trim());
-    showRequestInfoModal.value = false;
-    requestInfoText.value = "";
-    toast.success("Запрос информации отправлен");
-  } catch {
-    toast.error("Ошибка при отправке запроса");
-  } finally {
-    actionLoading.value = false;
-  }
-}
-
-async function onAddNote() {
-  if (actionLoading.value || !complaint.value) return;
-  actionLoading.value = true;
-  try {
-    complaint.value = await addManagerNote(complaint.value.id, noteText.value.trim());
-    showNoteModal.value = false;
-    noteText.value = "";
-    toast.success("Заметка добавлена");
-  } catch {
-    toast.error("Ошибка при добавлении заметки");
-  } finally {
-    actionLoading.value = false;
-  }
-}
-
 async function onResolve() {
   if (actionLoading.value || !complaint.value) return;
   actionLoading.value = true;
   try {
     complaint.value = await resolveComplaint(
       complaint.value.id,
-      resolveType.value,
       resolveNote.value.trim(),
     );
     showResolveModal.value = false;
-    resolveType.value = "";
     resolveNote.value = "";
     toast.success("Жалоба решена");
   } catch {
@@ -817,6 +1062,103 @@ async function onRequestAccess() {
   }
 }
 
+async function onApproveReopen(requestId: string) {
+  if (actionLoading.value || !complaint.value) return;
+  actionLoading.value = true;
+  try {
+    await approveReopenRequest(requestId);
+    // Reload complaint (status changes to InReview) and reopen requests
+    complaint.value = await getComplaintById(complaint.value.id);
+    reopenRequests.value = await getReopenRequests(complaint.value.id);
+    toast.success("Запрос одобрен, жалоба открыта повторно");
+  } catch {
+    toast.error("Ошибка при одобрении запроса");
+  } finally {
+    actionLoading.value = false;
+  }
+}
+
+function startRejectReopen(requestId: string) {
+  rejectReopenTargetId.value = requestId;
+  rejectReopenNote.value = "";
+  showRejectReopenModal.value = true;
+}
+
+async function onRejectReopen() {
+  if (actionLoading.value || !rejectReopenTargetId.value || !complaint.value) return;
+  actionLoading.value = true;
+  try {
+    await rejectReopenRequest(rejectReopenTargetId.value, rejectReopenNote.value.trim() || undefined);
+    reopenRequests.value = await getReopenRequests(complaint.value.id);
+    showRejectReopenModal.value = false;
+    rejectReopenTargetId.value = null;
+    toast.success("Запрос отклонён");
+  } catch {
+    toast.error("Ошибка при отклонении запроса");
+  } finally {
+    actionLoading.value = false;
+  }
+}
+
+// Manager action handlers
+async function onCancelBooking() {
+  if (actionLoading.value || !complaint.value) return;
+  actionLoading.value = true;
+  try {
+    complaint.value = await cancelComplaintBooking(
+      complaint.value.id,
+      cancelBookingReason.value.trim(),
+    );
+    showCancelBookingModal.value = false;
+    cancelBookingReason.value = "";
+    toast.success("Бронирование отменено");
+  } catch (e: any) {
+    const msg = e?.response?.data?.error || e?.response?.data?.message || "Ошибка при отмене бронирования";
+    toast.error(msg);
+  } finally {
+    actionLoading.value = false;
+  }
+}
+
+async function onWaiveCharge() {
+  if (actionLoading.value || !complaint.value || !complaint.value.chargeId) return;
+  actionLoading.value = true;
+  try {
+    complaint.value = await waiveComplaintCharge(
+      complaint.value.id,
+      complaint.value.chargeId,
+      waiveChargeReason.value.trim(),
+    );
+    showWaiveChargeModal.value = false;
+    waiveChargeReason.value = "";
+    toast.success("Начисление аннулировано");
+  } catch (e: any) {
+    const msg = e?.response?.data?.error || e?.response?.data?.message || "Ошибка при аннулировании начисления";
+    toast.error(msg);
+  } finally {
+    actionLoading.value = false;
+  }
+}
+
+async function onEscalate() {
+  if (actionLoading.value || !complaint.value) return;
+  actionLoading.value = true;
+  try {
+    complaint.value = await escalateComplaint(
+      complaint.value.id,
+      escalateReason.value.trim(),
+    );
+    showEscalateModal.value = false;
+    escalateReason.value = "";
+    toast.success("Жалоба эскалирована суперменеджеру");
+  } catch (e: any) {
+    const msg = e?.response?.data?.error || e?.response?.data?.message || "Ошибка при эскалации жалобы";
+    toast.error(msg);
+  } finally {
+    actionLoading.value = false;
+  }
+}
+
 async function downloadAttachment(attachmentId: string, fileName: string) {
   if (!complaint.value) return;
   try {
@@ -825,6 +1167,57 @@ async function downloadAttachment(attachmentId: string, fileName: string) {
   } catch {
     toast.error(`Ошибка при загрузке файла: ${fileName}`);
   }
+}
+
+async function ensureComplaintAttachmentPreview(attachment: ComplaintAttachment): Promise<string | null> {
+  if (!complaint.value || !isImageMimeType(attachment.fileType)) {
+    return null;
+  }
+
+  const existing = complaintAttachmentPreviewUrls.value[attachment.id];
+  if (existing) {
+    return existing;
+  }
+
+  try {
+    const link = await getComplaintAttachmentLink(complaint.value.id, attachment.id);
+    const resolvedUrl = resolveAttachmentPreviewUrl(link.url);
+    if (!resolvedUrl) {
+      return null;
+    }
+
+    complaintAttachmentPreviewUrls.value = {
+      ...complaintAttachmentPreviewUrls.value,
+      [attachment.id]: resolvedUrl,
+    };
+
+    return resolvedUrl;
+  } catch {
+    return null;
+  }
+}
+
+async function preloadComplaintAttachmentPreviews(targetComplaint: Complaint | null): Promise<void> {
+  if (!targetComplaint) {
+    return;
+  }
+
+  await Promise.all(
+    targetComplaint.attachments
+      .filter((attachment) => isImageMimeType(attachment.fileType))
+      .map((attachment) => ensureComplaintAttachmentPreview(attachment)),
+  );
+}
+
+async function openComplaintAttachmentPreview(attachment: ComplaintAttachment): Promise<void> {
+  const previewUrl = await ensureComplaintAttachmentPreview(attachment);
+
+  if (previewUrl) {
+    window.open(previewUrl, "_blank");
+    return;
+  }
+
+  await downloadAttachment(attachment.id, attachment.originalFileName);
 }
 
 onMounted(loadComplaint);

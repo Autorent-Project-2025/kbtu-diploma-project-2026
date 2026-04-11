@@ -50,8 +50,24 @@ export interface Complaint {
   rejectionReason: string | null;
   rejectedAt: string | null;
   rejectedBy: string | null;
+  isEscalated: boolean;
+  escalatedAt: string | null;
+  escalatedBy: string | null;
+  escalationReason: string | null;
   snapshotData: BookingSnapshot;
   createdAt: string;
   updatedAt: string;
   attachments: ComplaintAttachment[];
+}
+
+export interface ReopenRequest {
+  id: string;
+  complaintId: string;
+  requestedByUserId: string;
+  reason: string;
+  status: number; // 1=Pending, 2=Approved, 3=Rejected
+  reviewedByManagerId: string | null;
+  reviewedAt: string | null;
+  decisionNote: string | null;
+  createdAt: string;
 }
