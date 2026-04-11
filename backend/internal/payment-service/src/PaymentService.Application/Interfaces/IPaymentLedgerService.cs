@@ -22,6 +22,7 @@ public interface IPaymentLedgerService
         CancellationToken cancellationToken = default);
     Task<BookingChargeResponseDto> MarkBookingChargePaidAsync(long chargeId, CancellationToken cancellationToken = default);
     Task<BookingChargeResponseDto> CancelBookingChargeAsync(long chargeId, string? reason = null, CancellationToken cancellationToken = default);
+    Task<BookingChargeResponseDto> RefundBookingChargeAsync(long chargeId, string? reason = null, CancellationToken cancellationToken = default);
     Task<IReadOnlyCollection<BookingChargeResponseDto>> GetBookingChargesAsync(int bookingId, CancellationToken cancellationToken = default);
     Task<IReadOnlyCollection<BookingChargeResponseDto>> GetUserBookingChargesAsync(
         Guid userId,

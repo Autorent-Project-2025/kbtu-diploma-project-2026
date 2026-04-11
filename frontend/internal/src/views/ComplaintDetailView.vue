@@ -96,6 +96,33 @@
                   Бронирование #{{ complaint.bookingId }}
                 </EntityLink>
               </template>
+              <!-- Assigned manager gets auto-read access to booking review -->
+              <template v-else-if="isAssignedManager">
+                <router-link
+                  :to="`/complaints/${complaint.id}/booking-review`"
+                  class="inline-flex items-center gap-1.5 text-sm font-semibold text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 transition-colors"
+                >
+                  Просмотр бронирования #{{ complaint.bookingId }}
+                  <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+                  </svg>
+                </router-link>
+                <!-- Edit access request for higher-risk actions -->
+                <div v-if="!accessRequest || accessRequest.status === 3 || accessRequest.status === 5" class="mt-1">
+                  <button
+                    @click="showAccessRequestModal = true"
+                    class="text-xs font-medium text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 transition-colors"
+                  >
+                    Запросить доступ на редактирование
+                  </button>
+                </div>
+                <p v-else-if="accessRequest.status === 1" class="text-xs font-medium text-blue-600 dark:text-blue-400 mt-1">
+                  Запрос на доступ к редактированию отправлен
+                </p>
+                <p v-else-if="accessRequest.status === 2 && !isGrantExpired" class="text-xs font-medium text-emerald-600 dark:text-emerald-400 mt-1">
+                  Доступ на редактирование одобрен
+                </p>
+              </template>
               <template v-else>
                 <div class="space-y-2">
                   <p class="text-xs text-gray-500 dark:text-gray-400">
@@ -189,6 +216,38 @@
               <p class="font-mono text-xs text-gray-700 dark:text-gray-300 break-all leading-relaxed">
                 {{ complaint.snapshotData.counterpartyUserId }}
               </p>
+            </div>
+          </div>
+
+          <!-- Charges / Payments -->
+          <div
+            v-if="hasPaymentView && bookingCharges.length > 0"
+            class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-xl p-6"
+          >
+            <h2 class="text-lg font-bold text-gray-900 dark:text-white mb-4">Начисления</h2>
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead>
+                  <tr class="text-left text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                    <th class="pb-2 pr-4">ID</th>
+                    <th class="pb-2 pr-4">Тип</th>
+                    <th class="pb-2 pr-4">Сумма</th>
+                    <th class="pb-2 pr-4">Статус</th>
+                    <th class="pb-2">Дата</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+                  <tr v-for="charge in bookingCharges" :key="charge.id">
+                    <td class="py-2 pr-4 font-mono text-xs text-gray-600 dark:text-gray-400">#{{ charge.id }}</td>
+                    <td class="py-2 pr-4 text-gray-900 dark:text-white">{{ chargeTypeLabels[charge.chargeType] ?? charge.chargeType }}</td>
+                    <td class="py-2 pr-4 font-semibold text-gray-900 dark:text-white">{{ formatPrice(charge.amount) }}</td>
+                    <td class="py-2 pr-4">
+                      <span :class="chargeStatusClass(charge.status)">{{ chargeStatusLabel(charge.status) }}</span>
+                    </td>
+                    <td class="py-2 text-xs text-gray-500 dark:text-gray-400">{{ formatDateTime(charge.createdAt) }}</td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </div>
 
@@ -328,6 +387,20 @@
                   class="px-4 py-2 text-sm font-semibold text-amber-600 dark:text-amber-400 border border-amber-300 dark:border-amber-700 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded-xl transition-colors shrink-0"
                 >
                   Аннулировать
+                </button>
+              </div>
+
+              <!-- Refund Charge -->
+              <div v-if="complaint.chargeId" class="flex items-center justify-between gap-3">
+                <div>
+                  <p class="text-sm font-semibold text-gray-900 dark:text-white">Возврат средств</p>
+                  <p class="text-xs text-gray-500 dark:text-gray-400">Возврат оплаченного начисления #{{ complaint.chargeId }}</p>
+                </div>
+                <button
+                  @click="showRefundChargeModal = true"
+                  class="px-4 py-2 text-sm font-semibold text-rose-600 dark:text-rose-400 border border-rose-300 dark:border-rose-700 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-xl transition-colors shrink-0"
+                >
+                  Вернуть
                 </button>
               </div>
 
@@ -773,6 +846,45 @@
       </Transition>
     </Teleport>
 
+    <!-- Refund Charge Modal -->
+    <Teleport to="body">
+      <Transition name="fade">
+        <div
+          v-if="showRefundChargeModal"
+          class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+          @click.self="showRefundChargeModal = false"
+        >
+          <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 p-6 w-full max-w-md mx-4">
+            <h3 class="text-lg font-bold text-gray-900 dark:text-white mb-2">Возврат средств по начислению</h3>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">
+              Средства будут возвращены клиенту. Доля партнёра будет списана из кошелька.
+            </p>
+            <textarea
+              v-model="refundChargeReason"
+              rows="3"
+              placeholder="Причина возврата..."
+              class="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm text-gray-900 dark:text-white p-3 focus:outline-none focus:ring-2 focus:ring-rose-500 resize-none"
+            />
+            <div class="flex justify-end gap-3 mt-4">
+              <button
+                @click="showRefundChargeModal = false"
+                class="px-4 py-2 text-sm font-semibold text-gray-600 dark:text-gray-400 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-gray-300 transition-colors"
+              >
+                Отмена
+              </button>
+              <button
+                @click="onRefundCharge"
+                :disabled="actionLoading || !refundChargeReason.trim()"
+                class="px-4 py-2 text-sm font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-xl transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {{ actionLoading ? "Обработка..." : "Вернуть средства" }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
   </div>
 </template>
 
@@ -791,10 +903,12 @@ import {
   cancelComplaintBooking,
   waiveComplaintCharge,
   escalateComplaint,
+  refundComplaintCharge,
 } from "../api/complaints";
 import type { Complaint, ComplaintAttachment, ReopenRequest } from "../types/Complaint";
 import type { AccessRequest } from "../types/AccessRequest";
 import { createAccessRequest, getMyAccessRequest } from "../api/accessRequests";
+import { getBookingCharges, type BookingCharge } from "../api/payments";
 import { formatDateTime, formatPrice } from "../utils/formatters";
 import { useToast } from "../composables/useToast";
 import { auth } from "../store/auth";
@@ -842,15 +956,18 @@ const rejectReason = ref("");
 const showCancelBookingModal = ref(false);
 const showWaiveChargeModal = ref(false);
 const showEscalateModal = ref(false);
+const showRefundChargeModal = ref(false);
 const cancelBookingReason = ref("");
 const waiveChargeReason = ref("");
 const escalateReason = ref("");
+const refundChargeReason = ref("");
 
 // Computed: can booking be canceled?
+// Pending/Confirmed: always allowed. Active/AwaitingReview: allowed (server checks edit access).
 const canCancelBooking = computed(() => {
   if (!complaint.value) return false;
   const status = complaint.value.snapshotData.status?.toLowerCase();
-  return status === "pending" || status === "confirmed";
+  return status === "pending" || status === "confirmed" || status === "active" || status === "awaitingreview";
 });
 const bookingNotCancelable = computed(() => {
   if (!complaint.value) return false;
@@ -861,8 +978,6 @@ const bookingNotCancelableReason = computed(() => {
   const status = complaint.value.snapshotData.status?.toLowerCase();
   if (status === "completed") return "завершено";
   if (status === "canceled") return "отменено";
-  if (status === "active") return "активно (в процессе аренды)";
-  if (status === "awaitingreview") return "ожидает проверки";
   return "";
 });
 
@@ -872,6 +987,34 @@ const accessRequestReason = ref("");
 const accessRequest = ref<AccessRequest | null>(null);
 const complaintAttachmentPreviewUrls = ref<Record<string, string>>({});
 const hasBookingView = computed(() => auth.hasPermission("Booking.View"));
+const hasPaymentView = computed(() => auth.hasPermission("Payment.View"));
+const bookingCharges = ref<BookingCharge[]>([]);
+
+const chargeTypeLabels: Record<string, string> = {
+  LatePenalty: "Штраф за опоздание",
+  DamageFine: "Штраф за повреждение",
+};
+
+function chargeStatusLabel(status: string): string {
+  const map: Record<string, string> = { Pending: "Ожидает", Paid: "Оплачен", Canceled: "Отменён", Refunded: "Возвращён" };
+  return map[status] ?? status;
+}
+
+function chargeStatusClass(status: string): string {
+  const base = "px-2 py-0.5 rounded-full text-xs font-bold";
+  const map: Record<string, string> = {
+    Pending: `${base} bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400`,
+    Paid: `${base} bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400`,
+    Canceled: `${base} bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400`,
+    Refunded: `${base} bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400`,
+  };
+  return map[status] ?? `${base} bg-gray-100 text-gray-500`;
+}
+const isAssignedManager = computed(() => {
+  if (!complaint.value) return false;
+  const userId = auth.getUserId();
+  return !!userId && complaint.value.assignedToManagerId === userId;
+});
 const isGrantExpired = computed(() => {
   if (!accessRequest.value?.expiresAt) return true;
   return new Date(accessRequest.value.expiresAt) <= new Date();
@@ -986,6 +1129,12 @@ async function loadComplaint() {
     if (!hasBookingView.value) {
       promises.push(
         getMyAccessRequest(id).then((r) => { accessRequest.value = r; }).catch(() => {}),
+      );
+    }
+
+    if (hasPaymentView.value && complaint.value) {
+      promises.push(
+        getBookingCharges(complaint.value.bookingId).then((c) => { bookingCharges.value = c; }).catch(() => {}),
       );
     }
 
@@ -1153,6 +1302,26 @@ async function onEscalate() {
     toast.success("Жалоба эскалирована суперменеджеру");
   } catch (e: any) {
     const msg = e?.response?.data?.error || e?.response?.data?.message || "Ошибка при эскалации жалобы";
+    toast.error(msg);
+  } finally {
+    actionLoading.value = false;
+  }
+}
+
+async function onRefundCharge() {
+  if (actionLoading.value || !complaint.value) return;
+  actionLoading.value = true;
+  try {
+    complaint.value = await refundComplaintCharge(
+      complaint.value.id,
+      complaint.value.chargeId!,
+      refundChargeReason.value.trim(),
+    );
+    showRefundChargeModal.value = false;
+    refundChargeReason.value = "";
+    toast.success("Средства возвращены по начислению");
+  } catch (e: any) {
+    const msg = e?.response?.data?.error || e?.response?.data?.message || "Ошибка при возврате средств";
     toast.error(msg);
   } finally {
     actionLoading.value = false;

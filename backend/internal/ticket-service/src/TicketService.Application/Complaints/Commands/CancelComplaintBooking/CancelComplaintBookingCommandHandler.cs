@@ -12,19 +12,22 @@ public sealed class CancelComplaintBookingCommandHandler
     private readonly IBookingAdminClient _bookingAdminClient;
     private readonly IBookingReadClient _bookingReadClient;
     private readonly IChatServiceClient _chatServiceClient;
+    private readonly IAccessRequestRepository _accessRequestRepository;
 
     public CancelComplaintBookingCommandHandler(
         IComplaintRepository complaintRepository,
         ITicketUnitOfWork unitOfWork,
         IBookingAdminClient bookingAdminClient,
         IBookingReadClient bookingReadClient,
-        IChatServiceClient chatServiceClient)
+        IChatServiceClient chatServiceClient,
+        IAccessRequestRepository accessRequestRepository)
     {
         _complaintRepository = complaintRepository;
         _unitOfWork = unitOfWork;
         _bookingAdminClient = bookingAdminClient;
         _bookingReadClient = bookingReadClient;
         _chatServiceClient = chatServiceClient;
+        _accessRequestRepository = accessRequestRepository;
     }
 
     public async Task<CancelComplaintBookingResult> Handle(
@@ -53,8 +56,20 @@ public sealed class CancelComplaintBookingCommandHandler
         var bookingStatus = booking.Status.Trim().ToLowerInvariant();
         if (bookingStatus is "completed" or "canceled")
             throw new ValidationException($"Booking cannot be canceled because its status is '{booking.Status}'.");
+
+        // Active/AwaitingReview cancellation requires edit access approval (global Booking.Update or approved access request).
         if (bookingStatus is "active" or "awaitingreview")
-            throw new ValidationException($"Booking in status '{booking.Status}' cannot be canceled through a complaint. Active or post-rental bookings require a separate process.");
+        {
+            if (!command.HasGlobalBookingUpdate)
+            {
+                var grant = await _accessRequestRepository.GetActiveGrantAsync(
+                    command.ManagerId, complaint.BookingId, cancellationToken);
+
+                if (grant is null || !grant.IsActiveGrant())
+                    throw new ValidationException(
+                        $"Canceling an active booking requires edit access. Request access from a supermanager first.");
+            }
+        }
 
         // Call booking-service to cancel via its domain logic
         var canceled = await _bookingAdminClient.CancelBookingAsync(complaint.BookingId, cancellationToken);

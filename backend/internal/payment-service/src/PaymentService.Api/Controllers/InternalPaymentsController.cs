@@ -128,6 +128,20 @@ public sealed class InternalPaymentsController : ControllerBase
         return Ok(charge);
     }
 
+    [HttpPost("booking-charges/{chargeId:long}/refund")]
+    public async Task<IActionResult> RefundBookingCharge(
+        long chargeId,
+        [FromBody] CancelBookingChargeRequest? request,
+        CancellationToken cancellationToken)
+    {
+        if (!IsAuthorizedInternalRequest())
+            return Unauthorized(new { error = "Internal API key is invalid." });
+
+        var charge = await _paymentLedgerService.RefundBookingChargeAsync(
+            chargeId, request?.Reason, cancellationToken);
+        return Ok(charge);
+    }
+
     [HttpGet("bookings/{bookingId:int}/charges")]
     public async Task<IActionResult> GetBookingCharges(int bookingId, CancellationToken cancellationToken)
     {

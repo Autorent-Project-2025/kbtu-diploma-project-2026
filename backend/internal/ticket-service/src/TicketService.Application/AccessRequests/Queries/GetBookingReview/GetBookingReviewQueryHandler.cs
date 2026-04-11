@@ -33,7 +33,11 @@ public sealed class GetBookingReviewQueryHandler
         if (complaint is null)
             throw new NotFoundException($"Complaint '{query.ComplaintId}' was not found.");
 
-        if (!query.HasGlobalBookingView)
+        // Auto-read: assigned manager can always view the linked booking.
+        // Global Booking.View holders and managers with an approved access grant also qualify.
+        var isAssignedManager = complaint.AssignedToManagerId == query.ManagerId;
+
+        if (!query.HasGlobalBookingView && !isAssignedManager)
         {
             var grant = await _accessRequestRepository.GetActiveGrantAsync(
                 query.ManagerId, complaint.BookingId, cancellationToken);

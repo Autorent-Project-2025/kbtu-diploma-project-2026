@@ -86,6 +86,15 @@ export async function escalateComplaint(id: string, reason: string): Promise<Com
   return res.data as Complaint;
 }
 
+export async function refundComplaintCharge(
+  id: string,
+  chargeId: number,
+  reason: string,
+): Promise<Complaint> {
+  const res = await api.post(`/tickets/complaints/all/${id}/actions/refund-charge`, { chargeId, reason });
+  return res.data as Complaint;
+}
+
 export interface ComplaintActionLog {
   id: string;
   complaintId: string;

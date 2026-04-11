@@ -52,6 +52,9 @@ public sealed class BookingChargeConfiguration : IEntityTypeConfiguration<Bookin
         builder.Property(charge => charge.CanceledAt)
             .HasColumnType("timestamp with time zone");
 
+        builder.Property(charge => charge.RefundedAt)
+            .HasColumnType("timestamp with time zone");
+
         builder.HasIndex(charge => charge.BookingId);
         builder.HasIndex(charge => charge.UserId);
         builder.HasIndex(charge => charge.PartnerUserId);

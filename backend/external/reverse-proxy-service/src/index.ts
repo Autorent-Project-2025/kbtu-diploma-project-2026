@@ -21,7 +21,8 @@ type ServiceConfig = {
     | "INTERNAL_SERVICE_URL"
     | "TICKET_SERVICE_URL"
     | "FILE_SERVICE_URL"
-    | "CHAT_SERVICE_URL";
+    | "CHAT_SERVICE_URL"
+    | "PAYMENT_SERVICE_URL";
 };
 
 type RateLimitBucket = {
@@ -45,6 +46,7 @@ const services: ServiceConfig[] = [
   { route: "/files", envKey: "FILE_SERVICE_URL" },
   { route: "/chat", envKey: "CHAT_SERVICE_URL" },
   { route: "/internal", envKey: "INTERNAL_SERVICE_URL" },
+  { route: "/payments", envKey: "PAYMENT_SERVICE_URL" },
 ];
 
 const defaultAllowedOrigins = [

@@ -16,6 +16,8 @@ public static class PermissionConstants
     public const string ComplaintActionCancelBooking = "Complaint.Action.CancelBooking";
     public const string ComplaintActionWaiveCharge = "Complaint.Action.WaiveCharge";
     public const string ComplaintActionEscalate = "Complaint.Action.Escalate";
+    public const string ComplaintActionRefundCharge = "Complaint.Action.RefundCharge";
 
     public const string BookingView = "Booking.View";
+    public const string BookingUpdate = "Booking.Update";
 }

@@ -56,6 +56,33 @@ public sealed class PaymentClient : IPaymentClient
         return true;
     }
 
+    public async Task<bool> RefundBookingChargeAsync(
+        long chargeId,
+        string? reason = null,
+        CancellationToken cancellationToken = default)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"/internal/payments/booking-charges/{chargeId}/refund");
+        request.Headers.Add(InternalApiKeyHeader, _options.InternalApiKey);
+        request.Content = new StringContent(
+            JsonSerializer.Serialize(new { reason }, JsonOptions),
+            Encoding.UTF8,
+            "application/json");
+
+        using var response = await _httpClient.SendAsync(request, cancellationToken);
+
+        if (response.StatusCode == HttpStatusCode.NotFound)
+            return false;
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var errorBody = await response.Content.ReadAsStringAsync(cancellationToken);
+            throw new InvalidOperationException(
+                $"Payment service returned {(int)response.StatusCode} when refunding charge {chargeId}: {errorBody}");
+        }
+
+        return true;
+    }
+
     public async Task<IReadOnlyCollection<BookingChargeInfo>> GetBookingChargesAsync(
         int bookingId,
         CancellationToken cancellationToken = default)
@@ -74,7 +101,7 @@ public sealed class PaymentClient : IPaymentClient
 
         return charges.Select(c => new BookingChargeInfo(
             c.Id, c.BookingId, c.ChargeType ?? string.Empty, c.Amount,
-            c.Status ?? string.Empty, c.Description)).ToArray();
+            c.Status ?? string.Empty, c.Description, c.RefundedAt)).ToArray();
     }
 
     private sealed class ChargeResponse
@@ -85,5 +112,6 @@ public sealed class PaymentClient : IPaymentClient
         public decimal Amount { get; set; }
         public string? Status { get; set; }
         public string? Description { get; set; }
+        public DateTimeOffset? RefundedAt { get; set; }
     }
 }

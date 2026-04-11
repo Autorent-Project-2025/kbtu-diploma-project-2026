@@ -20,6 +20,7 @@ using TicketService.Application.AccessRequests.Queries.GetBookingReview;
 using TicketService.Application.Complaints.Commands.AddManagerNote;
 using TicketService.Application.Complaints.Commands.CancelComplaintBooking;
 using TicketService.Application.Complaints.Commands.EscalateComplaint;
+using TicketService.Application.Complaints.Commands.RefundComplaintCharge;
 using TicketService.Application.Complaints.Commands.WaiveComplaintCharge;
 using TicketService.Application.Complaints.Queries.GetComplaintActionLogs;
 using TicketService.Application.Complaints.Commands.ApproveReopenRequest;
@@ -132,6 +133,7 @@ builder.Services.AddScoped<GetReopenRequestsQueryHandler>();
 builder.Services.AddScoped<CancelComplaintBookingCommandHandler>();
 builder.Services.AddScoped<WaiveComplaintChargeCommandHandler>();
 builder.Services.AddScoped<EscalateComplaintCommandHandler>();
+builder.Services.AddScoped<RefundComplaintChargeCommandHandler>();
 builder.Services.AddScoped<GetComplaintActionLogsQueryHandler>();
 
 builder.Services.AddScoped<CreateAccessRequestCommandHandler>();
@@ -227,6 +229,9 @@ builder.Services.AddAuthorization(options =>
 
     options.AddPolicy("complaints:action:escalate", policy =>
         policy.RequireClaim("permissions", PermissionConstants.ComplaintActionEscalate));
+
+    options.AddPolicy("complaints:action:refund-charge", policy =>
+        policy.RequireClaim("permissions", PermissionConstants.ComplaintActionRefundCharge));
 });
 
 var app = builder.Build();

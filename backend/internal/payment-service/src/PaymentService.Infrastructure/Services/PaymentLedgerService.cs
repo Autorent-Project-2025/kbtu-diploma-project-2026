@@ -335,6 +335,73 @@ public sealed class PaymentLedgerService : IPaymentLedgerService
         return MapToBookingChargeResponseDto(charge);
     }
 
+    public async Task<BookingChargeResponseDto> RefundBookingChargeAsync(
+        long chargeId,
+        string? reason = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (chargeId <= 0)
+            throw new ArgumentException("Charge id must be greater than zero.", nameof(chargeId));
+
+        await using var transaction = await _db.Database.BeginTransactionAsync(
+            System.Data.IsolationLevel.Serializable, cancellationToken);
+
+        var charge = await _db.BookingCharges.FirstOrDefaultAsync(
+            item => item.Id == chargeId, cancellationToken);
+        if (charge is null)
+            throw new KeyNotFoundException($"Booking charge {chargeId} was not found.");
+
+        if (charge.Status == BookingChargeStatus.Refunded)
+            return MapToBookingChargeResponseDto(charge);
+
+        if (charge.Status != BookingChargeStatus.Paid)
+            throw new InvalidOperationException(
+                $"Only paid charges can be refunded. Current status: {charge.Status}.");
+
+        var now = DateTimeOffset.UtcNow;
+        charge.Status = BookingChargeStatus.Refunded;
+        charge.RefundedAt = now;
+        charge.UpdatedAt = now;
+
+        if (!string.IsNullOrWhiteSpace(reason))
+            charge.Description = $"{charge.Description} | Refunded: {reason.Trim()}".Trim(' ', '|');
+
+        // If the booking was completed, the partner wallet was already credited with the charge share.
+        // Reverse that credit by debiting the Available bucket.
+        var payment = await _db.CustomerPayments
+            .FirstOrDefaultAsync(p => p.BookingId == charge.BookingId, cancellationToken);
+
+        if (payment is not null && payment.Status == CustomerPaymentStatus.Available)
+        {
+            var wallet = await _db.PartnerWallets
+                .FirstOrDefaultAsync(w => w.PartnerUserId == charge.PartnerUserId, cancellationToken);
+
+            if (wallet is not null && charge.PartnerShareAmount > 0)
+            {
+                wallet.AvailableAmount -= charge.PartnerShareAmount;
+                wallet.UpdatedAt = now;
+
+                _db.PartnerLedgerEntries.Add(new PartnerLedgerEntry
+                {
+                    PartnerWalletId = wallet.Id,
+                    BookingId = charge.BookingId,
+                    CustomerPaymentId = payment.Id,
+                    EntryType = LedgerEntryType.BookingChargeRefunded,
+                    Bucket = LedgerBucket.Available,
+                    AmountDelta = -charge.PartnerShareAmount,
+                    Currency = charge.Currency,
+                    Description = $"Refund of charge #{charge.Id} ({charge.ChargeType}): {reason?.Trim() ?? "no reason"}",
+                    CreatedAt = now
+                });
+            }
+        }
+
+        await _db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+
+        return MapToBookingChargeResponseDto(charge);
+    }
+
     public async Task<IReadOnlyCollection<BookingChargeResponseDto>> GetBookingChargesAsync(
         int bookingId,
         CancellationToken cancellationToken = default)
@@ -838,7 +905,8 @@ public sealed class PaymentLedgerService : IPaymentLedgerService
             CreatedAt = charge.CreatedAt,
             UpdatedAt = charge.UpdatedAt,
             PaidAt = charge.PaidAt,
-            CanceledAt = charge.CanceledAt
+            CanceledAt = charge.CanceledAt,
+            RefundedAt = charge.RefundedAt
         };
     }
 

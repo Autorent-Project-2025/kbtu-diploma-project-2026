@@ -7,6 +7,7 @@ using TicketService.Application.Complaints.Commands.ApproveReopenRequest;
 using TicketService.Application.Complaints.Commands.CancelComplaintBooking;
 using TicketService.Application.Complaints.Commands.CreateComplaint;
 using TicketService.Application.Complaints.Commands.EscalateComplaint;
+using TicketService.Application.Complaints.Commands.RefundComplaintCharge;
 using TicketService.Application.Complaints.Commands.WaiveComplaintCharge;
 using TicketService.Application.Complaints.Queries.GetComplaintActionLogs;
 using TicketService.Application.Complaints.Commands.CreateReopenRequest;
@@ -22,6 +23,7 @@ using TicketService.Application.Complaints.Queries.GetComplaintById;
 using TicketService.Application.Complaints.Queries.GetMyComplaintById;
 using TicketService.Application.Complaints.Queries.GetMyComplaints;
 using TicketService.Application.Complaints.Queries.GetReopenRequests;
+using TicketService.Application.Constants;
 using TicketService.Application.Exceptions;
 using TicketService.Application.Interfaces;
 using TicketService.Application.Models;
@@ -52,6 +54,7 @@ public sealed class ComplaintsController : ControllerBase
     private readonly CancelComplaintBookingCommandHandler _cancelBookingHandler;
     private readonly WaiveComplaintChargeCommandHandler _waiveChargeHandler;
     private readonly EscalateComplaintCommandHandler _escalateHandler;
+    private readonly RefundComplaintChargeCommandHandler _refundChargeHandler;
     private readonly GetComplaintActionLogsQueryHandler _getActionLogsHandler;
     private readonly IFileStorageClient _fileStorageClient;
 
@@ -75,6 +78,7 @@ public sealed class ComplaintsController : ControllerBase
         CancelComplaintBookingCommandHandler cancelBookingHandler,
         WaiveComplaintChargeCommandHandler waiveChargeHandler,
         EscalateComplaintCommandHandler escalateHandler,
+        RefundComplaintChargeCommandHandler refundChargeHandler,
         GetComplaintActionLogsQueryHandler getActionLogsHandler,
         IFileStorageClient fileStorageClient)
     {
@@ -97,6 +101,7 @@ public sealed class ComplaintsController : ControllerBase
         _cancelBookingHandler = cancelBookingHandler;
         _waiveChargeHandler = waiveChargeHandler;
         _escalateHandler = escalateHandler;
+        _refundChargeHandler = refundChargeHandler;
         _getActionLogsHandler = getActionLogsHandler;
         _fileStorageClient = fileStorageClient;
     }
@@ -385,8 +390,9 @@ public sealed class ComplaintsController : ControllerBase
         CancellationToken cancellationToken)
     {
         var managerId = ResolveUserId();
+        var hasGlobalBookingUpdate = HasPermission(PermissionConstants.BookingUpdate);
         var result = await _cancelBookingHandler.Handle(
-            new CancelComplaintBookingCommand(id, managerId, request.Reason),
+            new CancelComplaintBookingCommand(id, managerId, request.Reason, hasGlobalBookingUpdate),
             cancellationToken);
         return Ok(result.Complaint);
     }
@@ -415,6 +421,20 @@ public sealed class ComplaintsController : ControllerBase
         var managerId = ResolveUserId();
         var result = await _escalateHandler.Handle(
             new EscalateComplaintCommand(id, managerId, request.Reason),
+            cancellationToken);
+        return Ok(result.Complaint);
+    }
+
+    [Authorize(Policy = "complaints:action:refund-charge")]
+    [HttpPost("all/{id:guid}/actions/refund-charge")]
+    public async Task<IActionResult> RefundCharge(
+        Guid id,
+        [FromBody] RefundComplaintChargeRequest request,
+        CancellationToken cancellationToken)
+    {
+        var managerId = ResolveUserId();
+        var result = await _refundChargeHandler.Handle(
+            new RefundComplaintChargeCommand(id, managerId, request.ChargeId, request.Reason),
             cancellationToken);
         return Ok(result.Complaint);
     }
@@ -493,6 +513,13 @@ public sealed class ComplaintsController : ControllerBase
             _ => throw new ValidationException(
                 "resolutionType must be empty or one of: in_favor_of_reporter, in_favor_of_counterparty, compromise_reached, no_action_required.")
         };
+    }
+
+    private bool HasPermission(string permission)
+    {
+        return User.Claims.Any(c =>
+            c.Type == "permissions" &&
+            c.Value.Equals(permission, StringComparison.OrdinalIgnoreCase));
     }
 
     private static async Task<IReadOnlyCollection<TicketDocumentFilePayload>?> MapToFilePayloadsAsync(
