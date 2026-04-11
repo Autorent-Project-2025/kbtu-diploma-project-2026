@@ -1,26 +1,42 @@
 <template>
-  <div class="min-h-screen bg-gray-50 dark:bg-gray-950 pt-24 pb-12 px-4 sm:px-6 lg:px-8 transition-colors duration-300">
+  <div
+    class="min-h-screen bg-gray-50 dark:bg-gray-950 pt-24 pb-12 px-4 sm:px-6 lg:px-8 transition-colors duration-300"
+  >
     <div class="max-w-6xl mx-auto space-y-8">
-      <header class="glass p-8 rounded-3xl border border-gray-200 dark:border-gray-800 shadow-xl space-y-3">
-        <h1 class="text-3xl font-extrabold text-gray-900 dark:text-white">Мои машины</h1>
+      <header
+        class="glass p-8 rounded-3xl border border-gray-200 dark:border-gray-800 shadow-xl space-y-3"
+      >
+        <h1 class="text-3xl font-extrabold text-gray-900 dark:text-white">
+          Мои машины
+        </h1>
         <p class="text-gray-600 dark:text-gray-400">
-          Добавление новой машины выполняется через заявку и согласование менеджером.
+          Добавление новой машины выполняется через заявку и согласование
+          менеджером.
         </p>
       </header>
 
-      <section class="glass p-8 rounded-3xl border border-gray-200 dark:border-gray-800 shadow-xl space-y-6">
-        <h2 class="text-2xl font-bold text-gray-900 dark:text-white">Новая заявка на машину</h2>
+      <section
+        class="glass p-8 rounded-3xl border border-gray-200 dark:border-gray-800 shadow-xl space-y-6"
+      >
+        <h2 class="text-2xl font-bold text-gray-900 dark:text-white">
+          Новая заявка на машину
+        </h2>
 
         <div
           v-if="submitted"
           class="rounded-xl border border-green-300/80 bg-green-50 p-4 text-green-800 dark:border-green-500/30 dark:bg-green-900/20 dark:text-green-300"
         >
-          Заявка отправлена. После решения менеджера вы получите уведомление на email.
+          Заявка отправлена. После решения менеджера вы получите уведомление на
+          email.
         </div>
 
         <form class="grid md:grid-cols-2 gap-4" @submit.prevent="submitTicket">
           <div class="space-y-2">
-            <label for="carBrand" class="block text-sm font-semibold text-gray-700 dark:text-gray-300">Марка</label>
+            <label
+              for="carBrand"
+              class="block text-sm font-semibold text-gray-700 dark:text-gray-300"
+              >Марка</label
+            >
             <select
               id="carBrand"
               v-model="form.brandSelection"
@@ -28,7 +44,9 @@
               class="w-full px-4 py-3 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white"
             >
               <option value="" disabled>Выберите марку</option>
-              <option v-for="brand in brandOptions" :key="brand" :value="brand">{{ brand }}</option>
+              <option v-for="brand in brandOptions" :key="brand" :value="brand">
+                {{ brand }}
+              </option>
               <option :value="customOptionValue">Свой вариант</option>
             </select>
             <input
@@ -41,12 +59,17 @@
               class="w-full px-4 py-3 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white"
             />
             <p class="text-xs text-gray-500 dark:text-gray-400">
-              Марки загружаются из каталога. При необходимости можно указать свою.
+              Марки загружаются из каталога. При необходимости можно указать
+              свою.
             </p>
           </div>
 
           <div class="space-y-2">
-            <label for="carModel" class="block text-sm font-semibold text-gray-700 dark:text-gray-300">Модель</label>
+            <label
+              for="carModel"
+              class="block text-sm font-semibold text-gray-700 dark:text-gray-300"
+              >Модель</label
+            >
             <select
               id="carModel"
               v-model="form.modelSelection"
@@ -55,7 +78,9 @@
               class="w-full px-4 py-3 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white disabled:cursor-not-allowed disabled:opacity-50"
             >
               <option value="" disabled>{{ modelPlaceholder }}</option>
-              <option v-for="model in modelOptions" :key="model" :value="model">{{ model }}</option>
+              <option v-for="model in modelOptions" :key="model" :value="model">
+                {{ model }}
+              </option>
               <option :value="customOptionValue">Свой вариант</option>
             </select>
             <input
@@ -67,11 +92,17 @@
               autocomplete="off"
               class="w-full px-4 py-3 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white"
             />
-            <p class="text-xs text-gray-500 dark:text-gray-400">{{ modelHint }}</p>
+            <p class="text-xs text-gray-500 dark:text-gray-400">
+              {{ modelHint }}
+            </p>
           </div>
 
           <div class="space-y-2">
-            <label for="licensePlate" class="block text-sm font-semibold text-gray-700 dark:text-gray-300">Гос номер</label>
+            <label
+              for="licensePlate"
+              class="block text-sm font-semibold text-gray-700 dark:text-gray-300"
+              >Гос номер</label
+            >
             <input
               id="licensePlate"
               v-model="form.licensePlate"
@@ -82,7 +113,11 @@
           </div>
 
           <div class="space-y-2">
-            <label for="carYear" class="block text-sm font-semibold text-gray-700 dark:text-gray-300">Год выпуска</label>
+            <label
+              for="carYear"
+              class="block text-sm font-semibold text-gray-700 dark:text-gray-300"
+              >Год выпуска</label
+            >
             <input
               id="carYear"
               v-model.number="form.carYear"
@@ -95,49 +130,77 @@
           </div>
 
           <div class="space-y-2">
-            <label for="transmission" class="block text-sm font-semibold text-gray-700 dark:text-gray-300">Коробка</label>
+            <label
+              for="transmission"
+              class="block text-sm font-semibold text-gray-700 dark:text-gray-300"
+              >Коробка</label
+            >
             <select
               id="transmission"
               v-model="form.transmission"
               class="w-full px-4 py-3 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white"
             >
               <option value="">Не указано</option>
-              <option v-for="option in transmissionOptions" :key="option.value" :value="option.value">
+              <option
+                v-for="option in transmissionOptions"
+                :key="option.value"
+                :value="option.value"
+              >
                 {{ option.label }}
               </option>
             </select>
           </div>
 
           <div class="space-y-2">
-            <label for="fuelType" class="block text-sm font-semibold text-gray-700 dark:text-gray-300">Топливо</label>
+            <label
+              for="fuelType"
+              class="block text-sm font-semibold text-gray-700 dark:text-gray-300"
+              >Топливо</label
+            >
             <select
               id="fuelType"
               v-model="form.fuelType"
               class="w-full px-4 py-3 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white"
             >
               <option value="">Не указано</option>
-              <option v-for="option in fuelTypeOptions" :key="option.value" :value="option.value">
+              <option
+                v-for="option in fuelTypeOptions"
+                :key="option.value"
+                :value="option.value"
+              >
                 {{ option.label }}
               </option>
             </select>
           </div>
 
           <div class="space-y-2">
-            <label for="bodyType" class="block text-sm font-semibold text-gray-700 dark:text-gray-300">Тип кузова</label>
+            <label
+              for="bodyType"
+              class="block text-sm font-semibold text-gray-700 dark:text-gray-300"
+              >Тип кузова</label
+            >
             <select
               id="bodyType"
               v-model="form.bodyType"
               class="w-full px-4 py-3 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white"
             >
               <option value="">Не указано</option>
-              <option v-for="option in bodyTypeOptions" :key="option.value" :value="option.value">
+              <option
+                v-for="option in bodyTypeOptions"
+                :key="option.value"
+                :value="option.value"
+              >
                 {{ option.label }}
               </option>
             </select>
           </div>
 
           <div class="space-y-2">
-            <label for="horsepower" class="block text-sm font-semibold text-gray-700 dark:text-gray-300">Мощность, л.с.</label>
+            <label
+              for="horsepower"
+              class="block text-sm font-semibold text-gray-700 dark:text-gray-300"
+              >Мощность, л.с.</label
+            >
             <input
               id="horsepower"
               v-model.number="form.horsepower"
@@ -149,7 +212,11 @@
           </div>
 
           <div class="space-y-2">
-            <label for="seats" class="block text-sm font-semibold text-gray-700 dark:text-gray-300">Мест</label>
+            <label
+              for="seats"
+              class="block text-sm font-semibold text-gray-700 dark:text-gray-300"
+              >Мест</label
+            >
             <input
               id="seats"
               v-model.number="form.seats"
@@ -161,7 +228,11 @@
           </div>
 
           <div class="space-y-2">
-            <label for="doors" class="block text-sm font-semibold text-gray-700 dark:text-gray-300">Дверей</label>
+            <label
+              for="doors"
+              class="block text-sm font-semibold text-gray-700 dark:text-gray-300"
+              >Дверей</label
+            >
             <input
               id="doors"
               v-model.number="form.doors"
@@ -173,7 +244,10 @@
           </div>
 
           <div class="space-y-2 md:col-span-2">
-            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300">Теги</label>
+            <label
+              class="block text-sm font-semibold text-gray-700 dark:text-gray-300"
+              >Теги</label
+            >
             <div class="relative" ref="tagDropdownRef">
               <button
                 type="button"
@@ -184,9 +258,16 @@
                 <svg
                   class="h-4 w-4 shrink-0 transition-transform"
                   :class="tagDropdownOpen ? 'rotate-180' : ''"
-                  fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
                 >
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    d="M19 9l-7 7-7-7"
+                  />
                 </svg>
               </button>
               <div
@@ -208,12 +289,18 @@
                   <span v-else class="h-1.5 w-1.5 shrink-0" />
                   {{ option.label }}
                 </button>
-                <p v-if="availableTagOptions.length === 0" class="px-4 py-2.5 text-sm text-gray-400 dark:text-gray-500">
+                <p
+                  v-if="availableTagOptions.length === 0"
+                  class="px-4 py-2.5 text-sm text-gray-400 dark:text-gray-500"
+                >
                   Все теги добавлены
                 </p>
               </div>
             </div>
-            <div v-if="form.selectedTags.length > 0" class="flex flex-wrap gap-2">
+            <div
+              v-if="form.selectedTags.length > 0"
+              class="flex flex-wrap gap-2"
+            >
               <span
                 v-for="tag in form.selectedTags"
                 :key="tag"
@@ -230,8 +317,18 @@
                   class="ml-0.5 rounded-full p-0.5 hover:bg-primary-200 dark:hover:bg-primary-500/30 transition-colors"
                   @click="toggleTag(tag)"
                 >
-                  <svg class="h-3 w-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  <svg
+                    class="h-3 w-3"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2.5"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      d="M6 18L18 6M6 6l12 12"
+                    />
                   </svg>
                 </button>
               </span>
@@ -239,14 +336,21 @@
             <p class="text-xs text-gray-500 dark:text-gray-400">
               Выберите теги из списка.
               <template v-if="suggestedTags.length > 0">
-                Теги с <span class="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500 align-middle" /> рекомендованы по характеристикам машины.
+                Теги с
+                <span
+                  class="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500 align-middle"
+                />
+                рекомендованы по характеристикам машины.
               </template>
               Менеджер сможет скорректировать.
             </p>
           </div>
 
           <div class="space-y-3 md:col-span-2">
-            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300">Примерная стоимость аренды</label>
+            <label
+              class="block text-sm font-semibold text-gray-700 dark:text-gray-300"
+              >Примерная стоимость аренды</label
+            >
             <div class="flex items-center gap-3 flex-wrap">
               <button
                 type="button"
@@ -254,47 +358,79 @@
                 class="inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
                 @click="runPriceEstimate"
               >
-                <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 11h.01M12 11h.01M15 11h.01M4 19h16a2 2 0 002-2V7a2 2 0 00-2-2H4a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                <svg
+                  class="h-4 w-4"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 11h.01M12 11h.01M15 11h.01M4 19h16a2 2 0 002-2V7a2 2 0 00-2-2H4a2 2 0 00-2 2v10a2 2 0 002 2z"
+                  />
                 </svg>
                 {{ estimating ? "Запрос..." : "Рассчитать" }}
               </button>
-              <p v-if="!canEstimatePrice" class="text-xs text-gray-400 dark:text-gray-500">
+              <p
+                v-if="!canEstimatePrice"
+                class="text-xs text-gray-400 dark:text-gray-500"
+              >
                 Заполните марку, модель и год
               </p>
               <div
                 v-if="priceEstimate"
                 class="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 dark:border-emerald-500/30 dark:bg-emerald-500/10"
               >
-                <span class="text-sm font-semibold text-emerald-800 dark:text-emerald-300">
-                  {{ priceEstimate.priceHour.toLocaleString('ru-RU') }} ₸/час
+                <span
+                  class="text-sm font-semibold text-emerald-800 dark:text-emerald-300"
+                >
+                  {{ priceEstimate.priceHour.toLocaleString("ru-RU") }} ₸/час
                 </span>
                 <span class="text-xs text-emerald-600 dark:text-emerald-400">
-                  · {{ priceEstimate.priceDay.toLocaleString('ru-RU') }} ₸/сут
+                  · {{ priceEstimate.priceDay.toLocaleString("ru-RU") }} ₸/сут
                 </span>
               </div>
             </div>
           </div>
 
-          <div class="space-y-3">
-            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300">Подтверждение собственности</label>
+          <div class="space-y-3 md:col-span-2">
+            <label
+              class="block text-sm font-semibold text-gray-700 dark:text-gray-300"
+              >Подтверждение собственности</label
+            >
             <div
               class="relative flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-6 py-6 transition-colors cursor-pointer"
-              :class="pdfDragging
-                ? 'border-primary-400 bg-primary-50 dark:border-primary-500 dark:bg-primary-500/10'
-                : form.ownershipDocumentFile
-                  ? 'border-emerald-300 bg-emerald-50 dark:border-emerald-500/40 dark:bg-emerald-500/10'
-                  : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-gray-300 dark:hover:border-gray-600'"
+              :class="
+                pdfDragging
+                  ? 'border-primary-400 bg-primary-50 dark:border-primary-500 dark:bg-primary-500/10'
+                  : form.ownershipDocumentFile
+                    ? 'border-emerald-300 bg-emerald-50 dark:border-emerald-500/40 dark:bg-emerald-500/10'
+                    : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-gray-300 dark:hover:border-gray-600'
+              "
               @dragover.prevent="pdfDragging = true"
               @dragleave.prevent="pdfDragging = false"
               @drop.prevent="onPdfDrop"
               @click="pdfInputRef?.click()"
             >
               <template v-if="form.ownershipDocumentFile">
-                <svg class="h-7 w-7 text-emerald-500 dark:text-emerald-400 shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                <svg
+                  class="h-7 w-7 text-emerald-500 dark:text-emerald-400 shrink-0"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"
+                  />
                 </svg>
-                <p class="text-sm font-medium text-emerald-700 dark:text-emerald-300 text-center break-all">
+                <p
+                  class="text-sm font-medium text-emerald-700 dark:text-emerald-300 text-center break-all"
+                >
                   {{ form.ownershipDocumentFile.name }}
                 </p>
                 <button
@@ -306,11 +442,25 @@
                 </button>
               </template>
               <template v-else>
-                <svg class="h-7 w-7 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                <svg
+                  class="h-7 w-7 text-gray-400 dark:text-gray-500"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"
+                  />
                 </svg>
                 <p class="text-sm text-gray-500 dark:text-gray-400">
-                  <span class="font-semibold text-primary-600 dark:text-primary-400">Нажмите</span> или перетащите PDF сюда
+                  <span
+                    class="font-semibold text-primary-600 dark:text-primary-400"
+                    >Нажмите</span
+                  >
+                  или перетащите PDF сюда
                 </p>
               </template>
               <input
@@ -324,25 +474,50 @@
           </div>
 
           <div class="space-y-3 md:col-span-2">
-            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300">Фото машины</label>
+            <label
+              class="block text-sm font-semibold text-gray-700 dark:text-gray-300"
+              >Фото машины</label
+            >
             <div
               class="relative flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-6 py-8 transition-colors cursor-pointer"
-              :class="imageDragging
-                ? 'border-primary-400 bg-primary-50 dark:border-primary-500 dark:bg-primary-500/10'
-                : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-gray-300 dark:hover:border-gray-600'"
+              :class="
+                imageDragging
+                  ? 'border-primary-400 bg-primary-50 dark:border-primary-500 dark:bg-primary-500/10'
+                  : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-gray-300 dark:hover:border-gray-600'
+              "
               @dragover.prevent="imageDragging = true"
               @dragleave.prevent="imageDragging = false"
               @drop.prevent="onImageDrop"
               @click="imageInputRef?.click()"
             >
-              <svg class="h-8 w-8 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3 10.5a7.5 7.5 0 1115 0 7.5 7.5 0 01-15 0z" />
-                <path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5v-9m-4.5 4.5h9" />
+              <svg
+                class="h-8 w-8 text-gray-400 dark:text-gray-500"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.5"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3 10.5a7.5 7.5 0 1115 0 7.5 7.5 0 01-15 0z"
+                />
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  d="M12 16.5v-9m-4.5 4.5h9"
+                />
               </svg>
               <p class="text-sm text-gray-500 dark:text-gray-400">
-                <span class="font-semibold text-primary-600 dark:text-primary-400">Нажмите</span> или перетащите фото сюда
+                <span
+                  class="font-semibold text-primary-600 dark:text-primary-400"
+                  >Нажмите</span
+                >
+                или перетащите фото сюда
               </p>
-              <p class="text-xs text-gray-400 dark:text-gray-500">До 12 изображений</p>
+              <p class="text-xs text-gray-400 dark:text-gray-500">
+                До 12 изображений
+              </p>
               <input
                 ref="imageInputRef"
                 type="file"
@@ -352,7 +527,10 @@
                 @change="onCarImagesChange"
               />
             </div>
-            <div v-if="form.carImageFiles.length > 0" class="grid grid-cols-4 sm:grid-cols-6 gap-2">
+            <div
+              v-if="form.carImageFiles.length > 0"
+              class="grid grid-cols-4 sm:grid-cols-6 gap-2"
+            >
               <div
                 v-for="(file, index) in form.carImageFiles"
                 :key="index"
@@ -368,8 +546,18 @@
                   class="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity"
                   @click.stop="removeImage(index)"
                 >
-                  <svg class="h-5 w-5 text-white" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  <svg
+                    class="h-5 w-5 text-white"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2.5"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      d="M6 18L18 6M6 6l12 12"
+                    />
                   </svg>
                 </button>
               </div>
@@ -388,16 +576,29 @@
         </form>
       </section>
 
-      <section class="glass p-8 rounded-3xl border border-gray-200 dark:border-gray-800 shadow-xl space-y-4">
+      <section
+        class="glass p-8 rounded-3xl border border-gray-200 dark:border-gray-800 shadow-xl space-y-4"
+      >
         <div class="flex items-center justify-between">
-          <h2 class="text-2xl font-bold text-gray-900 dark:text-white">Мои активные машины</h2>
-          <button class="btn-premium px-4 py-2 rounded-xl" @click="loadCars" :disabled="loadingCars">
+          <h2 class="text-2xl font-bold text-gray-900 dark:text-white">
+            Мои активные машины
+          </h2>
+          <button
+            class="btn-premium px-4 py-2 rounded-xl"
+            @click="loadCars"
+            :disabled="loadingCars"
+          >
             {{ loadingCars ? "Обновление..." : "Обновить" }}
           </button>
         </div>
 
-        <div v-if="loadingCars" class="text-gray-600 dark:text-gray-400">Загрузка...</div>
-        <div v-else-if="cars.length === 0" class="text-gray-600 dark:text-gray-400">
+        <div v-if="loadingCars" class="text-gray-600 dark:text-gray-400">
+          Загрузка...
+        </div>
+        <div
+          v-else-if="cars.length === 0"
+          class="text-gray-600 dark:text-gray-400"
+        >
           Пока нет машин. Создайте заявку выше.
         </div>
 
@@ -408,14 +609,21 @@
             class="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-5 space-y-3"
           >
             <div class="flex items-center justify-between gap-3">
-              <h3 class="font-bold text-gray-900 dark:text-white">{{ car.modelDisplayName }}</h3>
-              <span class="text-xs rounded-full bg-gray-100 dark:bg-gray-800 px-3 py-1 text-gray-600 dark:text-gray-300">
+              <h3 class="font-bold text-gray-900 dark:text-white">
+                {{ car.modelDisplayName }}
+              </h3>
+              <span
+                class="text-xs rounded-full bg-gray-100 dark:bg-gray-800 px-3 py-1 text-gray-600 dark:text-gray-300"
+              >
                 #{{ car.id }}
               </span>
             </div>
-            <p class="text-sm text-gray-600 dark:text-gray-400">Гос номер: {{ car.licensePlate }}</p>
             <p class="text-sm text-gray-600 dark:text-gray-400">
-              Рейтинг: {{ car.rating ?? "нет" }} · Бронирований: {{ car.bookingCount }}
+              Гос номер: {{ car.licensePlate }}
+            </p>
+            <p class="text-sm text-gray-600 dark:text-gray-400">
+              Рейтинг: {{ car.rating ?? "нет" }} · Бронирований:
+              {{ car.bookingCount }}
             </p>
             <router-link
               :to="`/partner/cars/${car.id}`"
@@ -487,15 +695,23 @@ const form = reactive({
   carImageFiles: [] as File[],
 });
 
-const isCustomBrandSelected = computed(() => form.brandSelection === customOptionValue);
-const isCustomModelSelected = computed(() => form.modelSelection === customOptionValue);
+const isCustomBrandSelected = computed(
+  () => form.brandSelection === customOptionValue,
+);
+const isCustomModelSelected = computed(
+  () => form.modelSelection === customOptionValue,
+);
 
 const resolvedCarBrand = computed(() => {
-  return isCustomBrandSelected.value ? form.customCarBrand.trim() : form.brandSelection.trim();
+  return isCustomBrandSelected.value
+    ? form.customCarBrand.trim()
+    : form.brandSelection.trim();
 });
 
 const resolvedCarModel = computed(() => {
-  return isCustomModelSelected.value ? form.customCarModel.trim() : form.modelSelection.trim();
+  return isCustomModelSelected.value
+    ? form.customCarModel.trim()
+    : form.modelSelection.trim();
 });
 
 const modelPlaceholder = computed(() => {
@@ -532,7 +748,9 @@ const suggestedTags = computed(() =>
 );
 
 const availableTagOptions = computed(() =>
-  semanticTagOptions.filter((option) => !form.selectedTags.includes(option.value)),
+  semanticTagOptions.filter(
+    (option) => !form.selectedTags.includes(option.value),
+  ),
 );
 
 interface PriceEstimateResult {
@@ -549,7 +767,13 @@ const canEstimatePrice = computed(() => {
   const year = form.carYear;
   const brand = resolvedCarBrand.value;
   const model = resolvedCarModel.value;
-  return !!brand && !!model && typeof year === "number" && year >= 1886 && year <= maxAllowedCarYear;
+  return (
+    !!brand &&
+    !!model &&
+    typeof year === "number" &&
+    year >= 1886 &&
+    year <= maxAllowedCarYear
+  );
 });
 
 async function runPriceEstimate() {
@@ -565,7 +789,9 @@ async function runPriceEstimate() {
     priceEstimate.value = result;
   } catch (e: any) {
     if (e?.response?.status === 404) {
-      error("Объявления для этой машины не найдены — рыночная стоимость недоступна.");
+      error(
+        "Объявления для этой машины не найдены — рыночная стоимость недоступна.",
+      );
     } else {
       error("Не удалось получить оценку стоимости.");
     }
@@ -595,13 +821,18 @@ function closeTagDropdown() {
 }
 
 function onDocumentClick(event: MouseEvent) {
-  if (tagDropdownRef.value && !tagDropdownRef.value.contains(event.target as Node)) {
+  if (
+    tagDropdownRef.value &&
+    !tagDropdownRef.value.contains(event.target as Node)
+  ) {
     tagDropdownOpen.value = false;
   }
 }
 
 function isPdf(file: File): boolean {
-  return file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+  return (
+    file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")
+  );
 }
 
 function validateOptionalInteger(
@@ -729,12 +960,20 @@ watch(
     }
 
     await refreshModelOptionsForCurrentBrand();
-  }
+  },
 );
 
 watch(
-  () => [form.brandSelection, form.customCarBrand, form.modelSelection, form.customCarModel, form.carYear],
-  () => { priceEstimate.value = null; },
+  () => [
+    form.brandSelection,
+    form.customCarBrand,
+    form.modelSelection,
+    form.customCarModel,
+    form.carYear,
+  ],
+  () => {
+    priceEstimate.value = null;
+  },
 );
 
 function resetForm() {
@@ -818,7 +1057,9 @@ async function submitTicket() {
       doors: form.doors,
       bodyType: form.bodyType || null,
       horsepower: form.horsepower,
-      selectedTags: [...new Set([...form.selectedTags, ...suggestedTags.value])],
+      selectedTags: [
+        ...new Set([...form.selectedTags, ...suggestedTags.value]),
+      ],
       ownershipDocumentFile: form.ownershipDocumentFile,
       carImageFiles: form.carImageFiles,
     });
@@ -834,7 +1075,11 @@ async function submitTicket() {
 
 onMounted(async () => {
   document.addEventListener("mousedown", onDocumentClick);
-  await Promise.all([loadCars(), loadBrandOptions(), refreshModelOptionsForCurrentBrand()]);
+  await Promise.all([
+    loadCars(),
+    loadBrandOptions(),
+    refreshModelOptionsForCurrentBrand(),
+  ]);
 });
 
 onUnmounted(() => {
