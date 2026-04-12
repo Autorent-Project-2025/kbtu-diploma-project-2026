@@ -6,4 +6,5 @@ public static class PermissionConstants
     public const string PartnerCreate = "Partner.Create";
     public const string PartnerUpdate = "Partner.Update";
     public const string PartnerDelete = "Partner.Delete";
+    public const string PartnerDeactivate = "Partner.Deactivate";
 }

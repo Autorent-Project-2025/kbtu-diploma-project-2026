@@ -75,6 +75,7 @@ namespace CarService.Infrastructure.Services
         {
             IQueryable<PartnerCar> query = _db.PartnerCars
                 .AsNoTracking()
+                .Where(partnerCar => partnerCar.IsActive)
                 .IncludeModelCatalog();
 
             if (queryParams.CarModelId.HasValue)
@@ -186,7 +187,7 @@ namespace CarService.Infrastructure.Services
                 .Include(partnerCar => partnerCar.Images)
                 .FirstOrDefaultAsync(partnerCar => partnerCar.Id == partnerCarId, cancellationToken);
 
-            if (entity is null)
+            if (entity is null || !entity.IsActive)
             {
                 return null;
             }
@@ -547,10 +548,10 @@ namespace CarService.Infrastructure.Services
                 .IncludeModelCatalog()
                 .FirstOrDefaultAsync(entity => entity.Id == partnerCarId, cancellationToken);
 
-            if (partnerCar is null)
+            if (partnerCar is null || !partnerCar.IsActive)
             {
                 _logger.LogWarning(
-                    "Pricing context was requested for missing partner car {PartnerCarId}.",
+                    "Pricing context was requested for missing or inactive partner car {PartnerCarId}.",
                     partnerCarId);
 
                 await _observabilityLogWriter.WriteAsync(new
@@ -931,6 +932,27 @@ namespace CarService.Infrastructure.Services
             await _db.SaveChangesAsync(cancellationToken);
             await _partnerCarDisplayPricingService.RecalculateForPartnerCarAsync(partnerCarId, cancellationToken);
             await _carSearchIndexEventPublisher.PublishUpsertRequestedAsync(partnerCarId, cancellationToken);
+        }
+
+        public async Task<int> SetPartnerCarsActiveAsync(Guid partnerUserId, bool isActive, CancellationToken cancellationToken = default)
+        {
+            if (partnerUserId == Guid.Empty)
+                throw new ArgumentException("Partner user id is required.", nameof(partnerUserId));
+
+            var cars = await _db.PartnerCars
+                .Where(car => car.PartnerUserId == partnerUserId && car.IsActive != isActive)
+                .ToListAsync(cancellationToken);
+
+            if (cars.Count == 0)
+                return 0;
+
+            foreach (var car in cars)
+            {
+                car.IsActive = isActive;
+            }
+
+            await _db.SaveChangesAsync(cancellationToken);
+            return cars.Count;
         }
 
         private static IReadOnlyCollection<string> ComputeCommercialBadgeKeys(

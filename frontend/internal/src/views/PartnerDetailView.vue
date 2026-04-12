@@ -22,9 +22,39 @@
             </template>
             <template v-else>Партнёр не найден</template>
           </h1>
-          <p v-if="partner" class="text-gray-500 dark:text-gray-400 text-sm font-medium">
-            {{ partner.phoneNumber || "—" }} · ID {{ partner.id }}
-          </p>
+          <div v-if="partner" class="flex items-center gap-2">
+            <p class="text-gray-500 dark:text-gray-400 text-sm font-medium">
+              {{ partner.phoneNumber || "—" }} · ID {{ partner.id }}
+            </p>
+            <span
+              :class="[
+                'px-3 py-1 rounded-full text-xs font-bold',
+                partner.isActive
+                  ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+                  : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+              ]"
+            >
+              {{ partner.isActive ? "Активен" : "Неактивен" }}
+            </span>
+          </div>
+        </div>
+        <!-- Deactivate / Activate button -->
+        <div v-if="partner && hasDeactivatePermission" class="ml-auto shrink-0">
+          <button
+            v-if="partner.isActive"
+            @click="showDeactivateModal = true"
+            class="px-4 py-2 text-sm font-semibold text-red-600 dark:text-red-400 border border-red-300 dark:border-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors"
+          >
+            Деактивировать
+          </button>
+          <button
+            v-else
+            @click="onActivate"
+            :disabled="statusLoading"
+            class="px-4 py-2 text-sm font-semibold text-emerald-600 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-xl transition-colors disabled:opacity-60"
+          >
+            {{ statusLoading ? "Обработка..." : "Активировать" }}
+          </button>
         </div>
       </div>
     </header>
@@ -393,6 +423,50 @@
         </div>
       </template>
 
+      <!-- ─── Tab: Жалобы ──────────────────────────────────────── -->
+      <template v-else-if="activeTab === 'complaints'">
+        <div class="rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-xl overflow-hidden">
+          <div class="p-5 border-b border-gray-100 dark:border-gray-800">
+            <p class="text-sm font-bold text-gray-900 dark:text-white">
+              Жалобы на партнёра ({{ partnerComplaints.length }})
+            </p>
+          </div>
+          <div v-if="complaintsLoading" class="p-8 text-center text-gray-400">Загрузка...</div>
+          <div v-else-if="partnerComplaints.length === 0" class="p-8 text-center text-gray-400">
+            Жалоб на данного партнёра не найдено.
+          </div>
+          <table v-else class="w-full text-sm">
+            <thead class="bg-gray-50 dark:bg-gray-800/50">
+              <tr class="text-left text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                <th class="px-5 py-3">Тема</th>
+                <th class="px-5 py-3">Статус</th>
+                <th class="px-5 py-3">Приоритет</th>
+                <th class="px-5 py-3">Бронирование</th>
+                <th class="px-5 py-3">Дата</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+              <tr
+                v-for="c in partnerComplaints"
+                :key="c.id"
+                class="hover:bg-gray-50 dark:hover:bg-gray-800/30 cursor-pointer transition"
+                @click="router.push(`/complaints/${c.id}`)"
+              >
+                <td class="px-5 py-3 font-medium text-gray-900 dark:text-white">{{ c.subject }}</td>
+                <td class="px-5 py-3">
+                  <span :class="complaintStatusBadge(c.status)">{{ complaintStatusLabel(c.status) }}</span>
+                </td>
+                <td class="px-5 py-3">
+                  <span :class="complaintPriorityBadge(c.priority)">{{ complaintPriorityLabel(c.priority) }}</span>
+                </td>
+                <td class="px-5 py-3 text-gray-600 dark:text-gray-400">#{{ c.bookingId }}</td>
+                <td class="px-5 py-3 text-gray-500 dark:text-gray-400">{{ formatDateTime(c.createdAt) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </template>
+
       <!-- ─── Tab: Финансы ───────────────────────────────────── -->
       <template v-else-if="activeTab === 'finance'">
         <!-- Wallet card -->
@@ -624,6 +698,45 @@
         </div>
       </template>
     </template>
+
+    <!-- Deactivate Modal -->
+    <Teleport to="body">
+      <Transition name="fade">
+        <div
+          v-if="showDeactivateModal"
+          class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+          @click.self="showDeactivateModal = false"
+        >
+          <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 p-6 w-full max-w-md mx-4">
+            <h3 class="text-lg font-bold text-gray-900 dark:text-white mb-2">Деактивировать партнёра</h3>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">
+              Все машины партнёра станут недоступны для бронирования.
+            </p>
+            <textarea
+              v-model="deactivateReason"
+              rows="3"
+              placeholder="Причина деактивации..."
+              class="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm text-gray-900 dark:text-white p-3 focus:outline-none focus:ring-2 focus:ring-red-500 resize-none"
+            />
+            <div class="flex justify-end gap-3 mt-4">
+              <button
+                @click="showDeactivateModal = false"
+                class="px-4 py-2 text-sm font-semibold text-gray-600 dark:text-gray-400 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-gray-300 transition-colors"
+              >
+                Отмена
+              </button>
+              <button
+                @click="onDeactivate"
+                :disabled="statusLoading || !deactivateReason.trim()"
+                class="px-4 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-xl transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {{ statusLoading ? "Обработка..." : "Деактивировать" }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
@@ -636,12 +749,17 @@ import {
   getPartnerLedger,
   getPartnerPayouts,
   getPartnerFileTemporaryLink,
+  deactivatePartner,
+  activatePartner,
   type PartnerDto,
   type PartnerWalletDto,
   type LedgerEntryDto,
   type PayoutDto,
 } from "../api/partners";
+import { auth } from "../store/auth";
 import { getPartnerCars, type PartnerCarDto } from "../api/cars";
+import { getAllComplaints } from "../api/complaints";
+import type { Complaint } from "../types/Complaint";
 import { getAllBookings, type BookingDto } from "../api/bookings";
 import { formatDate, formatDateTime, formatPrice } from "../utils/formatters";
 import {
@@ -675,15 +793,23 @@ const bookingsTotal = ref(0);
 const payouts = ref<PayoutDto[]>([]);
 const ledger = ref<LedgerEntryDto[]>([]);
 
-const activeTab = ref<"overview" | "cars" | "bookings" | "finance" | "documents">("overview");
+const activeTab = ref<"overview" | "cars" | "bookings" | "finance" | "documents" | "complaints">("overview");
+
+const statusLoading = ref(false);
+const showDeactivateModal = ref(false);
+const deactivateReason = ref("");
+const hasDeactivatePermission = computed(() => auth.hasPermission("Partner.Deactivate"));
 
 const financeLoaded = ref(false);
+const complaintsLoading = ref(false);
+const partnerComplaints = ref<Complaint[]>([]);
 
 // ── Tabs ───────────────────────────────────────────────────────────────
 const tabs = [
   { key: "overview" as const, label: "Обзор" },
   { key: "cars" as const, label: "Машины" },
   { key: "bookings" as const, label: "Бронирования" },
+  { key: "complaints" as const, label: "Жалобы" },
   { key: "finance" as const, label: "Финансы" },
   { key: "documents" as const, label: "Документы" },
 ];
@@ -780,6 +906,80 @@ async function loadFinance(partnerId: number) {
   }
 }
 
+function complaintStatusLabel(status: number): string {
+  const map: Record<number, string> = { 1: "Новая", 2: "На рассмотрении", 3: "Ожидает ответа", 4: "Решена", 5: "Отклонена" };
+  return map[status] ?? "—";
+}
+
+function complaintStatusBadge(status: number): string {
+  const base = "px-2 py-0.5 rounded-full text-xs font-bold";
+  const map: Record<number, string> = {
+    1: `${base} bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400`,
+    2: `${base} bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400`,
+    3: `${base} bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400`,
+    4: `${base} bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400`,
+    5: `${base} bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400`,
+  };
+  return map[status] ?? `${base} bg-gray-100 text-gray-500`;
+}
+
+function complaintPriorityLabel(priority: number): string {
+  const map: Record<number, string> = { 1: "Обычный", 2: "Высокий", 3: "Срочный" };
+  return map[priority] ?? "—";
+}
+
+function complaintPriorityBadge(priority: number): string {
+  const base = "px-2 py-0.5 rounded-full text-xs font-bold";
+  const map: Record<number, string> = {
+    1: `${base} bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400`,
+    2: `${base} bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400`,
+    3: `${base} bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400`,
+  };
+  return map[priority] ?? `${base} bg-gray-100 text-gray-500`;
+}
+
+async function loadComplaints(partnerRelatedUserId: string) {
+  complaintsLoading.value = true;
+  try {
+    const all = await getAllComplaints();
+    partnerComplaints.value = all.filter(
+      (c) => c.targetType === 1 && c.snapshotData?.counterpartyUserId === partnerRelatedUserId,
+    );
+  } catch {
+    partnerComplaints.value = [];
+  } finally {
+    complaintsLoading.value = false;
+  }
+}
+
+async function onDeactivate() {
+  if (!partner.value || statusLoading.value) return;
+  statusLoading.value = true;
+  try {
+    partner.value = await deactivatePartner(partner.value.id, deactivateReason.value.trim());
+    showDeactivateModal.value = false;
+    deactivateReason.value = "";
+    toast.success("Партнёр деактивирован. Все машины недоступны для бронирования.");
+  } catch (e: any) {
+    toast.error(e?.response?.data?.error || "Ошибка деактивации партнёра");
+  } finally {
+    statusLoading.value = false;
+  }
+}
+
+async function onActivate() {
+  if (!partner.value || statusLoading.value) return;
+  statusLoading.value = true;
+  try {
+    partner.value = await activatePartner(partner.value.id);
+    toast.success("Партнёр активирован. Машины снова доступны.");
+  } catch (e: any) {
+    toast.error(e?.response?.data?.error || "Ошибка активации партнёра");
+  } finally {
+    statusLoading.value = false;
+  }
+}
+
 async function loadAll() {
   const rawId = route.params.id;
   const partnerId = Number(Array.isArray(rawId) ? rawId[0] : rawId);
@@ -807,6 +1007,9 @@ async function loadAll() {
 watch(activeTab, (tab) => {
   if (tab === "finance" && partner.value) {
     loadFinance(partner.value.id);
+  }
+  if (tab === "complaints" && partner.value && partnerComplaints.value.length === 0) {
+    loadComplaints(partner.value.relatedUserId);
   }
 });
 

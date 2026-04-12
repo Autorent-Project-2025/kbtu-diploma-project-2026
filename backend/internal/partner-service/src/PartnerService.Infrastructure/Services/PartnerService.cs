@@ -173,6 +173,47 @@ public class PartnerService : IPartnerService
         return true;
     }
 
+    public async Task<PartnerResponseDto?> DeactivateAsync(int id, string reason, CancellationToken cancellationToken = default)
+    {
+        EnsureValidId(id);
+
+        if (string.IsNullOrWhiteSpace(reason))
+            throw new ArgumentException("Deactivation reason is required.", nameof(reason));
+
+        var entity = await _db.Partners.FirstOrDefaultAsync(partner => partner.Id == id, cancellationToken);
+        if (entity is null)
+            return null;
+
+        if (!entity.IsActive)
+            return entity.ToPartnerResponseDto();
+
+        entity.IsActive = false;
+        entity.DeactivatedAt = DateTime.UtcNow;
+        entity.DeactivationReason = reason.Trim();
+
+        await _db.SaveChangesAsync(cancellationToken);
+        return entity.ToPartnerResponseDto();
+    }
+
+    public async Task<PartnerResponseDto?> ActivateAsync(int id, CancellationToken cancellationToken = default)
+    {
+        EnsureValidId(id);
+
+        var entity = await _db.Partners.FirstOrDefaultAsync(partner => partner.Id == id, cancellationToken);
+        if (entity is null)
+            return null;
+
+        if (entity.IsActive)
+            return entity.ToPartnerResponseDto();
+
+        entity.IsActive = true;
+        entity.DeactivatedAt = null;
+        entity.DeactivationReason = null;
+
+        await _db.SaveChangesAsync(cancellationToken);
+        return entity.ToPartnerResponseDto();
+    }
+
     private static NormalizedPartnerData NormalizeAndValidate(
         string? ownerFirstName,
         string? ownerLastName,

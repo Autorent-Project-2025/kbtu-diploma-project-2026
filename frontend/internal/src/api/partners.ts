@@ -11,6 +11,9 @@ export interface PartnerDto {
   partnershipEndDate?: string;
   relatedUserId: string;
   phoneNumber?: string;
+  isActive: boolean;
+  deactivatedAt?: string | null;
+  deactivationReason?: string | null;
 }
 
 export interface PartnerWalletDto {
@@ -63,6 +66,16 @@ export async function getPartnerLedger(partnerId: number, take = 50): Promise<Le
 export async function getPartnerPayouts(partnerId: number, take = 50): Promise<PayoutDto[]> {
   const res = await api.get(`/partners/${partnerId}/payouts`, { params: { take } });
   return (res.data ?? []) as PayoutDto[];
+}
+
+export async function deactivatePartner(id: number, reason: string): Promise<PartnerDto> {
+  const res = await api.post(`/partners/${id}/deactivate`, { reason });
+  return res.data as PartnerDto;
+}
+
+export async function activatePartner(id: number): Promise<PartnerDto> {
+  const res = await api.post(`/partners/${id}/activate`);
+  return res.data as PartnerDto;
 }
 
 export interface FileTemporaryLinkDto {
