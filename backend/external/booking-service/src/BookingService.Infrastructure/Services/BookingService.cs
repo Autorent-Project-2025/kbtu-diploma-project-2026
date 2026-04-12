@@ -22,6 +22,9 @@ namespace BookingService.Infrastructure.Services
     public class BookingService : IBookingService
     {
         private const int MaxSerializableRetries = 3;
+        private const string CancellationActorClient = "client";
+        private const string CancellationActorPartner = "partner";
+        private const string CancellationActorManager = "manager";
         private static readonly SemaphoreSlim InMemoryCreateLock = new(1, 1);
 
         private readonly ApplicationDbContext _db;
@@ -473,7 +476,11 @@ namespace BookingService.Infrastructure.Services
                 return false;
             }
 
-            await PersistStatusTransitionWithPaymentOutbox(booking, BookingStatus.Canceled);
+            await CancelBookingWithMetadataAsync(
+                booking,
+                CancellationActorClient,
+                "Бронирование отменено клиентом.",
+                notifyCustomer: false);
             return true;
         }
 
@@ -491,7 +498,11 @@ namespace BookingService.Infrastructure.Services
                 booking.Status == BookingStatus.Canceled)
                 return false;
 
-            await PersistStatusTransitionWithPaymentOutbox(booking, BookingStatus.Canceled);
+            await CancelBookingWithMetadataAsync(
+                booking,
+                CancellationActorPartner,
+                "Бронирование отменено партнером.",
+                notifyCustomer: true);
             return true;
         }
 
@@ -561,6 +572,13 @@ namespace BookingService.Infrastructure.Services
             booking.PartnerCancellationTicketId = reviewTicket.Id;
             booking.PartnerCancellationRequestedAt = DateTimeOffset.UtcNow;
             await _db.SaveChangesAsync(cancellationToken);
+
+            await NotifyPartnerAboutCancellationRequestAsync(
+                normalizedRequesterEmail,
+                BuildPersonName(requesterProfile.FirstName, requesterProfile.LastName),
+                booking,
+                normalizedReason,
+                cancellationToken);
 
             return new PartnerBookingCancellationRequestResultDto
             {
@@ -819,7 +837,10 @@ namespace BookingService.Infrastructure.Services
                 .FirstOrDefaultAsync(cancellationToken);
         }
 
-        public async Task<bool> CancelBookingByAdmin(int id, CancellationToken cancellationToken = default)
+        public async Task<bool> CancelBookingByAdmin(
+            int id,
+            string? cancellationReason = null,
+            CancellationToken cancellationToken = default)
         {
             var booking = await _db.Bookings
                 .FirstOrDefaultAsync(b => b.Id == id, cancellationToken);
@@ -831,7 +852,14 @@ namespace BookingService.Infrastructure.Services
                 booking.Status == BookingStatus.Canceled)
                 return false;
 
-            await PersistStatusTransitionWithPaymentOutbox(booking, BookingStatus.Canceled);
+            await CancelBookingWithMetadataAsync(
+                booking,
+                CancellationActorManager,
+                string.IsNullOrWhiteSpace(cancellationReason)
+                    ? "Бронирование отменено менеджером."
+                    : cancellationReason,
+                notifyCustomer: true,
+                cancellationToken);
             return true;
         }
 
@@ -943,6 +971,7 @@ namespace BookingService.Infrastructure.Services
         public async Task ProcessPartnerCancellationApproved(
             int bookingId,
             Guid ticketId,
+            string partnerReason,
             CancellationToken cancellationToken = default)
         {
             if (ticketId == Guid.Empty)
@@ -965,9 +994,13 @@ namespace BookingService.Infrastructure.Services
             booking.PartnerCancellationTicketId ??= ticketId;
             booking.PartnerCancellationRequestedAt ??= DateTimeOffset.UtcNow;
 
-            await PersistStatusTransitionWithPaymentOutbox(
+            await CancelBookingWithMetadataAsync(
                 booking,
-                BookingStatus.Canceled,
+                CancellationActorPartner,
+                string.IsNullOrWhiteSpace(partnerReason)
+                    ? "Бронирование отменено по запросу партнера."
+                    : partnerReason,
+                notifyCustomer: true,
                 cancellationToken);
         }
 
@@ -1434,6 +1467,24 @@ namespace BookingService.Infrastructure.Services
             return normalized;
         }
 
+        private static string? NormalizeOptionalText(string? value, string parameterName, int maxLength)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return null;
+            }
+
+            var normalized = value.Trim();
+            if (normalized.Length > maxLength)
+            {
+                throw new ArgumentException(
+                    $"{parameterName} length must not exceed {maxLength}.",
+                    parameterName);
+            }
+
+            return normalized;
+        }
+
         private static void ValidateCommentRating(int rating)
         {
             if (rating is < 1 or > 5)
@@ -1576,6 +1627,180 @@ namespace BookingService.Infrastructure.Services
             }
 
             return $"Damage fine for booking #{bookingId}: {fineComment.Trim()}";
+        }
+
+        private async Task CancelBookingWithMetadataAsync(
+            Booking booking,
+            string cancellationActor,
+            string cancellationReason,
+            bool notifyCustomer,
+            CancellationToken cancellationToken = default)
+        {
+            var previousStatus = booking.Status;
+            booking.CancellationActor = NormalizeCancellationActor(cancellationActor);
+            booking.CancellationReason = NormalizeCancellationReason(cancellationReason, booking.CancellationActor);
+
+            await PersistStatusTransitionWithPaymentOutbox(booking, BookingStatus.Canceled, cancellationToken);
+
+            if (notifyCustomer)
+            {
+                await NotifyCustomerAboutCancellationAsync(
+                    booking,
+                    previousStatus,
+                    booking.CancellationActor,
+                    booking.CancellationReason,
+                    cancellationToken);
+            }
+        }
+
+        private async Task NotifyCustomerAboutCancellationAsync(
+            Booking booking,
+            BookingStatus previousStatus,
+            string cancellationActor,
+            string cancellationReason,
+            CancellationToken cancellationToken)
+        {
+            var identityUser = await _identityUserReadClient.GetUserByIdAsync(booking.UserId, cancellationToken);
+            if (identityUser is null || string.IsNullOrWhiteSpace(identityUser.Email))
+            {
+                return;
+            }
+
+            var clientProfile = await _clientBookingAccessClient.GetClientProfileAsync(booking.UserId, cancellationToken);
+            var customerFullName = BuildPersonName(clientProfile?.FirstName, clientProfile?.LastName);
+            if (string.IsNullOrWhiteSpace(customerFullName))
+            {
+                customerFullName = string.IsNullOrWhiteSpace(identityUser.Username)
+                    ? "Клиент"
+                    : identityUser.Username.Trim();
+            }
+
+            await _bookingEmailClient.SendCustomEmailAsync(
+                identityUser.Email,
+                $"Booking #{booking.Id}: бронирование отменено",
+                BuildCancellationEmailText(
+                    booking.Id,
+                    customerFullName,
+                    cancellationActor,
+                    cancellationReason,
+                    previousStatus),
+                cancellationToken: cancellationToken);
+        }
+
+        private async Task NotifyPartnerAboutCancellationRequestAsync(
+            string email,
+            string partnerFullName,
+            Booking booking,
+            string partnerReason,
+            CancellationToken cancellationToken)
+        {
+            try
+            {
+                await _bookingEmailClient.SendCustomEmailAsync(
+                    email,
+                    $"Booking #{booking.Id}: запрос на отмену отправлен",
+                    BuildPartnerCancellationRequestEmailText(
+                        booking.Id,
+                        partnerFullName,
+                        booking.CarBrand,
+                        booking.CarModel,
+                        booking.StartTime,
+                        booking.EndTime,
+                        partnerReason),
+                    cancellationToken: cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(
+                    ex,
+                    "Failed to send partner cancellation request email for booking {BookingId} to {Email}.",
+                    booking.Id,
+                    email);
+            }
+        }
+
+        private static string BuildCancellationEmailText(
+            int bookingId,
+            string customerFullName,
+            string cancellationActor,
+            string cancellationReason,
+            BookingStatus previousStatus)
+        {
+            var normalizedName = string.IsNullOrWhiteSpace(customerFullName) ? "Клиент" : customerFullName.Trim();
+            var actorText = GetCancellationActorDisplayText(cancellationActor);
+            var paymentText = previousStatus == BookingStatus.Pending
+                ? "Оплата по бронированию не была завершена. Если попытка оплаты уже была начата, она аннулирована."
+                : "Оплата по бронированию отменена, возврат средств оформлен.";
+
+            return $"{normalizedName}, бронирование #{bookingId} было отменено {actorText}. " +
+                   $"Причина отмены: {cancellationReason}. {paymentText}";
+        }
+
+        private static string BuildPartnerCancellationRequestEmailText(
+            int bookingId,
+            string partnerFullName,
+            string? carBrand,
+            string? carModel,
+            DateTimeOffset bookingStartTime,
+            DateTimeOffset bookingEndTime,
+            string partnerReason)
+        {
+            var normalizedName = string.IsNullOrWhiteSpace(partnerFullName) ? "Партнер" : partnerFullName.Trim();
+            var bookingTitle = BuildBookingTitle(carBrand, carModel);
+            var bookingWindow =
+                $"{bookingStartTime:dd.MM.yyyy HH:mm} - {bookingEndTime:dd.MM.yyyy HH:mm}";
+
+            return $"{normalizedName}, ваш запрос на отмену бронирования #{bookingId} отправлен менеджеру на рассмотрение. " +
+                   $"Автомобиль: {bookingTitle}. Период бронирования: {bookingWindow}. " +
+                   $"Указанная причина: {partnerReason}. Мы пришлем отдельное уведомление после решения менеджера.";
+        }
+
+        private static string BuildBookingTitle(string? carBrand, string? carModel)
+        {
+            var title = string.Join(
+                " ",
+                new[] { carBrand?.Trim(), carModel?.Trim() }
+                    .Where(value => !string.IsNullOrWhiteSpace(value)));
+
+            return string.IsNullOrWhiteSpace(title) ? "не указан" : title;
+        }
+
+        private static string NormalizeCancellationActor(string? value)
+        {
+            var normalized = (value ?? string.Empty).Trim().ToLowerInvariant();
+            return normalized switch
+            {
+                CancellationActorClient => CancellationActorClient,
+                CancellationActorPartner => CancellationActorPartner,
+                CancellationActorManager => CancellationActorManager,
+                _ => CancellationActorManager
+            };
+        }
+
+        private static string NormalizeCancellationReason(string? value, string cancellationActor)
+        {
+            var normalized = NormalizeOptionalText(value, nameof(value), 2000);
+            if (!string.IsNullOrWhiteSpace(normalized))
+            {
+                return normalized;
+            }
+
+            return cancellationActor switch
+            {
+                CancellationActorClient => "Бронирование отменено клиентом.",
+                CancellationActorPartner => "Бронирование отменено партнером.",
+                _ => "Бронирование отменено менеджером."
+            };
+        }
+
+        private static string GetCancellationActorDisplayText(string? cancellationActor)
+        {
+            return NormalizeCancellationActor(cancellationActor) switch
+            {
+                CancellationActorClient => "клиентом",
+                CancellationActorPartner => "партнером",
+                _ => "менеджером"
+            };
         }
 
         private async Task PersistStatusTransitionWithPaymentOutbox(

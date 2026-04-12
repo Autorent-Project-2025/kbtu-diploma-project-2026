@@ -137,6 +137,38 @@
               </div>
 
               <div
+                v-if="booking.status === 'canceled'"
+                class="rounded-2xl border border-red-200 dark:border-red-900/40 bg-red-50 dark:bg-red-950/30 p-5 space-y-4"
+              >
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p class="text-xs font-bold uppercase tracking-[0.18em] text-red-600 dark:text-red-300">Причина отмены</p>
+                    <p class="mt-1 text-sm text-red-700/80 dark:text-red-200/80">
+                      Здесь видно, кто отменил бронирование и по какой причине.
+                    </p>
+                  </div>
+                  <span class="inline-flex items-center rounded-full bg-white/80 dark:bg-red-900/40 px-3 py-1 text-sm font-bold text-red-700 dark:text-red-200">
+                    {{ cancellationActorLabel(booking.cancellationActor) }}
+                  </span>
+                </div>
+
+                <div class="grid gap-4 md:grid-cols-[220px_minmax(0,1fr)]">
+                  <article class="rounded-2xl border border-red-200/80 dark:border-red-900/40 bg-white/80 dark:bg-red-900/20 p-4 space-y-1.5">
+                    <p class="text-xs font-bold uppercase tracking-[0.18em] text-red-600 dark:text-red-300">Отменил</p>
+                    <p class="text-base font-bold text-gray-900 dark:text-white">
+                      {{ cancellationActorLabel(booking.cancellationActor) }}
+                    </p>
+                  </article>
+                  <article class="rounded-2xl border border-red-200/80 dark:border-red-900/40 bg-white/80 dark:bg-red-900/20 p-4 space-y-1.5">
+                    <p class="text-xs font-bold uppercase tracking-[0.18em] text-red-600 dark:text-red-300">Комментарий</p>
+                    <p class="text-base font-medium text-gray-900 dark:text-white whitespace-pre-line">
+                      {{ booking.cancellationReason || "Причина отмены не была сохранена." }}
+                    </p>
+                  </article>
+                </div>
+              </div>
+
+              <div
                 v-if="galleryImages.length > 0"
                 class="grid grid-cols-2 gap-3 sm:grid-cols-4"
               >
@@ -442,6 +474,14 @@ function statusClass(status: Booking["status"]) {
     default:
       return "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300";
   }
+}
+
+function cancellationActorLabel(actor: string | null | undefined) {
+  const normalized = (actor ?? "").trim().toLowerCase();
+  if (normalized === "client") return "Клиент";
+  if (normalized === "partner") return "Партнер";
+  if (normalized === "manager") return "Менеджер";
+  return "Не указано";
 }
 
 function chargeTypeLabel(chargeType: string) {

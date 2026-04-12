@@ -34,6 +34,8 @@ export interface Booking {
   carCommentSubmittedAt?: string | null;
   canLeaveComment?: boolean;
   pricingBreakdown?: BookingPricingBreakdown | null;
+  cancellationActor?: string | null;
+  cancellationReason?: string | null;
   status: BookingStatus;
 }
 

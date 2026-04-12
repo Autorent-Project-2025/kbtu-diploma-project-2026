@@ -9,5 +9,6 @@ internal sealed class PartnerBookingCancellationApprovedWorkflowPayload
 internal enum PartnerBookingCancellationApprovedWorkflowStep
 {
     NotifyBookingService = 1,
+    SendPartnerNotification = 2,
     Completed = 99
 }

@@ -73,6 +73,12 @@ namespace BookingService.Domain.Entities
         [Column("partner_cancellation_requested_at")]
         public DateTimeOffset? PartnerCancellationRequestedAt { get; set; }
 
+        [Column("cancellation_actor")]
+        public string? CancellationActor { get; set; }
+
+        [Column("cancellation_reason")]
+        public string? CancellationReason { get; set; }
+
         [Column("car_comment_id")]
         public int? CarCommentId { get; set; }
 

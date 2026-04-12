@@ -127,9 +127,12 @@ namespace BookingService.Api.Controllers
 
         [HttpPost("all/{id:int}/cancel")]
         [Authorize(Policy = "bookings:update")]
-        public async Task<IActionResult> AdminCancel(int id, CancellationToken cancellationToken)
+        public async Task<IActionResult> AdminCancel(
+            int id,
+            [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] CancelBookingRequest? request,
+            CancellationToken cancellationToken)
         {
-            var result = await _bookingService.CancelBookingByAdmin(id, cancellationToken);
+            var result = await _bookingService.CancelBookingByAdmin(id, request?.Reason, cancellationToken);
             if (!result)
             {
                 return NotFound(new { error = "Booking not found" });
@@ -139,7 +142,9 @@ namespace BookingService.Api.Controllers
         }
 
         [HttpPost("{id:int}/cancel")]
-        public async Task<IActionResult> Cancel(int id)
+        public async Task<IActionResult> Cancel(
+            int id,
+            [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] CancelBookingRequest? request)
         {
             var result = await _bookingService.CancelBooking(id, GetUserId());
             if (!result)

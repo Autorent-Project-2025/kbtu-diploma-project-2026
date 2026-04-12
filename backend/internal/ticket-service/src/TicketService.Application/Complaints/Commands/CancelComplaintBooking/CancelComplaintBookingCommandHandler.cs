@@ -72,7 +72,10 @@ public sealed class CancelComplaintBookingCommandHandler
         }
 
         // Call booking-service to cancel via its domain logic
-        var canceled = await _bookingAdminClient.CancelBookingAsync(complaint.BookingId, cancellationToken);
+        var canceled = await _bookingAdminClient.CancelBookingAsync(
+            complaint.BookingId,
+            command.Reason,
+            cancellationToken);
         if (!canceled)
             throw new InvalidOperationException($"Failed to cancel booking {complaint.BookingId}.");
 

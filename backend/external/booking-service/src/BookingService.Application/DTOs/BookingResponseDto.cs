@@ -29,6 +29,8 @@ namespace BookingService.Application.DTOs.Booking
         public Guid? CompletionReviewTicketId { get; set; }
         public Guid? PartnerCancellationTicketId { get; set; }
         public DateTimeOffset? PartnerCancellationRequestedAt { get; set; }
+        public string? CancellationActor { get; set; }
+        public string? CancellationReason { get; set; }
         public int? CarCommentId { get; set; }
         public DateTimeOffset? CarCommentSubmittedAt { get; set; }
         public bool CanLeaveComment { get; set; }

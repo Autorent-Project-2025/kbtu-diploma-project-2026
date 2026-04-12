@@ -7,6 +7,7 @@ using BookingService.Api.Contracts.Internal;
 using BookingService.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.Extensions.Options;
 
 namespace BookingService.Api.Controllers;
@@ -122,14 +123,17 @@ public sealed class InternalBookingsController : ControllerBase
 
     [AllowAnonymous]
     [HttpPost("{id:int}/cancel")]
-    public async Task<IActionResult> CancelBooking(int id, CancellationToken cancellationToken)
+    public async Task<IActionResult> CancelBooking(
+        int id,
+        [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] Contracts.Booking.CancelBookingRequest? request,
+        CancellationToken cancellationToken)
     {
         if (!IsAuthorizedInternalRequest())
         {
             return Unauthorized(new { error = "Internal API key is invalid." });
         }
 
-        var result = await _bookingService.CancelBookingByAdmin(id, cancellationToken);
+        var result = await _bookingService.CancelBookingByAdmin(id, request?.Reason, cancellationToken);
         if (!result)
         {
             return NotFound(new { error = "Booking not found or cannot be canceled." });
@@ -201,6 +205,7 @@ public sealed class InternalBookingsController : ControllerBase
         await _bookingService.ProcessPartnerCancellationApproved(
             id,
             request.TicketId,
+            request.PartnerReason,
             cancellationToken);
 
         return Ok(new CommonResponseDto { Message = "Partner cancellation request approved." });

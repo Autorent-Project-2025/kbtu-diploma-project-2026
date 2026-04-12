@@ -39,7 +39,7 @@ namespace BookingService.Application.Interfaces
         Task<IReadOnlyCollection<BookingChargeResponseDto>> GetAllBookingCharges(int id, CancellationToken cancellationToken = default);
         Task<BookingChargeResponseDto> PayBookingCharge(int id, long chargeId, Guid userId, CancellationToken cancellationToken = default);
         Task<BookingResponseDto?> GetBookingById(int id, CancellationToken cancellationToken = default);
-        Task<bool> CancelBookingByAdmin(int id, CancellationToken cancellationToken = default);
+        Task<bool> CancelBookingByAdmin(int id, string? cancellationReason = null, CancellationToken cancellationToken = default);
         Task ProcessCompletionReviewApproved(
             int bookingId,
             Guid ticketId,
@@ -59,6 +59,7 @@ namespace BookingService.Application.Interfaces
         Task ProcessPartnerCancellationApproved(
             int bookingId,
             Guid ticketId,
+            string partnerReason,
             CancellationToken cancellationToken = default);
         Task ProcessPartnerCancellationRejected(
             int bookingId,

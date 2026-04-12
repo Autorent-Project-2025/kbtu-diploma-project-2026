@@ -59,6 +59,8 @@ interface BookingApiDto {
   carCommentSubmittedAt?: string | null;
   canLeaveComment?: boolean | null;
   pricingBreakdown?: BookingPricingBreakdown | null;
+  cancellationActor?: string | null;
+  cancellationReason?: string | null;
   status?: string | null;
 }
 
@@ -155,6 +157,8 @@ function mapBooking(dto: BookingApiDto): Booking {
     carCommentSubmittedAt: dto.carCommentSubmittedAt ?? null,
     canLeaveComment: Boolean(dto.canLeaveComment),
     pricingBreakdown: dto.pricingBreakdown ?? null,
+    cancellationActor: dto.cancellationActor?.trim() || null,
+    cancellationReason: dto.cancellationReason?.trim() || null,
     status: normalizeStatus(dto.status),
   };
 }
