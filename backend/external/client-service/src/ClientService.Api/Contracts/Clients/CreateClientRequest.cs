@@ -30,4 +30,7 @@ public sealed class CreateClientRequest
 
     [MaxLength(1024)]
     public string? AvatarUrl { get; set; }
+
+    [MaxLength(255)]
+    public string? AvatarImageId { get; set; }
 }

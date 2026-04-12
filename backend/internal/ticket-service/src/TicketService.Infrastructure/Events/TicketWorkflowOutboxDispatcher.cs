@@ -311,8 +311,13 @@ public sealed class TicketWorkflowOutboxDispatcher : BackgroundService
                             RequireField(ticket.CarModel, nameof(ticket.CarModel)),
                             RequireYear(ticket.CarYear, nameof(ticket.CarYear)),
                             RequireField(ticket.LicensePlate, nameof(ticket.LicensePlate)),
-                            RequirePrice(ticket.PriceHour, nameof(ticket.PriceHour)),
-                            RequirePrice(ticket.PriceDay, nameof(ticket.PriceDay)),
+                            ticket.Transmission,
+                            ticket.FuelType,
+                            ticket.Seats,
+                            ticket.Doors,
+                            ticket.BodyType,
+                            ticket.Horsepower,
+                            ResolveProvisionSemanticTags(ticket),
                             RequireField(ticket.OwnershipDocumentFileName, nameof(ticket.OwnershipDocumentFileName)),
                             ticket.CarImages.Select(image => new PartnerCarProvisionRequestedImage(image.ImageId, image.ImageUrl)).ToArray()),
                         cancellationToken);
@@ -613,24 +618,17 @@ public sealed class TicketWorkflowOutboxDispatcher : BackgroundService
         return value.Value;
     }
 
-    private static decimal RequirePrice(decimal? value, string fieldName)
+    private static IReadOnlyCollection<string> ResolveProvisionSemanticTags(Ticket ticket)
     {
-        if (!value.HasValue)
-        {
-            throw new InvalidOperationException($"{fieldName} is required.");
-        }
+        var source = ticket.ConfirmedTags.Count > 0
+            ? ticket.ConfirmedTags
+            : ticket.SelectedTags.Concat(ticket.SuggestedTags).ToArray();
 
-        if (value.Value <= 0m)
-        {
-            throw new InvalidOperationException($"{fieldName} must be greater than 0.");
-        }
-
-        if (value.Value > 1_000_000m)
-        {
-            throw new InvalidOperationException($"{fieldName} must not exceed 1000000.");
-        }
-
-        return decimal.Round(value.Value, 2, MidpointRounding.AwayFromZero);
+        return source
+            .Where(tag => !string.IsNullOrWhiteSpace(tag))
+            .Select(tag => tag.Trim().ToLowerInvariant())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
     }
 
     private static decimal RequireChargeAmount(decimal? value, string fieldName)

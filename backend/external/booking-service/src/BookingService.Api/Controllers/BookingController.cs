@@ -16,10 +16,14 @@ namespace BookingService.Api.Controllers
     public class BookingController : ControllerBase
     {
         private readonly IBookingService _bookingService;
+        private readonly IDynamicPricingService _dynamicPricingService;
 
-        public BookingController(IBookingService bookingService)
+        public BookingController(
+            IBookingService bookingService,
+            IDynamicPricingService dynamicPricingService)
         {
             _bookingService = bookingService;
+            _dynamicPricingService = dynamicPricingService;
         }
 
         private Guid GetUserId()
@@ -175,6 +179,25 @@ namespace BookingService.Api.Controllers
             return Ok(result);
         }
 
+        [HttpPost("{id:int}/car-comment")]
+        public async Task<IActionResult> SubmitCarComment(
+            int id,
+            [FromBody] CreateBookingCarCommentRequest request,
+            CancellationToken cancellationToken)
+        {
+            var result = await _bookingService.SubmitCarComment(
+                id,
+                GetUserId(),
+                new BookingCarCommentCreateDto
+                {
+                    Rating = request.Rating,
+                    Content = request.Content
+                },
+                cancellationToken);
+
+            return Ok(result);
+        }
+
         [HttpGet("{id:int}/charges")]
         public async Task<IActionResult> GetCharges(int id, CancellationToken cancellationToken)
         {
@@ -187,6 +210,23 @@ namespace BookingService.Api.Controllers
         {
             var charge = await _bookingService.PayBookingCharge(id, chargeId, GetUserId(), cancellationToken);
             return Ok(charge);
+        }
+
+        [HttpGet("price-preview")]
+        [AllowAnonymous]
+        public async Task<IActionResult> GetPricePreview(
+            [FromQuery] int partnerCarId,
+            [FromQuery] DateTimeOffset startTime,
+            [FromQuery] DateTimeOffset endTime,
+            CancellationToken cancellationToken)
+        {
+            var result = await _dynamicPricingService.GetPricePreviewAsync(
+                partnerCarId,
+                startTime,
+                endTime,
+                cancellationToken);
+
+            return Ok(result);
         }
 
         [HttpGet("available")]

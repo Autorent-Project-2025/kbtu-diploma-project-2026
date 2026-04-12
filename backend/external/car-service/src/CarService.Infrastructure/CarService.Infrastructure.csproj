@@ -15,8 +15,13 @@
 	</ItemGroup>
 
 	<ItemGroup>
+		<FrameworkReference Include="Microsoft.AspNetCore.App" />
+	</ItemGroup>
+
+	<ItemGroup>
     <ProjectReference Include="..\CarService.Application\CarService.Application.csproj" />
     <ProjectReference Include="..\CarService.Domain\CarService.Domain.csproj" />
+    <ProjectReference Include="..\..\..\..\libraries\messaging-dotnet\src\AutoRent.Messaging\AutoRent.Messaging.csproj" />
   </ItemGroup>
 
 </Project>

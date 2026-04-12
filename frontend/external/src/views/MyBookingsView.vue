@@ -2,9 +2,9 @@
   <div
     class="min-h-screen bg-gray-50 dark:bg-gray-950 py-24 px-4 sm:px-6 lg:px-8 transition-colors duration-300"
   >
-    <div class="max-w-5xl mx-auto">
+    <div class="max-w-6xl mx-auto">
       <!-- Header -->
-      <div class="mb-12 space-y-4 animate-slide-up">
+      <div class="mb-12 space-y-5 animate-slide-up">
         <h1
           class="text-4xl sm:text-5xl font-extrabold text-gray-900 dark:text-white"
         >
@@ -15,13 +15,15 @@
         </p>
 
         <!-- Filters -->
-        <div class="flex flex-wrap gap-3">
+        <div
+          class="flex gap-3 overflow-x-auto rounded-3xl border border-white/10 bg-white/60 p-3 shadow-xl backdrop-blur-md dark:bg-gray-900/70 dark:border-gray-800 scrollbar-hide"
+        >
           <button
             v-for="filter in filters"
             :key="filter.value"
             @click="currentFilter = filter.value"
             :class="[
-              'px-5 py-2.5 rounded-xl font-extrabold text-sm transition-all',
+              'px-5 py-2.5 rounded-xl font-extrabold text-sm transition-all flex-shrink-0',
               currentFilter === filter.value
                 ? 'bg-primary-600 text-white shadow-lg shadow-primary-500/50'
                 : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700',
@@ -48,286 +50,285 @@
         <div
           v-for="b in filteredBookings"
           :key="b.id"
-          class="group bg-white dark:bg-gray-900 rounded-3xl shadow-lg hover:shadow-2xl transition-all duration-500 overflow-hidden border border-gray-200 dark:border-gray-800 card-hover"
+          class="group relative overflow-hidden rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-md hover:shadow-xl transition-all duration-300"
         >
-          <div class="p-8">
+          <div class="flex flex-col sm:flex-row">
+            <!-- Car image panel -->
             <div
-              class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6"
+              class="relative sm:w-56 sm:flex-shrink-0 h-48 sm:h-auto overflow-hidden bg-gray-100 dark:bg-gray-800 rounded-t-3xl sm:rounded-l-3xl sm:rounded-tr-none"
             >
-              <!-- Left: Car Info -->
-              <div class="space-y-4 flex-1">
-                <div class="flex items-start gap-4">
-                  <!-- Status Indicator -->
-                  <div class="flex-shrink-0 mt-1">
-                    <div
-                      :class="getStatusIndicatorClass(b.computedStatus)"
-                      class="w-3 h-3 rounded-full animate-pulse"
-                    ></div>
+              <img
+                v-if="getCoverImage(b)"
+                :src="getCoverImage(b)!"
+                :alt="`${b.carBrand} ${b.carModel}`"
+                class="w-full h-full object-cover"
+              />
+              <div
+                v-else
+                class="flex h-full w-full items-center justify-center text-gray-400 dark:text-gray-600"
+              >
+                <svg
+                  class="w-12 h-12"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="1.5"
+                    d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"
+                  />
+                </svg>
+              </div>
+              <!-- Status strip on image -->
+              <div class="absolute bottom-0 left-0 right-0 p-2.5">
+                <span
+                  :class="getStatusClass(b.computedStatus)"
+                  class="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold uppercase tracking-wide backdrop-blur-sm shadow"
+                >
+                  <span
+                    :class="getStatusDotClass(b.computedStatus)"
+                    class="w-1.5 h-1.5 rounded-full"
+                  ></span>
+                  {{ getStatusText(b.computedStatus) }}
+                </span>
+              </div>
+            </div>
+
+            <!-- Content -->
+            <div class="flex-1 p-5 flex flex-col gap-4">
+              <!-- Top row: car name + badges -->
+              <div class="flex items-start justify-between gap-3">
+                <div>
+                  <h3
+                    class="text-xl font-bold text-gray-900 dark:text-white leading-tight"
+                  >
+                    {{ b.carBrand }} {{ b.carModel }}
+                  </h3>
+                  <p
+                    v-if="b.partnerName"
+                    class="text-sm text-primary-600 dark:text-primary-400 font-medium mt-0.5"
+                  >
+                    {{ b.partnerName }}
+                  </p>
+                </div>
+                <div class="flex flex-col items-end gap-1.5 flex-shrink-0">
+                  <span
+                    v-if="b.usedSubscription"
+                    class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
+                  >
+                    SUB
+                  </span>
+                  <span
+                    v-if="b.carCommentId"
+                    class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300"
+                  >
+                    ★ Отзыв
+                  </span>
+                </div>
+              </div>
+
+              <!-- Dates + duration -->
+              <div class="flex flex-wrap items-center gap-3 text-sm">
+                <div
+                  class="flex items-center gap-2 text-gray-700 dark:text-gray-300"
+                >
+                  <svg
+                    class="w-4 h-4 text-gray-400"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                    />
+                  </svg>
+                  <span class="font-semibold">{{
+                    formatDate(b.startDate)
+                  }}</span>
+                </div>
+                <svg
+                  class="w-4 h-4 text-gray-300 dark:text-gray-600"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M13 7l5 5m0 0l-5 5m5-5H6"
+                  />
+                </svg>
+                <div
+                  class="flex items-center gap-2 text-gray-700 dark:text-gray-300"
+                >
+                  <svg
+                    class="w-4 h-4 text-gray-400"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
+                  </svg>
+                  <span class="font-semibold">{{ formatDate(b.endDate) }}</span>
+                </div>
+                <span
+                  v-if="getDuration(b)"
+                  class="text-gray-400 dark:text-gray-500 text-xs"
+                  >·</span
+                >
+                <span
+                  v-if="getDuration(b)"
+                  class="text-gray-500 dark:text-gray-400 text-xs font-medium"
+                  >{{ getDurationText(b) }}</span
+                >
+              </div>
+
+              <!-- Price row -->
+              <div class="flex items-end justify-between gap-4 flex-wrap">
+                <div>
+                  <div v-if="b.usedSubscription">
+                    <span
+                      class="text-lg font-bold text-emerald-600 dark:text-emerald-400"
+                      >Покрыто подпиской</span
+                    >
+                    <p
+                      v-if="b.pricingBreakdown"
+                      class="text-xs text-gray-400 mt-0.5"
+                    >
+                      Стоимость без подписки:
+                      {{
+                        formatMoney(
+                          b.pricingBreakdown.quotedTotalPrice,
+                          b.pricingBreakdown.currency,
+                        )
+                      }}
+                    </p>
                   </div>
-
-                  <div class="space-y-2 flex-1">
-                    <h3
-                      class="text-2xl font-bold text-gray-900 dark:text-white"
-                    >
-                      {{ b.carBrand }} {{ b.carModel }}
-                    </h3>
-
-                    <!-- Dates -->
-                    <div
-                      class="flex flex-col sm:flex-row sm:items-center gap-4 text-sm"
-                    >
-                      <div
-                        class="flex items-center gap-2 text-gray-600 dark:text-gray-400"
+                  <div v-else-if="b.price">
+                    <div class="flex items-baseline gap-2">
+                      <span
+                        class="text-2xl font-extrabold text-gray-900 dark:text-white"
                       >
-                        <div
-                          class="w-8 h-8 rounded-lg bg-primary-50 dark:bg-primary-900/20 flex items-center justify-center"
-                        >
-                          <svg
-                            class="w-4 h-4 text-primary-600 dark:text-primary-400"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              stroke-linecap="round"
-                              stroke-linejoin="round"
-                              stroke-width="2"
-                              d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                            />
-                          </svg>
-                        </div>
-                        <div>
-                          <p class="text-xs text-gray-500 dark:text-gray-500">
-                            Начало
-                          </p>
-                          <p
-                            class="font-semibold text-gray-900 dark:text-white"
-                          >
-                            {{ formatDate(b.startDate) }}
-                          </p>
-                        </div>
-                      </div>
-
-                      <svg
-                        class="w-5 h-5 text-gray-400 hidden sm:block"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          stroke-linecap="round"
-                          stroke-linejoin="round"
-                          stroke-width="2"
-                          d="M13 7l5 5m0 0l-5 5m5-5H6"
-                        />
-                      </svg>
-
-                      <div
-                        class="flex items-center gap-2 text-gray-600 dark:text-gray-400"
-                      >
-                        <div
-                          class="w-8 h-8 rounded-lg bg-primary-50 dark:bg-primary-900/20 flex items-center justify-center"
-                        >
-                          <svg
-                            class="w-4 h-4 text-primary-600 dark:text-primary-400"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              stroke-linecap="round"
-                              stroke-linejoin="round"
-                              stroke-width="2"
-                              d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                            />
-                          </svg>
-                        </div>
-                        <div>
-                          <p class="text-xs text-gray-500 dark:text-gray-500">
-                            Окончание
-                          </p>
-                          <p
-                            class="font-semibold text-gray-900 dark:text-white"
-                          >
-                            {{ formatDate(b.endDate) }}
-                          </p>
-                        </div>
-                      </div>
+                        {{ formatMoney(b.price, b.pricingBreakdown?.currency) }}
+                      </span>
+                      <span class="text-xs text-gray-400">итого</span>
                     </div>
+                    <p
+                      v-if="b.pricingBreakdown"
+                      class="text-xs text-gray-400 dark:text-gray-500 mt-0.5"
+                    >
+                      {{
+                        formatMoney(
+                          b.pricingBreakdown.quotedPriceHour,
+                          b.pricingBreakdown.currency,
+                        )
+                      }}/ч · {{ b.pricingBreakdown.billableHours }} ч. · ×{{
+                        b.pricingBreakdown.ratingCoefficient
+                      }}
+                      рейтинг · ×{{
+                        b.pricingBreakdown.advanceBookingCoefficient
+                      }}
+                      заблаговременность
+                    </p>
+                  </div>
+                </div>
 
-                    <!-- Duration -->
-                    <div
-                      v-if="getDuration(b)"
-                      class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400"
+                <!-- Actions -->
+                <div class="flex items-center gap-2 flex-shrink-0">
+                  <component
+                    :is="getPrimaryAction(b).to ? 'router-link' : 'button'"
+                    v-bind="getPrimaryActionProps(b)"
+                    @click="handlePrimaryAction(b, $event)"
+                    :disabled="isPrimaryActionDisabled(b)"
+                    class="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold text-white shadow transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+                    :class="getPrimaryActionButtonClass(b)"
+                  >
+                    {{ getPrimaryActionLabel(b) }}
+                  </component>
+
+                  <div
+                    v-if="
+                      canCancel(b) ||
+                      b.canLeaveComment ||
+                      canOpenCompletionDetails(b)
+                    "
+                    class="relative"
+                  >
+                    <button
+                      type="button"
+                      @click="toggleActionMenu(b.id)"
+                      class="inline-flex items-center justify-center w-10 h-10 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition"
                     >
                       <svg
                         class="w-4 h-4"
-                        fill="none"
-                        stroke="currentColor"
+                        fill="currentColor"
                         viewBox="0 0 24 24"
                       >
-                        <path
-                          stroke-linecap="round"
-                          stroke-linejoin="round"
-                          stroke-width="2"
-                          d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                        />
+                        <circle cx="12" cy="5" r="1.5" />
+                        <circle cx="12" cy="12" r="1.5" />
+                        <circle cx="12" cy="19" r="1.5" />
                       </svg>
-                      <span>{{ getDurationText(b) }}</span>
-                    </div>
+                    </button>
 
-                    <!-- Price (if available) -->
-                    <div v-if="b.price" class="flex items-baseline gap-2">
-                      <span
-                        class="text-3xl font-bold text-gray-900 dark:text-white"
-                        >${{ b.price }}</span
-                      >
-                      <span class="text-sm text-gray-500 dark:text-gray-400"
-                        >общая стоимость</span
-                      >
+                    <div
+                      v-if="openActionMenuId === b.id"
+                      class="absolute right-0 bottom-full mb-2 z-20 w-52 overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-2xl"
+                    >
+                      <div class="p-1.5 space-y-0.5">
+                        <router-link
+                          v-if="canOpenCompletionDetails(b)"
+                          :to="`/bookings/${b.id}/complete`"
+                          class="flex items-center rounded-xl px-3 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition"
+                          @click="closeActionMenu"
+                        >
+                          {{
+                            b.status === "completed"
+                              ? "Детали завершения"
+                              : "Статус завершения"
+                          }}
+                        </router-link>
+                        <button
+                          v-if="b.canLeaveComment"
+                          @click="openReviewFromMenu(b)"
+                          :disabled="reviewSubmittingId === b.id"
+                          class="flex w-full items-center rounded-xl px-3 py-2.5 text-left text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition disabled:opacity-60"
+                        >
+                          {{
+                            reviewSubmittingId === b.id
+                              ? "Отправляем..."
+                              : "Оставить отзыв"
+                          }}
+                        </button>
+                        <button
+                          v-if="canCancel(b)"
+                          @click="cancelFromMenu(b)"
+                          :disabled="cancelingId === b.id"
+                          class="flex w-full items-center rounded-xl px-3 py-2.5 text-left text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition disabled:opacity-60"
+                        >
+                          {{
+                            cancelingId === b.id
+                              ? "Отмена..."
+                              : "Отменить бронирование"
+                          }}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
-
-              <!-- Right: Status Badge & Actions -->
-              <div class="flex flex-col gap-3 flex-shrink-0">
-                <span
-                  :class="getStatusClass(b.computedStatus)"
-                  class="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-2xl text-sm font-extrabold uppercase tracking-wider shadow-lg"
-                >
-                  <span
-                    :class="getStatusDotClass(b.computedStatus)"
-                    class="w-2 h-2 rounded-full"
-                  ></span>
-                  {{ getStatusText(b.computedStatus) }}
-                </span>
-
-                <router-link
-                  v-if="canPay(b)"
-                  :to="`/bookings/${b.id}/payment`"
-                  class="px-6 py-3 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-xl transition-all hover:shadow-lg active:scale-95 flex items-center justify-center gap-2"
-                >
-                  <svg
-                    class="w-5 h-5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M17 9V7a5 5 0 00-10 0v2m-2 0h14a2 2 0 012 2v7a2 2 0 01-2 2H5a2 2 0 01-2-2v-7a2 2 0 012-2z"
-                    />
-                  </svg>
-                  <span>Оплатить</span>
-                </router-link>
-
-                <button
-                  v-if="canStartTripAction(b)"
-                  @click="handleStartTrip(b)"
-                  :disabled="startingId === b.id"
-                  class="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-400 text-white font-semibold rounded-xl transition-all hover:shadow-lg active:scale-95 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                >
-                  <svg
-                    v-if="startingId !== b.id"
-                    class="w-5 h-5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M14.752 11.168l-5.197-3.466A1 1 0 008 8.535v6.93a1 1 0 001.555.832l5.197-3.466a1 1 0 000-1.664z"
-                    />
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
-                  </svg>
-                  <span>{{ startingId === b.id ? "Запускаем..." : "Начать поездку" }}</span>
-                </button>
-
-                <router-link
-                  v-if="canCompleteTripAction(b)"
-                  :to="`/bookings/${b.id}/complete`"
-                  class="px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-xl transition-all hover:shadow-lg active:scale-95 flex items-center justify-center gap-2"
-                >
-                  <svg
-                    class="w-5 h-5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M5 13l4 4L19 7"
-                    />
-                  </svg>
-                  <span>Завершить поездку</span>
-                </router-link>
-
-                <router-link
-                  v-if="canOpenCompletionDetails(b)"
-                  :to="`/bookings/${b.id}/complete`"
-                  class="px-6 py-3 bg-violet-600 hover:bg-violet-700 text-white font-semibold rounded-xl transition-all hover:shadow-lg active:scale-95 flex items-center justify-center gap-2"
-                >
-                  <svg
-                    class="w-5 h-5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                    />
-                  </svg>
-                  <span>{{ b.status === "completed" ? "Детали завершения" : "Статус завершения" }}</span>
-                </router-link>
-
-                <!-- Cancel Button -->
-                <button
-                  v-if="canCancel(b)"
-                  @click="confirmCancel(b)"
-                  :disabled="cancelingId === b.id"
-                  class="px-6 py-3 bg-red-600 hover:bg-red-700 disabled:bg-gray-400 text-white font-semibold rounded-xl transition-all hover:shadow-lg active:scale-95 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                >
-                  <svg
-                    v-if="cancelingId !== b.id"
-                    class="w-5 h-5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M6 18L18 6M6 6l12 12"
-                    />
-                  </svg>
-                  <span v-if="cancelingId === b.id">Отмена...</span>
-                  <span v-else>Отменить</span>
-                </button>
-              </div>
             </div>
           </div>
-
-          <!-- Glow Effect -->
-          <div
-            class="absolute inset-0 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
-            style="box-shadow: 0 0 40px rgba(59, 130, 246, 0.2)"
-          ></div>
         </div>
       </div>
 
@@ -390,12 +391,26 @@
       @close="closeCancelModal"
       @confirm="handleCancelConfirm"
     />
+
+    <ReviewModal
+      v-if="bookingToReview && reviewSubject"
+      :is-open="showReviewModal"
+      :subject="reviewSubject"
+      :submitting="isReviewSubmitting"
+      @close="closeReviewModal"
+      @submit="handleReviewSubmit"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { onMounted, ref, computed } from "vue";
-import { getMyBookings, cancelBooking, startBookingTrip } from "../api/booking";
+import {
+  getMyBookings,
+  cancelBooking,
+  startBookingTrip,
+  submitBookingCarComment,
+} from "../api/booking";
 import type { Booking } from "../types/Booking";
 import {
   computeBookingStatus,
@@ -408,6 +423,7 @@ import {
 } from "../utils/bookingUtils";
 import { useToast } from "../composables/useToast";
 import CancelBookingModal from "../components/CancelBookingModal.vue";
+import ReviewModal from "../components/ReviewModal.vue";
 
 interface BookingWithComputedStatus extends Booking {
   computedStatus: ReturnType<typeof computeBookingStatus>;
@@ -427,28 +443,32 @@ const cancelingId = ref<number | null>(null);
 const startingId = ref<number | null>(null);
 const bookingToCancel = ref<BookingWithComputedStatus | null>(null);
 const showCancelModal = ref(false);
+const bookingToReview = ref<BookingWithComputedStatus | null>(null);
+const showReviewModal = ref(false);
+const reviewSubmittingId = ref<number | null>(null);
+const openActionMenuId = ref<number | null>(null);
 const { success, error } = useToast();
 
 // Filters configuration
 const filters = computed(() => {
   const all = bookings.value.length;
   const paymentPending = bookings.value.filter(
-    (b) => b.computedStatus === "paymentPending"
+    (b) => b.computedStatus === "paymentPending",
   ).length;
   const upcoming = bookings.value.filter(
-    (b) => b.computedStatus === "upcoming"
+    (b) => b.computedStatus === "upcoming",
   ).length;
   const active = bookings.value.filter(
-    (b) => b.computedStatus === "active"
+    (b) => b.computedStatus === "active",
   ).length;
   const awaitingReview = bookings.value.filter(
-    (b) => b.computedStatus === "awaitingReview"
+    (b) => b.computedStatus === "awaitingReview",
   ).length;
   const completed = bookings.value.filter(
-    (b) => b.computedStatus === "completed"
+    (b) => b.computedStatus === "completed",
   ).length;
   const canceled = bookings.value.filter(
-    (b) => b.computedStatus === "canceled"
+    (b) => b.computedStatus === "canceled",
   ).length;
 
   return [
@@ -477,6 +497,112 @@ const filteredBookings = computed(() => {
   return bookings.value.filter((b) => b.computedStatus === currentFilter.value);
 });
 
+const reviewSubject = computed(() => {
+  if (!bookingToReview.value) {
+    return null;
+  }
+
+  return {
+    brand: bookingToReview.value.carBrand,
+    model: bookingToReview.value.carModel,
+    year: null,
+  };
+});
+
+const isReviewSubmitting = computed(
+  () =>
+    bookingToReview.value != null &&
+    reviewSubmittingId.value === bookingToReview.value.id,
+);
+
+function toggleActionMenu(bookingId: number) {
+  openActionMenuId.value =
+    openActionMenuId.value === bookingId ? null : bookingId;
+}
+
+function closeActionMenu() {
+  openActionMenuId.value = null;
+}
+
+function getPrimaryActionLabel(booking: BookingWithComputedStatus) {
+  if (canPay(booking)) return "Оплатить";
+  if (canStartTripAction(booking))
+    return startingId.value === booking.id ? "Запускаем..." : "Начать поездку";
+  if (canCompleteTripAction(booking)) return "Завершить поездку";
+  if (canOpenCompletionDetails(booking))
+    return booking.status === "completed"
+      ? "Детали завершения"
+      : "Статус завершения";
+  if (booking.canLeaveComment)
+    return reviewSubmittingId.value === booking.id
+      ? "Отправляем..."
+      : "Оставить отзыв";
+  return "Открыть";
+}
+
+function getPrimaryActionButtonClass(booking: BookingWithComputedStatus) {
+  if (canPay(booking)) return "bg-amber-600 hover:bg-amber-700";
+  if (canStartTripAction(booking)) return "bg-emerald-600 hover:bg-emerald-700";
+  if (canCompleteTripAction(booking))
+    return "bg-primary-600 hover:bg-primary-700";
+  if (canOpenCompletionDetails(booking))
+    return "bg-violet-600 hover:bg-violet-700";
+  if (booking.canLeaveComment) return "bg-sky-600 hover:bg-sky-700";
+  return "bg-gray-900 hover:bg-gray-800 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-200";
+}
+
+function getPrimaryActionProps(booking: BookingWithComputedStatus) {
+  if (canPay(booking)) return { to: `/bookings/${booking.id}/payment` };
+  if (canCompleteTripAction(booking) || canOpenCompletionDetails(booking))
+    return { to: `/bookings/${booking.id}/complete` };
+  return { type: "button" };
+}
+
+function getPrimaryAction(booking: BookingWithComputedStatus) {
+  return {
+    to:
+      canPay(booking) ||
+      canCompleteTripAction(booking) ||
+      canOpenCompletionDetails(booking),
+  };
+}
+
+function isPrimaryActionDisabled(booking: BookingWithComputedStatus) {
+  if (canStartTripAction(booking)) return startingId.value === booking.id;
+  if (booking.canLeaveComment) return reviewSubmittingId.value === booking.id;
+  return false;
+}
+
+function handlePrimaryAction(
+  booking: BookingWithComputedStatus,
+  event?: Event,
+) {
+  if (
+    canPay(booking) ||
+    canCompleteTripAction(booking) ||
+    canOpenCompletionDetails(booking)
+  )
+    return;
+  event?.preventDefault();
+  if (canStartTripAction(booking)) {
+    void handleStartTrip(booking);
+    return;
+  }
+  if (booking.canLeaveComment) {
+    openReviewModal(booking);
+  }
+}
+
+function openReviewFromMenu(booking: BookingWithComputedStatus) {
+  closeActionMenu();
+  openReviewModal(booking);
+}
+
+function cancelFromMenu(booking: BookingWithComputedStatus) {
+  closeActionMenu();
+  confirmCancel(booking);
+}
+
 onMounted(async () => {
   await loadBookings();
 });
@@ -488,15 +614,21 @@ async function loadBookings() {
     // Обрабатываем оба формата ответа
     const items = Array.isArray(data) ? data : data.items;
 
-    bookings.value = items.map((b: Booking) => ({
-      ...b,
-      computedStatus: computeBookingStatus(b),
-    }));
+    bookings.value = items.map(toBookingWithComputedStatus);
   } catch (e) {
     console.error("Failed to load bookings", e);
     error("Не удалось загрузить бронирования");
     bookings.value = []; // Очищаем список при ошибке
   }
+}
+
+function toBookingWithComputedStatus(
+  booking: Booking,
+): BookingWithComputedStatus {
+  return {
+    ...booking,
+    computedStatus: computeBookingStatus(booking),
+  };
 }
 
 function formatDate(dateString: string): string {
@@ -518,6 +650,33 @@ function getDurationText(booking: Booking): string {
     parts.push(`${duration.minutes} мин.`);
 
   return parts.join(" ");
+}
+
+function formatMoney(
+  amount: number | null | undefined,
+  currency = "KZT",
+): string {
+  if (amount == null) {
+    return "Цена не рассчитана";
+  }
+
+  return new Intl.NumberFormat("ru-RU", {
+    style: "currency",
+    currency,
+    maximumFractionDigits: 2,
+  }).format(amount);
+}
+
+function getCoverImage(booking: Booking): string | null {
+  return booking.coverImageUrl ?? booking.imageUrls?.[0] ?? null;
+}
+
+function getGalleryImages(booking: Booking): string[] {
+  const coverImage = getCoverImage(booking);
+
+  return (booking.imageUrls ?? [])
+    .filter((imageUrl) => imageUrl !== coverImage)
+    .slice(0, 3);
 }
 
 function canCancel(booking: BookingWithComputedStatus): boolean {
@@ -547,12 +706,30 @@ function canOpenCompletionDetails(booking: BookingWithComputedStatus): boolean {
 function confirmCancel(booking: BookingWithComputedStatus) {
   bookingToCancel.value = booking;
   showCancelModal.value = true;
+  closeActionMenu();
 }
 
 function closeCancelModal() {
   showCancelModal.value = false;
   setTimeout(() => {
     bookingToCancel.value = null;
+  }, 300);
+}
+
+function openReviewModal(booking: BookingWithComputedStatus) {
+  bookingToReview.value = booking;
+  showReviewModal.value = true;
+  closeActionMenu();
+}
+
+function closeReviewModal() {
+  if (isReviewSubmitting.value) {
+    return;
+  }
+
+  showReviewModal.value = false;
+  setTimeout(() => {
+    bookingToReview.value = null;
   }, 300);
 }
 
@@ -572,7 +749,7 @@ async function handleCancelConfirm() {
     error(
       (e as any)?.response?.data?.detail ||
         (e as any)?.response?.data?.error ||
-        "Не удалось отменить бронирование"
+        "Не удалось отменить бронирование",
     );
   } finally {
     cancelingId.value = null;
@@ -591,11 +768,54 @@ async function handleStartTrip(booking: BookingWithComputedStatus) {
     error(
       (e as any)?.response?.data?.detail ||
         (e as any)?.response?.data?.error ||
-        "Не удалось начать поездку"
+        "Не удалось начать поездку",
     );
   } finally {
     startingId.value = null;
   }
+}
+
+async function handleReviewSubmit(rating: number, content: string) {
+  if (!bookingToReview.value) {
+    return;
+  }
+
+  reviewSubmittingId.value = bookingToReview.value.id;
+
+  try {
+    const result = await submitBookingCarComment(bookingToReview.value.id, {
+      rating,
+      content,
+    });
+
+    updateBookingInList(result.booking);
+    reviewSubmittingId.value = null;
+    showReviewModal.value = false;
+    setTimeout(() => {
+      bookingToReview.value = null;
+    }, 300);
+    success("Отзыв успешно опубликован");
+  } catch (e) {
+    console.error("Failed to submit booking car comment", e);
+    error(
+      (e as any)?.response?.data?.detail ||
+        (e as any)?.response?.data?.error ||
+        "Не удалось отправить отзыв",
+    );
+  } finally {
+    reviewSubmittingId.value = null;
+  }
+}
+
+function updateBookingInList(updatedBooking: Booking) {
+  const index = bookings.value.findIndex(
+    (item) => item.id === updatedBooking.id,
+  );
+  if (index === -1) {
+    return;
+  }
+
+  bookings.value[index] = toBookingWithComputedStatus(updatedBooking);
 }
 
 function getStatusClass(status: ReturnType<typeof computeBookingStatus>) {
@@ -618,7 +838,7 @@ function getStatusClass(status: ReturnType<typeof computeBookingStatus>) {
 }
 
 function getStatusIndicatorClass(
-  status: ReturnType<typeof computeBookingStatus>
+  status: ReturnType<typeof computeBookingStatus>,
 ) {
   switch (status) {
     case "paymentPending":

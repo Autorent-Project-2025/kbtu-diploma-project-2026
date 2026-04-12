@@ -131,6 +131,35 @@ services:
     networks:
       - data
 
+  car-market-value-service:
+    build:
+      context: ./backend/internal/car-market-value-service/src
+      dockerfile: ./Dockerfile
+    restart: unless-stopped
+    env_file:
+      - path: ./backend/internal/car-market-value-service/.env.example
+        required: true
+      - path: ./backend/internal/car-market-value-service/.env
+        required: false
+    environment:
+      PORT: 8080
+    expose:
+      - "8080"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/healthz')",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    networks:
+      - backend
+
   car-service:
     build:
       context: ./backend
@@ -147,8 +176,12 @@ services:
       PartnerService__BaseUrl: http://partner-service:8080
       BookingService__BaseUrl: http://booking-service:8080
       BookingService__InternalApiKey: local-booking-service-key
+      ClientService__BaseUrl: http://client-service:8080
+      ClientService__InternalApiKey: local-client-service-key
       ImageService__BaseUrl: http://image-service:8080
+      CarMarketValueService__BaseUrl: http://car-market-value-service:8080
       InternalAuth__ApiKey: local-car-service-key
+      Observability__LogPath: /tmp/autorent/car-service/car-service.jsonl
       RabbitMq__HostName: rabbitmq
       RabbitMq__Port: 5672
       RabbitMq__UserName: ${RABBITMQ_DEFAULT_USER:-autorent}
@@ -163,6 +196,8 @@ services:
         condition: service_healthy
       car-flyway:
         condition: service_completed_successfully
+      car-market-value-service:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/healthz"]
       interval: 10s
@@ -172,6 +207,153 @@ services:
     networks:
       - backend
       - data
+    volumes:
+      - car_logs:/tmp/autorent/car-service
+
+  ai-search-db:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres_db
+    expose:
+      - "5432"
+    volumes:
+      - ai_search_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+    networks:
+      - data
+
+  ai-search-flyway:
+    image: flyway/flyway:12
+    restart: "no"
+    depends_on:
+      ai-search-db:
+        condition: service_healthy
+    command: migrate
+    volumes:
+      - ./backend/external/ai-search-service/src/Migrations:/flyway/sql:ro
+    environment:
+      FLYWAY_URL: jdbc:postgresql://ai-search-db:5432/postgres_db
+      FLYWAY_USER: postgres
+      FLYWAY_PASSWORD: postgres
+      FLYWAY_CONNECT_RETRIES: 30
+    networks:
+      - data
+
+  ollama:
+    image: ollama/ollama:latest
+    restart: unless-stopped
+    environment:
+      OLLAMA_KEEP_ALIVE: 30m
+    expose:
+      - "11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+    networks:
+      - backend
+
+  ollama-pull:
+    image: curlimages/curl:8.13.0
+    restart: "no"
+    depends_on:
+      ollama:
+        condition: service_healthy
+    environment:
+      OLLAMA_BASE_URL: http://ollama:11434
+      OLLAMA_CHAT_MODEL: ${LOCAL_LLM_CHAT_MODEL:-qwen2.5:1.5b}
+      OLLAMA_EMBEDDING_MODEL: ${LOCAL_LLM_EMBEDDING_MODEL:-nomic-embed-text}
+    entrypoint:
+      - /bin/sh
+      - -ec
+    command: |
+      echo "Pulling Ollama model: $$OLLAMA_CHAT_MODEL"
+      curl -fsS "$$OLLAMA_BASE_URL/api/pull" \
+        -H "Content-Type: application/json" \
+        -d "{\"model\":\"$$OLLAMA_CHAT_MODEL\",\"stream\":false}"
+      echo
+      echo "Pulling Ollama model: $$OLLAMA_EMBEDDING_MODEL"
+      curl -fsS "$$OLLAMA_BASE_URL/api/pull" \
+        -H "Content-Type: application/json" \
+        -d "{\"model\":\"$$OLLAMA_EMBEDDING_MODEL\",\"stream\":false}"
+      echo
+    networks:
+      - backend
+
+  ai-search-service:
+    build:
+      context: ./backend/external/ai-search-service/src
+      dockerfile: ./Dockerfile
+    restart: unless-stopped
+    env_file:
+      - path: ./backend/external/ai-search-service/.env.example
+        required: true
+      - path: ./backend/external/ai-search-service/.env
+        required: false
+    environment:
+      PORT: 8080
+      DATABASE_URL: postgres://postgres:postgres@ai-search-db:5432/postgres_db
+      CAR_SERVICE_BASE_URL: http://car-service:8080
+      PARTNER_SERVICE_BASE_URL: http://partner-service:8080
+      BOOKING_SERVICE_BASE_URL: http://booking-service:8080
+      API_GATEWAY_PUBLIC_BASE_URL: http://localhost:9186
+      RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER:-autorent}:${RABBITMQ_DEFAULT_PASS:-autorent}@rabbitmq:5672
+      RABBITMQ_EXCHANGE: ${RABBITMQ_EXCHANGE_NAME:-autorent.events}
+      OBSERVABILITY_LOG_PATH: /tmp/autorent/ai-search-service/ai-search-service.jsonl
+      AUTO_INDEX_ON_STARTUP: "true"
+      AUTO_REFRESH_INTERVAL_SECONDS: 900
+      LOCAL_LLM_BASE_URL: http://ollama:11434
+      LOCAL_LLM_CHAT_MODEL: ${LOCAL_LLM_CHAT_MODEL:-qwen2.5:1.5b}
+      LOCAL_LLM_EMBEDDING_MODEL: ${LOCAL_LLM_EMBEDDING_MODEL:-nomic-embed-text}
+      LOCAL_LLM_TIMEOUT_SECONDS: 90
+    expose:
+      - "8080"
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      ai-search-db:
+        condition: service_healthy
+      ai-search-flyway:
+        condition: service_completed_successfully
+      ollama:
+        condition: service_healthy
+      ollama-pull:
+        condition: service_completed_successfully
+      car-service:
+        condition: service_healthy
+      partner-service:
+        condition: service_healthy
+      booking-service:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:8080/healthz').then((res)=>process.exit(res.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - backend
+      - data
+    volumes:
+      - ai_search_logs:/tmp/autorent/ai-search-service
 
   booking-db:
     image: postgres:16
@@ -224,7 +406,11 @@ services:
       ASPNETCORE_ENVIRONMENT: Development
       ConnectionStrings__DbConnection: Host=booking-db;Port=5432;Database=postgres_db;Username=postgres;Password=postgres
       InternalAuth__ApiKey: local-booking-service-key
+      Observability__LogPath: /tmp/autorent/booking-service/booking-service.jsonl
       CarService__BaseUrl: http://car-service:8080
+      CarService__InternalApiKey: local-car-service-key
+      PartnerService__BaseUrl: http://partner-service:8080
+      PartnerService__InternalApiKey: local-partner-service-key
       ClientService__BaseUrl: http://client-service:8080
       ClientService__InternalApiKey: local-client-service-key
       IdentityService__BaseUrl: http://identity-service:8080
@@ -258,6 +444,8 @@ services:
     networks:
       - backend
       - data
+    volumes:
+      - booking_logs:/tmp/autorent/booking-service
 
   client-db:
     image: postgres:16
@@ -310,6 +498,7 @@ services:
       ASPNETCORE_ENVIRONMENT: Development
       ConnectionStrings__DbConnection: Host=client-db;Port=5432;Database=postgres_db;Username=postgres;Password=postgres
       InternalAuth__ApiKey: local-client-service-key
+      ImageService__BaseUrl: http://image-service:8080
     expose:
       - "8080"
     depends_on:
@@ -545,7 +734,7 @@ services:
           "CMD",
           "node",
           "-e",
-          "fetch('http://127.0.0.1:8080/healthz').then((res)=>process.exit(res.ok?0:1)).catch(()=>process.exit(1))"
+          "fetch('http://127.0.0.1:8080/healthz').then((res)=>process.exit(res.ok?0:1)).catch(()=>process.exit(1))",
         ]
       interval: 10s
       timeout: 5s
@@ -648,7 +837,7 @@ services:
           "CMD",
           "node",
           "-e",
-          "fetch('http://127.0.0.1:8080/healthz').then((res)=>process.exit(res.ok?0:1)).catch(()=>process.exit(1))"
+          "fetch('http://127.0.0.1:8080/healthz').then((res)=>process.exit(res.ok?0:1)).catch(()=>process.exit(1))",
         ]
       interval: 10s
       timeout: 5s
@@ -681,7 +870,7 @@ services:
           "CMD",
           "node",
           "-e",
-          "fetch('http://127.0.0.1:8080/healthz').then((res)=>process.exit(res.ok?0:1)).catch(()=>process.exit(1))"
+          "fetch('http://127.0.0.1:8080/healthz').then((res)=>process.exit(res.ok?0:1)).catch(()=>process.exit(1))",
         ]
       interval: 10s
       timeout: 5s
@@ -698,6 +887,7 @@ services:
     environment:
       IDENTITY_SERVICE_URL: http://identity-service:8080
       CAR_SERVICE_URL: http://car-service:8080
+      AI_SEARCH_SERVICE_URL: http://ai-search-service:8080
       BOOKING_SERVICE_URL: http://booking-service:8080
       CLIENT_SERVICE_URL: http://client-service:8080
       PARTNER_SERVICE_URL: http://partner-service:8080
@@ -729,6 +919,8 @@ services:
         condition: service_healthy
       car-service:
         condition: service_healthy
+      ai-search-service:
+        condition: service_healthy
       booking-service:
         condition: service_healthy
       client-service:
@@ -747,7 +939,7 @@ services:
           "CMD",
           "node",
           "-e",
-          "fetch('http://127.0.0.1:8080/healthz').then((res)=>process.exit(res.ok?0:1)).catch(()=>process.exit(1))"
+          "fetch('http://127.0.0.1:8080/healthz').then((res)=>process.exit(res.ok?0:1)).catch(()=>process.exit(1))",
         ]
       interval: 10s
       timeout: 5s
@@ -781,7 +973,7 @@ services:
           "CMD",
           "node",
           "-e",
-          "fetch('http://127.0.0.1:5173').then((res)=>process.exit(res.ok?0:1)).catch(()=>process.exit(1))"
+          "fetch('http://127.0.0.1:5173').then((res)=>process.exit(res.ok?0:1)).catch(()=>process.exit(1))",
         ]
       interval: 15s
       timeout: 5s
@@ -812,7 +1004,7 @@ services:
           "CMD",
           "node",
           "-e",
-          "fetch('http://127.0.0.1:5173').then((res)=>process.exit(res.ok?0:1)).catch(()=>process.exit(1))"
+          "fetch('http://127.0.0.1:5173').then((res)=>process.exit(res.ok?0:1)).catch(()=>process.exit(1))",
         ]
       interval: 15s
       timeout: 5s
@@ -843,7 +1035,7 @@ services:
           "CMD",
           "node",
           "-e",
-          "fetch('http://127.0.0.1:5173').then((res)=>process.exit(res.ok?0:1)).catch(()=>process.exit(1))"
+          "fetch('http://127.0.0.1:5173').then((res)=>process.exit(res.ok?0:1)).catch(()=>process.exit(1))",
         ]
       interval: 15s
       timeout: 5s
@@ -916,10 +1108,13 @@ services:
       - loki
     volumes:
       - ./ops/observability/promtail/promtail.yml:/etc/promtail/promtail.yml:ro
+      - car_logs:/tmp/autorent/car-service:ro
+      - booking_logs:/tmp/autorent/booking-service:ro
       - gateway_logs:/tmp/autorent/api-gateway:ro
       - ticket_logs:/tmp/autorent/ticket-service:ro
       - identity_logs:/tmp/autorent/identity-service:ro
       - email_logs:/tmp/autorent/email-service:ro
+      - ai_search_logs:/tmp/autorent/ai-search-service:ro
     networks:
       - backend
 
@@ -948,6 +1143,8 @@ volumes:
   rabbitmq_data:
   identity_pgdata:
   car_pgdata:
+  ai_search_pgdata:
+  ollama_data:
   booking_pgdata:
   client_pgdata:
   partner_pgdata:
@@ -962,6 +1159,9 @@ volumes:
   ticket_logs:
   identity_logs:
   email_logs:
+  ai_search_logs:
+  car_logs:
+  booking_logs:
 
 networks:
   frontend:

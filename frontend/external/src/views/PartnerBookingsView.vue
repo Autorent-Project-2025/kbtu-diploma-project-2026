@@ -1,42 +1,91 @@
 <template>
-  <div class="min-h-screen bg-gray-50 dark:bg-gray-950 py-24 px-4 sm:px-6 lg:px-8 transition-colors duration-300">
+  <div
+    class="min-h-screen bg-gray-50 dark:bg-gray-950 py-24 px-4 sm:px-6 lg:px-8 transition-colors duration-300"
+  >
     <div class="max-w-7xl mx-auto space-y-8">
-      <header class="relative overflow-hidden rounded-[32px] border border-gray-200 dark:border-gray-800 bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.18),_transparent_38%),radial-gradient(circle_at_bottom_right,_rgba(59,130,246,0.16),_transparent_40%),linear-gradient(135deg,_rgba(255,255,255,0.96),_rgba(243,244,246,0.92))] dark:bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.22),_transparent_35%),radial-gradient(circle_at_bottom_right,_rgba(59,130,246,0.22),_transparent_40%),linear-gradient(135deg,_rgba(17,24,39,0.98),_rgba(3,7,18,0.96))] shadow-2xl p-8 sm:p-10">
-        <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
+      <header
+        class="relative overflow-hidden rounded-[32px] border border-gray-200 dark:border-gray-800 bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.18),_transparent_38%),radial-gradient(circle_at_bottom_right,_rgba(59,130,246,0.16),_transparent_40%),linear-gradient(135deg,_rgba(255,255,255,0.96),_rgba(243,244,246,0.92))] dark:bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.22),_transparent_35%),radial-gradient(circle_at_bottom_right,_rgba(59,130,246,0.22),_transparent_40%),linear-gradient(135deg,_rgba(17,24,39,0.98),_rgba(3,7,18,0.96))] shadow-2xl p-8 sm:p-10"
+      >
+        <div
+          class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6"
+        >
           <div class="space-y-4 max-w-3xl">
-            <p class="text-sm font-bold uppercase tracking-[0.3em] text-emerald-600 dark:text-emerald-400">
+            <p
+              class="text-sm font-bold uppercase tracking-[0.3em] text-emerald-600 dark:text-emerald-400"
+            >
               Partner Dashboard
             </p>
-            <h1 class="text-4xl sm:text-5xl font-extrabold text-gray-900 dark:text-white">
+            <h1
+              class="text-4xl sm:text-5xl font-extrabold text-gray-900 dark:text-white"
+            >
               Финансы и клиентские бронирования
             </h1>
             <p class="text-lg text-gray-600 dark:text-gray-300">
-              Доступный баланс, прибыль по дням и все бронирования по вашим машинам.
+              Доступный баланс, прибыль по дням и все бронирования по вашим
+              машинам.
             </p>
           </div>
 
-          <div class="flex flex-wrap gap-3">
-            <router-link
-              to="/partner/me"
-              class="inline-flex items-center justify-center px-5 py-3 rounded-2xl border border-gray-300 dark:border-gray-700 text-gray-800 dark:text-gray-100 font-semibold hover:border-emerald-500"
+          <div class="flex flex-col items-start gap-1 shrink-0">
+            <p
+              class="text-xs font-semibold text-gray-400 dark:text-gray-600 uppercase tracking-wider px-1"
             >
-              Профиль партнёра
-            </router-link>
-            <router-link
-              to="/partner/cars"
-              class="inline-flex items-center justify-center px-5 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-lg shadow-emerald-500/20"
-            >
-              Мои машины
-            </router-link>
+              Перейти
+            </p>
+            <div class="flex items-center gap-1">
+              <router-link
+                to="/partner/me"
+                class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-semibold text-gray-700 dark:text-gray-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 hover:text-emerald-700 dark:hover:text-emerald-300 border border-gray-200 dark:border-gray-700 transition-colors"
+              >
+                <svg
+                  class="w-3.5 h-3.5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                  />
+                </svg>
+                Профиль
+              </router-link>
+              <router-link
+                to="/partner/cars"
+                class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-semibold text-gray-700 dark:text-gray-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 hover:text-emerald-700 dark:hover:text-emerald-300 border border-gray-200 dark:border-gray-700 transition-colors"
+              >
+                <svg
+                  class="w-3.5 h-3.5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M13 10V3L4 14h7v7l9-11h-7z"
+                  />
+                </svg>
+                Мои машины
+              </router-link>
+            </div>
           </div>
         </div>
       </header>
 
       <div
         v-if="loading"
-        class="rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-xl p-8 text-gray-600 dark:text-gray-300"
+        class="rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-xl p-10 text-center"
       >
-        Загружаем данные партнёра...
+        <div
+          class="w-8 h-8 rounded-full border-2 border-emerald-500 border-t-transparent animate-spin mx-auto mb-3"
+        ></div>
+        <p class="text-sm text-gray-500 dark:text-gray-400">
+          Загружаем данные партнёра...
+        </p>
       </div>
 
       <div
@@ -47,51 +96,79 @@
       </div>
 
       <template v-else>
-        <section class="rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-xl p-6">
-          <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-            <div>
-              <p class="text-sm uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400 font-bold">
-                Период аналитики
+        <section
+          class="rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-xl px-6 py-4"
+        >
+          <div class="flex items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+              <p class="text-sm font-semibold text-gray-500 dark:text-gray-400">
+                Период аналитики:
               </p>
-              <h2 class="mt-2 text-2xl font-bold text-gray-900 dark:text-white">
-                Последние {{ selectedPeriod }} дней
-              </h2>
+              <span class="text-sm font-bold text-gray-900 dark:text-white"
+                >последние {{ selectedPeriod }} дней</span
+              >
             </div>
-
-            <div class="flex flex-wrap gap-2">
+            <div class="flex gap-1.5">
               <button
                 v-for="period in periodOptions"
                 :key="period"
                 type="button"
                 @click="selectedPeriod = period"
                 :class="[
-                  'px-4 py-2 rounded-2xl text-sm font-bold transition-colors',
+                  'px-3.5 py-1.5 rounded-xl text-sm font-bold transition-colors',
                   selectedPeriod === period
                     ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
-                    : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200',
+                    : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700',
                 ]"
               >
-                {{ period }} дней
+                {{ period }}д
               </button>
             </div>
           </div>
         </section>
 
         <section class="grid sm:grid-cols-2 xl:grid-cols-4 gap-4">
-          <article class="rounded-3xl border border-emerald-200/70 dark:border-emerald-700/40 bg-white dark:bg-gray-900 shadow-xl p-6 space-y-3">
-            <p class="text-sm uppercase tracking-[0.18em] text-emerald-600 dark:text-emerald-400 font-bold">
-              Доступный баланс
-            </p>
-            <p class="text-4xl font-extrabold text-gray-900 dark:text-white">
+          <article
+            class="rounded-3xl border border-emerald-200/70 dark:border-emerald-700/40 bg-white dark:bg-gray-900 shadow-xl p-6"
+          >
+            <div class="flex items-start justify-between mb-3">
+              <p
+                class="text-xs uppercase tracking-[0.18em] text-emerald-600 dark:text-emerald-400 font-bold"
+              >
+                Доступный баланс
+              </p>
+              <div
+                class="w-7 h-7 rounded-lg bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center"
+              >
+                <svg
+                  class="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+              </div>
+            </div>
+            <p class="text-3xl font-extrabold text-gray-900 dark:text-white">
               {{ formatMoney(wallet.availableAmount) }}
             </p>
-            <p class="text-sm text-gray-600 dark:text-gray-400">
-              Можно выводить прямо сейчас.
+            <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">
+              Можно выводить прямо сейчас
             </p>
           </article>
 
-          <article class="rounded-3xl border border-amber-200/70 dark:border-amber-700/40 bg-white dark:bg-gray-900 shadow-xl p-6 space-y-3">
-            <p class="text-sm uppercase tracking-[0.18em] text-amber-600 dark:text-amber-400 font-bold">
+          <article
+            class="rounded-3xl border border-amber-200/70 dark:border-amber-700/40 bg-white dark:bg-gray-900 shadow-xl p-6 space-y-3"
+          >
+            <p
+              class="text-sm uppercase tracking-[0.18em] text-amber-600 dark:text-amber-400 font-bold"
+            >
               Pending
             </p>
             <p class="text-4xl font-extrabold text-gray-900 dark:text-white">
@@ -102,8 +179,12 @@
             </p>
           </article>
 
-          <article class="rounded-3xl border border-blue-200/70 dark:border-blue-700/40 bg-white dark:bg-gray-900 shadow-xl p-6 space-y-3">
-            <p class="text-sm uppercase tracking-[0.18em] text-blue-600 dark:text-blue-400 font-bold">
+          <article
+            class="rounded-3xl border border-blue-200/70 dark:border-blue-700/40 bg-white dark:bg-gray-900 shadow-xl p-6 space-y-3"
+          >
+            <p
+              class="text-sm uppercase tracking-[0.18em] text-blue-600 dark:text-blue-400 font-bold"
+            >
               Reserved
             </p>
             <p class="text-4xl font-extrabold text-gray-900 dark:text-white">
@@ -114,33 +195,48 @@
             </p>
           </article>
 
-          <article class="rounded-3xl border border-violet-200/70 dark:border-violet-700/40 bg-white dark:bg-gray-900 shadow-xl p-6 space-y-3">
-            <p class="text-sm uppercase tracking-[0.18em] text-violet-600 dark:text-violet-400 font-bold">
+          <article
+            class="rounded-3xl border border-violet-200/70 dark:border-violet-700/40 bg-white dark:bg-gray-900 shadow-xl p-6 space-y-3"
+          >
+            <p
+              class="text-sm uppercase tracking-[0.18em] text-violet-600 dark:text-violet-400 font-bold"
+            >
               Бронирований за период
             </p>
             <p class="text-4xl font-extrabold text-gray-900 dark:text-white">
               {{ bookingsInSelectedPeriod.length }}
             </p>
             <p class="text-sm text-gray-600 dark:text-gray-400">
-              Последние {{ selectedPeriod }} дней · Completed: {{ completedBookingsCount }} · Активных: {{ activeBookingsCount }}
+              Последние {{ selectedPeriod }} дней · Completed:
+              {{ completedBookingsCount }} · Активных: {{ activeBookingsCount }}
             </p>
           </article>
         </section>
 
         <section class="grid xl:grid-cols-[1.1fr,0.9fr] gap-6">
-          <article class="rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-xl p-6 space-y-6">
+          <article
+            class="rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-xl p-6 space-y-6"
+          >
             <div class="flex items-start justify-between gap-4">
               <div>
-                <p class="text-sm uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400 font-bold">
+                <p
+                  class="text-sm uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400 font-bold"
+                >
                   Чистая прибыль по дням
                 </p>
-                <h2 class="mt-2 text-2xl font-bold text-gray-900 dark:text-white">
+                <h2
+                  class="mt-2 text-2xl font-bold text-gray-900 dark:text-white"
+                >
                   Последние {{ selectedPeriod }} дней
                 </h2>
               </div>
               <div class="text-right">
-                <p class="text-sm text-gray-500 dark:text-gray-400">За период</p>
-                <p class="text-xl font-bold text-emerald-600 dark:text-emerald-400">
+                <p class="text-sm text-gray-500 dark:text-gray-400">
+                  За период
+                </p>
+                <p
+                  class="text-xl font-bold text-emerald-600 dark:text-emerald-400"
+                >
                   {{ formatMoney(totalRealizedProfit) }}
                 </p>
               </div>
@@ -155,15 +251,22 @@
                 <div class="flex-1 flex items-end">
                   <div
                     class="w-full rounded-t-2xl bg-gradient-to-t from-emerald-600 to-emerald-400 dark:from-emerald-500 dark:to-emerald-300 transition-all duration-300"
-                    :style="{ height: `${point.heightPercent}%`, minHeight: point.amount > 0 ? '12px' : '4px' }"
+                    :style="{
+                      height: `${point.heightPercent}%`,
+                      minHeight: point.amount > 0 ? '12px' : '4px',
+                    }"
                     :title="`${point.label}: ${formatMoney(point.amount)}`"
                   ></div>
                 </div>
                 <div class="space-y-1 text-center">
-                  <p class="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-[0.12em]">
+                  <p
+                    class="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-[0.12em]"
+                  >
                     {{ point.shortLabel }}
                   </p>
-                  <p class="text-xs font-semibold text-gray-700 dark:text-gray-200 truncate">
+                  <p
+                    class="text-xs font-semibold text-gray-700 dark:text-gray-200 truncate"
+                  >
                     {{ formatCompactMoney(point.amount) }}
                   </p>
                 </div>
@@ -171,30 +274,48 @@
             </div>
           </article>
 
-          <article class="rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-xl p-6 space-y-6">
+          <article
+            class="rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-xl p-6 space-y-6"
+          >
             <div class="flex items-start justify-between gap-4">
               <div>
-                <p class="text-sm uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400 font-bold">
+                <p
+                  class="text-sm uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400 font-bold"
+                >
                   Выручка и поток броней
                 </p>
-                <h2 class="mt-2 text-2xl font-bold text-gray-900 dark:text-white">
+                <h2
+                  class="mt-2 text-2xl font-bold text-gray-900 dark:text-white"
+                >
                   Последние {{ selectedPeriod }} дней
                 </h2>
               </div>
               <div class="text-right">
-                <p class="text-sm text-gray-500 dark:text-gray-400">Валовый оборот</p>
+                <p class="text-sm text-gray-500 dark:text-gray-400">
+                  Валовый оборот
+                </p>
                 <p class="text-xl font-bold text-blue-600 dark:text-blue-400">
                   {{ formatMoney(totalGrossRevenue) }}
                 </p>
               </div>
             </div>
 
-            <div class="rounded-3xl bg-gray-50 dark:bg-gray-950 border border-gray-200 dark:border-gray-800 p-4">
+            <div
+              class="rounded-3xl bg-gray-50 dark:bg-gray-950 border border-gray-200 dark:border-gray-800 p-4"
+            >
               <svg viewBox="0 0 720 240" class="w-full h-56">
                 <defs>
                   <linearGradient id="revenueArea" x1="0" x2="0" y1="0" y2="1">
-                    <stop offset="0%" stop-color="rgb(59,130,246)" stop-opacity="0.45" />
-                    <stop offset="100%" stop-color="rgb(59,130,246)" stop-opacity="0.03" />
+                    <stop
+                      offset="0%"
+                      stop-color="rgb(59,130,246)"
+                      stop-opacity="0.45"
+                    />
+                    <stop
+                      offset="100%"
+                      stop-color="rgb(59,130,246)"
+                      stop-opacity="0.03"
+                    />
                   </linearGradient>
                 </defs>
                 <path :d="revenueAreaPath" fill="url(#revenueArea)" />
@@ -222,10 +343,14 @@
                   :key="point.isoDate"
                   class="text-center space-y-1"
                 >
-                  <p class="text-[11px] font-bold uppercase tracking-[0.12em] text-gray-500 dark:text-gray-400">
+                  <p
+                    class="text-[11px] font-bold uppercase tracking-[0.12em] text-gray-500 dark:text-gray-400"
+                  >
                     {{ point.shortLabel }}
                   </p>
-                  <p class="text-xs font-semibold text-gray-700 dark:text-gray-200">
+                  <p
+                    class="text-xs font-semibold text-gray-700 dark:text-gray-200"
+                  >
                     {{ point.bookingsCount }} бр.
                   </p>
                 </div>
@@ -234,17 +359,24 @@
           </article>
         </section>
 
-        <section class="rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-xl p-6 space-y-6">
-          <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+        <section
+          class="rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-xl p-6 space-y-6"
+        >
+          <div
+            class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4"
+          >
             <div>
-              <p class="text-sm uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400 font-bold">
+              <p
+                class="text-sm uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400 font-bold"
+              >
                 Клиентские бронирования
               </p>
               <h2 class="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
                 Все брони по вашим машинам
               </h2>
               <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                Показаны бронирования, созданные за последние {{ selectedPeriod }} дней.
+                Показаны бронирования, созданные за последние
+                {{ selectedPeriod }} дней.
               </p>
             </div>
 
@@ -258,44 +390,142 @@
                 Экспорт CSV
               </button>
 
-              <div class="flex flex-wrap gap-2">
+              <div class="relative">
                 <button
-                  v-for="filter in statusFilters"
-                  :key="filter.value"
                   type="button"
-                  @click="statusFilter = filter.value"
-                  :class="[
-                    'px-4 py-2 rounded-2xl text-sm font-bold transition-colors',
-                    statusFilter === filter.value
-                      ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
-                      : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200',
-                  ]"
+                  @click="statusDropdownOpen = !statusDropdownOpen"
+                  class="inline-flex items-center gap-3 px-5 py-3 rounded-2xl bg-gray-900 dark:bg-white text-white dark:text-gray-900 font-bold text-sm shadow-lg transition-colors min-w-[180px] justify-between"
                 >
-                  {{ filter.label }}
-                  <span class="ml-2 opacity-70">{{ filter.count }}</span>
+                  <span>
+                    {{
+                      statusFilters.find((f) => f.value === statusFilter)?.label
+                    }}
+                    <span class="ml-1 opacity-60">{{
+                      statusFilters.find((f) => f.value === statusFilter)?.count
+                    }}</span>
+                  </span>
+                  <svg
+                    class="w-4 h-4 transition-transform"
+                    :class="statusDropdownOpen ? 'rotate-180' : ''"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M19 9l-7 7-7-7"
+                    />
+                  </svg>
                 </button>
+
+                <Transition
+                  enter-active-class="transition ease-out duration-150"
+                  enter-from-class="opacity-0 translate-y-1 scale-95"
+                  enter-to-class="opacity-100 translate-y-0 scale-100"
+                  leave-active-class="transition ease-in duration-100"
+                  leave-from-class="opacity-100 translate-y-0 scale-100"
+                  leave-to-class="opacity-0 translate-y-1 scale-95"
+                >
+                  <div
+                    v-if="statusDropdownOpen"
+                    class="absolute right-0 mt-2 w-52 z-30 rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-2xl overflow-hidden"
+                  >
+                    <button
+                      v-for="filter in statusFilters"
+                      :key="filter.value"
+                      type="button"
+                      @click="
+                        statusFilter = filter.value;
+                        statusDropdownOpen = false;
+                      "
+                      :class="[
+                        'w-full flex items-center justify-between px-4 py-2.5 text-sm font-semibold transition-colors',
+                        statusFilter === filter.value
+                          ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
+                          : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800/60',
+                      ]"
+                    >
+                      <span>{{ filter.label }}</span>
+                      <span
+                        class="text-xs font-bold px-2 py-0.5 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300"
+                      >
+                        {{ filter.count }}
+                      </span>
+                    </button>
+                  </div>
+                </Transition>
               </div>
             </div>
           </div>
 
           <div
             v-if="filteredBookings.length === 0"
-            class="rounded-2xl border border-dashed border-gray-300 dark:border-gray-700 p-8 text-center text-gray-600 dark:text-gray-400"
+            class="rounded-2xl border border-dashed border-gray-300 dark:border-gray-700 p-10 text-center"
           >
-            Нет бронирований для выбранного фильтра.
+            <div
+              class="w-12 h-12 rounded-2xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center mx-auto mb-3"
+            >
+              <svg
+                class="w-6 h-6 text-gray-400"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="1.5"
+                  d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+                />
+              </svg>
+            </div>
+            <p class="text-sm font-semibold text-gray-500 dark:text-gray-400">
+              Нет бронирований
+            </p>
+            <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">
+              Попробуйте изменить фильтр или период
+            </p>
           </div>
 
           <div v-else class="overflow-x-auto">
             <table class="min-w-full text-sm">
               <thead>
-                <tr class="text-left text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-800">
-                  <th class="pb-3 pr-4 font-semibold">Бронь</th>
-                  <th class="pb-3 pr-4 font-semibold">Машина</th>
-                  <th class="pb-3 pr-4 font-semibold">Период</th>
-                  <th class="pb-3 pr-4 font-semibold">Сумма</th>
-                  <th class="pb-3 pr-4 font-semibold">Статус</th>
-                  <th class="pb-3 font-semibold">Создано</th>
-                  <th class="pb-3 font-semibold"></th>
+                <tr
+                  class="text-left border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50"
+                >
+                  <th
+                    class="px-4 py-3 text-xs font-bold uppercase tracking-[0.12em] text-gray-500 dark:text-gray-400"
+                  >
+                    Бронь
+                  </th>
+                  <th
+                    class="px-4 py-3 text-xs font-bold uppercase tracking-[0.12em] text-gray-500 dark:text-gray-400"
+                  >
+                    Машина
+                  </th>
+                  <th
+                    class="px-4 py-3 text-xs font-bold uppercase tracking-[0.12em] text-gray-500 dark:text-gray-400"
+                  >
+                    Период
+                  </th>
+                  <th
+                    class="px-4 py-3 text-xs font-bold uppercase tracking-[0.12em] text-gray-500 dark:text-gray-400"
+                  >
+                    Сумма
+                  </th>
+                  <th
+                    class="px-4 py-3 text-xs font-bold uppercase tracking-[0.12em] text-gray-500 dark:text-gray-400"
+                  >
+                    Статус
+                  </th>
+                  <th
+                    class="px-4 py-3 text-xs font-bold uppercase tracking-[0.12em] text-gray-500 dark:text-gray-400 hidden lg:table-cell"
+                  >
+                    Создано
+                  </th>
+                  <th class="px-4 py-3"></th>
                 </tr>
               </thead>
               <tbody>
@@ -304,11 +534,15 @@
                   :key="booking.id"
                   class="border-b border-gray-100 dark:border-gray-800/80"
                 >
-                  <td class="py-4 pr-4 align-top">
-                    <p class="font-bold text-gray-900 dark:text-white">#{{ booking.id }}</p>
-                    <p class="text-xs text-gray-500 dark:text-gray-400">carId: {{ booking.partnerCarId }}</p>
+                  <td class="px-4 py-4 align-top">
+                    <p class="font-bold text-gray-900 dark:text-white">
+                      #{{ booking.id }}
+                    </p>
+                    <p class="text-xs text-gray-500 dark:text-gray-400">
+                      carId: {{ booking.partnerCarId }}
+                    </p>
                   </td>
-                  <td class="py-4 pr-4 align-top">
+                  <td class="px-4 py-4 align-top">
                     <p class="font-semibold text-gray-900 dark:text-white">
                       {{ resolveCarName(booking) }}
                     </p>
@@ -316,19 +550,27 @@
                       {{ resolveLicensePlate(booking) }}
                     </p>
                   </td>
-                  <td class="py-4 pr-4 align-top">
-                    <p class="font-medium text-gray-900 dark:text-white">{{ formatDateTime(booking.startTime) }}</p>
-                    <p class="text-xs text-gray-500 dark:text-gray-400">до {{ formatDateTime(booking.endTime) }}</p>
+                  <td class="px-4 py-4 align-top">
+                    <p class="font-medium text-gray-900 dark:text-white">
+                      {{ formatDateTime(booking.startTime) }}
+                    </p>
+                    <p class="text-xs text-gray-500 dark:text-gray-400">
+                      до {{ formatDateTime(booking.endTime) }}
+                    </p>
                   </td>
-                  <td class="py-4 pr-4 align-top">
+                  <td class="px-4 py-4 align-top">
                     <p class="font-bold text-gray-900 dark:text-white">
                       {{ formatMoney(booking.totalPrice ?? 0) }}
                     </p>
                     <p class="text-xs text-gray-500 dark:text-gray-400">
-                      {{ booking.priceHour != null ? `${formatMoney(booking.priceHour)}/час` : "Ставка не указана" }}
+                      {{
+                        booking.priceHour != null
+                          ? `${formatMoney(booking.priceHour)}/час`
+                          : "Ставка не указана"
+                      }}
                     </p>
                   </td>
-                  <td class="py-4 pr-4 align-top">
+                  <td class="px-4 py-4 align-top">
                     <span
                       :class="getBookingStatusClass(booking.status)"
                       class="inline-flex px-3 py-1 rounded-full text-xs font-bold uppercase tracking-[0.12em]"
@@ -336,17 +578,24 @@
                       {{ getBookingStatusLabel(booking.status) }}
                     </span>
                   </td>
-                  <td class="py-4 align-top">
-                    <p class="font-medium text-gray-900 dark:text-white">{{ formatDateTime(booking.createdAt) }}</p>
+                  <td class="px-4 py-4 align-top hidden lg:table-cell">
+                    <p class="font-medium text-gray-900 dark:text-white">
+                      {{ formatDateTime(booking.createdAt) }}
+                    </p>
                   </td>
-                  <td class="py-4 align-top">
+                  <td class="px-4 py-4 align-top">
                     <button
-                      v-if="booking.status === 'pending' || booking.status === 'confirmed'"
+                      v-if="
+                        booking.status === 'pending' ||
+                        booking.status === 'confirmed'
+                      "
                       @click="handlePartnerCancel(booking.id)"
                       :disabled="cancelingId === booking.id"
                       class="px-3 py-1.5 rounded-xl border border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 text-xs font-bold hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50 transition-colors"
                     >
-                      {{ cancelingId === booking.id ? 'Отмена...' : 'Отменить' }}
+                      {{
+                        cancelingId === booking.id ? "Отмена..." : "Отменить"
+                      }}
                     </button>
                   </td>
                 </tr>
@@ -363,11 +612,20 @@
 import axios from "axios";
 import { computed, onMounted, ref } from "vue";
 import { getMyPartnerCars, type PartnerCarSummary } from "../api/partnerCars";
-import { getMyPartnerBookings, getMyPartnerLedger, getMyPartnerWallet, cancelPartnerBooking } from "../api/partners";
+import {
+  getMyPartnerBookings,
+  getMyPartnerLedger,
+  getMyPartnerWallet,
+  cancelPartnerBooking,
+} from "../api/partners";
 import { useToast } from "../composables/useToast";
 
 import type { BookingStatus } from "../types/Booking";
-import type { PartnerBooking, PartnerLedgerEntry, PartnerWallet } from "../types/Partner";
+import type {
+  PartnerBooking,
+  PartnerLedgerEntry,
+  PartnerWallet,
+} from "../types/Partner";
 
 type BookingFilter = "all" | BookingStatus;
 type AnalyticsPeriod = 7 | 14 | 30;
@@ -393,41 +651,65 @@ const bookings = ref<PartnerBooking[]>([]);
 const cars = ref<PartnerCarSummary[]>([]);
 const selectedPeriod = ref<AnalyticsPeriod>(14);
 const statusFilter = ref<BookingFilter>("all");
+const statusDropdownOpen = ref(false);
 
 const bookingsInSelectedPeriod = computed(() => {
   const periodStart = buildPeriodStartDate(selectedPeriod.value);
-  return bookings.value.filter((booking) => isOnOrAfterDate(booking.createdAt, periodStart));
+  return bookings.value.filter((booking) =>
+    isOnOrAfterDate(booking.createdAt, periodStart),
+  );
 });
 
 const statusFilters = computed(() => {
   const counts = {
     all: bookingsInSelectedPeriod.value.length,
-    pending: bookingsInSelectedPeriod.value.filter((booking) => booking.status === "pending").length,
-    confirmed: bookingsInSelectedPeriod.value.filter((booking) => booking.status === "confirmed").length,
-    active: bookingsInSelectedPeriod.value.filter((booking) => booking.status === "active").length,
-    awaitingReview: bookingsInSelectedPeriod.value.filter((booking) => booking.status === "awaitingReview").length,
-    completed: bookingsInSelectedPeriod.value.filter((booking) => booking.status === "completed").length,
-    canceled: bookingsInSelectedPeriod.value.filter((booking) => booking.status === "canceled").length,
+    pending: bookingsInSelectedPeriod.value.filter(
+      (booking) => booking.status === "pending",
+    ).length,
+    confirmed: bookingsInSelectedPeriod.value.filter(
+      (booking) => booking.status === "confirmed",
+    ).length,
+    active: bookingsInSelectedPeriod.value.filter(
+      (booking) => booking.status === "active",
+    ).length,
+    awaitingReview: bookingsInSelectedPeriod.value.filter(
+      (booking) => booking.status === "awaitingReview",
+    ).length,
+    completed: bookingsInSelectedPeriod.value.filter(
+      (booking) => booking.status === "completed",
+    ).length,
+    canceled: bookingsInSelectedPeriod.value.filter(
+      (booking) => booking.status === "canceled",
+    ).length,
   };
 
   return [
     { label: "Все", value: "all" as const, count: counts.all },
     { label: "Pending", value: "pending" as const, count: counts.pending },
-    { label: "Confirmed", value: "confirmed" as const, count: counts.confirmed },
+    {
+      label: "Confirmed",
+      value: "confirmed" as const,
+      count: counts.confirmed,
+    },
     { label: "Active", value: "active" as const, count: counts.active },
     {
       label: "Awaiting Review",
       value: "awaitingReview" as const,
       count: counts.awaitingReview,
     },
-    { label: "Completed", value: "completed" as const, count: counts.completed },
+    {
+      label: "Completed",
+      value: "completed" as const,
+      count: counts.completed,
+    },
     { label: "Canceled", value: "canceled" as const, count: counts.canceled },
   ];
 });
 
 const filteredBookings = computed(() => {
   const sorted = [...bookingsInSelectedPeriod.value].sort(
-    (left, right) => new Date(right.startTime).getTime() - new Date(left.startTime).getTime()
+    (left, right) =>
+      new Date(right.startTime).getTime() - new Date(left.startTime).getTime(),
   );
 
   if (statusFilter.value === "all") {
@@ -442,15 +724,26 @@ const carsById = computed(() => {
 });
 
 const completedBookingsCount = computed(() => {
-  return bookingsInSelectedPeriod.value.filter((booking) => booking.status === "completed").length;
+  return bookingsInSelectedPeriod.value.filter(
+    (booking) => booking.status === "completed",
+  ).length;
 });
 
 const activeBookingsCount = computed(() => {
-  return bookingsInSelectedPeriod.value.filter((booking) => booking.status === "active").length;
+  return bookingsInSelectedPeriod.value.filter(
+    (booking) => booking.status === "active",
+  ).length;
 });
 
-const profitPoints = computed(() => buildChartPointsFromLedger(ledgerEntries.value, selectedPeriod.value));
-const revenuePoints = computed(() => buildChartPointsFromBookings(bookingsInSelectedPeriod.value, selectedPeriod.value));
+const profitPoints = computed(() =>
+  buildChartPointsFromLedger(ledgerEntries.value, selectedPeriod.value),
+);
+const revenuePoints = computed(() =>
+  buildChartPointsFromBookings(
+    bookingsInSelectedPeriod.value,
+    selectedPeriod.value,
+  ),
+);
 
 const totalRealizedProfit = computed(() => {
   return profitPoints.value.reduce((sum, point) => sum + point.amount, 0);
@@ -475,7 +768,8 @@ const revenueChartPoints = computed(() => {
   const maxAmount = Math.max(...points.map((point) => point.amount), 1);
 
   return points.map((point, index) => {
-    const x = paddingX + (availableWidth / Math.max(points.length - 1, 1)) * index;
+    const x =
+      paddingX + (availableWidth / Math.max(points.length - 1, 1)) * index;
     const y = height - paddingY - (point.amount / maxAmount) * availableHeight;
     return { ...point, x, y };
   });
@@ -517,12 +811,13 @@ async function loadDashboard() {
   errorMessage.value = "";
 
   try {
-    const [walletResult, ledgerResult, bookingsResult, carsResult] = await Promise.all([
-      safeLoadWallet(),
-      getMyPartnerLedger(200),
-      getMyPartnerBookings(),
-      getMyPartnerCars(),
-    ]);
+    const [walletResult, ledgerResult, bookingsResult, carsResult] =
+      await Promise.all([
+        safeLoadWallet(),
+        getMyPartnerLedger(200),
+        getMyPartnerBookings(),
+        getMyPartnerCars(),
+      ]);
 
     wallet.value = walletResult;
     ledgerEntries.value = ledgerResult;
@@ -530,7 +825,10 @@ async function loadDashboard() {
     cars.value = carsResult;
   } catch (e) {
     console.error("Failed to load partner dashboard", e);
-    errorMessage.value = resolveErrorMessage(e, "Не удалось загрузить аналитику партнёра.");
+    errorMessage.value = resolveErrorMessage(
+      e,
+      "Не удалось загрузить аналитику партнёра.",
+    );
     error(errorMessage.value);
   } finally {
     loading.value = false;
@@ -576,17 +874,26 @@ function isOnOrAfterDate(value: string, threshold: Date) {
   return date.getTime() >= threshold.getTime();
 }
 
-function buildChartPointsFromLedger(entries: PartnerLedgerEntry[], days: number): ChartPoint[] {
+function buildChartPointsFromLedger(
+  entries: PartnerLedgerEntry[],
+  days: number,
+): ChartPoint[] {
   const dateBuckets = buildRecentDateBuckets(days);
   const groupedAmounts = new Map<string, number>();
 
   for (const entry of entries) {
-    if (entry.entryType !== "BookingAvailableCredit" || entry.amountDelta <= 0) {
+    if (
+      entry.entryType !== "BookingAvailableCredit" ||
+      entry.amountDelta <= 0
+    ) {
       continue;
     }
 
     const dateKey = toDateKey(entry.createdAt);
-    groupedAmounts.set(dateKey, (groupedAmounts.get(dateKey) ?? 0) + entry.amountDelta);
+    groupedAmounts.set(
+      dateKey,
+      (groupedAmounts.get(dateKey) ?? 0) + entry.amountDelta,
+    );
   }
 
   const rawPoints = dateBuckets.map((bucket) => ({
@@ -599,11 +906,15 @@ function buildChartPointsFromLedger(entries: PartnerLedgerEntry[], days: number)
 
   return rawPoints.map((point) => ({
     ...point,
-    heightPercent: point.amount > 0 ? Math.max((point.amount / maxAmount) * 100, 8) : 0,
+    heightPercent:
+      point.amount > 0 ? Math.max((point.amount / maxAmount) * 100, 8) : 0,
   }));
 }
 
-function buildChartPointsFromBookings(items: PartnerBooking[], days: number): ChartPoint[] {
+function buildChartPointsFromBookings(
+  items: PartnerBooking[],
+  days: number,
+): ChartPoint[] {
   const dateBuckets = buildRecentDateBuckets(days);
   const groupedAmounts = new Map<string, number>();
   const groupedCounts = new Map<string, number>();
@@ -614,7 +925,10 @@ function buildChartPointsFromBookings(items: PartnerBooking[], days: number): Ch
     }
 
     const dateKey = toDateKey(booking.createdAt);
-    groupedAmounts.set(dateKey, (groupedAmounts.get(dateKey) ?? 0) + (booking.totalPrice ?? 0));
+    groupedAmounts.set(
+      dateKey,
+      (groupedAmounts.get(dateKey) ?? 0) + (booking.totalPrice ?? 0),
+    );
     groupedCounts.set(dateKey, (groupedCounts.get(dateKey) ?? 0) + 1);
   }
 
@@ -628,7 +942,8 @@ function buildChartPointsFromBookings(items: PartnerBooking[], days: number): Ch
 
   return rawPoints.map((point) => ({
     ...point,
-    heightPercent: point.amount > 0 ? Math.max((point.amount / maxAmount) * 100, 8) : 0,
+    heightPercent:
+      point.amount > 0 ? Math.max((point.amount / maxAmount) * 100, 8) : 0,
   }));
 }
 
@@ -650,20 +965,24 @@ function buildRecentDateBuckets(days: number): Array<{
     const formatted = formatter.format(date);
 
     return {
-      isoDate: toDateKey(date.toISOString()),
+      isoDate: toDateKey(date),
       label: formatted,
       shortLabel: formatted.split(" ")[0] ?? formatted,
     };
   });
 }
 
-function toDateKey(value: string) {
-  const date = new Date(value);
+function toDateKey(value: string | Date) {
+  const date =
+    value instanceof Date ? new Date(value.getTime()) : new Date(value);
   if (Number.isNaN(date.getTime())) {
-    return value.slice(0, 10);
+    return typeof value === "string" ? value.slice(0, 10) : "";
   }
 
-  return date.toISOString().slice(0, 10);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 function resolveCarName(booking: PartnerBooking) {
@@ -677,7 +996,9 @@ function resolveCarName(booking: PartnerBooking) {
 }
 
 function resolveLicensePlate(booking: PartnerBooking) {
-  return carsById.value.get(booking.partnerCarId)?.licensePlate || "Номер не найден";
+  return (
+    carsById.value.get(booking.partnerCarId)?.licensePlate || "Номер не найден"
+  );
 }
 
 function exportFilteredBookingsCsv() {
@@ -732,7 +1053,10 @@ function escapeCsvCell(value: string) {
   return `"${escaped}"`;
 }
 
-function formatMoney(amount: number, currency = wallet.value.currency || "KZT") {
+function formatMoney(
+  amount: number,
+  currency = wallet.value.currency || "KZT",
+) {
   return new Intl.NumberFormat("ru-RU", {
     style: "currency",
     currency,

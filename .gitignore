@@ -9,3 +9,4 @@ bin/
 .vscode/
 .vs
 .dotnet-cli
+.codex-dotnet

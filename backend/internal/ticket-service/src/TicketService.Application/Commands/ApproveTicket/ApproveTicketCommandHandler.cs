@@ -64,8 +64,6 @@ public sealed class ApproveTicketCommandHandler
                 ticket.CarModel,
                 ticket.CarYear,
                 ticket.LicensePlate,
-                ticket.PriceHour,
-                ticket.PriceDay,
                 ticket.OwnershipDocumentFileName,
                 ticket.CarImages,
                 command.ManagerId,
@@ -90,8 +88,12 @@ public sealed class ApproveTicketCommandHandler
             partnerCarData.CarModel,
             partnerCarData.CarYear,
             partnerCarData.LicensePlate,
-            partnerCarData.PriceHour,
-            partnerCarData.PriceDay,
-            partnerCarData.Email);
+            partnerCarData.Transmission,
+            partnerCarData.FuelType,
+            partnerCarData.Seats,
+            partnerCarData.Doors,
+            partnerCarData.BodyType,
+            partnerCarData.Horsepower,
+            partnerCarData.ConfirmedTags);
     }
 }

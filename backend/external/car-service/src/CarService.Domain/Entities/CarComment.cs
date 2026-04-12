@@ -19,6 +19,9 @@ namespace CarService.Domain.Entities
         [Column("partner_car_id")]
         public int? PartnerCarId { get; set; }
 
+        [Column("booking_id")]
+        public int? BookingId { get; set; }
+
         [Column("content")]
         public string Content { get; set; } = string.Empty;
 

@@ -31,6 +31,12 @@ namespace CarService.Domain.Entities
         [Column("doors")]
         public int? Doors { get; set; }
 
+        [Column("body_type")]
+        public string? BodyType { get; set; }
+
+        [Column("horsepower")]
+        public int? Horsepower { get; set; }
+
         [Column("description")]
         public string? Description { get; set; }
 
@@ -39,6 +45,33 @@ namespace CarService.Domain.Entities
 
         [Column("ratings_count")]
         public int RatingsCount { get; set; }
+
+        [Column("market_value_kzt")]
+        public decimal? MarketValueKzt { get; set; }
+
+        [Column("market_value_fetched_at")]
+        public DateTimeOffset? MarketValueFetchedAt { get; set; }
+
+        [Column("market_value_source")]
+        public string? MarketValueSource { get; set; }
+
+        [Column("market_value_source_url")]
+        public string? MarketValueSourceUrl { get; set; }
+
+        [Column("market_value_sample_count")]
+        public int MarketValueSampleCount { get; set; }
+
+        [Column("market_value_filtered_sample_count")]
+        public int MarketValueFilteredSampleCount { get; set; }
+
+        [Column("market_value_confidence")]
+        public string? MarketValueConfidence { get; set; }
+
+        [Column("market_value_status")]
+        public string? MarketValueStatus { get; set; }
+
+        [Column("market_value_error")]
+        public string? MarketValueError { get; set; }
 
         public CarBrand Brand { get; set; } = null!;
         public CarModelLookup ModelLookup { get; set; } = null!;

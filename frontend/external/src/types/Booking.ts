@@ -1,9 +1,28 @@
+export interface BookingPricingBreakdown {
+  quotedAtUtc: string;
+  marketValueKzt: number;
+  rating: number;
+  currentAvailableCarsCount: number;
+  daysBeforeBooking: number;
+  billableHours: number;
+  ratingCoefficient: number;
+  advanceBookingCoefficient: number;
+  availabilityCoefficient: number;
+  quotedPriceHour: number;
+  quotedTotalPrice: number;
+  currency: string;
+  isMarketValueStale: boolean;
+}
+
 export interface Booking {
   id: number;
   carId: number;
   partnerUserId?: string;
   carBrand: string;
   carModel: string;
+  partnerName?: string | null;
+  coverImageUrl?: string | null;
+  imageUrls?: string[];
   startDate: string;
   endDate: string;
   price: number | null;
@@ -11,6 +30,11 @@ export interface Booking {
   tripStartedAt?: string | null;
   tripCompletedAt?: string | null;
   completionReviewTicketId?: string | null;
+  carCommentId?: number | null;
+  carCommentSubmittedAt?: string | null;
+  canLeaveComment?: boolean;
+  usedSubscription?: boolean;
+  pricingBreakdown?: BookingPricingBreakdown | null;
   status: BookingStatus;
 }
 
@@ -33,6 +57,12 @@ export interface BookingCompletionSubmissionResult {
   booking: Booking;
   reviewTicketId: string;
   latePenaltyAmount: number;
+}
+
+export interface BookingCarCommentSubmissionResult {
+  booking: Booking;
+  commentId: number;
+  submittedAt: string;
 }
 
 export type BookingStatus =
@@ -91,4 +121,9 @@ export interface SubmitBookingPaymentPayload {
   expiryMonth: number;
   expiryYear: number;
   cvv: string;
+}
+
+export interface SubmitBookingCarCommentPayload {
+  rating: number;
+  content: string;
 }

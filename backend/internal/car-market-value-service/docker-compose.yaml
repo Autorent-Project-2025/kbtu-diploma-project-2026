@@ -1,0 +1,12 @@
+services:
+  car-market-value-service:
+    build:
+      context: ./src
+      dockerfile: Dockerfile
+    env_file:
+      - path: .env
+        required: false
+      - path: .env.example
+        required: true
+    ports:
+      - "${EXTERNAL_PORT:-1816}:8080"

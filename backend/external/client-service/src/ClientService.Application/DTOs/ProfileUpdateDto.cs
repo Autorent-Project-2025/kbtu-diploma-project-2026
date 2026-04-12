@@ -7,4 +7,5 @@ public sealed class ProfileUpdateDto
     public DateOnly BirthDate { get; set; }
     public string PhoneNumber { get; set; } = string.Empty;
     public string? AvatarUrl { get; set; }
+    public string? AvatarImageId { get; set; }
 }

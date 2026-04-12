@@ -21,6 +21,19 @@ export interface PartnerCarImage {
   displayOrder: number;
 }
 
+export interface PartnerCarComment {
+  id: number;
+  userId: string;
+  userName: string;
+  carId: number;
+  bookingId?: number | null;
+  partnerCarId?: number | null;
+  avatarUrl?: string | null;
+  content: string;
+  rating: number;
+  createdOn: string;
+}
+
 export interface PartnerCarDetails {
   id: number;
   partnerUserId: string;
@@ -44,6 +57,36 @@ export interface PartnerCarDetails {
   doors?: number | null;
   description?: string | null;
   images: PartnerCarImage[];
+  comments: PartnerCarComment[];
+}
+
+export interface PublicPartnerCarDetails {
+  id: number;
+  partnerUserId: string;
+  licensePlate: string;
+  carModelId: number;
+  color?: string | null;
+  priceHour?: number | null;
+  priceDay?: number | null;
+  status: number;
+  createdAt: string;
+  rating?: number | null;
+  ratingsCount: number;
+  modelBrand: string;
+  modelName: string;
+  modelYear: number;
+  commercialBadgeKeys: string[];
+  images: PartnerCarImage[];
+  comments?: PartnerCarComment[];
+  bookings?: Array<{
+    id: number;
+    carId: number;
+    userId: string;
+    startDate: string;
+    endDate: string;
+    price?: number | null;
+    status?: string | null;
+  }>;
 }
 
 export async function getMyPartnerCars(): Promise<PartnerCarSummary[]> {
@@ -54,6 +97,25 @@ export async function getMyPartnerCars(): Promise<PartnerCarSummary[]> {
 export async function getMyPartnerCarDetails(carId: number): Promise<PartnerCarDetails> {
   const response = await api.get(`/cars/my/${carId}`);
   const payload = response.data as PartnerCarDetails;
+
+  return {
+    ...payload,
+    images: (payload.images ?? []).map((image) => ({
+      ...image,
+      imageUrl: resolveAssetUrl(image.imageUrl) ?? image.imageUrl,
+    })),
+    comments: (payload.comments ?? []).map((comment) => ({
+      ...comment,
+      avatarUrl: resolveAssetUrl(comment.avatarUrl ?? null) ?? comment.avatarUrl,
+    })),
+  };
+}
+
+export async function getPublicPartnerCarDetails(
+  partnerCarId: number,
+): Promise<PublicPartnerCarDetails> {
+  const response = await api.get(`/cars/partner-cars/${partnerCarId}`);
+  const payload = response.data as PublicPartnerCarDetails;
 
   return {
     ...payload,

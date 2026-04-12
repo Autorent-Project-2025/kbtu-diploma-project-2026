@@ -5,6 +5,7 @@ using BookingService.Application.Constants;
 using BookingService.Application.Interfaces;
 using BookingService.Application.Interfaces.Integrations;
 using BookingService.Infrastructure.Integrations;
+using BookingService.Infrastructure.Observability;
 using BookingService.Infrastructure.Options;
 using BookingService.Infrastructure.Persistence;
 using BookingService.Infrastructure.Services;
@@ -18,12 +19,16 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddSingleton<ObservabilityLogWriter>();
+builder.Services.AddTransient<ObservabilityHttpClientHandler>();
 var httpClientResilienceOptions = builder.Configuration.GetHttpClientResilienceOptions();
 builder.Services.Configure<InternalAuthOptions>(builder.Configuration.GetSection(InternalAuthOptions.SectionName));
 builder.Services.Configure<CarServiceOptions>(builder.Configuration.GetSection(CarServiceOptions.SectionName));
 builder.Services.Configure<PaymentServiceOptions>(builder.Configuration.GetSection(PaymentServiceOptions.SectionName));
 builder.Services.Configure<ClientServiceOptions>(builder.Configuration.GetSection(ClientServiceOptions.SectionName));
 builder.Services.Configure<IdentityServiceOptions>(builder.Configuration.GetSection(IdentityServiceOptions.SectionName));
+builder.Services.Configure<PartnerServiceOptions>(builder.Configuration.GetSection(PartnerServiceOptions.SectionName));
 builder.Services.Configure<TicketServiceOptions>(builder.Configuration.GetSection(TicketServiceOptions.SectionName));
 builder.Services.Configure<EmailServiceOptions>(builder.Configuration.GetSection(EmailServiceOptions.SectionName));
 builder.Services.AddOptions<RabbitMqOptions>()
@@ -144,6 +149,23 @@ builder.Services.AddHttpClient<IPartnerCarReadClient, PartnerCarReadClient>((ser
     client.BaseAddress = new Uri(options.BaseUrl, UriKind.Absolute);
     client.Timeout = Timeout.InfiniteTimeSpan;
 })
+.AddHttpMessageHandler<ObservabilityHttpClientHandler>()
+.AddConfiguredResilience(httpClientResilienceOptions);
+builder.Services.AddHttpClient<ICarCommentWriteClient, CarCommentWriteClient>((serviceProvider, client) =>
+{
+    var options = serviceProvider
+        .GetRequiredService<Microsoft.Extensions.Options.IOptions<CarServiceOptions>>()
+        .Value;
+
+    if (string.IsNullOrWhiteSpace(options.BaseUrl))
+    {
+        throw new InvalidOperationException("Configuration value 'CarService:BaseUrl' is required.");
+    }
+
+    client.BaseAddress = new Uri(options.BaseUrl, UriKind.Absolute);
+    client.Timeout = Timeout.InfiniteTimeSpan;
+})
+.AddHttpMessageHandler<ObservabilityHttpClientHandler>()
 .AddConfiguredResilience(httpClientResilienceOptions);
 builder.Services.AddHttpClient<IPaymentSyncClient, PaymentSyncClient>((serviceProvider, client) =>
 {
@@ -159,6 +181,7 @@ builder.Services.AddHttpClient<IPaymentSyncClient, PaymentSyncClient>((servicePr
     client.BaseAddress = new Uri(options.BaseUrl, UriKind.Absolute);
     client.Timeout = Timeout.InfiniteTimeSpan;
 })
+.AddHttpMessageHandler<ObservabilityHttpClientHandler>()
 .AddConfiguredResilience(httpClientResilienceOptions);
 builder.Services.AddHttpClient<IClientBookingAccessClient, ClientBookingAccessClient>((serviceProvider, client) =>
 {
@@ -173,6 +196,7 @@ builder.Services.AddHttpClient<IClientBookingAccessClient, ClientBookingAccessCl
 
     client.Timeout = Timeout.InfiniteTimeSpan;
 })
+.AddHttpMessageHandler<ObservabilityHttpClientHandler>()
 .AddConfiguredResilience(httpClientResilienceOptions);
 builder.Services.AddHttpClient<IIdentityUserReadClient, IdentityUserReadClient>((serviceProvider, client) =>
 {
@@ -187,6 +211,23 @@ builder.Services.AddHttpClient<IIdentityUserReadClient, IdentityUserReadClient>(
 
     client.Timeout = Timeout.InfiniteTimeSpan;
 })
+.AddHttpMessageHandler<ObservabilityHttpClientHandler>()
+.AddConfiguredResilience(httpClientResilienceOptions);
+builder.Services.AddHttpClient<IPartnerProfileReadClient, PartnerProfileReadClient>((serviceProvider, client) =>
+{
+    var options = serviceProvider
+        .GetRequiredService<Microsoft.Extensions.Options.IOptions<PartnerServiceOptions>>()
+        .Value;
+
+    if (string.IsNullOrWhiteSpace(options.BaseUrl))
+    {
+        throw new InvalidOperationException("Configuration value 'PartnerService:BaseUrl' is required.");
+    }
+
+    client.BaseAddress = new Uri(options.BaseUrl, UriKind.Absolute);
+    client.Timeout = Timeout.InfiniteTimeSpan;
+})
+.AddHttpMessageHandler<ObservabilityHttpClientHandler>()
 .AddConfiguredResilience(httpClientResilienceOptions);
 builder.Services.AddHttpClient<IBookingCompletionTicketClient, BookingCompletionTicketClient>((serviceProvider, client) =>
 {
@@ -201,6 +242,7 @@ builder.Services.AddHttpClient<IBookingCompletionTicketClient, BookingCompletion
 
     client.Timeout = Timeout.InfiniteTimeSpan;
 })
+.AddHttpMessageHandler<ObservabilityHttpClientHandler>()
 .AddConfiguredResilience(httpClientResilienceOptions);
 builder.Services.AddHttpClient<IBookingEmailClient, BookingEmailClient>((serviceProvider, client) =>
 {
@@ -215,8 +257,11 @@ builder.Services.AddHttpClient<IBookingEmailClient, BookingEmailClient>((service
 
     client.Timeout = Timeout.InfiniteTimeSpan;
 })
+.AddHttpMessageHandler<ObservabilityHttpClientHandler>()
 .AddConfiguredResilience(httpClientResilienceOptions);
 builder.Services.AddScoped<IBookingService, BookingService.Infrastructure.Services.BookingService>();
+builder.Services.AddScoped<IDynamicPricingService, DynamicPricingService>(); // dynamic pricing
+builder.Services.AddScoped<ISubscriptionService, SubscriptionService>();
 builder.Services.AddSingleton<IRabbitMqPublisher, RabbitMqPublisher>();
 builder.Services.AddHostedService<PaymentSyncOutboxDispatcher>();
 builder.Services.AddHostedService<PendingBookingExpirationDispatcher>();
@@ -224,6 +269,7 @@ builder.Services.AddHostedService<UnstartedBookingExpirationDispatcher>();
 
 var app = builder.Build();
 
+app.UseMiddleware<RequestObservabilityMiddleware>();
 app.UseMiddleware<ApiExceptionMiddleware>();
 app.UseHttpsRedirection();
 app.UseCors("app-cors");

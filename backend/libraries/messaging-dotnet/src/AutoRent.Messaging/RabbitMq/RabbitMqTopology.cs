@@ -8,6 +8,7 @@ public static class RabbitMqTopology
     public const string EmailNotificationsQueue = "email-service.notifications";
     public const string BookingPaymentsQueue = "payment-service.booking-payments";
     public const string PartnerCarProvisionQueue = "car-service.partner-car-provision";
+    public const string AiSearchIndexingQueue = "ai-search-service.indexing";
 
     public static class RoutingKeys
     {
@@ -21,6 +22,8 @@ public static class RabbitMqTopology
         public const string BookingPaymentConfirmed = "booking.payment.confirmed";
         public const string BookingPaymentCanceled = "booking.payment.canceled";
         public const string BookingPaymentCompleted = "booking.payment.completed";
+        public const string CarSearchPartnerCarUpsertRequested = "car.search.partner-car-upserted";
+        public const string CarSearchPartnerCarDeleted = "car.search.partner-car-deleted";
     }
 
     public static string ResolveExchangeName(RabbitMqOptions options)

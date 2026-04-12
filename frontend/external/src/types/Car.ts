@@ -10,6 +10,33 @@ export interface Car {
   description: string | null;
 }
 
+type BookingSelectionBase = Omit<Car, "id">;
+
+export interface BookingBusySlot {
+  bookingId: number;
+  startTime: string;
+  endTime: string;
+  status: string | null;
+}
+
+export type BookingModelSelection = BookingSelectionBase & {
+  kind: "model";
+  modelId: number;
+};
+
+export type BookingPartnerCarSelection = BookingSelectionBase & {
+  kind: "partnerCar";
+  partnerCarId: number;
+  partnerUserId: string;
+  carrierName: string | null;
+  licensePlate: string | null;
+  busySlots: BookingBusySlot[];
+};
+
+export type BookingSelection =
+  | BookingModelSelection
+  | BookingPartnerCarSelection;
+
 // Спецификации автомобиля
 export interface CarSpecifications {
   engine?: string;

@@ -22,8 +22,8 @@
             </span>
           </div>
 
-          <!-- Desktop Navigation -->
-          <div class="hidden md:flex items-center gap-8">
+          <!-- Desktop Navigation — только для клиентов -->
+          <div v-if="!isPartner" class="hidden md:flex items-center gap-8">
             <router-link
               to="/"
               exact-active-class="text-primary-600 dark:text-primary-400"
@@ -41,6 +41,17 @@
               class="text-gray-700 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 font-medium transition-colors relative group"
             >
               <span>Автомобили</span>
+              <span
+                class="absolute bottom-0 left-0 w-0 h-0.5 bg-primary-600 dark:bg-primary-400 group-hover:w-full transition-all duration-300"
+              ></span>
+            </router-link>
+
+            <router-link
+              to="/ai"
+              active-class="text-primary-600 dark:text-primary-400"
+              class="text-gray-700 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 font-medium transition-colors relative group"
+            >
+              <span>ИИ</span>
               <span
                 class="absolute bottom-0 left-0 w-0 h-0.5 bg-primary-600 dark:bg-primary-400 group-hover:w-full transition-all duration-300"
               ></span>
@@ -88,7 +99,6 @@
           </div>
 
           <div v-else class="flex items-center gap-3">
-            <!-- Profile avatar button -->
             <router-link
               to="/profile"
               class="w-9 h-9 rounded-xl bg-emerald-600 hover:bg-emerald-700 flex items-center justify-center transition-colors shadow-md shadow-emerald-500/20"
@@ -117,8 +127,9 @@
             </button>
           </div>
 
-          <!-- Mobile Menu Button -->
+          <!-- Mobile Menu Button — только для клиентов -->
           <button
+            v-if="!isPartner"
             @click="mobileMenuOpen = !mobileMenuOpen"
             class="md:hidden p-2 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
           >
@@ -155,7 +166,7 @@
       </div>
     </div>
 
-    <!-- Mobile Menu -->
+    <!-- Mobile Menu — только для клиентов -->
     <transition
       enter-active-class="transition-all duration-200"
       enter-from-class="opacity-0 -translate-y-4"
@@ -165,7 +176,7 @@
       leave-to-class="opacity-0 -translate-y-4"
     >
       <div
-        v-if="mobileMenuOpen"
+        v-if="mobileMenuOpen && !isPartner"
         class="md:hidden bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl border-t border-gray-200 dark:border-gray-800"
       >
         <div class="px-4 py-4 space-y-2">
@@ -188,6 +199,15 @@
           </router-link>
 
           <router-link
+            to="/ai"
+            active-class="bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400"
+            class="block px-4 py-3 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 font-medium transition-colors"
+            @click="mobileMenuOpen = false"
+          >
+            ИИ
+          </router-link>
+
+          <router-link
             v-if="!isAuthenticated"
             to="/apply"
             active-class="bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400"
@@ -207,7 +227,6 @@
             Мои бронирования
           </router-link>
 
-          <!-- Profile link in mobile menu -->
           <router-link
             v-if="isAuthenticated"
             to="/profile"
@@ -236,6 +255,9 @@ const isAuthenticated = computed(() => {
   }
   return false;
 });
+const isPartner = computed(() =>
+  isAuthenticated.value ? auth.isActorType("partner") : false,
+);
 const scrolled = ref(false);
 const mobileMenuOpen = ref(false);
 

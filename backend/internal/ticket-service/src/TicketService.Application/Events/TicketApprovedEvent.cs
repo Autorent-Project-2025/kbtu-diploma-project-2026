@@ -20,8 +20,6 @@ public sealed record TicketApprovedEvent(
     string? CarModel,
     int? CarYear,
     string? LicensePlate,
-    decimal? PriceHour,
-    decimal? PriceDay,
     string? OwnershipDocumentFileName,
     IReadOnlyCollection<PartnerCarTicketImageData> CarImages,
     Guid ManagerId,

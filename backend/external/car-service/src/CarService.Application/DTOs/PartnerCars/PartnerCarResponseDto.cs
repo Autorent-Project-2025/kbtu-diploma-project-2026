@@ -20,5 +20,7 @@ namespace CarService.Application.DTOs.PartnerCars
         public string ModelBrand { get; set; } = string.Empty;
         public string ModelName { get; set; } = string.Empty;
         public int ModelYear { get; set; }
+
+        public IReadOnlyCollection<string> CommercialBadgeKeys { get; set; } = [];
     }
 }

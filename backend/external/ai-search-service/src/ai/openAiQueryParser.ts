@@ -1,0 +1,106 @@
+import { config } from "../config/env";
+import { ParsedRecommendationQuery } from "../types";
+import {
+  canonicalizeStyleLabel,
+  canonicalizeTransmissionLabel,
+} from "./heuristicQueryParser";
+import { STYLE_LABELS_TEXT, TRANSMISSION_LABELS_TEXT } from "../queryTaxonomy";
+
+const systemPrompt = `
+You extract structured filters for car recommendation search.
+Return only valid JSON.
+Schema:
+{
+  "maxBudgetPerHour": number | null,
+  "passengers": number | null,
+  "transmission": string | null,
+  "minRating": number | null,
+  "preferredStyles": string[],
+  "excludedStyles": string[],
+  "preferredBrands": string[],
+  "minYear": number | null,
+  "maxYear": number | null,
+  "startTime": string | null,
+  "endTime": string | null,
+  "requiresAvailableOnDates": boolean
+}
+Allowed style labels: ${STYLE_LABELS_TEXT}.
+Allowed transmission labels: ${TRANSMISSION_LABELS_TEXT}.
+If a value is not explicitly or reasonably inferable, return null or [].
+Use "minYear" for requests like "от 2020 года", "2020+" or "не старше 2020".
+Use "maxYear" for requests like "до 2020 года", "по 2020 год" or "не новее 2020".
+Do not put year values into "maxBudgetPerHour".
+`;
+
+export async function parseQueryWithOpenAi(prompt: string): Promise<ParsedRecommendationQuery> {
+  if (!config.openAiApiKey) {
+    throw new Error("OPENAI_API_KEY is not configured.");
+  }
+
+  const response = await fetch(`${config.openAiBaseUrl.replace(/\/$/, "")}/chat/completions`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${config.openAiApiKey}`,
+    },
+    body: JSON.stringify({
+      model: config.openAiChatModel,
+      temperature: 0,
+      response_format: { type: "json_object" },
+      messages: [
+        { role: "system", content: systemPrompt.trim() },
+        { role: "user", content: prompt },
+      ],
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`OpenAI chat request failed with status ${response.status}.`);
+  }
+
+  const payload = (await response.json()) as {
+    choices?: Array<{ message?: { content?: string | null } }>;
+  };
+
+  const content = payload.choices?.[0]?.message?.content?.trim();
+  if (!content) {
+    throw new Error("OpenAI parser response was empty.");
+  }
+
+  const parsed = JSON.parse(content) as Omit<ParsedRecommendationQuery, "prompt">;
+  const excludedStyles = Array.isArray(parsed.excludedStyles)
+    ? parsed.excludedStyles.map((item) => String(item).trim().toLowerCase()).filter(Boolean)
+        .map((item) => canonicalizeStyleLabel(item))
+        .filter((item): item is string => Boolean(item))
+    : [];
+
+  return {
+    prompt,
+    maxBudgetPerHour:
+      typeof parsed.maxBudgetPerHour === "number" ? parsed.maxBudgetPerHour : null,
+    passengers: typeof parsed.passengers === "number" ? parsed.passengers : null,
+    transmission:
+      typeof parsed.transmission === "string"
+        ? canonicalizeTransmissionLabel(parsed.transmission)
+        : null,
+    minRating:
+      typeof parsed.minRating === "number" && parsed.minRating >= 0 && parsed.minRating <= 5
+        ? parsed.minRating
+        : null,
+    preferredStyles: Array.isArray(parsed.preferredStyles)
+      ? parsed.preferredStyles.map((item) => String(item).trim().toLowerCase()).filter(Boolean)
+          .map((item) => canonicalizeStyleLabel(item))
+          .filter((item): item is string => Boolean(item))
+          .filter((item) => !excludedStyles.includes(item))
+      : [],
+    excludedStyles,
+    preferredBrands: Array.isArray(parsed.preferredBrands)
+      ? parsed.preferredBrands.map((item) => String(item).trim().toLowerCase()).filter(Boolean)
+      : [],
+    minYear: typeof parsed.minYear === "number" ? parsed.minYear : null,
+    maxYear: typeof parsed.maxYear === "number" ? parsed.maxYear : null,
+    startTime: typeof parsed.startTime === "string" && parsed.startTime.trim() ? parsed.startTime : null,
+    endTime: typeof parsed.endTime === "string" && parsed.endTime.trim() ? parsed.endTime : null,
+    requiresAvailableOnDates: Boolean(parsed.requiresAvailableOnDates),
+  };
+}

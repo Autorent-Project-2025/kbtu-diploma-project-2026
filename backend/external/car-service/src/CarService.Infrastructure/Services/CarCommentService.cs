@@ -1,19 +1,33 @@
 using CarService.Application.DTOs.CarComment;
 using CarService.Application.DTOs.Common;
 using CarService.Application.Interfaces;
+using CarService.Application.Interfaces.Integrations;
 using CarService.Domain.Entities;
-using CarService.Infrastructure.Persistance;
+using CarService.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
 namespace CarService.Infrastructure.Services
 {
-    public sealed class CarCommentService : ICarCommentService
-    {
-        private readonly ApplicationDbContext _db;
+        public sealed class CarCommentService : ICarCommentService
+        {
+            private readonly ApplicationDbContext _db;
+            private readonly IPartnerCarService _partnerCarService;
+            private readonly ICarModelService _carModelService;
+            private readonly IClientProfileReadClient _clientProfileReadClient;
+            private readonly ICarSearchIndexEventPublisher _carSearchIndexEventPublisher;
 
-        public CarCommentService(ApplicationDbContext db)
+        public CarCommentService(
+            ApplicationDbContext db,
+            IPartnerCarService partnerCarService,
+            ICarModelService carModelService,
+            IClientProfileReadClient clientProfileReadClient,
+            ICarSearchIndexEventPublisher carSearchIndexEventPublisher)
         {
             _db = db;
+            _partnerCarService = partnerCarService;
+            _carModelService = carModelService;
+            _clientProfileReadClient = clientProfileReadClient;
+            _carSearchIndexEventPublisher = carSearchIndexEventPublisher;
         }
 
         public async Task<PagedResult<CarCommentResponseDto>> GetByPartnerCarPaginatedAsync(
@@ -34,6 +48,8 @@ namespace CarService.Infrastructure.Services
                 .Take(paginationParams.PageSize)
                 .Select(comment => MapToDto(comment))
                 .ToListAsync(cancellationToken);
+
+            await EnrichWithAvatarUrlsAsync(items, cancellationToken);
 
             return new PagedResult<CarCommentResponseDto>
             {
@@ -69,6 +85,8 @@ namespace CarService.Infrastructure.Services
                 .Select(comment => MapToDto(comment))
                 .ToListAsync(cancellationToken);
 
+            await EnrichWithAvatarUrlsAsync(items, cancellationToken);
+
             return new PagedResult<CarCommentResponseDto>
             {
                 Items = items,
@@ -85,7 +103,14 @@ namespace CarService.Infrastructure.Services
                 .AsNoTracking()
                 .FirstOrDefaultAsync(comment => comment.Id == id, cancellationToken);
 
-            return entity is null ? null : MapToDto(entity);
+            if (entity is null)
+            {
+                return null;
+            }
+
+            var dto = MapToDto(entity);
+            await EnrichWithAvatarUrlsAsync([dto], cancellationToken);
+            return dto;
         }
 
         public async Task<CarCommentResponseDto> CreateAsync(
@@ -94,6 +119,33 @@ namespace CarService.Infrastructure.Services
             CarCommentCreateDto dto,
             CancellationToken cancellationToken = default)
         {
+            return await CreateFromCompletedBookingAsync(dto, userId, userName, cancellationToken);
+        }
+
+        public async Task<CarCommentResponseDto> CreateFromCompletedBookingAsync(
+            CarCommentCreateDto dto,
+            string userId,
+            string userName,
+            CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(dto);
+
+            if (dto.BookingId <= 0)
+            {
+                throw new ArgumentException("BookingId must be greater than zero.", nameof(dto.BookingId));
+            }
+
+            ValidateRating(dto.Rating);
+
+            var existingComment = await _db.CarComments
+                .AsNoTracking()
+                .FirstOrDefaultAsync(comment => comment.BookingId == dto.BookingId, cancellationToken);
+
+            if (existingComment is not null)
+            {
+                return MapToDto(existingComment);
+            }
+
             var partnerCar = await _db.PartnerCars
                 .FirstOrDefaultAsync(car => car.Id == dto.PartnerCarId, cancellationToken);
 
@@ -108,17 +160,37 @@ namespace CarService.Infrastructure.Services
                 UserName = NormalizeRequired(userName, nameof(userName), 255),
                 CarId = partnerCar.CarModelId,
                 PartnerCarId = partnerCar.Id,
+                BookingId = dto.BookingId,
                 Content = NormalizeRequired(dto.Content, nameof(dto.Content), 4000),
                 Rating = dto.Rating,
                 CreatedOn = DateTime.UtcNow
             };
 
             _db.CarComments.Add(entity);
-            await _db.SaveChangesAsync(cancellationToken);
+            try
+            {
+                await _db.SaveChangesAsync(cancellationToken);
+            }
+            catch (DbUpdateException)
+            {
+                var persistedComment = await _db.CarComments
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(comment => comment.BookingId == dto.BookingId, cancellationToken);
+
+                if (persistedComment is not null)
+                {
+                    return MapToDto(persistedComment);
+                }
+
+                throw;
+            }
 
             await RecalculateRatingsAsync(partnerCar.Id, partnerCar.CarModelId, cancellationToken);
+            await _carSearchIndexEventPublisher.PublishUpsertRequestedAsync(partnerCar.Id, cancellationToken);
 
-            return MapToDto(entity);
+            var created = MapToDto(entity);
+            await EnrichWithAvatarUrlsAsync([created], cancellationToken);
+            return created;
         }
 
         public async Task<CarCommentResponseDto?> UpdateAsync(
@@ -140,7 +212,14 @@ namespace CarService.Infrastructure.Services
                 throw new UnauthorizedAccessException("You are not authorized to update this comment.");
             }
 
+            if (entity.BookingId.HasValue)
+            {
+                throw new InvalidOperationException(
+                    "Booking-linked car comments cannot be edited.");
+            }
+
             entity.Content = NormalizeRequired(dto.Content, nameof(dto.Content), 4000);
+            ValidateRating(dto.Rating);
             entity.Rating = dto.Rating;
 
             await _db.SaveChangesAsync(cancellationToken);
@@ -148,13 +227,16 @@ namespace CarService.Infrastructure.Services
             if (entity.PartnerCarId.HasValue)
             {
                 await RecalculateRatingsAsync(entity.PartnerCarId.Value, entity.CarId, cancellationToken);
+                await _carSearchIndexEventPublisher.PublishUpsertRequestedAsync(entity.PartnerCarId.Value, cancellationToken);
             }
             else
             {
                 await RecalculateModelRatingOnlyAsync(entity.CarId, cancellationToken);
             }
 
-            return MapToDto(entity);
+            var updated = MapToDto(entity);
+            await EnrichWithAvatarUrlsAsync([updated], cancellationToken);
+            return updated;
         }
 
         public async Task<bool> DeleteAsync(string userId, int commentId, CancellationToken cancellationToken = default)
@@ -172,6 +254,12 @@ namespace CarService.Infrastructure.Services
                 throw new UnauthorizedAccessException("You are not authorized to delete this comment.");
             }
 
+            if (entity.BookingId.HasValue)
+            {
+                throw new InvalidOperationException(
+                    "Booking-linked car comments cannot be deleted.");
+            }
+
             var partnerCarId = entity.PartnerCarId;
             var modelId = entity.CarId;
 
@@ -181,6 +269,7 @@ namespace CarService.Infrastructure.Services
             if (partnerCarId.HasValue)
             {
                 await RecalculateRatingsAsync(partnerCarId.Value, modelId, cancellationToken);
+                await _carSearchIndexEventPublisher.PublishUpsertRequestedAsync(partnerCarId.Value, cancellationToken);
             }
             else
             {
@@ -192,42 +281,13 @@ namespace CarService.Infrastructure.Services
 
         private async Task RecalculateRatingsAsync(int partnerCarId, int modelId, CancellationToken cancellationToken)
         {
-            var partnerCar = await _db.PartnerCars.FirstOrDefaultAsync(car => car.Id == partnerCarId, cancellationToken);
-            if (partnerCar is not null)
-            {
-                var partnerRatings = await _db.CarComments
-                    .Where(comment => comment.PartnerCarId == partnerCarId)
-                    .Select(comment => comment.Rating)
-                    .ToListAsync(cancellationToken);
-
-                partnerCar.RatingsCount = partnerRatings.Count;
-                partnerCar.Rating = partnerRatings.Count == 0
-                    ? null
-                    : Math.Round((decimal)partnerRatings.Average(), 1, MidpointRounding.AwayFromZero);
-            }
-
-            await RecalculateModelRatingOnlyAsync(modelId, cancellationToken);
+            await _partnerCarService.RecalculateRatingAsync(partnerCarId, cancellationToken);
+            await _carModelService.RecalculateRatingAsync(modelId, cancellationToken);
         }
 
         private async Task RecalculateModelRatingOnlyAsync(int modelId, CancellationToken cancellationToken)
         {
-            var model = await _db.CarModels.FirstOrDefaultAsync(entity => entity.Id == modelId, cancellationToken);
-            if (model is null)
-            {
-                return;
-            }
-
-            var ratings = await _db.CarComments
-                .Where(comment => comment.CarId == modelId)
-                .Select(comment => comment.Rating)
-                .ToListAsync(cancellationToken);
-
-            model.RatingsCount = ratings.Count;
-            model.Rating = ratings.Count == 0
-                ? null
-                : Math.Round((decimal)ratings.Average(), 1, MidpointRounding.AwayFromZero);
-
-            await _db.SaveChangesAsync(cancellationToken);
+            await _carModelService.RecalculateRatingAsync(modelId, cancellationToken);
         }
 
         private static CarCommentResponseDto MapToDto(CarComment entity)
@@ -238,11 +298,59 @@ namespace CarService.Infrastructure.Services
                 UserId = entity.UserId,
                 UserName = entity.UserName,
                 CarId = entity.CarId,
+                BookingId = entity.BookingId,
                 PartnerCarId = entity.PartnerCarId,
+                AvatarUrl = null,
                 Content = entity.Content,
                 Rating = entity.Rating,
                 CreatedOn = entity.CreatedOn
             };
+        }
+
+        private async Task EnrichWithAvatarUrlsAsync(
+            IReadOnlyCollection<CarCommentResponseDto> comments,
+            CancellationToken cancellationToken)
+        {
+            var userIds = comments
+                .Select(comment => comment.UserId?.Trim())
+                .Where(userId => !string.IsNullOrWhiteSpace(userId))
+                .Distinct(StringComparer.Ordinal)
+                .ToArray();
+
+            if (userIds.Length == 0)
+            {
+                return;
+            }
+
+            try
+            {
+                var avatarLookups = await Task.WhenAll(
+                    userIds.Select(async userId => new
+                    {
+                        UserId = userId!,
+                        AvatarUrl = await _clientProfileReadClient.GetAvatarUrlByRelatedUserIdAsync(
+                            userId!,
+                            cancellationToken)
+                    }));
+
+                var avatarMap = avatarLookups.ToDictionary(
+                    item => item.UserId,
+                    item => item.AvatarUrl,
+                    StringComparer.Ordinal);
+
+                foreach (var comment in comments)
+                {
+                    if (!string.IsNullOrWhiteSpace(comment.UserId) &&
+                        avatarMap.TryGetValue(comment.UserId, out var avatarUrl))
+                    {
+                        comment.AvatarUrl = avatarUrl;
+                    }
+                }
+            }
+            catch
+            {
+                // Avatar enrichment is best-effort only.
+            }
         }
 
         private static string NormalizeRequired(string? value, string paramName, int maxLength)
@@ -259,6 +367,14 @@ namespace CarService.Infrastructure.Services
             }
 
             return normalized;
+        }
+
+        private static void ValidateRating(int rating)
+        {
+            if (rating is < 1 or > 5)
+            {
+                throw new ArgumentException("Rating must be between 1 and 5.", nameof(rating));
+            }
         }
     }
 }

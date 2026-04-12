@@ -8,8 +8,13 @@ namespace CarService.Application.DTOs.PartnerCars
         public string CarModel { get; set; } = string.Empty;
         public int CarYear { get; set; }
         public string LicensePlate { get; set; } = string.Empty;
-        public decimal PriceHour { get; set; }
-        public decimal PriceDay { get; set; }
+        public string? Transmission { get; set; }
+        public string? FuelType { get; set; }
+        public int? Seats { get; set; }
+        public int? Doors { get; set; }
+        public string? BodyType { get; set; }
+        public int? Horsepower { get; set; }
+        public IReadOnlyCollection<string> SemanticTags { get; set; } = [];
         public string OwnershipFileName { get; set; } = string.Empty;
         public IReadOnlyCollection<PartnerCarProvisionImageDto> Images { get; set; } = [];
     }

@@ -261,7 +261,8 @@
                   Данные автомобиля
                 </h3>
                 <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                  При необходимости скорректируйте перед решением.
+                  При необходимости скорректируйте характеристики. Витринная
+                  цена будет рассчитана системой после одобрения заявки.
                 </p>
               </div>
               <div class="grid sm:grid-cols-2 gap-4">
@@ -470,11 +471,15 @@
                   Решение
                 </h3>
                 <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                  Причину нужно указать только для отказа. Для завершения поездки вместо отказа можно выставить штраф.
+                  Причину нужно указать только для отказа. Для завершения
+                  поездки вместо отказа можно выставить штраф.
                 </p>
               </div>
 
-              <div v-if="!isBookingCompletionTicket(selectedTicket)" class="space-y-1.5">
+              <div
+                v-if="!isBookingCompletionTicket(selectedTicket)"
+                class="space-y-1.5"
+              >
                 <label
                   for="rejectReason"
                   class="block text-xs font-bold uppercase tracking-[0.1em] text-gray-500 dark:text-gray-400"
@@ -488,14 +493,12 @@
                 />
               </div>
 
-              <div
-                v-else
-                class="space-y-1.5"
-              >
+              <div v-else class="space-y-1.5">
                 <label
                   for="fineAmount"
                   class="block text-xs font-bold uppercase tracking-[0.1em] text-gray-500 dark:text-gray-400"
-                >Сумма штрафа</label>
+                  >Сумма штрафа</label
+                >
                 <input
                   id="fineAmount"
                   v-model="fineAmount"
@@ -516,7 +519,11 @@
                   {{ actionLoading ? "Обработка..." : "✓ Одобрить" }}
                 </button>
                 <button
-                  @click="isBookingCompletionTicket(selectedTicket) ? issueFineSelected() : rejectSelected()"
+                  @click="
+                    isBookingCompletionTicket(selectedTicket)
+                      ? issueFineSelected()
+                      : rejectSelected()
+                  "
                   :disabled="actionLoading"
                   class="w-full px-5 py-3 rounded-2xl border border-red-300 dark:border-red-700 text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-60 disabled:cursor-not-allowed font-bold transition-colors"
                 >
@@ -568,17 +575,25 @@ const { success: toastSuccess, error: toastError } = useToast();
 const lastUpdatedAt = ref<string>("");
 const maxAllowedCarYear = new Date().getUTCFullYear() + 1;
 
+type PartnerCarFormField = {
+  id: string;
+  key: "carBrand" | "carModel" | "carYear" | "licensePlate" | "email";
+  label: string;
+  type?: string;
+  min?: string;
+  max?: string;
+  step?: string;
+};
+
 const partnerCarForm = reactive({
   carBrand: "",
   carModel: "",
   carYear: null as number | null,
   licensePlate: "",
   email: "",
-  priceHour: null as number | null,
-  priceDay: null as number | null,
 });
 
-const carFormFields = [
+const carFormFields: PartnerCarFormField[] = [
   { id: "carBrand", key: "carBrand", label: "Марка" },
   { id: "carModel", key: "carModel", label: "Модель" },
   {
@@ -591,24 +606,6 @@ const carFormFields = [
   },
   { id: "licensePlate", key: "licensePlate", label: "Госномер" },
   { id: "contactEmail", key: "email", label: "Email партнёра", type: "email" },
-  {
-    id: "priceHour",
-    key: "priceHour",
-    label: "Цена за час",
-    type: "number",
-    min: "0.01",
-    max: "1000000",
-    step: "0.01",
-  },
-  {
-    id: "priceDay",
-    key: "priceDay",
-    label: "Цена за день",
-    type: "number",
-    min: "0.01",
-    max: "1000000",
-    step: "0.01",
-  },
 ];
 
 const partnerCarImages = computed<PartnerCarTicketImageData[]>(() => {
@@ -625,25 +622,33 @@ const partnerCarImages = computed<PartnerCarTicketImageData[]>(() => {
   return [];
 });
 
-const completionTicketPhotos = computed<BookingCompletionTicketPhotoData[]>(() => {
-  if (!selectedTicket.value || !isBookingCompletionTicket(selectedTicket.value)) {
+const completionTicketPhotos = computed<BookingCompletionTicketPhotoData[]>(
+  () => {
+    if (
+      !selectedTicket.value ||
+      !isBookingCompletionTicket(selectedTicket.value)
+    ) {
+      return [];
+    }
+
+    if (
+      Array.isArray(selectedTicket.value.completionPhotos) &&
+      selectedTicket.value.completionPhotos.length > 0
+    ) {
+      return selectedTicket.value.completionPhotos;
+    }
+
+    const data = selectedTicket.value.data;
+    if (
+      data &&
+      (data as BookingCompletionTicketData).$type === "booking-completion"
+    ) {
+      return (data as BookingCompletionTicketData).completionPhotos ?? [];
+    }
+
     return [];
-  }
-
-  if (
-    Array.isArray(selectedTicket.value.completionPhotos) &&
-    selectedTicket.value.completionPhotos.length > 0
-  ) {
-    return selectedTicket.value.completionPhotos;
-  }
-
-  const data = selectedTicket.value.data;
-  if (data && (data as BookingCompletionTicketData).$type === "booking-completion") {
-    return (data as BookingCompletionTicketData).completionPhotos ?? [];
-  }
-
-  return [];
-});
+  },
+);
 
 const ticketStats = computed(() => {
   let client = 0,
@@ -800,8 +805,6 @@ function syncPartnerCarForm(ticket: Ticket | null) {
       carYear: null,
       licensePlate: "",
       email: "",
-      priceHour: null,
-      priceDay: null,
     });
     return;
   }
@@ -816,10 +819,6 @@ function syncPartnerCarForm(ticket: Ticket | null) {
     ""
   ).trim();
   partnerCarForm.email = (ticket.email ?? "").trim();
-  const rph = ticket.priceHour ?? data?.priceHour ?? null;
-  const rpd = ticket.priceDay ?? data?.priceDay ?? null;
-  partnerCarForm.priceHour = rph === null ? null : Number(rph);
-  partnerCarForm.priceDay = rpd === null ? null : Number(rpd);
 }
 
 function buildPartnerCarPayload(): PartnerCarReviewPayload | null | undefined {
@@ -830,8 +829,6 @@ function buildPartnerCarPayload(): PartnerCarReviewPayload | null | undefined {
   const carYear = Number(partnerCarForm.carYear);
   const licensePlate = partnerCarForm.licensePlate.trim();
   const email = partnerCarForm.email.trim();
-  const priceHour = Number(partnerCarForm.priceHour);
-  const priceDay = Number(partnerCarForm.priceDay);
 
   if (
     !carBrand ||
@@ -842,20 +839,9 @@ function buildPartnerCarPayload(): PartnerCarReviewPayload | null | undefined {
   ) {
     toastError("Заполните марку, модель, год, госномер и email.");
     return null;
-    return null;
   }
   if (carYear < 1886 || carYear > maxAllowedCarYear) {
     toastError(`Год машины должен быть в диапазоне 1886-${maxAllowedCarYear}.`);
-    return null;
-    return null;
-  }
-  if (
-    !Number.isFinite(priceHour) ||
-    !Number.isFinite(priceDay) ||
-    priceHour <= 0 ||
-    priceDay <= 0
-  ) {
-    toastError("Укажите корректные значения цен за час и за день.");
     return null;
   }
   return {
@@ -863,8 +849,6 @@ function buildPartnerCarPayload(): PartnerCarReviewPayload | null | undefined {
     carModel,
     carYear,
     licensePlate,
-    priceHour,
-    priceDay,
     email,
   };
 }
@@ -893,7 +877,9 @@ async function loadPending() {
       : fallback.id;
     await selectTicket(nextId);
   } catch (e: any) {
-    toastError(e?.response?.data?.error || "Не удалось получить список заявок.");
+    toastError(
+      e?.response?.data?.error || "Не удалось получить список заявок.",
+    );
   } finally {
     loading.value = false;
   }
@@ -996,7 +982,9 @@ async function openDocument(
     );
     window.open(link.url, "_blank", "noopener,noreferrer");
   } catch (e: any) {
-    toastError(e?.response?.data?.error || "Не удалось получить ссылку на документ.");
+    toastError(
+      e?.response?.data?.error || "Не удалось получить ссылку на документ.",
+    );
   } finally {
     actionLoading.value = false;
   }

@@ -94,6 +94,72 @@ scrape_configs:
           route:
           statusCode:
 
+  - job_name: car-service
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: car-service
+          service_name: car-service
+          __path__: /tmp/autorent/car-service/*.jsonl
+    pipeline_stages:
+      - json:
+          expressions:
+            timestamp: timestamp
+            service: service
+            level: level
+            event: event
+            method: method
+            route: route
+            statusCode: statusCode
+            target: target
+            outcome: outcome
+      - timestamp:
+          source: timestamp
+          format: RFC3339
+      - labels:
+          service:
+          level:
+          event:
+          method:
+          route:
+          statusCode:
+          target:
+          outcome:
+
+  - job_name: booking-service
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: booking-service
+          service_name: booking-service
+          __path__: /tmp/autorent/booking-service/*.jsonl
+    pipeline_stages:
+      - json:
+          expressions:
+            timestamp: timestamp
+            service: service
+            level: level
+            event: event
+            method: method
+            route: route
+            statusCode: statusCode
+            target: target
+            outcome: outcome
+      - timestamp:
+          source: timestamp
+          format: RFC3339
+      - labels:
+          service:
+          level:
+          event:
+          method:
+          route:
+          statusCode:
+          target:
+          outcome:
+
   - job_name: email-service
     static_configs:
       - targets:
@@ -120,3 +186,32 @@ scrape_configs:
           event:
           routingKey:
           transport:
+
+  - job_name: ai-search-service
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: ai-search-service
+          service_name: ai-search-service
+          __path__: /tmp/autorent/ai-search-service/*.jsonl
+    pipeline_stages:
+      - json:
+          expressions:
+            timestamp: timestamp
+            service: service
+            level: level
+            event: event
+            method: method
+            route: route
+            statusCode: statusCode
+      - timestamp:
+          source: timestamp
+          format: RFC3339
+      - labels:
+          service:
+          level:
+          event:
+          method:
+          route:
+          statusCode:

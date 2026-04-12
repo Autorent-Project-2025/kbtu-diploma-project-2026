@@ -61,11 +61,8 @@ namespace CarService.Api.Controllers
         [Authorize(Policy = "car-comments:create")]
         public async Task<IActionResult> Create([FromBody] CarCommentCreateDto dto, CancellationToken cancellationToken)
         {
-            var userId = User.GetRequiredUserId();
-            var userName = User.GetPreferredUserName();
-
-            var created = await _carCommentService.CreateAsync(userId, userName, dto, cancellationToken);
-            return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
+            throw new InvalidOperationException(
+                "Direct comment creation is disabled. Submit the review through the completed booking flow.");
         }
 
         [HttpPut("{id:int}")]

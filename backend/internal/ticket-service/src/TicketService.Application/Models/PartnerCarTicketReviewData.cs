@@ -5,6 +5,10 @@ public sealed record PartnerCarTicketReviewData(
     string? CarModel,
     int? CarYear,
     string? LicensePlate,
-    decimal? PriceHour,
-    decimal? PriceDay,
-    string? Email);
+    string? Transmission,
+    string? FuelType,
+    int? Seats,
+    int? Doors,
+    string? BodyType,
+    int? Horsepower,
+    IReadOnlyCollection<string>? ConfirmedTags);

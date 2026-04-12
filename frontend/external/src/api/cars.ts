@@ -1,7 +1,10 @@
 import api from "./axios";
 import { getPartnerPublicProfileByRelatedUserId } from "./partners";
+import { getPublicPartnerCarDetails } from "./partnerCars";
 import type { PaginatedResponse } from "../types/Pagination";
+import type { BookingBusySlot } from "../types/Car";
 import { resolveAssetUrl } from "../utils/resolveAssetUrl";
+import { buildCarTags } from "../utils/carTags";
 
 function toCamelCase(obj: any): any {
   if (Array.isArray(obj)) {
@@ -33,6 +36,7 @@ export interface AvailableCarModel {
 export interface AvailableModelCard extends AvailableCarModel {
   imageUrl: string | null;
   description?: string | null;
+  tags: string[];
 }
 
 export interface CarModelImageDto {
@@ -87,6 +91,7 @@ export interface CarCommentDto {
   userName: string;
   carId: number;
   partnerCarId?: number | null;
+  avatarUrl?: string | null;
   content: string;
   rating: number;
   createdOn: string;
@@ -103,6 +108,17 @@ export interface ModelDetailsPayload {
   reviews: ModelReviewDto[];
   minPriceHour: number | null;
   maxPriceHour: number | null;
+  tags: string[];
+}
+
+export interface PartnerCarDetailsPayload {
+  car: Awaited<ReturnType<typeof getPublicPartnerCarDetails>>;
+  model: CarModelDetailsDto;
+  carrierName: string;
+  reviews: CarCommentDto[];
+  tags: string[];
+  commercialBadgeKeys: string[];
+  busySlots: BookingBusySlot[];
 }
 
 export interface MatchCarByModelPayload {
@@ -139,6 +155,11 @@ function getMaxPrice(cars: PartnerCarSummaryDto[]): number | null {
     .filter((value): value is number => value !== null && value !== undefined);
 
   return prices.length > 0 ? Math.max(...prices) : null;
+}
+
+function isActiveBookingStatus(status: string | null | undefined): boolean {
+  const normalized = (status ?? "").trim().toLowerCase();
+  return normalized === "pending" || normalized === "confirmed" || normalized === "active";
 }
 
 async function resolveCarrierName(relatedUserId: string): Promise<string> {
@@ -241,6 +262,17 @@ export async function getAvailableModelCards(): Promise<AvailableModelCard[]> {
       ...item,
       imageUrl: resolveAssetUrl(detail?.images?.[0]?.imageUrl ?? null),
       description: detail?.description ?? null,
+      tags: buildCarTags(
+        {
+          engine: detail?.engine,
+          transmission: detail?.transmission,
+          fuelType: detail?.fuelType,
+          seats: detail?.seats,
+          doors: detail?.doors,
+          features: detail?.features ?? [],
+        },
+        4,
+      ),
     };
   });
 }
@@ -260,6 +292,7 @@ export async function getModelDetailsPayload(modelId: number): Promise<ModelDeta
       const carrierName = await resolveCarrierName(partnerCar.partnerUserId);
       return comments.map((comment) => ({
         ...comment,
+        avatarUrl: resolveAssetUrl(comment.avatarUrl) ?? comment.avatarUrl,
         carrierPartnerUserId: partnerCar.partnerUserId,
         carrierName,
       }));
@@ -280,6 +313,71 @@ export async function getModelDetailsPayload(modelId: number): Promise<ModelDeta
     reviews,
     minPriceHour: availability?.minPriceHour ?? getMinPrice(partnerCars),
     maxPriceHour: availability?.maxPriceHour ?? getMaxPrice(partnerCars),
+    tags: buildCarTags(
+      {
+        engine: model.engine,
+        transmission: model.transmission,
+        fuelType: model.fuelType,
+        seats: model.seats,
+        doors: model.doors,
+        features: model.features ?? [],
+      },
+      8,
+    ),
+  };
+}
+
+export async function getPartnerCarDetailsPayload(
+  partnerCarId: number,
+): Promise<PartnerCarDetailsPayload> {
+  const car = await getPublicPartnerCarDetails(partnerCarId);
+  const [model, reviews, carrierName] = await Promise.all([
+    getCarModelDetails(car.carModelId),
+    getPartnerCarComments(partnerCarId),
+    resolveCarrierName(car.partnerUserId),
+  ]);
+
+  const busySlots = (car.bookings ?? [])
+    .filter((booking) => isActiveBookingStatus(booking.status))
+    .map((booking) => ({
+      bookingId: booking.id,
+      startTime: booking.startDate,
+      endTime: booking.endDate,
+      status: booking.status ?? null,
+    }))
+    .sort((left, right) => {
+      const leftTime = new Date(left.startTime).getTime();
+      const rightTime = new Date(right.startTime).getTime();
+      return leftTime - rightTime;
+    });
+
+  return {
+    car,
+    model,
+    carrierName,
+    reviews: reviews
+      .map((review) => ({
+        ...review,
+        avatarUrl: resolveAssetUrl(review.avatarUrl) ?? review.avatarUrl,
+      }))
+      .sort((left, right) => {
+        const leftTime = new Date(left.createdOn).getTime();
+        const rightTime = new Date(right.createdOn).getTime();
+        return rightTime - leftTime;
+      }),
+    tags: buildCarTags(
+      {
+        engine: model.engine,
+        transmission: model.transmission,
+        fuelType: model.fuelType,
+        seats: model.seats,
+        doors: model.doors,
+        features: model.features ?? [],
+      },
+      8,
+    ),
+    commercialBadgeKeys: car.commercialBadgeKeys ?? [],
+    busySlots,
   };
 }
 
@@ -288,4 +386,23 @@ export async function matchCarByModel(
 ): Promise<MatchCarByModelResult> {
   const response = await api.post("/cars/match", payload);
   return toCamelCase(response.data) as MatchCarByModelResult;
+}
+
+export interface PriceEstimateResult {
+  marketValueKzt: number;
+  priceHour: number;
+  priceDay: number;
+  confidence: string;
+  sampleCount: number;
+}
+
+export async function getCarPriceEstimate(
+  brand: string,
+  model: string,
+  year: number,
+): Promise<PriceEstimateResult> {
+  const response = await api.get("/cars/price-estimate", {
+    params: { brand, model, year },
+  });
+  return toCamelCase(response.data) as PriceEstimateResult;
 }

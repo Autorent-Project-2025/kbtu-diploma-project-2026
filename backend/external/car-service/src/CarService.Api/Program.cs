@@ -6,8 +6,10 @@ using CarService.Api.Middleware;
 using CarService.Application.Interfaces;
 using CarService.Application.Interfaces.Integrations;
 using CarService.Infrastructure.Integrations;
+using CarService.Infrastructure.Observability;
 using CarService.Infrastructure.Options;
-using CarService.Infrastructure.Persistance;
+using CarService.Infrastructure.Persistence;
+using CarService.Infrastructure.Persistence.Catalog;
 using CarService.Infrastructure.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
@@ -19,12 +21,17 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddSingleton<ObservabilityLogWriter>();
+builder.Services.AddTransient<ObservabilityHttpClientHandler>();
 var httpClientResilienceOptions = builder.Configuration.GetHttpClientResilienceOptions();
 
 builder.Services.Configure<PartnerServiceOptions>(builder.Configuration.GetSection(PartnerServiceOptions.SectionName));
 builder.Services.Configure<BookingServiceOptions>(builder.Configuration.GetSection(BookingServiceOptions.SectionName));
+builder.Services.Configure<ClientServiceOptions>(builder.Configuration.GetSection(ClientServiceOptions.SectionName));
 builder.Services.Configure<ImageServiceOptions>(builder.Configuration.GetSection(ImageServiceOptions.SectionName));
 builder.Services.Configure<InternalAuthOptions>(builder.Configuration.GetSection(InternalAuthOptions.SectionName));
+builder.Services.Configure<CarMarketValueServiceOptions>(builder.Configuration.GetSection(CarMarketValueServiceOptions.SectionName));
 builder.Services.AddOptions<RabbitMqOptions>()
     .Bind(builder.Configuration.GetSection(RabbitMqOptions.SectionName))
     .Validate(options =>
@@ -34,6 +41,16 @@ builder.Services.AddOptions<RabbitMqOptions>()
         !string.IsNullOrWhiteSpace(options.Password),
         "RabbitMQ configuration is invalid.")
     .ValidateOnStart();
+builder.Services.AddOptions<MarketValueRefreshOptions>()
+    .Bind(builder.Configuration.GetSection(MarketValueRefreshOptions.SectionName))
+    .Validate(options =>
+        options.RefreshAfterHours > 0 &&
+        options.RefreshAfterHours <= 24 * 30 &&
+        options.PollIntervalSeconds > 0 &&
+        options.PollIntervalSeconds <= 24 * 60 * 60 &&
+        options.BatchSize > 0 &&
+        options.BatchSize <= 500,
+        "Market value refresh configuration is invalid.");
 
 var connectionString = builder.Configuration.GetConnectionString("DbConnection");
 
@@ -137,7 +154,13 @@ builder.Services.AddScoped<ICarCommentService, CarCommentService>();
 builder.Services.AddScoped<ICarImageService, CarImageService>();
 builder.Services.AddScoped<ICarFeatureService, CarFeatureService>();
 builder.Services.AddScoped<CarCatalogResolver>();
+builder.Services.AddScoped<ICarRecommendationService, CarRecommendationService>();
+builder.Services.AddScoped<ICarMarketValueSyncService, CarMarketValueSyncService>();
+builder.Services.AddScoped<IPartnerCarDisplayPricingService, PartnerCarDisplayPricingService>();
+builder.Services.AddScoped<ICarSearchIndexEventPublisher, CarSearchIndexEventPublisher>();
+builder.Services.AddSingleton<IRabbitMqPublisher, RabbitMqPublisher>();
 builder.Services.AddHostedService<PartnerCarProvisionConsumer>();
+builder.Services.AddHostedService<MarketValueRefreshDispatcher>();
 
 builder.Services.AddHttpClient<IPartnerContextClient, PartnerContextClient>((serviceProvider, client) =>
 {
@@ -150,6 +173,7 @@ builder.Services.AddHttpClient<IPartnerContextClient, PartnerContextClient>((ser
     client.BaseAddress = new Uri(NormalizeBaseUrl(options.BaseUrl));
     client.Timeout = Timeout.InfiniteTimeSpan;
 })
+.AddHttpMessageHandler<ObservabilityHttpClientHandler>()
 .AddConfiguredResilience(httpClientResilienceOptions);
 
 builder.Services.AddHttpClient<IBookingReadClient, BookingReadClient>((serviceProvider, client) =>
@@ -168,6 +192,26 @@ builder.Services.AddHttpClient<IBookingReadClient, BookingReadClient>((servicePr
     client.BaseAddress = new Uri(NormalizeBaseUrl(options.BaseUrl));
     client.Timeout = Timeout.InfiniteTimeSpan;
 })
+.AddHttpMessageHandler<ObservabilityHttpClientHandler>()
+.AddConfiguredResilience(httpClientResilienceOptions);
+
+builder.Services.AddHttpClient<IClientProfileReadClient, ClientProfileReadClient>((serviceProvider, client) =>
+{
+    var options = serviceProvider.GetRequiredService<IOptions<ClientServiceOptions>>().Value;
+    if (string.IsNullOrWhiteSpace(options.BaseUrl))
+    {
+        throw new InvalidOperationException("ClientService:BaseUrl configuration is required.");
+    }
+
+    if (string.IsNullOrWhiteSpace(options.InternalApiKey))
+    {
+        throw new InvalidOperationException("ClientService:InternalApiKey configuration is required.");
+    }
+
+    client.BaseAddress = new Uri(NormalizeBaseUrl(options.BaseUrl));
+    client.Timeout = Timeout.InfiniteTimeSpan;
+})
+.AddHttpMessageHandler<ObservabilityHttpClientHandler>()
 .AddConfiguredResilience(httpClientResilienceOptions);
 
 builder.Services.AddHttpClient<IImageStorageClient, ImageStorageClient>((serviceProvider, client) =>
@@ -181,10 +225,26 @@ builder.Services.AddHttpClient<IImageStorageClient, ImageStorageClient>((service
     client.BaseAddress = new Uri(NormalizeBaseUrl(options.BaseUrl));
     client.Timeout = Timeout.InfiniteTimeSpan;
 })
+.AddHttpMessageHandler<ObservabilityHttpClientHandler>()
+.AddConfiguredResilience(httpClientResilienceOptions);
+
+builder.Services.AddHttpClient<ICarMarketValueClient, CarMarketValueClient>((serviceProvider, client) =>
+{
+    var options = serviceProvider.GetRequiredService<IOptions<CarMarketValueServiceOptions>>().Value;
+    if (string.IsNullOrWhiteSpace(options.BaseUrl))
+    {
+        throw new InvalidOperationException("CarMarketValueService:BaseUrl configuration is required.");
+    }
+
+    client.BaseAddress = new Uri(NormalizeBaseUrl(options.BaseUrl));
+    client.Timeout = Timeout.InfiniteTimeSpan;
+})
+.AddHttpMessageHandler<ObservabilityHttpClientHandler>()
 .AddConfiguredResilience(httpClientResilienceOptions);
 
 var app = builder.Build();
 
+app.UseMiddleware<RequestObservabilityMiddleware>();
 app.UseMiddleware<ApiExceptionMiddleware>();
 app.UseHttpsRedirection();
 app.UseCors("app-cors");

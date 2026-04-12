@@ -30,8 +30,6 @@ public sealed record TicketDto(
     string? CarModel,
     int? CarYear,
     string? LicensePlate,
-    decimal? PriceHour,
-    decimal? PriceDay,
     IReadOnlyCollection<PartnerCarTicketImageData> CarImages,
     TicketStatus Status,
     string? DecisionReason,

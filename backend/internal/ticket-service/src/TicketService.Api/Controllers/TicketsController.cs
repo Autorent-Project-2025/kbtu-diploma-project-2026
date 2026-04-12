@@ -62,7 +62,7 @@ public sealed class TicketsController : ControllerBase
                 request.LastName ?? string.Empty,
                 request.CompanyName,
                 request.ContactEmail,
-                request.Email ?? string.Empty,
+                ResolveRequestEmail(request, ticketType),
                 request.BirthDate,
                 request.PhoneNumber ?? string.Empty,
                 request.AvatarUrl,
@@ -72,8 +72,13 @@ public sealed class TicketsController : ControllerBase
                 request.CarModel,
                 request.CarYear,
                 request.LicensePlate,
-                request.PriceHour,
-                request.PriceDay,
+                request.Transmission,
+                request.FuelType,
+                request.Seats,
+                request.Doors,
+                request.BodyType,
+                request.Horsepower,
+                request.SelectedTags,
                 await MapToOptionalFilePayloadAsync(request.OwnershipDocumentFile, cancellationToken),
                 await MapToFilePayloadCollectionAsync(request.CarImageFiles, cancellationToken),
                 request.BookingId,
@@ -284,8 +289,29 @@ public sealed class TicketsController : ControllerBase
             request.CarModel,
             request.CarYear,
             request.LicensePlate,
-            request.PriceHour,
-            request.PriceDay,
-            request.Email);
+            request.Transmission,
+            request.FuelType,
+            request.Seats,
+            request.Doors,
+            request.BodyType,
+            request.Horsepower,
+            request.ConfirmedTags);
+    }
+
+    private string ResolveRequestEmail(CreateTicketRequest request, TicketType ticketType)
+    {
+        if (!string.IsNullOrWhiteSpace(request.Email))
+        {
+            return request.Email;
+        }
+
+        if (ticketType != TicketType.PartnerCar)
+        {
+            return string.Empty;
+        }
+
+        return User.FindFirstValue(ClaimTypes.Email)
+            ?? User.FindFirstValue("email")
+            ?? string.Empty;
     }
 }

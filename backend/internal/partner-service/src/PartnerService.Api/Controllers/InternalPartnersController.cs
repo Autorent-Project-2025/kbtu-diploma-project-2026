@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using PartnerService.Api.Contracts.Internal;
+using PartnerService.Api.Contracts.Partners;
 using PartnerService.Api.Options;
 using PartnerService.Application.DTOs;
 using PartnerService.Application.Interfaces;
@@ -29,10 +30,10 @@ public sealed class InternalPartnersController : ControllerBase
 
     [AllowAnonymous]
     [HttpPost("provision")]
-    public async Task<IActionResult> Provision(
-        [FromBody] ProvisionPartnerRequest request,
-        CancellationToken cancellationToken)
-    {
+        public async Task<IActionResult> Provision(
+            [FromBody] ProvisionPartnerRequest request,
+            CancellationToken cancellationToken)
+        {
         if (!IsAuthorizedInternalRequest())
         {
             return Unauthorized(new { error = "Internal API key is invalid." });
@@ -58,11 +59,40 @@ public sealed class InternalPartnersController : ControllerBase
             },
             cancellationToken);
 
-        return Ok(created);
-    }
+            return Ok(created);
+        }
 
-    private bool IsAuthorizedInternalRequest()
-    {
+        [AllowAnonymous]
+        [HttpGet("public-profile/by-related-user/{relatedUserId}")]
+        public async Task<IActionResult> GetPublicProfileByRelatedUserId(
+            string relatedUserId,
+            CancellationToken cancellationToken)
+        {
+            if (!IsAuthorizedInternalRequest())
+            {
+                return Unauthorized(new { error = "Internal API key is invalid." });
+            }
+
+            if (string.IsNullOrWhiteSpace(relatedUserId))
+            {
+                return BadRequest(new { error = "RelatedUserId is required." });
+            }
+
+            var partner = await _partnerService.GetByRelatedUserIdAsync(relatedUserId, cancellationToken);
+            if (partner is null)
+            {
+                return NotFound(new { error = "Partner not found." });
+            }
+
+            return Ok(new PublicPartnerProfileResponse
+            {
+                RelatedUserId = partner.RelatedUserId,
+                CarrierName = $"{partner.OwnerFirstName} {partner.OwnerLastName}".Trim()
+            });
+        }
+
+        private bool IsAuthorizedInternalRequest()
+        {
         if (string.IsNullOrWhiteSpace(_internalAuthOptions.ApiKey))
         {
             return false;

@@ -2,17 +2,41 @@ import api from "./axios";
 import type {
   Booking,
   BookingCharge,
+  BookingCarCommentSubmissionResult,
   BookingCompletionSubmissionResult,
+  BookingPricingBreakdown,
   BookingPaymentState,
   BookingPaymentStatus,
   BookingStatus,
+  SubmitBookingCarCommentPayload,
   SubmitBookingPaymentPayload,
 } from "../types/Booking";
 import type { PaginatedResponse } from "../types/Pagination";
+import { resolveAssetUrl } from "../utils/resolveAssetUrl";
 
 export interface GetMyBookingsParams {
   page?: number;
   pageSize?: number;
+}
+
+export interface BookingPricePreview {
+  partnerCarId: number;
+  marketValueKzt: number;
+  rating: number;
+  currentAvailableCarsCount: number;
+  daysBeforeBooking: number;
+  billableHours: number;
+  ratingCoefficient: number;
+  advanceBookingCoefficient: number;
+  availabilityCoefficient: number;
+  priceHour: number;
+  finalPrice: number;
+  currency: string;
+  isMarketValueStale: boolean;
+}
+
+export interface PartnerCarAvailability {
+  available: boolean;
 }
 
 interface BookingApiDto {
@@ -21,6 +45,9 @@ interface BookingApiDto {
   partnerUserId?: string;
   carBrand: string;
   carModel: string;
+  partnerName?: string | null;
+  coverImageUrl?: string | null;
+  imageUrls?: string[] | null;
   startTime: string;
   endTime: string;
   priceHour?: number | null;
@@ -28,6 +55,11 @@ interface BookingApiDto {
   tripStartedAt?: string | null;
   tripCompletedAt?: string | null;
   completionReviewTicketId?: string | null;
+  carCommentId?: number | null;
+  carCommentSubmittedAt?: string | null;
+  canLeaveComment?: boolean | null;
+  usedSubscription?: boolean | null;
+  pricingBreakdown?: BookingPricingBreakdown | null;
   status?: string | null;
 }
 
@@ -73,6 +105,12 @@ interface BookingCompletionSubmissionApiDto {
   latePenaltyAmount?: number | null;
 }
 
+interface BookingCarCommentSubmissionApiDto {
+  booking: BookingApiDto;
+  commentId: number;
+  submittedAt: string;
+}
+
 function normalizeStatus(value: string | null | undefined): BookingStatus {
   const normalized = (value ?? "").trim().toLowerCase();
   if (normalized === "pending") return "pending";
@@ -90,12 +128,23 @@ function normalizeStatus(value: string | null | undefined): BookingStatus {
 }
 
 function mapBooking(dto: BookingApiDto): Booking {
+  const normalizedImageUrls = (dto.imageUrls ?? [])
+    .map((imageUrl) => resolveAssetUrl(imageUrl) ?? imageUrl)
+    .filter((imageUrl): imageUrl is string => Boolean(imageUrl));
+  const resolvedCoverImageUrl = resolveAssetUrl(dto.coverImageUrl ?? null);
+
   return {
     id: dto.id,
     carId: dto.partnerCarId,
     partnerUserId: dto.partnerUserId,
     carBrand: dto.carBrand ?? "",
     carModel: dto.carModel ?? "",
+    partnerName: dto.partnerName?.trim() || null,
+    coverImageUrl:
+      resolvedCoverImageUrl ??
+      normalizedImageUrls[0] ??
+      null,
+    imageUrls: normalizedImageUrls,
     startDate: dto.startTime,
     endDate: dto.endTime,
     price: dto.totalPrice ?? null,
@@ -103,12 +152,17 @@ function mapBooking(dto: BookingApiDto): Booking {
     tripStartedAt: dto.tripStartedAt ?? null,
     tripCompletedAt: dto.tripCompletedAt ?? null,
     completionReviewTicketId: dto.completionReviewTicketId ?? null,
+    carCommentId: dto.carCommentId ?? null,
+    carCommentSubmittedAt: dto.carCommentSubmittedAt ?? null,
+    canLeaveComment: Boolean(dto.canLeaveComment),
+    usedSubscription: dto.usedSubscription ?? false,
+    pricingBreakdown: dto.pricingBreakdown ?? null,
     status: normalizeStatus(dto.status),
   };
 }
 
 function normalizePaymentStatus(
-  value: string | null | undefined
+  value: string | null | undefined,
 ): BookingPaymentState {
   const normalized = (value ?? "").trim().toLowerCase();
   if (normalized === "started") return "started";
@@ -120,7 +174,7 @@ function normalizePaymentStatus(
 }
 
 function mapBookingPaymentStatus(
-  dto: BookingPaymentStatusApiDto
+  dto: BookingPaymentStatusApiDto,
 ): BookingPaymentStatus {
   return {
     bookingId: dto.bookingId,
@@ -162,7 +216,7 @@ function mapBookingCharge(dto: BookingChargeApiDto): BookingCharge {
 }
 
 function mapBookingCompletionSubmission(
-  dto: BookingCompletionSubmissionApiDto
+  dto: BookingCompletionSubmissionApiDto,
 ): BookingCompletionSubmissionResult {
   return {
     booking: mapBooking(dto.booking),
@@ -171,15 +225,26 @@ function mapBookingCompletionSubmission(
   };
 }
 
+function mapBookingCarCommentSubmission(
+  dto: BookingCarCommentSubmissionApiDto,
+): BookingCarCommentSubmissionResult {
+  return {
+    booking: mapBooking(dto.booking),
+    commentId: dto.commentId,
+    submittedAt: dto.submittedAt,
+  };
+}
+
 /**
  * Получить бронирования текущего пользователя с пагинацией.
  */
 export async function getMyBookings(
-  params?: GetMyBookingsParams
+  params?: GetMyBookingsParams,
 ): Promise<PaginatedResponse<Booking> | Booking[]> {
   const queryParams = new URLSearchParams();
   if (params?.page) queryParams.append("page", params.page.toString());
-  if (params?.pageSize) queryParams.append("pageSize", params.pageSize.toString());
+  if (params?.pageSize)
+    queryParams.append("pageSize", params.pageSize.toString());
 
   const url = `/bookings/my${queryParams.toString() ? `?${queryParams.toString()}` : ""}`;
   const response = await api.get(url);
@@ -211,11 +276,15 @@ export async function getMyBookings(
       pageSize: payload.pageSize ?? params?.pageSize ?? mappedItems.length,
       totalPages:
         payload.totalPages ??
-        Math.ceil((payload.totalCount ?? mappedItems.length) / (payload.pageSize ?? 1)),
+        Math.ceil(
+          (payload.totalCount ?? mappedItems.length) / (payload.pageSize ?? 1),
+        ),
     };
   }
 
-  const list = (Array.isArray(response.data) ? response.data : []) as BookingApiDto[];
+  const list = (
+    Array.isArray(response.data) ? response.data : []
+  ) as BookingApiDto[];
   const mapped = list.map(mapBooking);
   return {
     items: mapped,
@@ -233,15 +302,49 @@ export async function getMyBookings(
 export async function createBooking(
   partnerCarId: number,
   start: string,
-  end: string
+  end: string,
+  useSubscription = false,
 ): Promise<Booking> {
   const response = await api.post("/bookings", {
     partnerCarId,
     startTime: start,
     endTime: end,
+    useSubscription,
   });
 
   return mapBooking(response.data as BookingApiDto);
+}
+
+export async function getBookingPricePreview(
+  partnerCarId: number,
+  startTime: string,
+  endTime: string,
+): Promise<BookingPricePreview> {
+  const response = await api.get("/bookings/price-preview", {
+    params: {
+      partnerCarId,
+      startTime,
+      endTime,
+    },
+  });
+
+  return response.data as BookingPricePreview;
+}
+
+export async function getPartnerCarAvailability(
+  partnerCarId: number,
+  startTime: string,
+  endTime: string,
+): Promise<PartnerCarAvailability> {
+  const response = await api.get("/bookings/available", {
+    params: {
+      partnerCarId,
+      startTime,
+      endTime,
+    },
+  });
+
+  return response.data as PartnerCarAvailability;
 }
 
 export async function getBooking(bookingId: number): Promise<Booking> {
@@ -265,27 +368,52 @@ export async function submitBookingCompletionReview(
     completionSideLeftPhotoFile: File;
     completionSideRightPhotoFile: File;
     completionInteriorPhotoFile: File;
-  }
+  },
 ): Promise<BookingCompletionSubmissionResult> {
   const formData = new FormData();
   formData.append("completionFrontPhotoFile", files.completionFrontPhotoFile);
   formData.append("completionBackPhotoFile", files.completionBackPhotoFile);
-  formData.append("completionSideLeftPhotoFile", files.completionSideLeftPhotoFile);
-  formData.append("completionSideRightPhotoFile", files.completionSideRightPhotoFile);
-  formData.append("completionInteriorPhotoFile", files.completionInteriorPhotoFile);
+  formData.append(
+    "completionSideLeftPhotoFile",
+    files.completionSideLeftPhotoFile,
+  );
+  formData.append(
+    "completionSideRightPhotoFile",
+    files.completionSideRightPhotoFile,
+  );
+  formData.append(
+    "completionInteriorPhotoFile",
+    files.completionInteriorPhotoFile,
+  );
 
-  const response = await api.post(`/bookings/${bookingId}/complete-review`, formData, {
-    headers: {
-      "Content-Type": "multipart/form-data",
+  const response = await api.post(
+    `/bookings/${bookingId}/complete-review`,
+    formData,
+    {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
     },
-  });
+  );
 
   return mapBookingCompletionSubmission(
-    response.data as BookingCompletionSubmissionApiDto
+    response.data as BookingCompletionSubmissionApiDto,
   );
 }
 
-export async function getBookingCharges(bookingId: number): Promise<BookingCharge[]> {
+export async function submitBookingCarComment(
+  bookingId: number,
+  payload: SubmitBookingCarCommentPayload,
+): Promise<BookingCarCommentSubmissionResult> {
+  const response = await api.post(`/bookings/${bookingId}/car-comment`, payload);
+  return mapBookingCarCommentSubmission(
+    response.data as BookingCarCommentSubmissionApiDto,
+  );
+}
+
+export async function getBookingCharges(
+  bookingId: number,
+): Promise<BookingCharge[]> {
   const response = await api.get(`/bookings/${bookingId}/charges`);
   const payload = Array.isArray(response.data) ? response.data : [];
   return payload.map((item) => mapBookingCharge(item as BookingChargeApiDto));
@@ -293,21 +421,23 @@ export async function getBookingCharges(bookingId: number): Promise<BookingCharg
 
 export async function payBookingCharge(
   bookingId: number,
-  chargeId: number
+  chargeId: number,
 ): Promise<BookingCharge> {
-  const response = await api.post(`/bookings/${bookingId}/charges/${chargeId}/pay`);
+  const response = await api.post(
+    `/bookings/${bookingId}/charges/${chargeId}/pay`,
+  );
   return mapBookingCharge(response.data as BookingChargeApiDto);
 }
 
 export async function startBookingPayment(
-  bookingId: number
+  bookingId: number,
 ): Promise<BookingPaymentStatus> {
   const response = await api.post(`/bookings/${bookingId}/payment/start`);
   return mapBookingPaymentStatus(response.data as BookingPaymentStatusApiDto);
 }
 
 export async function getBookingPaymentStatus(
-  bookingId: number
+  bookingId: number,
 ): Promise<BookingPaymentStatus> {
   const response = await api.get(`/bookings/${bookingId}/payment/status`);
   return mapBookingPaymentStatus(response.data as BookingPaymentStatusApiDto);
@@ -315,9 +445,12 @@ export async function getBookingPaymentStatus(
 
 export async function submitBookingPayment(
   bookingId: number,
-  payload: SubmitBookingPaymentPayload
+  payload: SubmitBookingPaymentPayload,
 ): Promise<BookingPaymentStatus> {
-  const response = await api.post(`/bookings/${bookingId}/payment/submit`, payload);
+  const response = await api.post(
+    `/bookings/${bookingId}/payment/submit`,
+    payload,
+  );
   return mapBookingPaymentStatus(response.data as BookingPaymentStatusApiDto);
 }
 

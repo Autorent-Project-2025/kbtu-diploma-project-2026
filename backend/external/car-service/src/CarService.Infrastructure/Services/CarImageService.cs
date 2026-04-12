@@ -2,7 +2,7 @@ using CarService.Application.DTOs.CarImage;
 using CarService.Application.Interfaces;
 using CarService.Application.Interfaces.Integrations;
 using CarService.Domain.Entities;
-using CarService.Infrastructure.Persistance;
+using CarService.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
 namespace CarService.Infrastructure.Services
@@ -11,11 +11,16 @@ namespace CarService.Infrastructure.Services
     {
         private readonly ApplicationDbContext _db;
         private readonly IImageStorageClient _imageStorageClient;
+        private readonly ICarSearchIndexEventPublisher _carSearchIndexEventPublisher;
 
-        public CarImageService(ApplicationDbContext db, IImageStorageClient imageStorageClient)
+        public CarImageService(
+            ApplicationDbContext db,
+            IImageStorageClient imageStorageClient,
+            ICarSearchIndexEventPublisher carSearchIndexEventPublisher)
         {
             _db = db;
             _imageStorageClient = imageStorageClient;
+            _carSearchIndexEventPublisher = carSearchIndexEventPublisher;
         }
 
         public async Task<CarImageCreateResponseDto> CreateModelImageAsync(
@@ -45,6 +50,7 @@ namespace CarService.Infrastructure.Services
 
             _db.CarModelImages.Add(entity);
             await _db.SaveChangesAsync(cancellationToken);
+            await PublishModelAffectedCarsAsync(modelId, cancellationToken);
 
             return MapToResponse(entity);
         }
@@ -85,6 +91,7 @@ namespace CarService.Infrastructure.Services
 
             _db.PartnerCarImages.Add(entity);
             await _db.SaveChangesAsync(cancellationToken);
+            await _carSearchIndexEventPublisher.PublishUpsertRequestedAsync(partnerCarId, cancellationToken);
 
             return MapToResponse(entity);
         }
@@ -143,6 +150,7 @@ namespace CarService.Infrastructure.Services
             entity.DisplayOrder = dto.DisplayOrder;
 
             await _db.SaveChangesAsync(cancellationToken);
+            await PublishModelAffectedCarsAsync(entity.ModelId, cancellationToken);
 
             return MapToResponse(entity);
         }
@@ -174,6 +182,7 @@ namespace CarService.Infrastructure.Services
             entity.DisplayOrder = dto.DisplayOrder;
 
             await _db.SaveChangesAsync(cancellationToken);
+            await _carSearchIndexEventPublisher.PublishUpsertRequestedAsync(entity.CarId, cancellationToken);
 
             return MapToResponse(entity);
         }
@@ -196,6 +205,7 @@ namespace CarService.Infrastructure.Services
 
             _db.CarModelImages.Remove(entity);
             await _db.SaveChangesAsync(cancellationToken);
+            await PublishModelAffectedCarsAsync(entity.ModelId, cancellationToken);
             return true;
         }
 
@@ -226,7 +236,22 @@ namespace CarService.Infrastructure.Services
 
             _db.PartnerCarImages.Remove(entity);
             await _db.SaveChangesAsync(cancellationToken);
+            await _carSearchIndexEventPublisher.PublishUpsertRequestedAsync(entity.CarId, cancellationToken);
             return true;
+        }
+
+        private async Task PublishModelAffectedCarsAsync(int modelId, CancellationToken cancellationToken)
+        {
+            var partnerCarIds = await _db.PartnerCars
+                .AsNoTracking()
+                .Where(car => car.CarModelId == modelId)
+                .Select(car => car.Id)
+                .ToListAsync(cancellationToken);
+
+            foreach (var partnerCarId in partnerCarIds)
+            {
+                await _carSearchIndexEventPublisher.PublishUpsertRequestedAsync(partnerCarId, cancellationToken);
+            }
         }
 
         private async Task ReplaceBinaryIfNeededAsync(

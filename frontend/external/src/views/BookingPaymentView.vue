@@ -1,204 +1,342 @@
 <template>
-  <div class="min-h-screen bg-gray-50 dark:bg-gray-950 py-24 px-4 sm:px-6 lg:px-8 transition-colors duration-300">
-    <div class="max-w-6xl mx-auto space-y-8">
+  <div
+    class="min-h-screen bg-gray-50 dark:bg-gray-950 py-24 px-4 sm:px-6 lg:px-8 transition-colors duration-300"
+  >
+    <div class="max-w-7xl mx-auto space-y-8">
       <button
         @click="router.push('/bookings')"
         class="inline-flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
       >
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+        <svg
+          class="w-5 h-5"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M10 19l-7-7m0 0l7-7m-7 7h18"
+          />
         </svg>
         <span class="font-medium">Назад к бронированиям</span>
       </button>
 
-      <div class="grid lg:grid-cols-[1.2fr,0.8fr] gap-8">
-        <section class="bg-white dark:bg-gray-900 rounded-3xl border border-gray-200 dark:border-gray-800 shadow-xl p-8 space-y-6">
+      <div
+        class="grid grid-cols-1 xl:grid-cols-[minmax(0,1.55fr)_360px] gap-8 items-start"
+      >
+        <section
+          class="min-w-0 bg-white dark:bg-gray-900 rounded-[32px] border border-gray-200 dark:border-gray-800 shadow-xl p-6 sm:p-8 space-y-6"
+        >
           <div class="space-y-3">
-            <p class="text-sm font-bold uppercase tracking-[0.25em] text-amber-600 dark:text-amber-400">
+            <p
+              class="text-sm font-bold uppercase tracking-[0.25em] text-amber-600 dark:text-amber-400"
+            >
               Mock Payment
             </p>
-            <h1 class="text-4xl font-extrabold text-gray-900 dark:text-white">
+            <h1
+              class="text-4xl sm:text-5xl font-extrabold leading-tight text-gray-900 dark:text-white"
+            >
               Завершите оплату бронирования
             </h1>
-            <p class="text-gray-600 dark:text-gray-400 max-w-2xl">
-              Это тестовый checkout. Карта не списывается, а результат определяется псевдо-данными.
-            </p>
           </div>
 
           <div v-if="loading" class="py-16 text-center">
             <div class="inline-flex flex-col items-center gap-4">
-              <div class="w-14 h-14 rounded-full border-4 border-amber-200 dark:border-amber-900 border-t-amber-600 dark:border-t-amber-400 animate-spin"></div>
-              <p class="text-gray-600 dark:text-gray-400 font-medium">Подготавливаем mock checkout...</p>
+              <div
+                class="w-14 h-14 rounded-full border-4 border-amber-200 dark:border-amber-900 border-t-amber-600 dark:border-t-amber-400 animate-spin"
+              ></div>
+              <p class="text-gray-600 dark:text-gray-400 font-medium">
+                Подготавливаем checkout...
+              </p>
             </div>
           </div>
 
           <template v-else-if="booking && payment">
-            <div class="grid md:grid-cols-2 gap-4">
-              <article class="p-5 rounded-2xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
-                <p class="text-sm text-gray-500 dark:text-gray-400">Автомобиль</p>
-                <p class="mt-2 text-2xl font-bold text-gray-900 dark:text-white">
-                  {{ booking.carBrand }} {{ booking.carModel }}
+            <div
+              class="grid grid-cols-1 lg:grid-cols-[1.08fr_0.92fr] gap-4 items-stretch"
+            >
+              <article
+                class="min-w-0 p-5 rounded-3xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700"
+              >
+                <p class="text-sm text-gray-500 dark:text-gray-400">
+                  Автомобиль
                 </p>
-                <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                  {{ formatDate(booking.startDate) }} -> {{ formatDate(booking.endDate) }}
-                </p>
+
+                <div class="mt-3 flex flex-col sm:flex-row gap-4">
+                  <div
+                    class="h-24 w-full sm:w-32 shrink-0 overflow-hidden rounded-2xl bg-gray-200 dark:bg-gray-700"
+                  >
+                    <img
+                      v-if="getBookingHeroImage(booking)"
+                      :src="getBookingHeroImage(booking)!"
+                      :alt="`${booking.carBrand} ${booking.carModel}`"
+                      class="h-full w-full object-cover"
+                    />
+                    <div
+                      v-else
+                      class="flex h-full w-full items-center justify-center text-xs text-gray-500 dark:text-gray-400"
+                    >
+                      Нет фото
+                    </div>
+                  </div>
+
+                  <div class="min-w-0 flex-1 space-y-3">
+                    <p
+                      class="text-2xl font-bold leading-tight text-gray-900 dark:text-white break-words"
+                    >
+                      {{ booking.carBrand }} {{ booking.carModel }}
+                    </p>
+
+                    <div
+                      v-if="booking.partnerName"
+                      class="flex max-w-full items-center gap-3 rounded-2xl bg-primary-50 dark:bg-primary-900/20 px-4 py-3"
+                    >
+                      <div
+                        class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white text-primary-600 shadow-sm dark:bg-primary-950/70 dark:text-primary-300"
+                      >
+                        <svg
+                          class="h-5 w-5"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                            d="M5.121 17.804A11.955 11.955 0 0112 15c2.461 0 4.748.745 6.879 2.022M15 11a3 3 0 11-6 0 3 3 0 016 0zm6 1a9 9 0 11-18 0 9 9 0 0118 0z"
+                          />
+                        </svg>
+                      </div>
+
+                      <div class="min-w-0 flex-1">
+                        <p
+                          class="text-xs font-bold uppercase tracking-[0.2em] text-primary-700 dark:text-primary-300"
+                        >
+                          Партнёр
+                        </p>
+                        <p
+                          class="text-sm sm:text-base font-bold text-gray-900 dark:text-white break-words leading-5"
+                        >
+                          {{ booking.partnerName }}
+                        </p>
+                      </div>
+                    </div>
+
+                    <p
+                      class="text-sm text-gray-600 dark:text-gray-400 break-words"
+                    >
+                      {{ formatDate(booking.startDate) }} →
+                      {{ formatDate(booking.endDate) }}
+                    </p>
+                  </div>
+                </div>
+
+                <div
+                  v-if="getBookingGalleryImages(booking).length > 0"
+                  class="mt-4 flex flex-wrap gap-2"
+                >
+                  <div
+                    v-for="imageUrl in getBookingGalleryImages(booking)"
+                    :key="imageUrl"
+                    class="h-12 w-16 overflow-hidden rounded-xl bg-gray-200 dark:bg-gray-700"
+                  >
+                    <img
+                      :src="imageUrl"
+                      :alt="`${booking.carBrand} ${booking.carModel}`"
+                      class="h-full w-full object-cover"
+                    />
+                  </div>
+                </div>
               </article>
 
-              <article class="p-5 rounded-2xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
-                <p class="text-sm text-amber-700 dark:text-amber-300">К оплате</p>
-                <p class="mt-2 text-3xl font-extrabold text-amber-900 dark:text-amber-100">
+              <article
+                class="min-w-0 p-5 rounded-3xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800"
+              >
+                <p class="text-sm text-amber-700 dark:text-amber-300">
+                  К оплате
+                </p>
+                <p
+                  class="mt-2 text-3xl sm:text-4xl font-extrabold leading-tight text-amber-900 dark:text-amber-100 break-words"
+                >
                   {{ formatAmount(payment.amount, payment.currency) }}
                 </p>
-                <p class="mt-2 text-sm text-amber-700/80 dark:text-amber-200/80">
-                  Бронь останется в статусе `pending`, пока mock-оплата не станет успешной.
+                <p
+                  class="mt-3 text-sm leading-6 text-amber-700/80 dark:text-amber-200/80"
+                >
+                  Бронь останется в статусе
+                  <span class="font-semibold">pending</span>, пока Оплата не
+                  станет успешной.
                 </p>
               </article>
             </div>
 
-            <div class="grid md:grid-cols-2 gap-4">
-              <article
-                :class="[
-                  'p-5 rounded-2xl border transition-colors',
-                  isDeadlineCritical(sessionRemainingMs)
-                    ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
-                    : 'bg-sky-50 dark:bg-sky-900/20 border-sky-200 dark:border-sky-800',
-                ]"
+            <article
+              :class="[
+                'p-5 rounded-3xl border transition-colors',
+                isDeadlineCritical(paymentDeadlineRemainingMs)
+                  ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
+                  : 'bg-sky-50 dark:bg-sky-900/20 border-sky-200 dark:border-sky-800',
+              ]"
+            >
+              <p
+                class="text-sm font-bold uppercase tracking-[0.18em]"
+                :class="
+                  isDeadlineCritical(paymentDeadlineRemainingMs)
+                    ? 'text-red-700 dark:text-red-300'
+                    : 'text-sky-700 dark:text-sky-300'
+                "
               >
-                <p class="text-sm font-bold uppercase tracking-[0.18em]" :class="isDeadlineCritical(sessionRemainingMs) ? 'text-red-700 dark:text-red-300' : 'text-sky-700 dark:text-sky-300'">
-                  Сессия оплаты
-                </p>
-                <p class="mt-3 text-3xl font-extrabold text-gray-900 dark:text-white">
-                  {{ formatCountdown(sessionRemainingMs) }}
-                </p>
-                <p class="mt-2 text-sm text-gray-600 dark:text-gray-300">
-                  {{ payment.paymentExpiresAt ? `Истекает ${formatDate(payment.paymentExpiresAt)}` : "Сессия ещё не создана" }}
-                </p>
-              </article>
-
-              <article
-                :class="[
-                  'p-5 rounded-2xl border transition-colors',
-                  isDeadlineCritical(bookingRemainingMs)
-                    ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
-                    : 'bg-violet-50 dark:bg-violet-900/20 border-violet-200 dark:border-violet-800',
-                ]"
+                Оплатите в течении
+              </p>
+              <p
+                class="mt-3 text-3xl sm:text-4xl font-extrabold text-gray-900 dark:text-white"
               >
-                <p class="text-sm font-bold uppercase tracking-[0.18em]" :class="isDeadlineCritical(bookingRemainingMs) ? 'text-red-700 dark:text-red-300' : 'text-violet-700 dark:text-violet-300'">
-                  Бронь удерживает слот
-                </p>
-                <p class="mt-3 text-3xl font-extrabold text-gray-900 dark:text-white">
-                  {{ formatCountdown(bookingRemainingMs) }}
-                </p>
-                <p class="mt-2 text-sm text-gray-600 dark:text-gray-300">
-                  {{ payment.bookingExpiresAt ? `Авто-отмена ${formatDate(payment.bookingExpiresAt)}` : "Для этой брони TTL больше не действует" }}
-                </p>
-              </article>
-            </div>
+                {{ formatCountdown(paymentDeadlineRemainingMs) }}
+              </p>
+            </article>
 
             <div
               :class="[
-                'rounded-2xl border px-5 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3',
+                'rounded-3xl border px-5 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3',
                 payment.paymentStatus === 'succeeded'
                   ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800'
-                  : payment.paymentStatus === 'failed' || payment.paymentStatus === 'expired'
+                  : payment.paymentStatus === 'failed' ||
+                      payment.paymentStatus === 'expired'
                     ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
                     : 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800',
               ]"
             >
-              <div class="space-y-1">
-                <p class="text-xs font-bold uppercase tracking-[0.2em]" :class="badgeTextClass">
+              <div class="space-y-1 min-w-0">
+                <p
+                  class="text-xs font-bold uppercase tracking-[0.2em]"
+                  :class="badgeTextClass"
+                >
                   Payment Status
                 </p>
-                <p class="text-lg font-bold text-gray-900 dark:text-white">
+                <p
+                  class="text-lg font-bold text-gray-900 dark:text-white break-words"
+                >
                   {{ getPaymentStatusText(payment.paymentStatus) }}
                 </p>
-                <p v-if="payment.failureReason" class="text-sm text-gray-600 dark:text-gray-300">
+                <p
+                  v-if="payment.failureReason"
+                  class="text-sm text-gray-600 dark:text-gray-300 break-words"
+                >
                   {{ payment.failureReason }}
                 </p>
               </div>
 
-              <div v-if="payment.cardLast4" class="text-sm text-gray-600 dark:text-gray-300">
-                Последняя успешная/последняя карта: **** {{ payment.cardLast4 }}
+              <div
+                v-if="payment.cardLast4"
+                class="text-sm text-gray-600 dark:text-gray-300"
+              >
+                **** {{ payment.cardLast4 }}
               </div>
             </div>
 
-            <div class="grid xl:grid-cols-[1fr,0.85fr] gap-6">
+            <div
+              class="grid grid-cols-1 lg:grid-cols-[minmax(0,1.05fr)_minmax(280px,0.95fr)] gap-6 items-start"
+            >
               <form
-                class="space-y-5 p-6 rounded-3xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700"
+                class="min-w-0 space-y-5 p-6 rounded-3xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700"
                 @submit.prevent="handleSubmit"
               >
                 <div class="space-y-1">
-                  <h2 class="text-2xl font-bold text-gray-900 dark:text-white">Псевдо-данные карты</h2>
-                  <p class="text-sm text-gray-600 dark:text-gray-400">
-                    Храним только last4 и holder. Полный номер и CVV не сохраняются.
+                  <h2 class="text-2xl font-bold text-gray-900 dark:text-white">
+                    Псевдо-данные карты
+                  </h2>
+                  <p class="text-sm text-gray-600 dark:text-gray-400 leading-6">
+                    Храним только last4 и holder. Полный номер и CVV не
+                    сохраняются.
                   </p>
                 </div>
 
                 <label class="block space-y-2">
-                  <span class="text-sm font-semibold text-gray-700 dark:text-gray-300">Имя держателя</span>
+                  <span
+                    class="text-sm font-semibold text-gray-700 dark:text-gray-300"
+                    >Имя держателя</span
+                  >
                   <input
                     v-model="form.cardHolder"
                     type="text"
                     autocomplete="cc-name"
-                    class="w-full px-4 py-3 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    class="w-full min-w-0 px-4 py-3 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
                     placeholder="TEST USER"
                     :disabled="submitDisabled"
                   />
                 </label>
 
                 <label class="block space-y-2">
-                  <span class="text-sm font-semibold text-gray-700 dark:text-gray-300">Номер карты</span>
+                  <span
+                    class="text-sm font-semibold text-gray-700 dark:text-gray-300"
+                    >Номер карты</span
+                  >
                   <input
                     v-model="form.cardNumber"
                     type="text"
                     inputmode="numeric"
                     autocomplete="cc-number"
-                    class="w-full px-4 py-3 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    class="w-full min-w-0 px-4 py-3 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
                     placeholder="4242 4242 4242 4242"
                     :disabled="submitDisabled"
                   />
                 </label>
 
-                <div class="grid sm:grid-cols-3 gap-4">
-                  <label class="block space-y-2">
-                    <span class="text-sm font-semibold text-gray-700 dark:text-gray-300">Месяц</span>
+                <div class="grid grid-cols-3 gap-3">
+                  <label class="block space-y-2 min-w-0">
+                    <span
+                      class="text-sm font-semibold text-gray-700 dark:text-gray-300"
+                      >Месяц</span
+                    >
                     <input
                       v-model="form.expiryMonth"
                       type="number"
                       min="1"
                       max="12"
-                      class="w-full px-4 py-3 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      class="w-full min-w-0 px-3 sm:px-4 py-3 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
                       :disabled="submitDisabled"
                     />
                   </label>
 
-                  <label class="block space-y-2">
-                    <span class="text-sm font-semibold text-gray-700 dark:text-gray-300">Год</span>
+                  <label class="block space-y-2 min-w-0">
+                    <span
+                      class="text-sm font-semibold text-gray-700 dark:text-gray-300"
+                      >Год</span
+                    >
                     <input
                       v-model="form.expiryYear"
                       type="number"
                       :min="currentYear"
                       :max="currentYear + 20"
-                      class="w-full px-4 py-3 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      class="w-full min-w-0 px-3 sm:px-4 py-3 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
                       :disabled="submitDisabled"
                     />
                   </label>
 
-                  <label class="block space-y-2">
-                    <span class="text-sm font-semibold text-gray-700 dark:text-gray-300">CVV</span>
+                  <label class="block space-y-2 min-w-0">
+                    <span
+                      class="text-sm font-semibold text-gray-700 dark:text-gray-300"
+                      >CVV</span
+                    >
                     <input
                       v-model="form.cvv"
                       type="password"
                       inputmode="numeric"
                       autocomplete="cc-csc"
-                      class="w-full px-4 py-3 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      class="w-full min-w-0 px-3 sm:px-4 py-3 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
                       placeholder="123"
                       :disabled="submitDisabled"
                     />
                   </label>
                 </div>
 
-                <p v-if="formError" class="text-sm font-medium text-red-600 dark:text-red-400">
+                <p
+                  v-if="formError"
+                  class="text-sm font-medium text-red-600 dark:text-red-400"
+                >
                   {{ formError }}
                 </p>
 
@@ -208,7 +346,7 @@
                     class="px-6 py-3 rounded-xl bg-amber-600 hover:bg-amber-700 disabled:bg-gray-400 text-white font-bold transition-colors"
                     :disabled="submitDisabled || !payment.sessionKey"
                   >
-                    {{ submitting ? "Обрабатываем..." : "Оплатить mock-картой" }}
+                    {{ submitting ? "Обрабатываем..." : "Оплатить картой" }}
                   </button>
 
                   <button
@@ -232,9 +370,15 @@
                 </div>
               </form>
 
-              <aside class="space-y-4">
-                <article class="p-6 rounded-3xl bg-gray-900 text-white shadow-xl">
-                  <p class="text-sm uppercase tracking-[0.2em] text-amber-300 font-bold">Тестовые карты</p>
+              <aside class="min-w-0 space-y-4">
+                <article
+                  class="p-6 rounded-3xl bg-gray-900 text-white shadow-xl"
+                >
+                  <p
+                    class="text-sm uppercase tracking-[0.2em] text-amber-300 font-bold"
+                  >
+                    Тестовые карты
+                  </p>
                   <div class="mt-5 space-y-4">
                     <button
                       v-for="sample in samples"
@@ -243,20 +387,45 @@
                       class="w-full text-left px-4 py-4 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/10 transition-colors"
                       @click="applySample(sample.number)"
                     >
-                      <p class="font-bold">{{ sample.number }}</p>
-                      <p class="text-sm text-gray-200 mt-1">{{ sample.label }}</p>
+                      <p class="font-bold break-words">{{ sample.number }}</p>
+                      <p class="text-sm text-gray-200 mt-1">
+                        {{ sample.label }}
+                      </p>
                     </button>
                   </div>
                 </article>
 
-                <article class="p-6 rounded-3xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800">
-                  <p class="text-sm uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400 font-bold">Что произойдет</p>
-                  <ol class="mt-4 space-y-3 text-sm text-gray-600 dark:text-gray-300">
-                    <li>1. После успешного submit бронь станет `confirmed`.</li>
-                    <li>2. `booking-service` положит outbox-событие в оплату.</li>
-                    <li>3. `payment-service` начислит партнёру сумму в `pending`.</li>
-                    <li>4. После поездки бронь сначала перейдёт в `awaitingReview`.</li>
-                    <li>5. После подтверждения завершения сумма перейдёт в `available`.</li>
+                <article
+                  class="p-6 rounded-3xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800"
+                >
+                  <p
+                    class="text-sm uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400 font-bold"
+                  >
+                    Что произойдет
+                  </p>
+                  <ol
+                    class="mt-4 space-y-3 text-sm leading-6 text-gray-600 dark:text-gray-300"
+                  >
+                    <li>
+                      1. После оплаты бронирование будет подтверждено.
+                      <span class="font-semibold">confirmed</span>.
+                    </li>
+                    <li>
+                      2. Данные автомобиля и партнера сохраняются в вашем
+                      заказе.
+                      <span class="font-semibold">booking-service</span>
+                    </li>
+                    <li>
+                      3. Перед началом поездки вы увидите статус бронирования в
+                      личном кабинете.
+                      <span class="font-semibold">payment-service</span>
+
+                      <span class="font-semibold">pending</span>.
+                    </li>
+                    <li>
+                      4. После завершения поездки можно будет оставить отзыв
+                      <span class="font-semibold">awaitingReview</span>.
+                    </li>
                   </ol>
                 </article>
               </aside>
@@ -264,28 +433,122 @@
           </template>
 
           <div v-else class="py-16 text-center">
-            <p class="text-xl font-bold text-gray-900 dark:text-white">Бронь не найдена</p>
+            <p class="text-xl font-bold text-gray-900 dark:text-white">
+              Бронь не найдена
+            </p>
           </div>
         </section>
 
-        <aside class="space-y-6">
-          <article class="bg-white dark:bg-gray-900 rounded-3xl border border-gray-200 dark:border-gray-800 shadow-xl p-6">
-            <p class="text-sm uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400 font-bold">Статус брони</p>
-            <p class="mt-3 text-3xl font-extrabold text-gray-900 dark:text-white">
-              {{ booking ? getBookingStatusText(booking.status) : "..." }}
+        <aside class="min-w-0 space-y-6">
+          <article
+            class="bg-white dark:bg-gray-900 rounded-3xl border border-gray-200 dark:border-gray-800 shadow-xl p-6"
+          >
+            <p
+              class="text-sm uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400 font-bold"
+            >
+              Статус брони
             </p>
-            <p class="mt-3 text-sm text-gray-600 dark:text-gray-400">
-              Пока статус `pending`, эта бронь удерживает слот автомобиля, но партнёру деньги ещё не начислены.
+            <p
+              class="mt-3 text-3xl font-extrabold leading-tight text-gray-900 dark:text-white break-words"
+            >
+              {{ booking ? getBookingStatusText(booking.status) : "..." }}
             </p>
           </article>
 
-          <article class="bg-gradient-to-br from-amber-500 to-orange-600 rounded-3xl shadow-xl p-6 text-white">
-            <p class="text-sm uppercase tracking-[0.2em] font-bold text-amber-100">Mock Rules</p>
-            <ul class="mt-4 space-y-3 text-sm text-amber-50">
-              <li>`4242 4242 4242 4242` -> success</li>
-              <li>`4000 0000 0000 0002` -> declined</li>
-              <li>`4000 0000 0000 9995` -> insufficient funds</li>
-              <li>Любой другой валидный 16-значный номер -> success</li>
+          <article
+            v-if="pricingBreakdown"
+            class="bg-white dark:bg-gray-900 rounded-3xl border border-gray-200 dark:border-gray-800 shadow-xl p-6"
+          >
+            <p
+              class="text-sm uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400 font-bold"
+            >
+              Расчет цены
+            </p>
+            <div
+              class="mt-4 space-y-3 text-sm leading-6 text-gray-600 dark:text-gray-300"
+            >
+              <p>
+                Сохранен:
+                <span class="font-semibold text-gray-900 dark:text-white">{{
+                  formatDate(pricingBreakdown.quotedAtUtc)
+                }}</span>
+              </p>
+              <p>
+                Базовая цена за час:
+                <span class="font-semibold text-gray-900 dark:text-white">{{
+                  formatAmount(basePricePerHour, pricingBreakdown.currency)
+                }}</span>
+              </p>
+              <p>
+                Рейтинг:
+                <span class="font-semibold text-gray-900 dark:text-white">{{
+                  formatRating(pricingBreakdown.rating)
+                }}</span>
+                <span class="font-semibold text-gray-900 dark:text-white">
+                  (x{{ formatCoefficient(pricingBreakdown.ratingCoefficient) }})
+                </span>
+              </p>
+              <p>
+                Предварительное бронирование:
+                <span class="font-semibold text-gray-900 dark:text-white">{{
+                  pricingBreakdown.daysBeforeBooking
+                }}
+                  дн. (x{{
+                    formatCoefficient(
+                      pricingBreakdown.advanceBookingCoefficient,
+                    )
+                  }})</span
+                >
+              </p>
+              <p>
+                Коэффициент доступности:
+                <span class="font-semibold text-gray-900 dark:text-white"
+                  >x{{
+                    formatCoefficient(pricingBreakdown.availabilityCoefficient)
+                  }}</span
+                >
+              </p>
+              <p>
+                Итоговая цена за час:
+                <span class="font-semibold text-gray-900 dark:text-white">{{
+                  formatAmount(
+                    pricingBreakdown.quotedPriceHour,
+                    pricingBreakdown.currency,
+                  )
+                }}</span>
+              </p>
+              <p
+                v-if="pricingBreakdown.isMarketValueStale"
+                class="font-medium text-amber-700 dark:text-amber-300"
+              >
+                Рыночный снапшот на момент расчета уже был устаревшим.
+              </p>
+            </div>
+          </article>
+
+          <article
+            class="rounded-3xl bg-gradient-to-br from-amber-500 to-orange-600 shadow-xl p-6 text-white"
+          >
+            <p
+              class="text-sm uppercase tracking-[0.2em] font-bold text-amber-100"
+            >
+              Rules
+            </p>
+            <ul
+              class="mt-4 space-y-3 text-sm leading-6 text-amber-50 break-words"
+            >
+              <li>
+                <span class="font-semibold">4242 4242 4242 4242</span> → success
+              </li>
+              <li>
+                <span class="font-semibold">4000 0000 0000 0002</span> →
+                declined
+              </li>
+              <li>
+                <span class="font-semibold">4000 0000 0000 9995</span> →
+                insufficient funds
+              </li>
+              <li>Любой другой валидный 16-значный номер → success</li>
             </ul>
           </article>
         </aside>
@@ -305,7 +568,11 @@ import {
   submitBookingPayment,
 } from "../api/booking";
 import { useToast } from "../composables/useToast";
-import type { Booking, BookingPaymentState, BookingPaymentStatus } from "../types/Booking";
+import type {
+  Booking,
+  BookingPaymentState,
+  BookingPaymentStatus,
+} from "../types/Booking";
 
 const route = useRoute();
 const router = useRouter();
@@ -349,6 +616,22 @@ const submitDisabled = computed(() => {
   );
 });
 
+const pricingBreakdown = computed(
+  () => booking.value?.pricingBreakdown ?? null,
+);
+
+const HOURLY_BASE_FACTOR = 0.0001;
+
+const basePricePerHour = computed(() => {
+  if (!pricingBreakdown.value) {
+    return null;
+  }
+
+  return Number(
+    (pricingBreakdown.value.marketValueKzt * HOURLY_BASE_FACTOR).toFixed(2),
+  );
+});
+
 onMounted(async () => {
   clockTimer = window.setInterval(() => {
     now.value = Date.now();
@@ -376,6 +659,7 @@ async function loadCheckout(startSession = true) {
     payment.value = startSession
       ? await startBookingPayment(bookingId)
       : await getBookingPaymentStatus(bookingId);
+
     booking.value = await getBooking(bookingId);
   } catch (e) {
     console.error("Failed to load booking payment page", e);
@@ -408,14 +692,14 @@ async function handleSubmit() {
     booking.value = await getBooking(booking.value.id);
 
     if (payment.value.paymentStatus === "succeeded") {
-      success("Mock-оплата успешна. Бронь подтверждена.");
+      success("Оплата успешна. Бронь подтверждена.");
       return;
     }
 
     error(getPaymentStatusText(payment.value.paymentStatus));
   } catch (e) {
-    console.error("Failed to submit mock payment", e);
-    formError.value = resolveErrorMessage(e, "Не удалось выполнить mock-оплату.");
+    console.error("Failed to submit payment", e);
+    formError.value = resolveErrorMessage(e, "Не удалось выполнить Оплату.");
   } finally {
     submitting.value = false;
   }
@@ -464,7 +748,10 @@ function formatDate(value: string): string {
   }).format(date);
 }
 
-function formatAmount(amount: number | null | undefined, currency: string): string {
+function formatAmount(
+  amount: number | null | undefined,
+  currency: string,
+): string {
   if (amount == null) {
     return "Сумма не рассчитана";
   }
@@ -474,6 +761,26 @@ function formatAmount(amount: number | null | undefined, currency: string): stri
     currency,
     maximumFractionDigits: 2,
   }).format(amount);
+}
+
+function getBookingHeroImage(currentBooking: Booking): string | null {
+  return currentBooking.coverImageUrl ?? currentBooking.imageUrls?.[0] ?? null;
+}
+
+function getBookingGalleryImages(currentBooking: Booking): string[] {
+  const heroImage = getBookingHeroImage(currentBooking);
+
+  return (currentBooking.imageUrls ?? [])
+    .filter((imageUrl) => imageUrl !== heroImage)
+    .slice(0, 4);
+}
+
+function formatCoefficient(value: number): string {
+  return value.toFixed(2);
+}
+
+function formatRating(value: number): string {
+  return value.toFixed(1);
 }
 
 function getPaymentStatusText(status: BookingPaymentState): string {
@@ -524,29 +831,28 @@ const badgeTextClass = computed(() => {
   }
 });
 
-const sessionRemainingMs = computed(() => {
-  if (!payment.value?.paymentExpiresAt) {
+const paymentDeadlineAt = computed(() => {
+  const candidates = [
+    payment.value?.paymentExpiresAt,
+    payment.value?.bookingExpiresAt,
+  ]
+    .filter((value): value is string => Boolean(value))
+    .sort(
+      (left, right) => new Date(left).getTime() - new Date(right).getTime(),
+    );
+
+  return candidates[0] ?? null;
+});
+
+const paymentDeadlineRemainingMs = computed(() => {
+  if (!paymentDeadlineAt.value) {
     return null;
   }
 
-  return new Date(payment.value.paymentExpiresAt).getTime() - now.value;
+  return new Date(paymentDeadlineAt.value).getTime() - now.value;
 });
 
-const bookingRemainingMs = computed(() => {
-  if (!payment.value?.bookingExpiresAt) {
-    return null;
-  }
-
-  return new Date(payment.value.bookingExpiresAt).getTime() - now.value;
-});
-
-watch(sessionRemainingMs, async (currentValue, previousValue) => {
-  if (shouldAutoRefreshDeadline(currentValue, previousValue)) {
-    await refreshCheckoutStatus();
-  }
-});
-
-watch(bookingRemainingMs, async (currentValue, previousValue) => {
+watch(paymentDeadlineRemainingMs, async (currentValue, previousValue) => {
   if (shouldAutoRefreshDeadline(currentValue, previousValue)) {
     await refreshCheckoutStatus();
   }
@@ -574,7 +880,7 @@ function isDeadlineCritical(remainingMs: number | null): boolean {
 
 function shouldAutoRefreshDeadline(
   currentValue: number | null,
-  previousValue: number | null | undefined
+  previousValue: number | null | undefined,
 ): boolean {
   if (previousValue == null || currentValue == null) {
     return false;

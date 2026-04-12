@@ -8,25 +8,65 @@ using CarService.Application.Interfaces;
 using CarService.Application.Interfaces.Integrations;
 using CarService.Domain.Entities;
 using CarService.Domain.Enums;
-using CarService.Infrastructure.Persistance;
+using CarService.Infrastructure.Persistence;
+using CarService.Infrastructure.Persistence.Catalog;
+using CarService.Infrastructure.Persistence.Extensions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using CarService.Infrastructure.Options;
+using CarService.Infrastructure.Observability;
 
 namespace CarService.Infrastructure.Services
 {
     public sealed class PartnerCarService : IPartnerCarService
     {
+        private static readonly HashSet<string> AllowedSemanticTags = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "econom",
+            "comfort",
+            "business",
+            "sport",
+            "suv",
+            "electric",
+            "family"
+        };
+
+        private const decimal EconomPriceHourMax = 4000m;
+        private const decimal PremiumPriceHourMin = 8000m;
+        private const decimal DealDiscountRatio = 0.9m;
+        private const decimal DealMinSavings = 500m;
+
         private readonly ApplicationDbContext _db;
         private readonly IBookingReadClient _bookingReadClient;
         private readonly CarCatalogResolver _catalogResolver;
+        private readonly ICarMarketValueSyncService _carMarketValueSyncService;
+        private readonly IPartnerCarDisplayPricingService _partnerCarDisplayPricingService;
+        private readonly ICarSearchIndexEventPublisher _carSearchIndexEventPublisher;
+        private readonly MarketValueRefreshOptions _marketValueRefreshOptions;
+        private readonly ILogger<PartnerCarService> _logger;
+        private readonly ObservabilityLogWriter _observabilityLogWriter;
 
         public PartnerCarService(
             ApplicationDbContext db,
             IBookingReadClient bookingReadClient,
-            CarCatalogResolver catalogResolver)
+            CarCatalogResolver catalogResolver,
+            ICarMarketValueSyncService carMarketValueSyncService,
+            IPartnerCarDisplayPricingService partnerCarDisplayPricingService,
+            ICarSearchIndexEventPublisher carSearchIndexEventPublisher,
+            IOptions<MarketValueRefreshOptions> marketValueRefreshOptions,
+            ILogger<PartnerCarService> logger,
+            ObservabilityLogWriter observabilityLogWriter)
         {
             _db = db;
             _bookingReadClient = bookingReadClient;
             _catalogResolver = catalogResolver;
+            _carMarketValueSyncService = carMarketValueSyncService;
+            _partnerCarDisplayPricingService = partnerCarDisplayPricingService;
+            _carSearchIndexEventPublisher = carSearchIndexEventPublisher;
+            _marketValueRefreshOptions = marketValueRefreshOptions.Value;
+            _logger = logger;
+            _observabilityLogWriter = observabilityLogWriter;
         }
 
         public async Task<PagedResult<PartnerCarResponseDto>> GetAllAsync(
@@ -90,6 +130,11 @@ namespace CarService.Infrastructure.Services
                 return null;
             }
 
+            var referencePriceHour = await _db.PartnerCars
+                .AsNoTracking()
+                .Where(pc => pc.CarModelId == entity.CarModelId && pc.PriceHour.HasValue)
+                .AverageAsync(pc => (decimal?)pc.PriceHour, cancellationToken);
+
             var bookings = await _bookingReadClient.GetBookingsByCarIdAsync(id, cancellationToken);
 
             return new PartnerCarDetailsDto
@@ -109,6 +154,7 @@ namespace CarService.Infrastructure.Services
                 ModelBrand = entity.CarModel.Brand.Name,
                 ModelName = entity.CarModel.ModelLookup.Name,
                 ModelYear = entity.CarModel.Year,
+                CommercialBadgeKeys = ComputeCommercialBadgeKeys(entity.PriceHour, referencePriceHour),
                 Images = entity.Images
                     .OrderBy(image => image.DisplayOrder)
                     .ThenBy(image => image.Id)
@@ -120,6 +166,41 @@ namespace CarService.Infrastructure.Services
                     .Select(MapToCommentDto)
                     .ToList(),
                 Bookings = bookings.OrderByDescending(booking => booking.StartDate).ToList()
+            };
+        }
+
+        public async Task<PartnerCarSnapshotDto?> GetSnapshotAsync(int partnerCarId, CancellationToken cancellationToken = default)
+        {
+            var entity = await _db.PartnerCars
+                .AsNoTracking()
+                .IncludeModelCatalog()
+                .Include(partnerCar => partnerCar.Images)
+                .FirstOrDefaultAsync(partnerCar => partnerCar.Id == partnerCarId, cancellationToken);
+
+            if (entity is null)
+            {
+                return null;
+            }
+
+            var orderedImages = entity.Images
+                .OrderBy(image => image.DisplayOrder)
+                .ThenBy(image => image.Id)
+                .Select(image => image.ImageUrl)
+                .Where(imageUrl => !string.IsNullOrWhiteSpace(imageUrl))
+                .ToList();
+
+            return new PartnerCarSnapshotDto
+            {
+                PartnerCarId = entity.Id,
+                PartnerUserId = entity.PartnerUserId,
+                CarBrand = entity.CarModel.Brand.Name,
+                CarModel = entity.CarModel.ModelLookup.Name,
+                ModelYear = entity.CarModel.Year,
+                LicensePlate = entity.LicensePlate,
+                PriceHour = entity.PriceHour,
+                Rating = entity.Rating,
+                CoverImageUrl = orderedImages.FirstOrDefault(),
+                ImageUrls = orderedImages
             };
         }
 
@@ -140,8 +221,8 @@ namespace CarService.Infrastructure.Services
                 LicensePlate = NormalizeRequired(dto.LicensePlate, nameof(dto.LicensePlate), 20),
                 OwnershipFileName = null,
                 Color = NormalizeOptional(dto.Color, 50),
-                PriceHour = dto.PriceHour,
-                PriceDay = dto.PriceDay,
+                PriceHour = null,
+                PriceDay = null,
                 Status = dto.Status,
                 CreatedAt = DateTimeOffset.UtcNow,
                 RatingsCount = 0
@@ -149,6 +230,8 @@ namespace CarService.Infrastructure.Services
 
             _db.PartnerCars.Add(entity);
             await _db.SaveChangesAsync(cancellationToken);
+            await _carMarketValueSyncService.EnsureCarModelMarketValueAsync(entity.CarModelId, cancellationToken);
+            await _carSearchIndexEventPublisher.PublishUpsertRequestedAsync(entity.Id, cancellationToken);
 
             var persistedEntity = await _db.PartnerCars
                 .AsNoTracking()
@@ -174,8 +257,13 @@ namespace CarService.Infrastructure.Services
             var normalizedModel = NormalizeRequired(dto.CarModel, nameof(dto.CarModel), 255);
             var normalizedYear = NormalizeCarYear(dto.CarYear, nameof(dto.CarYear));
             var normalizedLicensePlate = NormalizeRequired(dto.LicensePlate, nameof(dto.LicensePlate), 20).ToUpperInvariant();
-            var normalizedPriceHour = NormalizePrice(dto.PriceHour, nameof(dto.PriceHour));
-            var normalizedPriceDay = NormalizePrice(dto.PriceDay, nameof(dto.PriceDay));
+            var normalizedTransmission = NormalizeOptional(dto.Transmission, 50)?.ToLowerInvariant();
+            var normalizedFuelType = NormalizeOptional(dto.FuelType, 50)?.ToLowerInvariant();
+            var normalizedSeats = NormalizePositiveInt(dto.Seats, nameof(dto.Seats), 20);
+            var normalizedDoors = NormalizePositiveInt(dto.Doors, nameof(dto.Doors), 6);
+            var normalizedBodyType = NormalizeOptional(dto.BodyType, 50)?.ToLowerInvariant();
+            var normalizedHorsepower = NormalizePositiveInt(dto.Horsepower, nameof(dto.Horsepower), 3000);
+            var normalizedSemanticTags = NormalizeSemanticTags(dto.SemanticTags, nameof(dto.SemanticTags));
             var normalizedOwnershipFileName = NormalizeRequired(dto.OwnershipFileName, nameof(dto.OwnershipFileName), 255);
             var normalizedImages = (dto.Images ?? [])
                 .Select((image, index) => new NormalizedProvisionImage(
@@ -206,8 +294,6 @@ namespace CarService.Infrastructure.Services
                         normalizedModel,
                         normalizedYear,
                         normalizedLicensePlate,
-                        normalizedPriceHour,
-                        normalizedPriceDay,
                         normalizedOwnershipFileName,
                         normalizedImages);
 
@@ -221,7 +307,6 @@ namespace CarService.Infrastructure.Services
                 cancellationToken);
 
             var model = await _db.CarModels
-                .AsNoTracking()
                 .Where(carModel =>
                     carModel.BrandId == brand.Id &&
                     carModel.ModelId == modelLookup.Id &&
@@ -246,6 +331,12 @@ namespace CarService.Infrastructure.Services
                     BrandId = brand.Id,
                     ModelId = modelLookup.Id,
                     Year = normalizedYear,
+                    Transmission = normalizedTransmission,
+                    Seats = normalizedSeats,
+                    FuelType = normalizedFuelType,
+                    Doors = normalizedDoors,
+                    BodyType = normalizedBodyType,
+                    Horsepower = normalizedHorsepower,
                     RatingsCount = 0
                 };
 
@@ -264,6 +355,53 @@ namespace CarService.Infrastructure.Services
                 await _db.SaveChangesAsync(cancellationToken);
                 model = createdModel;
             }
+            else
+            {
+                var modelWasChanged = false;
+
+                if (string.IsNullOrWhiteSpace(model.Transmission) && normalizedTransmission is not null)
+                {
+                    model.Transmission = normalizedTransmission;
+                    modelWasChanged = true;
+                }
+
+                if (string.IsNullOrWhiteSpace(model.FuelType) && normalizedFuelType is not null)
+                {
+                    model.FuelType = normalizedFuelType;
+                    modelWasChanged = true;
+                }
+
+                if (!model.Seats.HasValue && normalizedSeats.HasValue)
+                {
+                    model.Seats = normalizedSeats;
+                    modelWasChanged = true;
+                }
+
+                if (!model.Doors.HasValue && normalizedDoors.HasValue)
+                {
+                    model.Doors = normalizedDoors;
+                    modelWasChanged = true;
+                }
+
+                if (string.IsNullOrWhiteSpace(model.BodyType) && normalizedBodyType is not null)
+                {
+                    model.BodyType = normalizedBodyType;
+                    modelWasChanged = true;
+                }
+
+                if (!model.Horsepower.HasValue && normalizedHorsepower.HasValue)
+                {
+                    model.Horsepower = normalizedHorsepower;
+                    modelWasChanged = true;
+                }
+
+                if (modelWasChanged)
+                {
+                    await _db.SaveChangesAsync(cancellationToken);
+                }
+            }
+
+            await SyncSemanticTagsAsync(model.Id, normalizedSemanticTags, cancellationToken);
 
             var entity = new PartnerCar
             {
@@ -271,8 +409,8 @@ namespace CarService.Infrastructure.Services
                 CarModelId = model.Id,
                 LicensePlate = normalizedLicensePlate,
                 OwnershipFileName = normalizedOwnershipFileName,
-                PriceHour = normalizedPriceHour,
-                PriceDay = normalizedPriceDay,
+                PriceHour = null,
+                PriceDay = null,
                 Status = PartnerCarStatus.Available,
                 CreatedAt = DateTimeOffset.UtcNow,
                 RatingsCount = 0,
@@ -301,8 +439,6 @@ namespace CarService.Infrastructure.Services
                         normalizedModel,
                         normalizedYear,
                         normalizedLicensePlate,
-                        normalizedPriceHour,
-                        normalizedPriceDay,
                         normalizedOwnershipFileName,
                         normalizedImages);
 
@@ -319,6 +455,8 @@ namespace CarService.Infrastructure.Services
 
             _db.PartnerCarImages.AddRange(images);
             await _db.SaveChangesAsync(cancellationToken);
+            await _carMarketValueSyncService.EnsureCarModelMarketValueAsync(entity.CarModelId, cancellationToken);
+            await _carSearchIndexEventPublisher.PublishUpsertRequestedAsync(entity.Id, cancellationToken);
 
             var persistedEntity = await _db.PartnerCars
                 .AsNoTracking()
@@ -350,11 +488,10 @@ namespace CarService.Infrastructure.Services
 
             entity.LicensePlate = NormalizeRequired(dto.LicensePlate, nameof(dto.LicensePlate), 20);
             entity.Color = NormalizeOptional(dto.Color, 50);
-            entity.PriceHour = dto.PriceHour;
-            entity.PriceDay = dto.PriceDay;
             entity.Status = dto.Status;
 
             await _db.SaveChangesAsync(cancellationToken);
+            await _carSearchIndexEventPublisher.PublishUpsertRequestedAsync(entity.Id, cancellationToken);
 
             return MapToResponse(entity);
         }
@@ -372,9 +509,119 @@ namespace CarService.Infrastructure.Services
                 throw new UnauthorizedAccessException("You are not allowed to delete this partner car.");
             }
 
+            var partnerCarId = entity.Id;
             _db.PartnerCars.Remove(entity);
             await _db.SaveChangesAsync(cancellationToken);
+            await _carSearchIndexEventPublisher.PublishDeletedAsync(partnerCarId, cancellationToken);
             return true;
+        }
+
+        public async Task<PartnerCarPricingContextDto?> GetPricingContextAsync(
+            int partnerCarId,
+            DateTimeOffset startTime,
+            DateTimeOffset endTime,
+            CancellationToken cancellationToken = default)
+        {
+            if (partnerCarId <= 0)
+            {
+                throw new ArgumentException("PartnerCarId must be greater than zero.", nameof(partnerCarId));
+            }
+
+            if (endTime <= startTime)
+            {
+                throw new ArgumentException("EndTime must be greater than StartTime.", nameof(endTime));
+            }
+
+            var partnerCar = await _db.PartnerCars
+                .AsNoTracking()
+                .IncludeModelCatalog()
+                .FirstOrDefaultAsync(entity => entity.Id == partnerCarId, cancellationToken);
+
+            if (partnerCar is null)
+            {
+                _logger.LogWarning(
+                    "Pricing context was requested for missing partner car {PartnerCarId}.",
+                    partnerCarId);
+
+                await _observabilityLogWriter.WriteAsync(new
+                {
+                    timestamp = DateTimeOffset.UtcNow,
+                    service = "car-service",
+                    level = "Warning",
+                    @event = "partner_car_pricing_context_missing",
+                    partnerCarId,
+                    startTime,
+                    endTime
+                }, cancellationToken);
+
+                return null;
+            }
+
+            var candidateCarIds = await _db.PartnerCars
+                .AsNoTracking()
+                .Where(entity =>
+                    entity.CarModelId == partnerCar.CarModelId &&
+                    entity.Status == PartnerCarStatus.Available)
+                .Select(entity => entity.Id)
+                .ToArrayAsync(cancellationToken);
+
+            var availability = await _bookingReadClient.CheckAvailabilityByCarIdsAsync(
+                candidateCarIds,
+                startTime,
+                endTime,
+                cancellationToken);
+
+            var availableCarsCount = availability.Count(item => item.IsAvailable);
+            var effectiveRating = partnerCar.Rating ?? partnerCar.CarModel.Rating ?? 3.0m;
+            var marketValueFetchedAt = partnerCar.CarModel.MarketValueFetchedAt;
+            var staleCutoff = DateTimeOffset.UtcNow.AddHours(-_marketValueRefreshOptions.RefreshAfterHours);
+            var isMarketValueStale =
+                !partnerCar.CarModel.MarketValueKzt.HasValue ||
+                !marketValueFetchedAt.HasValue ||
+                marketValueFetchedAt <= staleCutoff;
+
+            _logger.LogInformation(
+                "Pricing context prepared for partner car {PartnerCarId}: carModelId={CarModelId}, startTime={StartTime}, endTime={EndTime}, candidateCarsCount={CandidateCarsCount}, currentAvailableCarsCount={CurrentAvailableCarsCount}, rating={Rating}, marketValueKzt={MarketValueKzt}, marketValueFetchedAt={MarketValueFetchedAt}, isMarketValueStale={IsMarketValueStale}.",
+                partnerCar.Id,
+                partnerCar.CarModelId,
+                startTime,
+                endTime,
+                candidateCarIds.Length,
+                availableCarsCount,
+                effectiveRating,
+                partnerCar.CarModel.MarketValueKzt,
+                marketValueFetchedAt,
+                isMarketValueStale);
+
+            await _observabilityLogWriter.WriteAsync(new
+            {
+                timestamp = DateTimeOffset.UtcNow,
+                service = "car-service",
+                level = "Information",
+                @event = "partner_car_pricing_context_prepared",
+                partnerCarId = partnerCar.Id,
+                carModelId = partnerCar.CarModelId,
+                startTime,
+                endTime,
+                candidateCarsCount = candidateCarIds.Length,
+                currentAvailableCarsCount = availableCarsCount,
+                rating = effectiveRating,
+                marketValueKzt = partnerCar.CarModel.MarketValueKzt,
+                marketValueFetchedAt,
+                isMarketValueStale
+            }, cancellationToken);
+
+            return new PartnerCarPricingContextDto
+            {
+                PartnerCarId = partnerCar.Id,
+                PartnerUserId = partnerCar.PartnerUserId,
+                CarModelId = partnerCar.CarModelId,
+                MarketValueKzt = partnerCar.CarModel.MarketValueKzt,
+                MarketValueFetchedAt = marketValueFetchedAt,
+                IsMarketValueStale = isMarketValueStale,
+                Rating = effectiveRating,
+                CurrentAvailableCarsCount = availableCarsCount
+            };
         }
 
         public async Task<IReadOnlyCollection<MyPartnerCarSummaryDto>> GetMyCarsAsync(
@@ -449,6 +696,8 @@ namespace CarService.Infrastructure.Services
                 Seats = entity.CarModel.Seats,
                 FuelType = entity.CarModel.FuelType,
                 Doors = entity.CarModel.Doors,
+                BodyType = entity.CarModel.BodyType,
+                Horsepower = entity.CarModel.Horsepower,
                 Description = entity.CarModel.Description,
                 Images = entity.Images
                     .OrderBy(image => image.DisplayOrder)
@@ -670,6 +919,40 @@ namespace CarService.Infrastructure.Services
                 : Math.Round((decimal)ratings.Average(), 1, MidpointRounding.AwayFromZero);
 
             await _db.SaveChangesAsync(cancellationToken);
+            await _partnerCarDisplayPricingService.RecalculateForPartnerCarAsync(partnerCarId, cancellationToken);
+            await _carSearchIndexEventPublisher.PublishUpsertRequestedAsync(partnerCarId, cancellationToken);
+        }
+
+        private static IReadOnlyCollection<string> ComputeCommercialBadgeKeys(
+            decimal? priceHour,
+            decimal? referencePriceHour = null,
+            int maxBadges = 2)
+        {
+            if (!priceHour.HasValue || priceHour.Value <= 0)
+            {
+                return [];
+            }
+
+            var price = priceHour.Value;
+            var badges = new List<string>(2);
+
+            if (referencePriceHour.HasValue && referencePriceHour.Value > 0
+                && price <= referencePriceHour.Value * DealDiscountRatio
+                && referencePriceHour.Value - price >= DealMinSavings)
+            {
+                badges.Add("deal");
+            }
+
+            if (price <= EconomPriceHourMax)
+            {
+                badges.Add("econom");
+            }
+            else if (price >= PremiumPriceHourMin)
+            {
+                badges.Add("premium");
+            }
+
+            return maxBadges >= badges.Count ? badges : badges.Take(maxBadges).ToList();
         }
 
         private static PartnerCarResponseDto MapToResponse(PartnerCar entity)
@@ -690,7 +973,8 @@ namespace CarService.Infrastructure.Services
                 RatingsCount = entity.RatingsCount,
                 ModelBrand = entity.CarModel.Brand.Name,
                 ModelName = entity.CarModel.ModelLookup.Name,
-                ModelYear = entity.CarModel.Year
+                ModelYear = entity.CarModel.Year,
+                CommercialBadgeKeys = ComputeCommercialBadgeKeys(entity.PriceHour)
             };
         }
 
@@ -753,6 +1037,132 @@ namespace CarService.Infrastructure.Services
             return normalized;
         }
 
+        private static int? NormalizePositiveInt(int? value, string paramName, int maxValue)
+        {
+            if (!value.HasValue)
+            {
+                return null;
+            }
+
+            if (value.Value <= 0 || value.Value > maxValue)
+            {
+                throw new ArgumentException($"{paramName} must be between 1 and {maxValue}.", paramName);
+            }
+
+            return value.Value;
+        }
+
+        private static IReadOnlyCollection<string> NormalizeSemanticTags(
+            IReadOnlyCollection<string>? tags,
+            string paramName)
+        {
+            if (tags is null || tags.Count == 0)
+            {
+                return [];
+            }
+
+            var normalized = new List<string>(tags.Count);
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var tag in tags)
+            {
+                var normalizedTag = NormalizeSemanticTag(tag, paramName);
+                if (seen.Add(normalizedTag))
+                {
+                    normalized.Add(normalizedTag);
+                }
+            }
+
+            return normalized;
+        }
+
+        private static string NormalizeSemanticTag(string? tag, string paramName)
+        {
+            var normalized = NormalizeRequired(tag, paramName, 50).ToLowerInvariant();
+            normalized = normalized switch
+            {
+                "эконом" => "econom",
+                "комфорт" => "comfort",
+                "бизнес" => "business",
+                "спортивная" => "sport",
+                "внедорожник" => "suv",
+                "электро" => "electric",
+                "семейная" => "family",
+                _ => normalized
+            };
+
+            if (!AllowedSemanticTags.Contains(normalized))
+            {
+                throw new ArgumentException($"Unsupported semantic tag '{tag}'.", paramName);
+            }
+
+            return normalized;
+        }
+
+        private async Task SyncSemanticTagsAsync(
+            int modelId,
+            IReadOnlyCollection<string> semanticTags,
+            CancellationToken cancellationToken)
+        {
+            if (semanticTags.Count == 0)
+            {
+                return;
+            }
+
+            var normalizedTags = semanticTags
+                .Select(tag => tag.ToLowerInvariant())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+
+            var existingFeatures = await _db.Features
+                .Where(feature => normalizedTags.Contains(feature.Name.ToLower()))
+                .ToListAsync(cancellationToken);
+
+            var existingFeatureNames = existingFeatures
+                .Select(feature => feature.Name)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            var missingFeatures = normalizedTags
+                .Where(tag => !existingFeatureNames.Contains(tag))
+                .Select(tag => new Feature
+                {
+                    Name = tag,
+                    CreatedOn = DateTime.UtcNow
+                })
+                .ToArray();
+
+            if (missingFeatures.Length > 0)
+            {
+                _db.Features.AddRange(missingFeatures);
+                await _db.SaveChangesAsync(cancellationToken);
+                existingFeatures.AddRange(missingFeatures);
+            }
+
+            var featureIds = existingFeatures.Select(feature => feature.Id).ToArray();
+            var existingLinks = await _db.CarFeatures
+                .Where(link => link.CarId == modelId && featureIds.Contains(link.FeatureId))
+                .Select(link => link.FeatureId)
+                .ToListAsync(cancellationToken);
+
+            var existingLinkIds = existingLinks.ToHashSet();
+            var linksToCreate = featureIds
+                .Where(featureId => !existingLinkIds.Contains(featureId))
+                .Select(featureId => new CarFeature
+                {
+                    CarId = modelId,
+                    FeatureId = featureId
+                })
+                .ToArray();
+
+            if (linksToCreate.Length == 0)
+            {
+                return;
+            }
+
+            _db.CarFeatures.AddRange(linksToCreate);
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+
         private static void EnsureMatchingProvision(
             PartnerCar existingCar,
             Guid relatedUserId,
@@ -760,8 +1170,6 @@ namespace CarService.Infrastructure.Services
             string model,
             int year,
             string licensePlate,
-            decimal priceHour,
-            decimal priceDay,
             string ownershipFileName,
             IReadOnlyCollection<NormalizedProvisionImage> images)
         {
@@ -770,8 +1178,6 @@ namespace CarService.Infrastructure.Services
                 !string.Equals(existingCar.CarModel.ModelLookup.Name, model, StringComparison.Ordinal) ||
                 existingCar.CarModel.Year != year ||
                 !string.Equals(existingCar.LicensePlate, licensePlate, StringComparison.Ordinal) ||
-                existingCar.PriceHour != priceHour ||
-                existingCar.PriceDay != priceDay ||
                 !string.Equals(existingCar.OwnershipFileName, ownershipFileName, StringComparison.Ordinal) ||
                 !HaveMatchingImages(existingCar.Images, images))
             {
@@ -831,16 +1237,6 @@ namespace CarService.Infrastructure.Services
             }
 
             return value;
-        }
-
-        private static decimal NormalizePrice(decimal value, string paramName)
-        {
-            if (value <= 0m || value > 1_000_000m)
-            {
-                throw new ArgumentException($"{paramName} must be greater than 0 and less than or equal to 1000000.", paramName);
-            }
-
-            return Math.Round(value, 2, MidpointRounding.AwayFromZero);
         }
 
         private static double Normalize(double value, double min, double max)
