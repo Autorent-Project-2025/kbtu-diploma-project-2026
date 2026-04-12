@@ -17,7 +17,10 @@ public static class PartnerMappers
         RegistrationDate = entity.RegistrationDate,
         PartnershipEndDate = entity.PartnershipEndDate,
         RelatedUserId = entity.RelatedUserId,
-        PhoneNumber = entity.PhoneNumber
+        PhoneNumber = entity.PhoneNumber,
+        IsActive = entity.IsActive,
+        DeactivatedAt = entity.DeactivatedAt,
+        DeactivationReason = entity.DeactivationReason
     };
 
     public static IQueryable<PartnerResponseDto> SelectToPartnerResponseDto(this IQueryable<Partner> query)
@@ -38,7 +41,10 @@ public static class PartnerMappers
             RegistrationDate = entity.RegistrationDate,
             PartnershipEndDate = entity.PartnershipEndDate,
             RelatedUserId = entity.RelatedUserId,
-            PhoneNumber = entity.PhoneNumber
+            PhoneNumber = entity.PhoneNumber,
+            IsActive = entity.IsActive,
+            DeactivatedAt = entity.DeactivatedAt,
+            DeactivationReason = entity.DeactivationReason
         };
     }
 }

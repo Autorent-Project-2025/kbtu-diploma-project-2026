@@ -16,17 +16,20 @@ public sealed class PartnersController : ControllerBase
     private readonly IFileStorageClient _fileStorageClient;
     private readonly IPartnerPaymentClient _partnerPaymentClient;
     private readonly IPartnerBookingClient _partnerBookingClient;
+    private readonly ICarServiceClient _carServiceClient;
 
     public PartnersController(
         IPartnerService partnerService,
         IFileStorageClient fileStorageClient,
         IPartnerPaymentClient partnerPaymentClient,
-        IPartnerBookingClient partnerBookingClient)
+        IPartnerBookingClient partnerBookingClient,
+        ICarServiceClient carServiceClient)
     {
         _partnerService = partnerService;
         _fileStorageClient = fileStorageClient;
         _partnerPaymentClient = partnerPaymentClient;
         _partnerBookingClient = partnerBookingClient;
+        _carServiceClient = carServiceClient;
     }
 
     [HttpGet]
@@ -82,6 +85,40 @@ public sealed class PartnersController : ControllerBase
         }
 
         return NoContent();
+    }
+
+    [HttpPost("{id:int}/deactivate")]
+    [Authorize(Policy = "partners:deactivate")]
+    public async Task<IActionResult> Deactivate(int id, [FromBody] DeactivatePartnerRequest request, CancellationToken cancellationToken)
+    {
+        var result = await _partnerService.DeactivateAsync(id, request.Reason, cancellationToken);
+        if (result is null)
+            return NotFound(new { error = "Partner not found" });
+
+        // Cascade: deactivate all partner cars
+        if (!result.IsActive && Guid.TryParse(result.RelatedUserId, out var partnerUserId))
+        {
+            await _carServiceClient.SetPartnerCarsActiveAsync(partnerUserId, false, cancellationToken);
+        }
+
+        return Ok(result);
+    }
+
+    [HttpPost("{id:int}/activate")]
+    [Authorize(Policy = "partners:deactivate")]
+    public async Task<IActionResult> Activate(int id, CancellationToken cancellationToken)
+    {
+        var result = await _partnerService.ActivateAsync(id, cancellationToken);
+        if (result is null)
+            return NotFound(new { error = "Partner not found" });
+
+        // Cascade: reactivate all partner cars
+        if (result.IsActive && Guid.TryParse(result.RelatedUserId, out var partnerUserId))
+        {
+            await _carServiceClient.SetPartnerCarsActiveAsync(partnerUserId, true, cancellationToken);
+        }
+
+        return Ok(result);
     }
 
     [HttpGet("me")]

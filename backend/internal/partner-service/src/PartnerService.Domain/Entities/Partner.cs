@@ -36,4 +36,13 @@ public class Partner
 
     [Column("provision_request_key")]
     public string? ProvisionRequestKey { get; set; }
+
+    [Column("is_active")]
+    public bool IsActive { get; set; } = true;
+
+    [Column("deactivated_at")]
+    public DateTime? DeactivatedAt { get; set; }
+
+    [Column("deactivation_reason")]
+    public string? DeactivationReason { get; set; }
 }

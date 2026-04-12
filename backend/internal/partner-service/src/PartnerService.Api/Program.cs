@@ -21,6 +21,7 @@ builder.Services.Configure<InternalAuthOptions>(builder.Configuration.GetSection
 builder.Services.Configure<FileServiceOptions>(builder.Configuration.GetSection(FileServiceOptions.SectionName));
 builder.Services.Configure<PaymentServiceOptions>(builder.Configuration.GetSection(PaymentServiceOptions.SectionName));
 builder.Services.Configure<BookingServiceOptions>(builder.Configuration.GetSection(BookingServiceOptions.SectionName));
+builder.Services.Configure<CarServiceOptions>(builder.Configuration.GetSection(CarServiceOptions.SectionName));
 
 var connectionString = builder.Configuration.GetConnectionString("DbConnection");
 if (string.IsNullOrWhiteSpace(connectionString))
@@ -100,6 +101,9 @@ builder.Services.AddAuthorization(options =>
 
     options.AddPolicy("partners:delete", policy =>
         policy.RequireClaim("permissions", PermissionConstants.PartnerDelete));
+
+    options.AddPolicy("partners:deactivate", policy =>
+        policy.RequireClaim("permissions", PermissionConstants.PartnerDeactivate));
 });
 
 builder.Services.AddScoped<IPartnerService, PartnerService.Infrastructure.Services.PartnerService>();
@@ -149,6 +153,16 @@ builder.Services.AddHttpClient<IPartnerBookingClient, PartnerBookingClient>((ser
     {
         throw new InvalidOperationException("BookingService:InternalApiKey configuration is required.");
     }
+
+    client.BaseAddress = new Uri(NormalizeBaseUrl(options.BaseUrl));
+    client.Timeout = Timeout.InfiniteTimeSpan;
+})
+.AddConfiguredResilience(httpClientResilienceOptions);
+builder.Services.AddHttpClient<ICarServiceClient, CarServiceClient>((serviceProvider, client) =>
+{
+    var options = serviceProvider.GetRequiredService<IOptions<CarServiceOptions>>().Value;
+    if (string.IsNullOrWhiteSpace(options.BaseUrl))
+        throw new InvalidOperationException("CarService:BaseUrl configuration is required.");
 
     client.BaseAddress = new Uri(NormalizeBaseUrl(options.BaseUrl));
     client.Timeout = Timeout.InfiniteTimeSpan;
