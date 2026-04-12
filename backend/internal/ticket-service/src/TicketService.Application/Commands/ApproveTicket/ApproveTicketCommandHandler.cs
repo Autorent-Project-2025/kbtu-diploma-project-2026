@@ -10,15 +10,18 @@ public sealed class ApproveTicketCommandHandler
     private readonly ITicketRepository _ticketRepository;
     private readonly ITicketUnitOfWork _ticketUnitOfWork;
     private readonly ITicketEventPublisher _ticketEventPublisher;
+    private readonly IBookingReadClient _bookingReadClient;
 
     public ApproveTicketCommandHandler(
         ITicketRepository ticketRepository,
         ITicketUnitOfWork ticketUnitOfWork,
-        ITicketEventPublisher ticketEventPublisher)
+        ITicketEventPublisher ticketEventPublisher,
+        IBookingReadClient bookingReadClient)
     {
         _ticketRepository = ticketRepository;
         _ticketUnitOfWork = ticketUnitOfWork;
         _ticketEventPublisher = ticketEventPublisher;
+        _bookingReadClient = bookingReadClient;
     }
 
     public async Task<ApproveTicketResult> Handle(
@@ -42,6 +45,7 @@ public sealed class ApproveTicketCommandHandler
         }
 
         ApplyPartnerCarReviewDataIfNeeded(ticket, command.PartnerCarData);
+        await ValidatePartnerBookingCancellationAsync(ticket, cancellationToken);
 
         var reviewedAtUtc = DateTime.UtcNow;
         ticket.Approve(command.ManagerId, reviewedAtUtc);
@@ -95,5 +99,33 @@ public sealed class ApproveTicketCommandHandler
             partnerCarData.BodyType,
             partnerCarData.Horsepower,
             partnerCarData.ConfirmedTags);
+    }
+
+    private async Task ValidatePartnerBookingCancellationAsync(
+        Domain.Entities.Ticket ticket,
+        CancellationToken cancellationToken)
+    {
+        if (ticket.TicketType != Domain.Enums.TicketType.PartnerBookingCancellation)
+        {
+            return;
+        }
+
+        var bookingId = ticket.BookingId ?? 0;
+        if (bookingId <= 0)
+        {
+            throw new ValidationException("Booking id is required for partner cancellation tickets.");
+        }
+
+        var booking = await _bookingReadClient.GetBookingAsync(bookingId, cancellationToken);
+        if (booking is null)
+        {
+            throw new NotFoundException($"Booking '{bookingId}' was not found.");
+        }
+
+        var bookingStatus = booking.Status.Trim().ToLowerInvariant();
+        if (bookingStatus is "completed" or "canceled")
+        {
+            throw new ValidationException($"Booking cannot be canceled because its status is '{booking.Status}'.");
+        }
     }
 }

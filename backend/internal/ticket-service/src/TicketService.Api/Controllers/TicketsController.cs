@@ -86,7 +86,12 @@ public sealed class TicketsController : ControllerBase
                 await MapToOptionalFilePayloadAsync(request.OwnershipDocumentFile, cancellationToken),
                 await MapToFilePayloadCollectionAsync(request.CarImageFiles, cancellationToken),
                 request.CarImageTypes,
+                request.RelatedPartnerUserId,
                 request.BookingId,
+                request.BookingStatus,
+                request.BookingStartTime,
+                request.BookingEndTime,
+                request.PartnerReason,
                 request.PlannedStartTime,
                 request.PlannedEndTime,
                 request.TripStartedAt,
@@ -262,7 +267,8 @@ public sealed class TicketsController : ControllerBase
             "partner" => TicketType.Partner,
             "partnercar" or "partner-car" or "partner_car" => TicketType.PartnerCar,
             "bookingcompletion" or "booking-completion" or "booking_completion" => TicketType.BookingCompletion,
-            _ => throw new ValidationException("ticketType must be 'Client', 'Partner', 'PartnerCar' or 'BookingCompletion'.")
+            "partnerbookingcancellation" or "partner-booking-cancellation" or "partner_booking_cancellation" => TicketType.PartnerBookingCancellation,
+            _ => throw new ValidationException("ticketType must be 'Client', 'Partner', 'PartnerCar', 'BookingCompletion' or 'PartnerBookingCancellation'.")
         };
     }
 

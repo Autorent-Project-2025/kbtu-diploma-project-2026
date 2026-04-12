@@ -72,6 +72,10 @@ public sealed class CreateTicketCommandHandler
         {
             completionPhotos = await UploadBookingCompletionPhotosAsync(command, cancellationToken);
         }
+        else if (command.TicketType == TicketType.PartnerBookingCancellation)
+        {
+            relatedPartnerUserId = command.RelatedPartnerUserId;
+        }
         else
         {
             identityDocumentFileName = await _fileStorageClient.UploadFileAsync(
@@ -86,8 +90,9 @@ public sealed class CreateTicketCommandHandler
             }
         }
 
-        var ticket = command.TicketType == TicketType.BookingCompletion
-            ? Ticket.CreateBookingCompletion(
+        var ticket = command.TicketType switch
+        {
+            TicketType.BookingCompletion => Ticket.CreateBookingCompletion(
                 Guid.NewGuid(),
                 firstName,
                 lastName,
@@ -100,8 +105,23 @@ public sealed class CreateTicketCommandHandler
                 command.TripCompletedAt ?? default,
                 command.LatePenaltyAmount,
                 completionPhotos ?? [],
-                DateTime.UtcNow)
-            : new Ticket(
+                DateTime.UtcNow),
+            TicketType.PartnerBookingCancellation => Ticket.CreatePartnerBookingCancellation(
+                Guid.NewGuid(),
+                firstName,
+                lastName,
+                email,
+                phoneNumber,
+                command.RelatedPartnerUserId ?? Guid.Empty,
+                command.BookingId ?? 0,
+                command.CarBrand ?? string.Empty,
+                command.CarModel ?? string.Empty,
+                command.BookingStatus ?? string.Empty,
+                command.BookingStartTime ?? default,
+                command.BookingEndTime ?? default,
+                command.PartnerReason ?? string.Empty,
+                DateTime.UtcNow),
+            _ => new Ticket(
                 Guid.NewGuid(),
                 command.TicketType,
                 firstName,
@@ -128,7 +148,8 @@ public sealed class CreateTicketCommandHandler
                 command.SelectedTags,
                 ownershipDocumentFileName,
                 carImages,
-                DateTime.UtcNow);
+                DateTime.UtcNow)
+        };
 
         await _ticketRepository.AddAsync(ticket, cancellationToken);
         await _ticketUnitOfWork.SaveChangesAsync(cancellationToken);
@@ -224,7 +245,7 @@ public sealed class CreateTicketCommandHandler
             throw new ValidationException("Email is required.");
         }
 
-        if (command.TicketType is not TicketType.Client and not TicketType.Partner and not TicketType.PartnerCar and not TicketType.BookingCompletion)
+        if (command.TicketType is not TicketType.Client and not TicketType.Partner and not TicketType.PartnerCar and not TicketType.BookingCompletion and not TicketType.PartnerBookingCancellation)
         {
             throw new ValidationException("Ticket type is invalid.");
         }
@@ -292,6 +313,66 @@ public sealed class CreateTicketCommandHandler
             ValidateImage(command.CompletionSideLeftPhotoFile, nameof(command.CompletionSideLeftPhotoFile));
             ValidateImage(command.CompletionSideRightPhotoFile, nameof(command.CompletionSideRightPhotoFile));
             ValidateImage(command.CompletionInteriorPhotoFile, nameof(command.CompletionInteriorPhotoFile));
+            return;
+        }
+
+        if (command.TicketType == TicketType.PartnerBookingCancellation)
+        {
+            if (string.IsNullOrWhiteSpace(command.FirstName))
+            {
+                throw new ValidationException("First name is required.");
+            }
+
+            if (string.IsNullOrWhiteSpace(command.LastName))
+            {
+                throw new ValidationException("Last name is required.");
+            }
+
+            if (string.IsNullOrWhiteSpace(command.PhoneNumber))
+            {
+                throw new ValidationException("Phone number is required.");
+            }
+
+            if (!command.RelatedPartnerUserId.HasValue || command.RelatedPartnerUserId == Guid.Empty)
+            {
+                throw new ValidationException("RelatedPartnerUserId is required.");
+            }
+
+            if (!command.BookingId.HasValue || command.BookingId.Value <= 0)
+            {
+                throw new ValidationException("BookingId is required.");
+            }
+
+            if (string.IsNullOrWhiteSpace(command.CarBrand))
+            {
+                throw new ValidationException("Car brand is required.");
+            }
+
+            if (string.IsNullOrWhiteSpace(command.CarModel))
+            {
+                throw new ValidationException("Car model is required.");
+            }
+
+            if (string.IsNullOrWhiteSpace(command.BookingStatus))
+            {
+                throw new ValidationException("BookingStatus is required.");
+            }
+
+            if (!command.BookingStartTime.HasValue || !command.BookingEndTime.HasValue)
+            {
+                throw new ValidationException("Booking start and end times are required.");
+            }
+
+            if (command.BookingEndTime.Value < command.BookingStartTime.Value)
+            {
+                throw new ValidationException("BookingEndTime must be greater than or equal to BookingStartTime.");
+            }
+
+            if (string.IsNullOrWhiteSpace(command.PartnerReason))
+            {
+                throw new ValidationException("PartnerReason is required.");
+            }
+
             return;
         }
 
@@ -380,7 +461,7 @@ public sealed class CreateTicketCommandHandler
 
         if (command.TicketType == TicketType.Client)
         {
-            if (command.BirthDate == default)
+            if (command.BirthDate is null || command.BirthDate == default)
             {
                 throw new ValidationException("Birth date is required.");
             }

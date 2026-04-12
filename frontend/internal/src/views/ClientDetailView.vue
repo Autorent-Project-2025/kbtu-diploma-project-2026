@@ -515,7 +515,9 @@ function startEdit() {
   editForm.firstName = client.value.firstName ?? "";
   editForm.lastName = client.value.lastName ?? "";
   editForm.phoneNumber = client.value.phoneNumber ?? "";
-  editForm.birthDate = client.value.birthDate ? client.value.birthDate.split("T")[0] : "";
+  editForm.birthDate = client.value.birthDate
+    ? (client.value.birthDate.split("T")[0] ?? "")
+    : "";
   editMode.value = true;
 }
 
@@ -572,6 +574,7 @@ const ticketTypeLabels: Record<number, string> = {
   2: "Партнёр",
   3: "Авто партнёра",
   4: "Завершение поездки",
+  5: "Отмена бронирования",
 };
 
 const ticketTypeBadgeMap: Record<number, string> = {
@@ -579,6 +582,7 @@ const ticketTypeBadgeMap: Record<number, string> = {
   2: "bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-300",
   3: "bg-orange-100 text-orange-700 dark:bg-orange-500/20 dark:text-orange-300",
   4: "bg-teal-100 text-teal-700 dark:bg-teal-500/20 dark:text-teal-300",
+  5: "bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300",
 };
 
 function ticketTypeLabel(type: number): string {

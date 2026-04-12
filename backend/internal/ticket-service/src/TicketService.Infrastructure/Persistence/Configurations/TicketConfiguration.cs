@@ -77,6 +77,10 @@ public sealed class TicketConfiguration : IEntityTypeConfiguration<Ticket>
         builder.Ignore(ticket => ticket.LatePenaltyAmount);
         builder.Ignore(ticket => ticket.DamageFineAmount);
         builder.Ignore(ticket => ticket.CompletionPhotos);
+        builder.Ignore(ticket => ticket.BookingStatusSnapshot);
+        builder.Ignore(ticket => ticket.BookingStartTime);
+        builder.Ignore(ticket => ticket.BookingEndTime);
+        builder.Ignore(ticket => ticket.PartnerReason);
         builder.Ignore(ticket => ticket.DecisionReason);
         builder.Ignore(ticket => ticket.ReviewedByManagerId);
         builder.Ignore(ticket => ticket.ReviewedAt);

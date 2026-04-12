@@ -45,6 +45,31 @@ public sealed class TicketEventPublisher : ITicketEventPublisher
             return Task.CompletedTask;
         }
 
+        if (ticketApprovedEvent.TicketType == TicketType.PartnerBookingCancellation)
+        {
+            var partnerCancellationEventKey = $"ticket:{ticketApprovedEvent.TicketId}:partner-booking-cancellation-approved";
+            if (_ticketDbContext.TicketWorkflowOutboxMessages.Local.Any(message => message.EventKey == partnerCancellationEventKey))
+            {
+                return Task.CompletedTask;
+            }
+
+            _ticketDbContext.TicketWorkflowOutboxMessages.Add(new TicketWorkflowOutboxMessage
+            {
+                TicketId = ticketApprovedEvent.TicketId,
+                EventKey = partnerCancellationEventKey,
+                EventType = TicketWorkflowOutboxEventTypes.PartnerBookingCancellationApproved,
+                Payload = TicketWorkflowPayloadSerializer.Serialize(new PartnerBookingCancellationApprovedWorkflowPayload
+                {
+                    TicketId = ticketApprovedEvent.TicketId,
+                    CurrentStep = PartnerBookingCancellationApprovedWorkflowStep.NotifyBookingService
+                }),
+                CreatedAt = DateTimeOffset.UtcNow,
+                NextAttemptAt = DateTimeOffset.UtcNow
+            });
+
+            return Task.CompletedTask;
+        }
+
         var eventKey = $"ticket:{ticketApprovedEvent.TicketId}:approved";
         if (_ticketDbContext.TicketWorkflowOutboxMessages.Local.Any(message => message.EventKey == eventKey))
         {
@@ -108,6 +133,31 @@ public sealed class TicketEventPublisher : ITicketEventPublisher
 
         if (ticketRejectedEvent.TicketType == TicketType.BookingCompletion)
         {
+            return Task.CompletedTask;
+        }
+
+        if (ticketRejectedEvent.TicketType == TicketType.PartnerBookingCancellation)
+        {
+            var partnerCancellationEventKey = $"ticket:{ticketRejectedEvent.TicketId}:partner-booking-cancellation-rejected";
+            if (_ticketDbContext.TicketWorkflowOutboxMessages.Local.Any(message => message.EventKey == partnerCancellationEventKey))
+            {
+                return Task.CompletedTask;
+            }
+
+            _ticketDbContext.TicketWorkflowOutboxMessages.Add(new TicketWorkflowOutboxMessage
+            {
+                TicketId = ticketRejectedEvent.TicketId,
+                EventKey = partnerCancellationEventKey,
+                EventType = TicketWorkflowOutboxEventTypes.PartnerBookingCancellationRejected,
+                Payload = TicketWorkflowPayloadSerializer.Serialize(new PartnerBookingCancellationRejectedWorkflowPayload
+                {
+                    TicketId = ticketRejectedEvent.TicketId,
+                    CurrentStep = PartnerBookingCancellationRejectedWorkflowStep.NotifyBookingService
+                }),
+                CreatedAt = DateTimeOffset.UtcNow,
+                NextAttemptAt = DateTimeOffset.UtcNow
+            });
+
             return Task.CompletedTask;
         }
 

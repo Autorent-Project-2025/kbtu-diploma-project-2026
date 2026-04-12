@@ -33,6 +33,7 @@ namespace BookingService.Infrastructure.Services
         private readonly IIdentityUserReadClient _identityUserReadClient;
         private readonly IPartnerProfileReadClient _partnerProfileReadClient;
         private readonly IBookingCompletionTicketClient _bookingCompletionTicketClient;
+        private readonly IPartnerBookingCancellationTicketClient _partnerBookingCancellationTicketClient;
         private readonly IBookingEmailClient _bookingEmailClient;
         private readonly PaymentServiceOptions _paymentServiceOptions;
         private readonly PendingBookingExpirationOptions _pendingBookingExpirationOptions;
@@ -48,6 +49,7 @@ namespace BookingService.Infrastructure.Services
             IIdentityUserReadClient identityUserReadClient,
             IPartnerProfileReadClient partnerProfileReadClient,
             IBookingCompletionTicketClient bookingCompletionTicketClient,
+            IPartnerBookingCancellationTicketClient partnerBookingCancellationTicketClient,
             IBookingEmailClient bookingEmailClient,
             IOptions<PaymentServiceOptions> paymentServiceOptions,
             IOptions<PendingBookingExpirationOptions> pendingBookingExpirationOptions,
@@ -62,6 +64,7 @@ namespace BookingService.Infrastructure.Services
             _identityUserReadClient = identityUserReadClient;
             _partnerProfileReadClient = partnerProfileReadClient;
             _bookingCompletionTicketClient = bookingCompletionTicketClient;
+            _partnerBookingCancellationTicketClient = partnerBookingCancellationTicketClient;
             _bookingEmailClient = bookingEmailClient;
             _paymentServiceOptions = paymentServiceOptions.Value;
             _pendingBookingExpirationOptions = pendingBookingExpirationOptions.Value;
@@ -492,6 +495,81 @@ namespace BookingService.Infrastructure.Services
             return true;
         }
 
+        public async Task<PartnerBookingCancellationRequestResultDto> RequestPartnerCancellation(
+            int id,
+            Guid partnerUserId,
+            string requesterEmail,
+            string reason,
+            CancellationToken cancellationToken = default)
+        {
+            EnsureValidUserId(partnerUserId);
+
+            var booking = await _db.Bookings
+                .FirstOrDefaultAsync(
+                    value => value.Id == id && value.PartnerUserId == partnerUserId,
+                    cancellationToken)
+                ?? throw new KeyNotFoundException("Booking not found.");
+
+            if (booking.Status is BookingStatus.Completed or BookingStatus.Canceled)
+            {
+                throw new InvalidOperationException($"Booking cannot be canceled because its status is '{booking.Status}'.");
+            }
+
+            if (booking.Status is not BookingStatus.Pending and not BookingStatus.Confirmed)
+            {
+                throw new InvalidOperationException("Partner cancellation requests are allowed only for pending or confirmed bookings.");
+            }
+
+            if (booking.PartnerCancellationTicketId.HasValue)
+            {
+                return new PartnerBookingCancellationRequestResultDto
+                {
+                    ReviewTicketId = booking.PartnerCancellationTicketId.Value,
+                    AlreadyPending = true,
+                    Booking = booking.ToBookingResponseDto()
+                };
+            }
+
+            var normalizedRequesterEmail = NormalizeRequiredText(
+                requesterEmail,
+                nameof(requesterEmail),
+                255).ToLowerInvariant();
+            var normalizedReason = NormalizeRequiredText(reason, nameof(reason), 1000);
+            var requesterProfile = await ResolvePartnerCancellationRequesterProfileAsync(
+                partnerUserId,
+                booking.PartnerName,
+                cancellationToken);
+
+            var reviewTicket = await _partnerBookingCancellationTicketClient.CreatePartnerBookingCancellationTicketAsync(
+                new PartnerBookingCancellationTicketCreatePayload
+                {
+                    FirstName = requesterProfile.FirstName,
+                    LastName = requesterProfile.LastName,
+                    Email = normalizedRequesterEmail,
+                    PhoneNumber = requesterProfile.PhoneNumber,
+                    RelatedPartnerUserId = partnerUserId,
+                    BookingId = booking.Id,
+                    CarBrand = booking.CarBrand ?? string.Empty,
+                    CarModel = booking.CarModel ?? string.Empty,
+                    BookingStatus = booking.Status.ToString().ToLowerInvariant(),
+                    BookingStartTime = booking.StartTime,
+                    BookingEndTime = booking.EndTime,
+                    PartnerReason = normalizedReason
+                },
+                cancellationToken);
+
+            booking.PartnerCancellationTicketId = reviewTicket.Id;
+            booking.PartnerCancellationRequestedAt = DateTimeOffset.UtcNow;
+            await _db.SaveChangesAsync(cancellationToken);
+
+            return new PartnerBookingCancellationRequestResultDto
+            {
+                ReviewTicketId = reviewTicket.Id,
+                AlreadyPending = false,
+                Booking = booking.ToBookingResponseDto()
+            };
+        }
+
         public async Task<bool> ConfirmBooking(int id, Guid userId)
         {
             var booking = await GetUserBookingEntity(id, userId);
@@ -862,6 +940,62 @@ namespace BookingService.Infrastructure.Services
                 cancellationToken: cancellationToken);
         }
 
+        public async Task ProcessPartnerCancellationApproved(
+            int bookingId,
+            Guid ticketId,
+            CancellationToken cancellationToken = default)
+        {
+            if (ticketId == Guid.Empty)
+            {
+                throw new ArgumentException("Ticket id is required.", nameof(ticketId));
+            }
+
+            var booking = await GetRequiredBookingEntityById(bookingId, cancellationToken);
+            if (booking.PartnerCancellationTicketId.HasValue &&
+                booking.PartnerCancellationTicketId.Value != ticketId)
+            {
+                throw new InvalidOperationException("Partner cancellation request does not match the booking.");
+            }
+
+            if (booking.Status is BookingStatus.Canceled or BookingStatus.Completed)
+            {
+                return;
+            }
+
+            booking.PartnerCancellationTicketId ??= ticketId;
+            booking.PartnerCancellationRequestedAt ??= DateTimeOffset.UtcNow;
+
+            await PersistStatusTransitionWithPaymentOutbox(
+                booking,
+                BookingStatus.Canceled,
+                cancellationToken);
+        }
+
+        public async Task ProcessPartnerCancellationRejected(
+            int bookingId,
+            Guid ticketId,
+            string decisionReason,
+            CancellationToken cancellationToken = default)
+        {
+            _ = NormalizeRequiredText(decisionReason, nameof(decisionReason), 1000);
+
+            if (ticketId == Guid.Empty)
+            {
+                throw new ArgumentException("Ticket id is required.", nameof(ticketId));
+            }
+
+            var booking = await GetRequiredBookingEntityById(bookingId, cancellationToken);
+            if (booking.PartnerCancellationTicketId.HasValue &&
+                booking.PartnerCancellationTicketId.Value != ticketId)
+            {
+                throw new InvalidOperationException("Partner cancellation request does not match the booking.");
+            }
+
+            booking.PartnerCancellationTicketId = null;
+            booking.PartnerCancellationRequestedAt = null;
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+
         public async Task<BookingStatsDto> GetUserBookingStats(Guid userId, CancellationToken cancellationToken = default)
         {
             EnsureValidUserId(userId);
@@ -1020,6 +1154,51 @@ namespace BookingService.Infrastructure.Services
                 partnerName,
                 NormalizeOptionalUrl(partnerCar.CoverImageUrl),
                 NormalizeImageUrls(partnerCar.ImageUrls, partnerCar.CoverImageUrl));
+        }
+
+        private async Task<(string FirstName, string LastName, string PhoneNumber)> ResolvePartnerCancellationRequesterProfileAsync(
+            Guid partnerUserId,
+            string? fallbackFullName,
+            CancellationToken cancellationToken)
+        {
+            PartnerPublicProfilePayload? partnerProfile = null;
+            try
+            {
+                partnerProfile = await _partnerProfileReadClient.GetPublicProfileByRelatedUserIdAsync(
+                    partnerUserId,
+                    cancellationToken);
+            }
+            catch
+            {
+                partnerProfile = null;
+            }
+
+            var (fallbackFirstName, fallbackLastName) = SplitPersonName(
+                string.IsNullOrWhiteSpace(partnerProfile?.CarrierName)
+                    ? fallbackFullName
+                    : partnerProfile!.CarrierName);
+
+            var firstName = string.IsNullOrWhiteSpace(partnerProfile?.OwnerFirstName)
+                ? fallbackFirstName
+                : partnerProfile.OwnerFirstName.Trim();
+            var lastName = string.IsNullOrWhiteSpace(partnerProfile?.OwnerLastName)
+                ? fallbackLastName
+                : partnerProfile.OwnerLastName.Trim();
+            var phoneNumber = string.IsNullOrWhiteSpace(partnerProfile?.PhoneNumber)
+                ? "Не указан"
+                : partnerProfile.PhoneNumber.Trim();
+
+            if (string.IsNullOrWhiteSpace(firstName))
+            {
+                firstName = "Партнер";
+            }
+
+            if (string.IsNullOrWhiteSpace(lastName))
+            {
+                lastName = "Пользователь";
+            }
+
+            return (firstName, lastName, phoneNumber);
         }
 
         private Task<bool> HasOverlappingActiveBookings(int partnerCarId, DateTimeOffset startTime, DateTimeOffset endTime)
@@ -1212,6 +1391,29 @@ namespace BookingService.Infrastructure.Services
                 .Where(part => !string.IsNullOrWhiteSpace(part));
 
             return string.Join(" ", parts);
+        }
+
+        private static (string FirstName, string LastName) SplitPersonName(string? fullName)
+        {
+            if (string.IsNullOrWhiteSpace(fullName))
+            {
+                return (string.Empty, string.Empty);
+            }
+
+            var parts = fullName
+                .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+            if (parts.Length == 0)
+            {
+                return (string.Empty, string.Empty);
+            }
+
+            if (parts.Length == 1)
+            {
+                return (parts[0], string.Empty);
+            }
+
+            return (parts[0], string.Join(' ', parts.Skip(1)));
         }
 
         private static string NormalizeRequiredText(string? value, string parameterName, int maxLength)

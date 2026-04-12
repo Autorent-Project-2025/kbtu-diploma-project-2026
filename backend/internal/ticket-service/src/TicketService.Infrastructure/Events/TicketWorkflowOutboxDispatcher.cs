@@ -134,6 +134,20 @@ public sealed class TicketWorkflowOutboxDispatcher : BackgroundService
                     break;
                 }
 
+                case TicketWorkflowOutboxEventTypes.PartnerBookingCancellationApproved:
+                {
+                    var payload = TicketWorkflowPayloadSerializer.Deserialize<PartnerBookingCancellationApprovedWorkflowPayload>(message.Payload);
+                    await ProcessPartnerBookingCancellationApprovedWorkflowAsync(serviceProvider, db, message, payload, cancellationToken);
+                    break;
+                }
+
+                case TicketWorkflowOutboxEventTypes.PartnerBookingCancellationRejected:
+                {
+                    var payload = TicketWorkflowPayloadSerializer.Deserialize<PartnerBookingCancellationRejectedWorkflowPayload>(message.Payload);
+                    await ProcessPartnerBookingCancellationRejectedWorkflowAsync(serviceProvider, db, message, payload, cancellationToken);
+                    break;
+                }
+
                 case TicketWorkflowOutboxEventTypes.Rejected:
                 {
                     var payload = TicketWorkflowPayloadSerializer.Deserialize<TicketRejectedWorkflowPayload>(message.Payload);
@@ -504,6 +518,91 @@ public sealed class TicketWorkflowOutboxDispatcher : BackgroundService
                 default:
                     throw new InvalidOperationException(
                         $"Unsupported booking completion fine workflow step '{payload.CurrentStep}'.");
+            }
+        }
+    }
+
+    private async Task ProcessPartnerBookingCancellationApprovedWorkflowAsync(
+        IServiceProvider serviceProvider,
+        TicketDbContext db,
+        TicketWorkflowOutboxMessage message,
+        PartnerBookingCancellationApprovedWorkflowPayload payload,
+        CancellationToken cancellationToken)
+    {
+        var ticket = await LoadRequiredTicketAsync(db, payload.TicketId, cancellationToken);
+        if (ticket.TicketType != TicketType.PartnerBookingCancellation)
+        {
+            throw new InvalidOperationException("Partner booking cancellation approval workflow is valid only for partner booking cancellation tickets.");
+        }
+
+        var bookingAdminClient = serviceProvider.GetRequiredService<IBookingAdminClient>();
+        while (payload.CurrentStep != PartnerBookingCancellationApprovedWorkflowStep.Completed)
+        {
+            switch (payload.CurrentStep)
+            {
+                case PartnerBookingCancellationApprovedWorkflowStep.NotifyBookingService:
+                {
+                    var bookingId = RequireBookingId(ticket.BookingId, nameof(ticket.BookingId));
+                    var approved = await bookingAdminClient.ApprovePartnerCancellationAsync(
+                        bookingId,
+                        ticket.Id,
+                        cancellationToken);
+                    if (!approved)
+                    {
+                        throw new InvalidOperationException($"Failed to approve partner cancellation for booking {bookingId}.");
+                    }
+
+                    payload.CurrentStep = PartnerBookingCancellationApprovedWorkflowStep.Completed;
+                    message.Payload = TicketWorkflowPayloadSerializer.Serialize(payload);
+                    break;
+                }
+
+                default:
+                    throw new InvalidOperationException(
+                        $"Unsupported partner booking cancellation approved workflow step '{payload.CurrentStep}'.");
+            }
+        }
+    }
+
+    private async Task ProcessPartnerBookingCancellationRejectedWorkflowAsync(
+        IServiceProvider serviceProvider,
+        TicketDbContext db,
+        TicketWorkflowOutboxMessage message,
+        PartnerBookingCancellationRejectedWorkflowPayload payload,
+        CancellationToken cancellationToken)
+    {
+        var ticket = await LoadRequiredTicketAsync(db, payload.TicketId, cancellationToken);
+        if (ticket.TicketType != TicketType.PartnerBookingCancellation)
+        {
+            throw new InvalidOperationException("Partner booking cancellation rejection workflow is valid only for partner booking cancellation tickets.");
+        }
+
+        var bookingAdminClient = serviceProvider.GetRequiredService<IBookingAdminClient>();
+        while (payload.CurrentStep != PartnerBookingCancellationRejectedWorkflowStep.Completed)
+        {
+            switch (payload.CurrentStep)
+            {
+                case PartnerBookingCancellationRejectedWorkflowStep.NotifyBookingService:
+                {
+                    var bookingId = RequireBookingId(ticket.BookingId, nameof(ticket.BookingId));
+                    var rejected = await bookingAdminClient.RejectPartnerCancellationAsync(
+                        bookingId,
+                        ticket.Id,
+                        RequireField(ticket.DecisionReason, nameof(ticket.DecisionReason)),
+                        cancellationToken);
+                    if (!rejected)
+                    {
+                        throw new InvalidOperationException($"Failed to reject partner cancellation for booking {bookingId}.");
+                    }
+
+                    payload.CurrentStep = PartnerBookingCancellationRejectedWorkflowStep.Completed;
+                    message.Payload = TicketWorkflowPayloadSerializer.Serialize(payload);
+                    break;
+                }
+
+                default:
+                    throw new InvalidOperationException(
+                        $"Unsupported partner booking cancellation rejected workflow step '{payload.CurrentStep}'.");
             }
         }
     }

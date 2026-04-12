@@ -236,6 +236,7 @@ function ticketTypeLabel(type: number): string {
     2: "Партнёр",
     3: "Авто партнёра",
     4: "Завершение поездки",
+    5: "Отмена бронирования",
   };
   return map[type] ?? String(type);
 }
@@ -246,6 +247,7 @@ function ticketTypeBadge(type: number): string {
     2: "bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-300",
     3: "bg-orange-100 text-orange-700 dark:bg-orange-500/20 dark:text-orange-300",
     4: "bg-teal-100 text-teal-700 dark:bg-teal-500/20 dark:text-teal-300",
+    5: "bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300",
   };
   return map[type] ?? "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300";
 }

@@ -250,6 +250,21 @@ builder.Services.AddHttpClient<IBookingCompletionTicketClient, BookingCompletion
 })
 .AddHttpMessageHandler<ObservabilityHttpClientHandler>()
 .AddConfiguredResilience(httpClientResilienceOptions);
+builder.Services.AddHttpClient<IPartnerBookingCancellationTicketClient, PartnerBookingCancellationTicketClient>((serviceProvider, client) =>
+{
+    var options = serviceProvider
+        .GetRequiredService<Microsoft.Extensions.Options.IOptions<TicketServiceOptions>>()
+        .Value;
+
+    if (!string.IsNullOrWhiteSpace(options.BaseUrl))
+    {
+        client.BaseAddress = new Uri(options.BaseUrl, UriKind.Absolute);
+    }
+
+    client.Timeout = Timeout.InfiniteTimeSpan;
+})
+.AddHttpMessageHandler<ObservabilityHttpClientHandler>()
+.AddConfiguredResilience(httpClientResilienceOptions);
 builder.Services.AddHttpClient<IBookingEmailClient, BookingEmailClient>((serviceProvider, client) =>
 {
     var options = serviceProvider

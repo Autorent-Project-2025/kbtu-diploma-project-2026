@@ -43,6 +43,13 @@ interface PartnerBookingApiDto {
   totalPrice?: number | null;
   createdAt: string;
   status?: string | null;
+  partnerCancellationTicketId?: string | null;
+  partnerCancellationRequestedAt?: string | null;
+}
+
+export interface PartnerCancellationRequestResult {
+  reviewTicketId: string;
+  alreadyPending: boolean;
 }
 
 function normalizeBookingStatus(value: string | null | undefined): BookingStatus {
@@ -102,6 +109,8 @@ function mapBooking(dto: PartnerBookingApiDto): PartnerBooking {
     totalPrice: dto.totalPrice ?? null,
     createdAt: dto.createdAt,
     status: normalizeBookingStatus(dto.status),
+    partnerCancellationTicketId: dto.partnerCancellationTicketId ?? null,
+    partnerCancellationRequestedAt: dto.partnerCancellationRequestedAt ?? null,
   };
 }
 
@@ -153,6 +162,16 @@ export async function getPartnerPublicProfileByRelatedUserId(
   return response.data as PartnerPublicProfile;
 }
 
-export async function cancelPartnerBooking(bookingId: number): Promise<void> {
-  await api.post(`/bookings/${bookingId}/partner-cancel`);
+export async function cancelPartnerBooking(
+  bookingId: number,
+  reason: string
+): Promise<PartnerCancellationRequestResult> {
+  const response = await api.post(`/bookings/${bookingId}/partner-cancel`, {
+    reason,
+  });
+
+  return {
+    reviewTicketId: String(response.data?.reviewTicketId ?? ""),
+    alreadyPending: Boolean(response.data?.alreadyPending),
+  };
 }

@@ -6,6 +6,7 @@ using BookingService.Application.Interfaces.Integrations;
 using BookingService.Api.Contracts.Booking;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 using System.Security.Claims;
 
 namespace BookingService.Api.Controllers
@@ -37,6 +38,21 @@ namespace BookingService.Api.Controllers
             }
 
             return userId;
+        }
+
+        private string GetUserEmail()
+        {
+            var email =
+                User.FindFirstValue(ClaimTypes.Email) ??
+                User.FindFirstValue("email") ??
+                User.FindFirstValue("username");
+
+            if (string.IsNullOrWhiteSpace(email))
+            {
+                throw new UnauthorizedAccessException("Authenticated user email claim is required.");
+            }
+
+            return email.Trim();
         }
 
         [HttpPost]
@@ -135,12 +151,19 @@ namespace BookingService.Api.Controllers
         }
 
         [HttpPost("{id:int}/partner-cancel")]
-        public async Task<IActionResult> PartnerCancel(int id)
+        public async Task<IActionResult> PartnerCancel(
+            int id,
+            [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] PartnerCancelBookingRequest? request,
+            CancellationToken cancellationToken)
         {
-            var result = await _bookingService.CancelBookingByPartner(id, GetUserId());
-            if (!result)
-                return NotFound(new { error = "Booking not found or cannot be canceled." });
-            return Ok(new CommonResponseDto { Message = "Booking canceled by partner" });
+            var result = await _bookingService.RequestPartnerCancellation(
+                id,
+                GetUserId(),
+                GetUserEmail(),
+                request?.Reason ?? string.Empty,
+                cancellationToken);
+
+            return Ok(result);
         }
 
         [HttpPost("{id:int}/confirm")]

@@ -186,6 +186,47 @@ public sealed class InternalBookingsController : ControllerBase
         return Ok(new CommonResponseDto { Message = "Booking completion fine issued." });
     }
 
+    [AllowAnonymous]
+    [HttpPost("{id:int}/partner-cancellation/approve")]
+    public async Task<IActionResult> ApprovePartnerCancellation(
+        int id,
+        [FromBody] ApprovePartnerBookingCancellationRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!IsAuthorizedInternalRequest())
+        {
+            return Unauthorized(new { error = "Internal API key is invalid." });
+        }
+
+        await _bookingService.ProcessPartnerCancellationApproved(
+            id,
+            request.TicketId,
+            cancellationToken);
+
+        return Ok(new CommonResponseDto { Message = "Partner cancellation request approved." });
+    }
+
+    [AllowAnonymous]
+    [HttpPost("{id:int}/partner-cancellation/reject")]
+    public async Task<IActionResult> RejectPartnerCancellation(
+        int id,
+        [FromBody] RejectPartnerBookingCancellationRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!IsAuthorizedInternalRequest())
+        {
+            return Unauthorized(new { error = "Internal API key is invalid." });
+        }
+
+        await _bookingService.ProcessPartnerCancellationRejected(
+            id,
+            request.TicketId,
+            request.DecisionReason,
+            cancellationToken);
+
+        return Ok(new CommonResponseDto { Message = "Partner cancellation request rejected." });
+    }
+
     private static IReadOnlyCollection<int> ParseIds(string? raw)
     {
         if (string.IsNullOrWhiteSpace(raw))

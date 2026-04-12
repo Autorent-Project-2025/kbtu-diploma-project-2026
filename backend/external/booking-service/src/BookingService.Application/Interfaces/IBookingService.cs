@@ -24,6 +24,12 @@ namespace BookingService.Application.Interfaces
         Task<BookingPaymentStatusResponseDto> SubmitPayment(int id, Guid userId, BookingPaymentSubmitRequestDto dto);
         Task<bool> CancelBooking(int id, Guid userId);
         Task<bool> CancelBookingByPartner(int id, Guid partnerUserId);
+        Task<PartnerBookingCancellationRequestResultDto> RequestPartnerCancellation(
+            int id,
+            Guid partnerUserId,
+            string requesterEmail,
+            string reason,
+            CancellationToken cancellationToken = default);
         Task<bool> ConfirmBooking(int id, Guid userId);
         Task<bool> StartTrip(int id, Guid userId);
         Task<BookingCompletionSubmissionResponseDto> SubmitCompletionReview(int id, Guid userId, BookingCompletionSubmissionDto dto);
@@ -49,6 +55,15 @@ namespace BookingService.Application.Interfaces
             string fineComment,
             string customerEmail,
             string customerFullName,
+            CancellationToken cancellationToken = default);
+        Task ProcessPartnerCancellationApproved(
+            int bookingId,
+            Guid ticketId,
+            CancellationToken cancellationToken = default);
+        Task ProcessPartnerCancellationRejected(
+            int bookingId,
+            Guid ticketId,
+            string decisionReason,
             CancellationToken cancellationToken = default);
 
         // Profile stats

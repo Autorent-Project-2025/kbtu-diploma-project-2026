@@ -73,11 +73,24 @@ export interface BookingCompletionTicketData extends TicketDataBase {
   completionPhotos: BookingCompletionTicketPhotoData[];
 }
 
+export interface PartnerBookingCancellationTicketData extends TicketDataBase {
+  $type: "partner-booking-cancellation";
+  bookingId: number;
+  relatedPartnerUserId: string;
+  carBrand: string;
+  carModel: string;
+  bookingStatus: string;
+  bookingStartTime: string;
+  bookingEndTime: string;
+  partnerReason: string;
+}
+
 export type TicketData =
   | ClientTicketData
   | PartnerTicketData
   | PartnerCarTicketData
   | BookingCompletionTicketData
+  | PartnerBookingCancellationTicketData
   | TicketDataBase;
 
 export interface Ticket {

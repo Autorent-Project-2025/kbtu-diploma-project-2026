@@ -29,7 +29,12 @@ public sealed class CreateTicketRequest
     public IFormFile? OwnershipDocumentFile { get; init; }
     public List<IFormFile>? CarImageFiles { get; init; }
     public List<string>? CarImageTypes { get; init; }
+    public Guid? RelatedPartnerUserId { get; init; }
     public int? BookingId { get; init; }
+    public string? BookingStatus { get; init; }
+    public DateTimeOffset? BookingStartTime { get; init; }
+    public DateTimeOffset? BookingEndTime { get; init; }
+    public string? PartnerReason { get; init; }
     public DateTimeOffset? PlannedStartTime { get; init; }
     public DateTimeOffset? PlannedEndTime { get; init; }
     public DateTimeOffset? TripStartedAt { get; init; }
