@@ -242,33 +242,52 @@
               </div>
             </div>
 
-            <div class="h-72 flex items-end gap-3">
+            <div class="space-y-2">
+              <!-- Bars -->
               <div
-                v-for="point in profitPoints"
-                :key="point.isoDate"
-                class="flex-1 min-w-0 h-full flex flex-col justify-end gap-3"
+                class="h-72 flex items-end"
+                :class="selectedPeriod <= 14 ? 'gap-3' : 'gap-1'"
               >
-                <div class="flex-1 flex items-end">
+                <div
+                  v-for="point in profitPoints"
+                  :key="point.isoDate"
+                  class="flex-1 min-w-0 h-full flex items-end"
+                >
                   <div
-                    class="w-full rounded-t-2xl bg-gradient-to-t from-emerald-600 to-emerald-400 dark:from-emerald-500 dark:to-emerald-300 transition-all duration-300"
+                    class="w-full bg-gradient-to-t from-emerald-600 to-emerald-400 dark:from-emerald-500 dark:to-emerald-300 transition-all duration-300"
+                    :class="selectedPeriod <= 14 ? 'rounded-t-2xl' : 'rounded-t-lg'"
                     :style="{
                       height: `${point.heightPercent}%`,
-                      minHeight: point.amount > 0 ? '12px' : '4px',
+                      minHeight: point.amount > 0 ? '8px' : '3px',
                     }"
                     :title="`${point.label}: ${formatMoney(point.amount)}`"
                   ></div>
                 </div>
-                <div class="space-y-1 text-center">
-                  <p
-                    class="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-[0.12em]"
-                  >
-                    {{ point.shortLabel }}
-                  </p>
-                  <p
-                    class="text-xs font-semibold text-gray-700 dark:text-gray-200 truncate"
-                  >
-                    {{ formatCompactMoney(point.amount) }}
-                  </p>
+              </div>
+              <!-- Labels -->
+              <div
+                class="flex"
+                :class="selectedPeriod <= 14 ? 'gap-3' : 'gap-1'"
+              >
+                <div
+                  v-for="(point, idx) in profitPoints"
+                  :key="point.isoDate"
+                  class="flex-1 min-w-0 text-center"
+                >
+                  <template v-if="selectedPeriod <= 14 || idx % 5 === 0 || idx === profitPoints.length - 1">
+                    <p
+                      class="font-bold text-gray-500 dark:text-gray-400 uppercase"
+                      :class="selectedPeriod <= 14 ? 'text-[11px] tracking-[0.12em]' : 'text-[9px] tracking-[0.08em]'"
+                    >
+                      {{ point.shortLabel }}
+                    </p>
+                    <p
+                      v-if="selectedPeriod <= 14"
+                      class="text-xs font-semibold text-gray-700 dark:text-gray-200 truncate"
+                    >
+                      {{ formatCompactMoney(point.amount) }}
+                    </p>
+                  </template>
                 </div>
               </div>
             </div>

@@ -510,7 +510,6 @@ function goToLogin() {
 async function handleBookingConfirm(payloadData: {
   startDate: string;
   endDate: string;
-  useSubscription: boolean;
   partnerCarId: number;
 }) {
   if (!payload.value) {
@@ -525,22 +524,14 @@ async function handleBookingConfirm(payloadData: {
       payloadData.partnerCarId,
       payloadData.startDate,
       payloadData.endDate,
-      payloadData.useSubscription,
     );
 
     success(
-      payloadData.useSubscription
-        ? `${carTitle.value}: бронь создана по подписке.`
-        : `${carTitle.value}: бронь создана, завершите оплату.`,
+      `${carTitle.value}: бронь создана, завершите оплату.`,
     );
 
     closeBookingModal();
-
-    if (payloadData.useSubscription) {
-      await router.push("/bookings");
-    } else {
-      await router.push(`/bookings/${booking.id}/payment`);
-    }
+    await router.push(`/bookings/${booking.id}/payment`);
   } catch (bookingCreateError) {
     console.error("Failed to create direct partner car booking:", bookingCreateError);
     bookingError.value = "Не удалось забронировать машину. Попробуйте снова.";

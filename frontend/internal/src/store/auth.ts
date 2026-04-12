@@ -105,4 +105,10 @@ export const auth = reactive({
       (p) => p.toLowerCase() === permission.toLowerCase(),
     );
   },
+
+  getUserId(): string {
+    const token = this.token || localStorage.getItem("token") || "";
+    const payload = decodeJwtPayload(token);
+    return (payload?.sub as string) || "";
+  },
 });

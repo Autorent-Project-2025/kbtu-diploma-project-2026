@@ -121,6 +121,24 @@ public sealed class InternalBookingsController : ControllerBase
     }
 
     [AllowAnonymous]
+    [HttpPost("{id:int}/cancel")]
+    public async Task<IActionResult> CancelBooking(int id, CancellationToken cancellationToken)
+    {
+        if (!IsAuthorizedInternalRequest())
+        {
+            return Unauthorized(new { error = "Internal API key is invalid." });
+        }
+
+        var result = await _bookingService.CancelBookingByAdmin(id, cancellationToken);
+        if (!result)
+        {
+            return NotFound(new { error = "Booking not found or cannot be canceled." });
+        }
+
+        return Ok(new CommonResponseDto { Message = "Booking canceled." });
+    }
+
+    [AllowAnonymous]
     [HttpPost("{id:int}/completion-review/approve")]
     public async Task<IActionResult> ApproveCompletionReview(
         int id,
@@ -160,6 +178,7 @@ public sealed class InternalBookingsController : ControllerBase
             request.TicketId,
             request.LatePenaltyAmount,
             request.DamageFineAmount,
+            request.FineComment,
             request.CustomerEmail,
             request.CustomerFullName,
             cancellationToken);

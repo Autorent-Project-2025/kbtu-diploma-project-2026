@@ -30,8 +30,10 @@ public static class DependencyInjection
         services.Configure<ClientServiceOptions>(configuration.GetSection(ClientServiceOptions.SectionName));
         services.Configure<PartnerServiceOptions>(configuration.GetSection(PartnerServiceOptions.SectionName));
         services.Configure<BookingServiceOptions>(configuration.GetSection(BookingServiceOptions.SectionName));
+        services.Configure<PaymentServiceOptions>(configuration.GetSection(PaymentServiceOptions.SectionName));
         services.Configure<FileServiceOptions>(configuration.GetSection(FileServiceOptions.SectionName));
         services.Configure<ImageServiceOptions>(configuration.GetSection(ImageServiceOptions.SectionName));
+        services.Configure<ChatServiceOptions>(configuration.GetSection(ChatServiceOptions.SectionName));
         services.Configure<CarServiceOptions>(configuration.GetSection(CarServiceOptions.SectionName));
         services.Configure<ActivationOptions>(configuration.GetSection(ActivationOptions.SectionName));
         services.AddOptions<RabbitMqOptions>()
@@ -74,7 +76,11 @@ public static class DependencyInjection
         services.AddDbContext<TicketDbContext>(options => options.UseNpgsql(connectionString));
         services.AddScoped<ITicketUnitOfWork>(serviceProvider => serviceProvider.GetRequiredService<TicketDbContext>());
         services.AddScoped<ITicketRepository, TicketRepository>();
+        services.AddScoped<IComplaintRepository, ComplaintRepository>();
+        services.AddScoped<IAccessRequestRepository, AccessRequestRepository>();
+        services.AddScoped<IReopenRequestRepository, ReopenRequestRepository>();
         services.AddScoped<ITicketEventPublisher, TicketEventPublisher>();
+        services.AddScoped<TicketService.Application.Complaints.Services.ComplaintChatMigrationService>();
         services.AddSingleton<IRabbitMqPublisher, RabbitMqPublisher>();
         services.AddHostedService<TicketWorkflowOutboxDispatcher>();
 
@@ -121,6 +127,20 @@ public static class DependencyInjection
         .AddConfiguredResilience(httpClientResilienceOptions);
 
         services.AddHttpClient<IBookingCompletionWorkflowClient, BookingCompletionWorkflowClient>((serviceProvider, client) =>
+        {
+            var options = serviceProvider.GetRequiredService<IOptions<BookingServiceOptions>>().Value;
+            if (string.IsNullOrWhiteSpace(options.BaseUrl))
+            {
+                throw new InvalidOperationException("BookingService:BaseUrl configuration is required.");
+            }
+
+            client.BaseAddress = new Uri(NormalizeBaseUrl(options.BaseUrl));
+            client.Timeout = Timeout.InfiniteTimeSpan;
+        })
+        .AddHttpMessageHandler<ObservabilityHttpClientHandler>()
+        .AddConfiguredResilience(httpClientResilienceOptions);
+
+        services.AddHttpClient<IBookingReadClient, BookingReadClient>((serviceProvider, client) =>
         {
             var options = serviceProvider.GetRequiredService<IOptions<BookingServiceOptions>>().Value;
             if (string.IsNullOrWhiteSpace(options.BaseUrl))
@@ -196,6 +216,48 @@ public static class DependencyInjection
             if (string.IsNullOrWhiteSpace(options.BaseUrl))
             {
                 throw new InvalidOperationException("ImageService:BaseUrl configuration is required.");
+            }
+
+            client.BaseAddress = new Uri(NormalizeBaseUrl(options.BaseUrl));
+            client.Timeout = Timeout.InfiniteTimeSpan;
+        })
+        .AddHttpMessageHandler<ObservabilityHttpClientHandler>()
+        .AddConfiguredResilience(httpClientResilienceOptions);
+
+        services.AddHttpClient<IChatServiceClient, ChatServiceClient>((serviceProvider, client) =>
+        {
+            var options = serviceProvider.GetRequiredService<IOptions<ChatServiceOptions>>().Value;
+            if (string.IsNullOrWhiteSpace(options.BaseUrl))
+            {
+                throw new InvalidOperationException("ChatService:BaseUrl configuration is required.");
+            }
+
+            client.BaseAddress = new Uri(NormalizeBaseUrl(options.BaseUrl));
+            client.Timeout = Timeout.InfiniteTimeSpan;
+        })
+        .AddHttpMessageHandler<ObservabilityHttpClientHandler>()
+        .AddConfiguredResilience(httpClientResilienceOptions);
+
+        services.AddHttpClient<IBookingAdminClient, BookingAdminClient>((serviceProvider, client) =>
+        {
+            var options = serviceProvider.GetRequiredService<IOptions<BookingServiceOptions>>().Value;
+            if (string.IsNullOrWhiteSpace(options.BaseUrl))
+            {
+                throw new InvalidOperationException("BookingService:BaseUrl configuration is required.");
+            }
+
+            client.BaseAddress = new Uri(NormalizeBaseUrl(options.BaseUrl));
+            client.Timeout = Timeout.InfiniteTimeSpan;
+        })
+        .AddHttpMessageHandler<ObservabilityHttpClientHandler>()
+        .AddConfiguredResilience(httpClientResilienceOptions);
+
+        services.AddHttpClient<IPaymentClient, PaymentClient>((serviceProvider, client) =>
+        {
+            var options = serviceProvider.GetRequiredService<IOptions<PaymentServiceOptions>>().Value;
+            if (string.IsNullOrWhiteSpace(options.BaseUrl))
+            {
+                throw new InvalidOperationException("PaymentService:BaseUrl configuration is required.");
             }
 
             client.BaseAddress = new Uri(NormalizeBaseUrl(options.BaseUrl));

@@ -34,7 +34,6 @@ namespace BookingService.Infrastructure.Services
         private readonly IPartnerProfileReadClient _partnerProfileReadClient;
         private readonly IBookingCompletionTicketClient _bookingCompletionTicketClient;
         private readonly IBookingEmailClient _bookingEmailClient;
-        private readonly ISubscriptionService _subscriptionService;
         private readonly PaymentServiceOptions _paymentServiceOptions;
         private readonly PendingBookingExpirationOptions _pendingBookingExpirationOptions;
         private readonly ILogger<BookingService> _logger;
@@ -50,7 +49,6 @@ namespace BookingService.Infrastructure.Services
             IPartnerProfileReadClient partnerProfileReadClient,
             IBookingCompletionTicketClient bookingCompletionTicketClient,
             IBookingEmailClient bookingEmailClient,
-            ISubscriptionService subscriptionService,
             IOptions<PaymentServiceOptions> paymentServiceOptions,
             IOptions<PendingBookingExpirationOptions> pendingBookingExpirationOptions,
             ILogger<BookingService> logger)
@@ -65,7 +63,6 @@ namespace BookingService.Infrastructure.Services
             _partnerProfileReadClient = partnerProfileReadClient;
             _bookingCompletionTicketClient = bookingCompletionTicketClient;
             _bookingEmailClient = bookingEmailClient;
-            _subscriptionService = subscriptionService;
             _paymentServiceOptions = paymentServiceOptions.Value;
             _pendingBookingExpirationOptions = pendingBookingExpirationOptions.Value;
             _logger = logger;
@@ -104,8 +101,7 @@ namespace BookingService.Infrastructure.Services
                     partnerCarId,
                     priceQuote,
                     startTime,
-                    endTime,
-                    dto.UseSubscription);
+                    endTime);
             }
 
             for (var attempt = 1; attempt <= MaxSerializableRetries; attempt++)
@@ -118,8 +114,7 @@ namespace BookingService.Infrastructure.Services
                         partnerCarId,
                         priceQuote,
                         startTime,
-                        endTime,
-                        dto.UseSubscription);
+                        endTime);
 
                     await transaction.CommitAsync();
                     await EnsureMockPaymentSessionStartedAsync(booking);
@@ -184,6 +179,70 @@ namespace BookingService.Infrastructure.Services
             IQueryable<Booking> query = _db.Bookings
                 .AsNoTracking()
                 .Where(b => b.UserId == userId);
+
+            query = sortBy switch
+            {
+                "starttime" => isDescending ? query.OrderByDescending(b => b.StartTime) : query.OrderBy(b => b.StartTime),
+                "endtime" => isDescending ? query.OrderByDescending(b => b.EndTime) : query.OrderBy(b => b.EndTime),
+                _ => isDescending ? query.OrderByDescending(b => b.Id) : query.OrderBy(b => b.Id)
+            };
+
+            var totalCount = await query.CountAsync();
+
+            var bookings = await query
+                .Skip((queryParams.Page - 1) * queryParams.PageSize)
+                .Take(queryParams.PageSize)
+                .SelectToBookingResponseDto()
+                .ToListAsync();
+
+            return new PagedResult<BookingResponseDto>
+            {
+                Items = bookings,
+                TotalCount = totalCount,
+                Page = queryParams.Page,
+                PageSize = queryParams.PageSize
+            };
+        }
+
+        public async Task<PagedResult<BookingResponseDto>> GetAllBookingsPaginated(BookingQueryParams queryParams)
+        {
+            ArgumentNullException.ThrowIfNull(queryParams);
+
+            var sortBy = NormalizeSortBy(queryParams.SortBy);
+            var isDescending = string.Equals(queryParams.SortOrder, "desc", StringComparison.OrdinalIgnoreCase);
+
+            IQueryable<Booking> query = _db.Bookings.AsNoTracking();
+
+            if (!string.IsNullOrWhiteSpace(queryParams.Status) &&
+                Enum.TryParse<BookingStatus>(queryParams.Status, true, out var statusFilter))
+            {
+                query = query.Where(b => b.Status == statusFilter);
+            }
+
+            if (queryParams.UserId.HasValue)
+            {
+                query = query.Where(b => b.UserId == queryParams.UserId.Value);
+            }
+
+            if (queryParams.PartnerUserId.HasValue)
+            {
+                query = query.Where(b => b.PartnerUserId == queryParams.PartnerUserId.Value);
+            }
+
+            if (queryParams.PartnerCarId.HasValue)
+            {
+                query = query.Where(b => b.PartnerCarId == queryParams.PartnerCarId.Value);
+            }
+
+            if (!string.IsNullOrWhiteSpace(queryParams.Search))
+            {
+                var q = queryParams.Search.Trim().ToLower();
+                var isIdSearch = int.TryParse(queryParams.Search.Trim(), out var searchId);
+                query = query.Where(b =>
+                    (isIdSearch && b.Id == searchId) ||
+                    (b.CarBrand != null && b.CarBrand.ToLower().Contains(q)) ||
+                    (b.CarModel != null && b.CarModel.ToLower().Contains(q)));
+            }
 
             query = sortBy switch
             {
@@ -339,16 +398,6 @@ namespace BookingService.Infrastructure.Services
         {
             var booking = await GetRequiredUserBookingEntity(id, userId);
 
-            if (booking.UsedSubscription)
-            {
-                if (booking.Status == BookingStatus.Pending)
-                {
-                    await PersistStatusTransitionWithPaymentOutbox(booking, BookingStatus.Confirmed);
-                }
-
-                return MapBookingPaymentStatus(booking, null);
-            }
-
             if (await ExpirePendingBookingIfNeededAsync(booking))
             {
                 var latestExpiredAttempt = await _paymentSyncClient.GetLatestMockPaymentAsync(booking.Id, userId);
@@ -377,16 +426,6 @@ namespace BookingService.Infrastructure.Services
         {
             var booking = await GetRequiredUserBookingEntity(id, userId);
 
-            if (booking.UsedSubscription)
-            {
-                if (booking.Status == BookingStatus.Pending)
-                {
-                    await PersistStatusTransitionWithPaymentOutbox(booking, BookingStatus.Confirmed);
-                }
-
-                return MapBookingPaymentStatus(booking, null);
-            }
-
             await ExpirePendingBookingIfNeededAsync(booking);
             var latestAttempt = await _paymentSyncClient.GetLatestMockPaymentAsync(booking.Id, userId);
             return MapBookingPaymentStatus(booking, latestAttempt);
@@ -397,11 +436,6 @@ namespace BookingService.Infrastructure.Services
             ArgumentNullException.ThrowIfNull(dto);
 
             var booking = await GetRequiredUserBookingEntity(id, userId);
-
-            if (booking.UsedSubscription)
-            {
-                throw new InvalidOperationException("Subscription booking does not require payment submission.");
-            }
 
             if (await ExpirePendingBookingIfNeededAsync(booking))
             {
@@ -634,6 +668,28 @@ namespace BookingService.Infrastructure.Services
                 .ToArray();
         }
 
+        public async Task<IReadOnlyCollection<BookingChargeResponseDto>> GetAllBookingCharges(
+            int id,
+            CancellationToken cancellationToken = default)
+        {
+            if (id <= 0)
+            {
+                throw new ArgumentException("Booking id must be greater than zero.", nameof(id));
+            }
+
+            var booking = await _db.Bookings
+                .AsNoTracking()
+                .FirstOrDefaultAsync(b => b.Id == id, cancellationToken)
+                ?? throw new KeyNotFoundException("Booking not found.");
+
+            var charges = await _paymentSyncClient.GetBookingChargesAsync(booking.Id, cancellationToken);
+
+            return charges
+                .OrderBy(charge => charge.CreatedAt)
+                .Select(MapBookingCharge)
+                .ToArray();
+        }
+
         public async Task<BookingChargeResponseDto> PayBookingCharge(
             int id,
             long chargeId,
@@ -685,6 +741,22 @@ namespace BookingService.Infrastructure.Services
                 .FirstOrDefaultAsync(cancellationToken);
         }
 
+        public async Task<bool> CancelBookingByAdmin(int id, CancellationToken cancellationToken = default)
+        {
+            var booking = await _db.Bookings
+                .FirstOrDefaultAsync(b => b.Id == id, cancellationToken);
+
+            if (booking == null)
+                return false;
+
+            if (booking.Status == BookingStatus.Completed ||
+                booking.Status == BookingStatus.Canceled)
+                return false;
+
+            await PersistStatusTransitionWithPaymentOutbox(booking, BookingStatus.Canceled);
+            return true;
+        }
+
         public async Task ProcessCompletionReviewApproved(
             int bookingId,
             Guid ticketId,
@@ -731,6 +803,7 @@ namespace BookingService.Infrastructure.Services
             Guid ticketId,
             decimal? latePenaltyAmount,
             decimal damageFineAmount,
+            string fineComment,
             string customerEmail,
             string customerFullName,
             CancellationToken cancellationToken = default)
@@ -755,7 +828,7 @@ namespace BookingService.Infrastructure.Services
                 booking,
                 "DamageFine",
                 damageFineAmount,
-                $"Damage fine for booking #{booking.Id}.",
+                BuildDamageFineDescription(booking.Id, fineComment),
                 cancellationToken);
 
             var pendingDamageFines = await _paymentSyncClient.GetUserBookingChargesAsync(
@@ -784,7 +857,8 @@ namespace BookingService.Infrastructure.Services
                     booking.Id,
                     customerFullName,
                     damageFineAmount,
-                    latePenaltyAmount),
+                    latePenaltyAmount,
+                    fineComment),
                 cancellationToken: cancellationToken);
         }
 
@@ -823,8 +897,7 @@ namespace BookingService.Infrastructure.Services
             int partnerCarId,
             BookingPriceQuoteDto priceQuote,
             DateTimeOffset startTime,
-            DateTimeOffset endTime,
-            bool useSubscription)
+            DateTimeOffset endTime)
         {
             await InMemoryCreateLock.WaitAsync();
             try
@@ -834,8 +907,7 @@ namespace BookingService.Infrastructure.Services
                     partnerCarId,
                     priceQuote,
                     startTime,
-                    endTime,
-                    useSubscription);
+                    endTime);
 
                 await EnsureMockPaymentSessionStartedAsync(booking);
                 return booking.ToBookingResponseDto();
@@ -851,35 +923,11 @@ namespace BookingService.Infrastructure.Services
             int partnerCarId,
             BookingPriceQuoteDto priceQuote,
             DateTimeOffset startTime,
-            DateTimeOffset endTime,
-            bool useSubscription)
+            DateTimeOffset endTime)
         {
             if (await HasOverlappingActiveBookings(partnerCarId, startTime, endTime))
             {
                 throw new InvalidOperationException("Car is already booked for this time.");
-            }
-
-            decimal? totalPrice = null;
-            int? subscriptionId = null;
-            var usedSubscription = false;
-
-            if (useSubscription)
-            {
-                var activeSubscription = await GetRequiredActiveSubscription(userId);
-
-                if (activeSubscription.UsedBookings >= activeSubscription.IncludedBookings)
-                {
-                    throw new InvalidOperationException("No remaining bookings in active subscription.");
-                }
-
-                activeSubscription.UsedBookings += 1;
-                subscriptionId = activeSubscription.Id;
-                usedSubscription = true;
-                totalPrice = 0m;
-            }
-            else
-            {
-                totalPrice = priceQuote.TotalPrice;
             }
 
             var displaySnapshot = await GetBookingDisplaySnapshotAsync(
@@ -899,9 +947,7 @@ namespace BookingService.Infrastructure.Services
                 EndTime = endTime,
                 Status = BookingStatus.Pending,
                 PriceHour = priceQuote.PriceHour,
-                TotalPrice = totalPrice,
-                SubscriptionId = subscriptionId,
-                UsedSubscription = usedSubscription,
+                TotalPrice = priceQuote.TotalPrice,
                 CreatedAt = DateTimeOffset.UtcNow,
                 TripStartedAt = null,
                 TripCompletedAt = null,
@@ -984,22 +1030,6 @@ namespace BookingService.Infrastructure.Services
                     (b.Status == BookingStatus.Pending || b.Status == BookingStatus.Confirmed || b.Status == BookingStatus.Active) &&
                     startTime < b.EndTime &&
                     endTime > b.StartTime);
-        }
-
-        private async Task<Subscription> GetRequiredActiveSubscription(Guid userId)
-        {
-            var subscription = await _db.Subscriptions
-                .FirstOrDefaultAsync(x =>
-                    x.UserId == userId &&
-                    x.Status == "active" &&
-                    x.EndDate > DateTimeOffset.UtcNow);
-
-            if (subscription == null)
-            {
-                throw new InvalidOperationException("No active subscription found.");
-            }
-
-            return subscription;
         }
 
         private async Task<Booking?> GetUserBookingEntity(int id, Guid userId)
@@ -1318,7 +1348,8 @@ namespace BookingService.Infrastructure.Services
             int bookingId,
             string customerFullName,
             decimal damageFineAmount,
-            decimal? latePenaltyAmount)
+            decimal? latePenaltyAmount,
+            string? fineComment)
         {
             var normalizedName = string.IsNullOrWhiteSpace(customerFullName) ? "Customer" : customerFullName.Trim();
             var fineText = $"{normalizedName}, по бронированию #{bookingId} начислен штраф за повреждение: {RoundCurrency(damageFineAmount):0.00} KZT.";
@@ -1327,7 +1358,22 @@ namespace BookingService.Infrastructure.Services
                 fineText += $" Дополнительно начислена пеня за поздний возврат: {RoundCurrency(latePenaltyAmount.Value):0.00} KZT.";
             }
 
+            if (!string.IsNullOrWhiteSpace(fineComment))
+            {
+                fineText += $" Комментарий менеджера: {fineComment.Trim()}.";
+            }
+
             return fineText + " Пока штраф не будет оплачен, создание и начало новых броней будут заблокированы.";
+        }
+
+        private static string BuildDamageFineDescription(int bookingId, string? fineComment)
+        {
+            if (string.IsNullOrWhiteSpace(fineComment))
+            {
+                return $"Damage fine for booking #{bookingId}.";
+            }
+
+            return $"Damage fine for booking #{bookingId}: {fineComment.Trim()}";
         }
 
         private async Task PersistStatusTransitionWithPaymentOutbox(
@@ -1441,7 +1487,7 @@ namespace BookingService.Infrastructure.Services
             {
                 BookingStatus.Pending => targetStatus is BookingStatus.Confirmed or BookingStatus.Canceled,
                 BookingStatus.Confirmed => targetStatus is BookingStatus.Active or BookingStatus.Completed or BookingStatus.Canceled,
-                BookingStatus.Active => targetStatus is BookingStatus.AwaitingReview or BookingStatus.Completed,
+                BookingStatus.Active => targetStatus is BookingStatus.AwaitingReview or BookingStatus.Completed or BookingStatus.Canceled,
                 BookingStatus.AwaitingReview => targetStatus is BookingStatus.Completed or BookingStatus.Canceled,
                 BookingStatus.Completed => false,
                 BookingStatus.Canceled => false,
@@ -1472,7 +1518,7 @@ namespace BookingService.Infrastructure.Services
             Booking booking,
             CancellationToken cancellationToken = default)
         {
-            if (booking.UsedSubscription || booking.Status != BookingStatus.Pending)
+            if (booking.Status != BookingStatus.Pending)
             {
                 return;
             }

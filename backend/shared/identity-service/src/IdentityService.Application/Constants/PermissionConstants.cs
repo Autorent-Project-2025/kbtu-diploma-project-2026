@@ -18,6 +18,7 @@ public static class PermissionConstants
     public const string TicketView = "Ticket.View";
     public const string TicketApprove = "Ticket.Approve";
     public const string TicketReject = "Ticket.Reject";
+    public const string TicketViewAll = "Ticket.ViewAll";
     public const string FileCreate = "File.Create";
     public const string FileRead = "File.Read";
     public const string FileDelete = "File.Delete";
@@ -31,4 +32,9 @@ public static class PermissionConstants
     public const string PartnerCreate = "Partner.Create";
     public const string PartnerUpdate = "Partner.Update";
     public const string PartnerDelete = "Partner.Delete";
+    public const string BookingView = "Booking.View";
+    public const string BookingUpdate = "Booking.Update";
+    public const string BookingDelete = "Booking.Delete";
+    public const string PartnerCarView = "PartnerCar.View";
+    public const string ClientBlock = "Client.Block";
 }

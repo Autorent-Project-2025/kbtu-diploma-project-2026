@@ -22,9 +22,9 @@ public class ClientsController : ControllerBase
 
     [HttpGet]
     [Authorize(Policy = "clients:view")]
-    public async Task<IActionResult> GetAll(CancellationToken cancellationToken)
+    public async Task<IActionResult> GetAll([FromQuery] string? search, CancellationToken cancellationToken)
     {
-        var clients = await _clientService.GetAllAsync(cancellationToken);
+        var clients = await _clientService.GetAllAsync(search, cancellationToken);
         return Ok(clients);
     }
 

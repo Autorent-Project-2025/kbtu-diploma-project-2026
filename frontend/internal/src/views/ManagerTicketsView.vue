@@ -1,60 +1,53 @@
 <template>
   <div class="min-h-screen bg-gray-50 dark:bg-gray-950 py-8 px-6 space-y-6">
-    <!-- Hero header -->
-    <header
-      class="relative overflow-hidden rounded-[28px] border border-gray-200 dark:border-gray-800 bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.18),_transparent_38%),radial-gradient(circle_at_bottom_right,_rgba(59,130,246,0.16),_transparent_40%),linear-gradient(135deg,_rgba(255,255,255,0.96),_rgba(243,244,246,0.92))] dark:bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.22),_transparent_35%),radial-gradient(circle_at_bottom_right,_rgba(59,130,246,0.22),_transparent_40%),linear-gradient(135deg,_rgba(17,24,39,0.98),_rgba(3,7,18,0.96))] shadow-2xl p-8"
-    >
-      <div
-        class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6"
-      >
-        <div class="space-y-3">
-          <p
-            class="text-xs font-bold uppercase tracking-[0.3em] text-emerald-600 dark:text-emerald-400"
-          >
-            Internal Panel
-          </p>
-          <h1 class="text-4xl font-extrabold text-gray-900 dark:text-white">
-            Рабочая очередь
-          </h1>
-          <p class="text-gray-600 dark:text-gray-400">
-            Проверяйте новые регистрации, открывайте документы и принимайте
-            решение по каждой заявке.
-          </p>
-        </div>
-
-        <!-- Stats strip -->
-        <div class="flex flex-wrap gap-3 items-center">
-          <div
-            class="flex rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow overflow-hidden"
-          >
-            <div
-              v-for="(stat, i) in statsStrip"
-              :key="stat.label"
-              :class="[
-                'px-5 py-3 text-center',
-                i > 0 ? 'border-l border-gray-200 dark:border-gray-800' : '',
-              ]"
-            >
-              <p class="text-2xl font-extrabold text-gray-900 dark:text-white">
-                {{ stat.value }}
-              </p>
-              <p
-                class="text-xs text-gray-500 dark:text-gray-400 font-semibold uppercase tracking-wider mt-0.5"
-              >
-                {{ stat.label }}
-              </p>
-            </div>
+    <!-- Header -->
+    <div class="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 rounded-2xl">
+      <div class="max-w-7xl mx-auto px-6 py-6">
+        <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+          <div class="space-y-1">
+            <p class="text-xs font-bold uppercase tracking-[0.3em] text-emerald-600 dark:text-emerald-400">
+              Operations CRM
+            </p>
+            <h1 class="text-2xl font-extrabold text-gray-900 dark:text-white">
+              Рабочая очередь
+            </h1>
+            <p class="text-sm text-gray-500 dark:text-gray-400">
+              Проверяйте новые регистрации, открывайте документы и принимайте решение по каждой заявке.
+            </p>
           </div>
-          <button
-            @click="loadPending"
-            :disabled="loading"
-            class="px-5 py-3 rounded-2xl border border-gray-300 dark:border-gray-700 text-gray-800 dark:text-gray-100 font-semibold hover:border-emerald-500 transition-colors disabled:opacity-60"
-          >
-            Обновить
-          </button>
+
+          <!-- Stats strip -->
+          <div class="flex flex-wrap gap-3 items-center">
+            <div
+              class="flex rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow overflow-hidden"
+            >
+              <div
+                v-for="(stat, i) in statsStrip"
+                :key="stat.label"
+                :class="[
+                  'px-5 py-3 text-center',
+                  i > 0 ? 'border-l border-gray-200 dark:border-gray-800' : '',
+                ]"
+              >
+                <p class="text-2xl font-extrabold text-gray-900 dark:text-white">
+                  {{ stat.value }}
+                </p>
+                <p class="text-xs text-gray-500 dark:text-gray-400 font-semibold uppercase tracking-wider mt-0.5">
+                  {{ stat.label }}
+                </p>
+              </div>
+            </div>
+            <button
+              @click="loadPending"
+              :disabled="loading"
+              class="px-5 py-3 rounded-2xl border border-gray-300 dark:border-gray-700 text-gray-800 dark:text-gray-100 font-semibold hover:border-emerald-500 transition-colors disabled:opacity-60"
+            >
+              Обновить
+            </button>
+          </div>
         </div>
       </div>
-    </header>
+    </div>
 
     <!-- Уведомления через toast-систему -->
 
@@ -94,7 +87,7 @@
             v-if="lastUpdatedAt"
             class="text-xs text-gray-400 dark:text-gray-500 mt-1"
           >
-            Обновлено {{ formatDate(lastUpdatedAt) }}
+            Обновлено {{ formatDateTime(lastUpdatedAt) }}
           </p>
         </div>
 
@@ -116,7 +109,7 @@
                   <div
                     class="w-9 h-9 flex-shrink-0 rounded-xl bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 flex items-center justify-center text-xs font-bold"
                   >
-                    {{ getInitials(ticket.fullName) }}
+                    {{ userInitials(ticket.fullName) }}
                   </div>
                   <div class="min-w-0">
                     <p
@@ -142,7 +135,7 @@
                 class="flex justify-between mt-2 pl-12 text-xs text-gray-400 dark:text-gray-500"
               >
                 <span>{{ ticket.phoneNumber }}</span>
-                <span>{{ formatDate(ticket.createdAt) }}</span>
+                <span>{{ formatDateTime(ticket.createdAt) }}</span>
               </div>
             </button>
           </li>
@@ -162,7 +155,7 @@
             <div
               class="w-12 h-12 flex-shrink-0 rounded-2xl bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 flex items-center justify-center text-base font-extrabold"
             >
-              {{ getInitials(selectedTicket.fullName) }}
+              {{ userInitials(selectedTicket.fullName) }}
             </div>
             <div>
               <h2 class="text-2xl font-extrabold text-gray-900 dark:text-white">
@@ -183,7 +176,7 @@
                 statusLabel(selectedTicket.status)
               }}</span>
             </p>
-            <p>Создана: {{ formatDate(selectedTicket.createdAt) }}</p>
+            <p>Создана: {{ formatDateTime(selectedTicket.createdAt) }}</p>
           </div>
         </div>
 
@@ -428,7 +421,7 @@
                     @click="openImage(image.imageUrl)"
                     class="px-4 py-2 rounded-xl border border-gray-300 dark:border-gray-700 text-sm font-semibold text-gray-700 dark:text-gray-300 hover:border-emerald-500 transition-colors"
                   >
-                    Фото {{ index + 1 }}
+                    {{ partnerCarImageTypeLabel(image.imageType, index) }}
                   </button>
                 </div>
               </div>
@@ -472,7 +465,8 @@
                 </h3>
                 <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">
                   Причину нужно указать только для отказа. Для завершения
-                  поездки вместо отказа можно выставить штраф.
+                  поездки вынесите решение в отдельном блоке: либо одобрение,
+                  либо штраф с комментарием.
                 </p>
               </div>
 
@@ -493,24 +487,77 @@
                 />
               </div>
 
-              <div v-else class="space-y-1.5">
-                <label
-                  for="fineAmount"
-                  class="block text-xs font-bold uppercase tracking-[0.1em] text-gray-500 dark:text-gray-400"
-                  >Сумма штрафа</label
-                >
-                <input
-                  id="fineAmount"
-                  v-model="fineAmount"
-                  type="number"
-                  min="0.01"
-                  step="0.01"
-                  placeholder="Например 15000"
-                  class="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-colors placeholder-gray-400"
-                />
+              <div v-else class="space-y-4">
+                <div class="rounded-2xl border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50/70 dark:bg-emerald-500/10 p-4 space-y-3">
+                  <div>
+                    <p class="text-xs font-bold uppercase tracking-[0.14em] text-emerald-700 dark:text-emerald-300">
+                      Одобрение без штрафа
+                    </p>
+                    <p class="text-xs text-emerald-700/80 dark:text-emerald-200/80 mt-1">
+                      Кнопка активна только когда блок штрафа пустой.
+                    </p>
+                  </div>
+                  <button
+                    @click="approveSelected"
+                    :disabled="actionLoading || !canApproveSelected"
+                    class="w-full px-5 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed text-white font-bold shadow-lg shadow-emerald-500/20 transition-colors"
+                  >
+                    {{ actionLoading ? "Обработка..." : "✓ Одобрить завершение" }}
+                  </button>
+                </div>
+
+                <div class="rounded-2xl border border-red-200 dark:border-red-500/30 bg-red-50/70 dark:bg-red-500/10 p-4 space-y-4">
+                  <div>
+                    <p class="text-xs font-bold uppercase tracking-[0.14em] text-red-700 dark:text-red-300">
+                      Выставление штрафа
+                    </p>
+                    <p class="text-xs text-red-700/80 dark:text-red-200/80 mt-1">
+                      Укажите сумму и обязательно добавьте комментарий, чтобы клиент видел причину начисления.
+                    </p>
+                  </div>
+
+                  <div class="space-y-1.5">
+                    <label
+                      for="fineAmount"
+                      class="block text-xs font-bold uppercase tracking-[0.1em] text-gray-500 dark:text-gray-400"
+                      >Сумма штрафа</label
+                    >
+                    <input
+                      id="fineAmount"
+                      v-model="fineAmount"
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      placeholder="Например 15000"
+                      class="w-full px-4 py-3 rounded-xl border border-red-200 dark:border-red-500/30 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:border-red-500 focus:ring-2 focus:ring-red-500/20 transition-colors placeholder-gray-400"
+                    />
+                  </div>
+
+                  <div class="space-y-1.5">
+                    <label
+                      for="fineComment"
+                      class="block text-xs font-bold uppercase tracking-[0.1em] text-gray-500 dark:text-gray-400"
+                      >Комментарий к штрафу</label
+                    >
+                    <textarea
+                      id="fineComment"
+                      v-model="fineComment"
+                      placeholder="Опишите повреждение, недостающие элементы или иную причину начисления"
+                      class="w-full px-4 py-3 rounded-xl border border-red-200 dark:border-red-500/30 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm min-h-[110px] resize-y focus:outline-none focus:border-red-500 focus:ring-2 focus:ring-red-500/20 transition-colors placeholder-gray-400"
+                    />
+                  </div>
+
+                  <button
+                    @click="issueFineSelected"
+                    :disabled="actionLoading"
+                    class="w-full px-5 py-3 rounded-2xl border border-red-300 dark:border-red-700 text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-60 disabled:cursor-not-allowed font-bold transition-colors"
+                  >
+                    {{ actionLoading ? "Обработка..." : "Выставить штраф" }}
+                  </button>
+                </div>
               </div>
 
-              <div class="flex flex-col gap-3">
+              <div v-if="!isBookingCompletionTicket(selectedTicket)" class="flex flex-col gap-3">
                 <button
                   @click="approveSelected"
                   :disabled="actionLoading"
@@ -519,21 +566,11 @@
                   {{ actionLoading ? "Обработка..." : "✓ Одобрить" }}
                 </button>
                 <button
-                  @click="
-                    isBookingCompletionTicket(selectedTicket)
-                      ? issueFineSelected()
-                      : rejectSelected()
-                  "
+                  @click="rejectSelected"
                   :disabled="actionLoading"
                   class="w-full px-5 py-3 rounded-2xl border border-red-300 dark:border-red-700 text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-60 disabled:cursor-not-allowed font-bold transition-colors"
                 >
-                  {{
-                    actionLoading
-                      ? "Обработка..."
-                      : isBookingCompletionTicket(selectedTicket)
-                        ? "Выставить штраф"
-                        : "✕ Отклонить"
-                  }}
+                  {{ actionLoading ? "Обработка..." : "✕ Отклонить" }}
                 </button>
               </div>
             </div>
@@ -563,21 +600,23 @@ import type {
   PartnerCarTicketImageData,
   Ticket,
 } from "../types/Ticket";
+import { formatDateTime, userInitials } from "../utils/formatters";
 
 const tickets = ref<Ticket[]>([]);
 const selectedTicket = ref<Ticket | null>(null);
 const selectedTicketId = ref<string>("");
 const rejectReason = ref("");
 const fineAmount = ref("");
+const fineComment = ref("");
 const loading = ref(false);
 const actionLoading = ref(false);
-const { success: toastSuccess, error: toastError } = useToast();
+const toast = useToast();
 const lastUpdatedAt = ref<string>("");
 const maxAllowedCarYear = new Date().getUTCFullYear() + 1;
 
 type PartnerCarFormField = {
   id: string;
-  key: "carBrand" | "carModel" | "carYear" | "licensePlate" | "email";
+  key: "carBrand" | "carModel" | "carYear" | "licensePlate";
   label: string;
   type?: string;
   min?: string;
@@ -590,7 +629,6 @@ const partnerCarForm = reactive({
   carModel: "",
   carYear: null as number | null,
   licensePlate: "",
-  email: "",
 });
 
 const carFormFields: PartnerCarFormField[] = [
@@ -605,7 +643,6 @@ const carFormFields: PartnerCarFormField[] = [
     max: String(maxAllowedCarYear),
   },
   { id: "licensePlate", key: "licensePlate", label: "Госномер" },
-  { id: "contactEmail", key: "email", label: "Email партнёра", type: "email" },
 ];
 
 const partnerCarImages = computed<PartnerCarTicketImageData[]>(() => {
@@ -735,6 +772,14 @@ const summaryRows = computed(() => {
   return rows;
 });
 
+const canApproveSelected = computed(() => {
+  if (!isBookingCompletionTicket(selectedTicket.value)) {
+    return true;
+  }
+
+  return !fineAmount.value.trim() && !fineComment.value.trim();
+});
+
 function statusLabel(status: number) {
   if (status === 1) return "На рассмотрении";
   if (status === 2) return "Одобрена";
@@ -760,12 +805,6 @@ function getTicketTypeBadgeClass(ticketType: number) {
   return "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300";
 }
 
-function getInitials(value: string) {
-  const parts = value.trim().split(/\s+/).filter(Boolean).slice(0, 2);
-  if (parts.length === 0) return "AR";
-  return parts.map((p) => p[0]?.toUpperCase() ?? "").join("");
-}
-
 function isClientTicket(ticket: Ticket) {
   return ticket.ticketType === 1;
 }
@@ -788,13 +827,13 @@ function completionPhotoLabel(slot: string) {
   return slot;
 }
 
-function formatDate(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat("ru-RU", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(date);
+function partnerCarImageTypeLabel(imageType?: string | null, index?: number) {
+  if (imageType === "front") return "Фото спереди";
+  if (imageType === "back") return "Фото сзади";
+  if (imageType === "side") return "Фото сбоку";
+  if (imageType === "interior") return "Фото салона";
+  if (imageType === "general") return "Общий вид";
+  return `Фото ${(index ?? 0) + 1}`;
 }
 
 function syncPartnerCarForm(ticket: Ticket | null) {
@@ -804,7 +843,6 @@ function syncPartnerCarForm(ticket: Ticket | null) {
       carModel: "",
       carYear: null,
       licensePlate: "",
-      email: "",
     });
     return;
   }
@@ -818,7 +856,6 @@ function syncPartnerCarForm(ticket: Ticket | null) {
     data?.licensePlate ??
     ""
   ).trim();
-  partnerCarForm.email = (ticket.email ?? "").trim();
 }
 
 function buildPartnerCarPayload(): PartnerCarReviewPayload | null | undefined {
@@ -828,20 +865,13 @@ function buildPartnerCarPayload(): PartnerCarReviewPayload | null | undefined {
   const carModel = partnerCarForm.carModel.trim();
   const carYear = Number(partnerCarForm.carYear);
   const licensePlate = partnerCarForm.licensePlate.trim();
-  const email = partnerCarForm.email.trim();
 
-  if (
-    !carBrand ||
-    !carModel ||
-    !licensePlate ||
-    !email ||
-    !Number.isInteger(carYear)
-  ) {
-    toastError("Заполните марку, модель, год, госномер и email.");
+  if (!carBrand || !carModel || !licensePlate || !Number.isInteger(carYear)) {
+    toast.error("Заполните марку, модель, год и госномер.");
     return null;
   }
   if (carYear < 1886 || carYear > maxAllowedCarYear) {
-    toastError(`Год машины должен быть в диапазоне 1886-${maxAllowedCarYear}.`);
+    toast.error(`Год машины должен быть в диапазоне 1886-${maxAllowedCarYear}.`);
     return null;
   }
   return {
@@ -849,8 +879,13 @@ function buildPartnerCarPayload(): PartnerCarReviewPayload | null | undefined {
     carModel,
     carYear,
     licensePlate,
-    email,
   };
+}
+
+function resetDecisionForm() {
+  rejectReason.value = "";
+  fineAmount.value = "";
+  fineComment.value = "";
 }
 
 async function loadPending() {
@@ -862,6 +897,7 @@ async function loadPending() {
     if (data.length === 0) {
       selectedTicket.value = null;
       selectedTicketId.value = "";
+      resetDecisionForm();
       syncPartnerCarForm(null);
       return;
     }
@@ -869,6 +905,7 @@ async function loadPending() {
     if (!fallback) {
       selectedTicket.value = null;
       selectedTicketId.value = "";
+      resetDecisionForm();
       syncPartnerCarForm(null);
       return;
     }
@@ -877,9 +914,7 @@ async function loadPending() {
       : fallback.id;
     await selectTicket(nextId);
   } catch (e: any) {
-    toastError(
-      e?.response?.data?.error || "Не удалось получить список заявок.",
-    );
+    toast.error(e?.response?.data?.error || "Не удалось получить список заявок.");
   } finally {
     loading.value = false;
   }
@@ -887,26 +922,30 @@ async function loadPending() {
 
 async function selectTicket(ticketId: string) {
   selectedTicketId.value = ticketId;
-  rejectReason.value = "";
+  resetDecisionForm();
   try {
     selectedTicket.value = await getTicketById(ticketId);
     syncPartnerCarForm(selectedTicket.value);
   } catch (e: any) {
-    toastError(e?.response?.data?.error || "Не удалось загрузить заявку.");
+    toast.error(e?.response?.data?.error || "Не удалось загрузить заявку.");
   }
 }
 
 async function approveSelected() {
   if (!selectedTicket.value || actionLoading.value) return;
+  if (!canApproveSelected.value) {
+    toast.error("Очистите блок штрафа, если хотите одобрить завершение поездки без начислений.");
+    return;
+  }
   actionLoading.value = true;
   try {
     const payload = buildPartnerCarPayload();
     if (payload === null) return;
     await approveTicket(selectedTicket.value.id, payload);
-    toastSuccess("✓ Заявка одобрена");
+    toast.success("✓ Заявка одобрена");
     await loadPending();
   } catch (e: any) {
-    toastError(e?.response?.data?.error || "Не удалось одобрить заявку.");
+    toast.error(e?.response?.data?.error || "Не удалось одобрить заявку.");
   } finally {
     actionLoading.value = false;
   }
@@ -915,7 +954,7 @@ async function approveSelected() {
 async function rejectSelected() {
   if (!selectedTicket.value || actionLoading.value) return;
   if (!rejectReason.value.trim()) {
-    toastError("Укажите причину отказа.");
+    toast.error("Укажите причину отказа.");
     return;
   }
   actionLoading.value = true;
@@ -927,10 +966,10 @@ async function rejectSelected() {
       rejectReason.value.trim(),
       payload,
     );
-    toastSuccess("✕ Заявка отклонена", 4000);
+    toast.success("✕ Заявка отклонена", 4000);
     await loadPending();
   } catch (e: any) {
-    toastError(e?.response?.data?.error || "Не удалось отклонить заявку.");
+    toast.error(e?.response?.data?.error || "Не удалось отклонить заявку.");
   } finally {
     actionLoading.value = false;
   }
@@ -940,18 +979,23 @@ async function issueFineSelected() {
   if (!selectedTicket.value || actionLoading.value) return;
   const amount = Number(fineAmount.value);
   if (!Number.isFinite(amount) || amount <= 0) {
-    toastError("Укажите корректную сумму штрафа.");
+    toast.error("Укажите корректную сумму штрафа.");
+    return;
+  }
+  if (!fineComment.value.trim()) {
+    toast.error("Добавьте комментарий к штрафу.");
     return;
   }
 
   actionLoading.value = true;
   try {
-    await issueTicketFine(selectedTicket.value.id, amount);
-    toastSuccess("Штраф выставлен");
+    await issueTicketFine(selectedTicket.value.id, amount, fineComment.value.trim());
+    toast.success("Штраф выставлен");
     fineAmount.value = "";
+    fineComment.value = "";
     await loadPending();
   } catch (e: any) {
-    toastError(e?.response?.data?.error || "Не удалось выставить штраф.");
+    toast.error(e?.response?.data?.error || "Не удалось выставить штраф.");
   } finally {
     actionLoading.value = false;
   }
@@ -982,9 +1026,7 @@ async function openDocument(
     );
     window.open(link.url, "_blank", "noopener,noreferrer");
   } catch (e: any) {
-    toastError(
-      e?.response?.data?.error || "Не удалось получить ссылку на документ.",
-    );
+    toast.error(e?.response?.data?.error || "Не удалось получить ссылку на документ.");
   } finally {
     actionLoading.value = false;
   }

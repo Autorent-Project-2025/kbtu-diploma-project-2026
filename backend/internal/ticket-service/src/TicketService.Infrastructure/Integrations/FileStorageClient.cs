@@ -37,7 +37,7 @@ public sealed class FileStorageClient : IFileStorageClient
         };
 
         message.Headers.Add(InternalApiKeyHeader, _fileServiceOptions.InternalApiKey);
-        message.Headers.Add("x-file-name", payload.FileName);
+        message.Headers.Add("x-file-name", Uri.EscapeDataString(payload.FileName));
 
         using var response = await _httpClient.SendAsync(message, cancellationToken);
         if (!response.IsSuccessStatusCode)

@@ -48,7 +48,7 @@
       <!-- Bookings List -->
       <div v-if="filteredBookings.length > 0" class="space-y-6">
         <div
-          v-for="b in filteredBookings"
+          v-for="b in paginatedBookings"
           :key="b.id"
           class="group relative overflow-hidden rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-md hover:shadow-xl transition-all duration-300"
         >
@@ -114,12 +114,6 @@
                   </p>
                 </div>
                 <div class="flex flex-col items-end gap-1.5 flex-shrink-0">
-                  <span
-                    v-if="b.usedSubscription"
-                    class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
-                  >
-                    SUB
-                  </span>
                   <span
                     v-if="b.carCommentId"
                     class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300"
@@ -197,25 +191,7 @@
               <!-- Price row -->
               <div class="flex items-end justify-between gap-4 flex-wrap">
                 <div>
-                  <div v-if="b.usedSubscription">
-                    <span
-                      class="text-lg font-bold text-emerald-600 dark:text-emerald-400"
-                      >Покрыто подпиской</span
-                    >
-                    <p
-                      v-if="b.pricingBreakdown"
-                      class="text-xs text-gray-400 mt-0.5"
-                    >
-                      Стоимость без подписки:
-                      {{
-                        formatMoney(
-                          b.pricingBreakdown.quotedTotalPrice,
-                          b.pricingBreakdown.currency,
-                        )
-                      }}
-                    </p>
-                  </div>
-                  <div v-else-if="b.price">
+                  <div v-if="b.price">
                     <div class="flex items-baseline gap-2">
                       <span
                         class="text-2xl font-extrabold text-gray-900 dark:text-white"
@@ -261,7 +237,8 @@
                     v-if="
                       canCancel(b) ||
                       b.canLeaveComment ||
-                      canOpenCompletionDetails(b)
+                      canOpenCompletionDetails(b) ||
+                      canFileComplaint(b)
                     "
                     class="relative"
                   >
@@ -322,6 +299,13 @@
                               : "Отменить бронирование"
                           }}
                         </button>
+                        <button
+                          v-if="canFileComplaint(b)"
+                          @click="openComplaintFromMenu(b)"
+                          class="flex w-full items-center rounded-xl px-3 py-2.5 text-left text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition"
+                        >
+                          {{ bookingComplaintMap[b.id] ? 'Открыть обращение' : 'Подать жалобу' }}
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -330,6 +314,45 @@
             </div>
           </div>
         </div>
+
+        <!-- Pagination -->
+        <div v-if="totalPages > 1" class="flex items-center justify-center gap-2 pt-4">
+          <button
+            :disabled="currentPage <= 1"
+            @click="currentPage--"
+            class="px-4 py-2 rounded-xl text-sm font-bold border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:border-primary-500 dark:hover:border-primary-500 transition-colors disabled:opacity-40 disabled:pointer-events-none"
+          >
+            ←
+          </button>
+
+          <template v-for="p in paginationRange" :key="p">
+            <span v-if="p === '...'" class="px-2 text-gray-400 text-sm select-none">...</span>
+            <button
+              v-else
+              @click="currentPage = p as number"
+              :class="[
+                'w-10 h-10 rounded-xl text-sm font-bold transition-all',
+                currentPage === p
+                  ? 'bg-primary-600 text-white shadow-lg shadow-primary-500/40'
+                  : 'border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:border-primary-500 dark:hover:border-primary-500',
+              ]"
+            >
+              {{ p }}
+            </button>
+          </template>
+
+          <button
+            :disabled="currentPage >= totalPages"
+            @click="currentPage++"
+            class="px-4 py-2 rounded-xl text-sm font-bold border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:border-primary-500 dark:hover:border-primary-500 transition-colors disabled:opacity-40 disabled:pointer-events-none"
+          >
+            →
+          </button>
+        </div>
+
+        <p class="text-center text-sm text-gray-400 dark:text-gray-500">
+          {{ filteredBookings.length }} из {{ bookings.length }} бронирований
+        </p>
       </div>
 
       <!-- Empty State -->
@@ -400,11 +423,20 @@
       @close="closeReviewModal"
       @submit="handleReviewSubmit"
     />
+
+    <CreateComplaintModal
+      v-if="bookingToComplain"
+      :is-open="showComplaintModal"
+      :booking-id="bookingToComplain.id"
+      :is-partner="isPartnerUser"
+      @close="closeComplaintModal"
+      @submit="handleComplaintSubmit"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref, computed } from "vue";
+import { onMounted, ref, computed, watch } from "vue";
 import {
   getMyBookings,
   cancelBooking,
@@ -424,12 +456,18 @@ import {
 import { useToast } from "../composables/useToast";
 import CancelBookingModal from "../components/CancelBookingModal.vue";
 import ReviewModal from "../components/ReviewModal.vue";
+import CreateComplaintModal from "../components/CreateComplaintModal.vue";
+import { getMyComplaintByBooking } from "../api/complaints";
+import { auth } from "../store/auth";
+import { useRouter } from "vue-router";
 
 interface BookingWithComputedStatus extends Booking {
   computedStatus: ReturnType<typeof computeBookingStatus>;
 }
 
 const bookings = ref<BookingWithComputedStatus[]>([]);
+const currentPage = ref(1);
+const perPage = 10;
 const currentFilter = ref<
   | "all"
   | "paymentPending"
@@ -447,6 +485,11 @@ const bookingToReview = ref<BookingWithComputedStatus | null>(null);
 const showReviewModal = ref(false);
 const reviewSubmittingId = ref<number | null>(null);
 const openActionMenuId = ref<number | null>(null);
+const bookingToComplain = ref<BookingWithComputedStatus | null>(null);
+const showComplaintModal = ref(false);
+const isPartnerUser = computed(() => auth.isActorType("partner"));
+const router = useRouter();
+const bookingComplaintMap = ref<Record<number, string>>({});
 const { success, error } = useToast();
 
 // Filters configuration
@@ -495,6 +538,34 @@ const filteredBookings = computed(() => {
     return bookings.value;
   }
   return bookings.value.filter((b) => b.computedStatus === currentFilter.value);
+});
+
+const totalPages = computed(() => Math.ceil(filteredBookings.value.length / perPage));
+
+const paginatedBookings = computed(() => {
+  const start = (currentPage.value - 1) * perPage;
+  return filteredBookings.value.slice(start, start + perPage);
+});
+
+watch(currentFilter, () => {
+  currentPage.value = 1;
+});
+
+const paginationRange = computed(() => {
+  const total = totalPages.value;
+  const current = currentPage.value;
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+
+  const pages: (number | string)[] = [1];
+  const left = Math.max(2, current - 1);
+  const right = Math.min(total - 1, current + 1);
+
+  if (left > 2) pages.push("...");
+  for (let i = left; i <= right; i++) pages.push(i);
+  if (right < total - 1) pages.push("...");
+  pages.push(total);
+
+  return pages;
 });
 
 const reviewSubject = computed(() => {
@@ -555,6 +626,8 @@ function getPrimaryActionProps(booking: BookingWithComputedStatus) {
   if (canPay(booking)) return { to: `/bookings/${booking.id}/payment` };
   if (canCompleteTripAction(booking) || canOpenCompletionDetails(booking))
     return { to: `/bookings/${booking.id}/complete` };
+  if (!canStartTripAction(booking) && !booking.canLeaveComment)
+    return { to: `/bookings/${booking.id}` };
   return { type: "button" };
 }
 
@@ -563,7 +636,8 @@ function getPrimaryAction(booking: BookingWithComputedStatus) {
     to:
       canPay(booking) ||
       canCompleteTripAction(booking) ||
-      canOpenCompletionDetails(booking),
+      canOpenCompletionDetails(booking) ||
+      (!canStartTripAction(booking) && !booking.canLeaveComment),
   };
 }
 
@@ -580,7 +654,8 @@ function handlePrimaryAction(
   if (
     canPay(booking) ||
     canCompleteTripAction(booking) ||
-    canOpenCompletionDetails(booking)
+    canOpenCompletionDetails(booking) ||
+    (!canStartTripAction(booking) && !booking.canLeaveComment)
   )
     return;
   event?.preventDefault();
@@ -603,22 +678,81 @@ function cancelFromMenu(booking: BookingWithComputedStatus) {
   confirmCancel(booking);
 }
 
+function canFileComplaint(booking: BookingWithComputedStatus): boolean {
+  const status = booking.status;
+  if (
+    status === "active" ||
+    status === "awaitingReview" ||
+    status === "completed"
+  ) {
+    return true;
+  }
+  if (status === "canceled" && booking.tripStartedAt) {
+    return true;
+  }
+  return false;
+}
+
+async function openComplaintFromMenu(booking: BookingWithComputedStatus) {
+  closeActionMenu();
+  // Check if complaint already exists for this booking
+  const existingId = bookingComplaintMap.value[booking.id];
+  if (existingId) {
+    router.push(`/complaints/${existingId}`);
+    return;
+  }
+  // Double-check with API
+  try {
+    const existing = await getMyComplaintByBooking(booking.id);
+    if (existing) {
+      bookingComplaintMap.value[booking.id] = existing.id;
+      router.push(`/complaints/${existing.id}`);
+      return;
+    }
+  } catch { /* ignore */ }
+  bookingToComplain.value = booking;
+  showComplaintModal.value = true;
+}
+
+function closeComplaintModal() {
+  showComplaintModal.value = false;
+  setTimeout(() => {
+    bookingToComplain.value = null;
+  }, 300);
+}
+
+function handleComplaintSubmit() {
+  closeComplaintModal();
+  success("Жалоба успешно отправлена");
+  router.push("/complaints");
+}
+
 onMounted(async () => {
   await loadBookings();
+  // Prefetch complaint existence for bookings that can file complaints
+  const eligible = bookings.value.filter(canFileComplaint);
+  await Promise.allSettled(
+    eligible.map(async (b) => {
+      try {
+        const existing = await getMyComplaintByBooking(b.id);
+        if (existing) bookingComplaintMap.value[b.id] = existing.id;
+      } catch { /* ignore */ }
+    }),
+  );
 });
 
 async function loadBookings() {
   try {
-    const data = await getMyBookings();
+    const data = await getMyBookings({ page: 1, pageSize: 100 });
 
-    // Обрабатываем оба формата ответа
     const items = Array.isArray(data) ? data : data.items;
 
     bookings.value = items.map(toBookingWithComputedStatus);
+    currentPage.value = 1;
   } catch (e) {
     console.error("Failed to load bookings", e);
     error("Не удалось загрузить бронирования");
-    bookings.value = []; // Очищаем список при ошибке
+    bookings.value = [];
   }
 }
 

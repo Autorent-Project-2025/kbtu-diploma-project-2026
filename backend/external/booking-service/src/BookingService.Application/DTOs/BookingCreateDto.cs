@@ -10,8 +10,6 @@ namespace BookingService.Application.DTOs.Booking
         public DateTimeOffset? StartTime { get; set; }
         public DateTimeOffset? EndTime { get; set; }
 
-        public bool UseSubscription { get; set; }
-
         public int ResolvePartnerCarId()
         {
             if (PartnerCarId <= 0)

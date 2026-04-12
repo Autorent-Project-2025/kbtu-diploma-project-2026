@@ -20,6 +20,11 @@ export async function getPendingTickets(): Promise<Ticket[]> {
   return (res.data ?? []) as Ticket[];
 }
 
+export async function getAllTickets(search?: string): Promise<Ticket[]> {
+  const res = await api.get("/tickets/all", { params: { search } });
+  return (res.data ?? []) as Ticket[];
+}
+
 export async function getTicketById(ticketId: string): Promise<Ticket> {
   const res = await api.get(`/tickets/${ticketId}`);
   return res.data as Ticket;
@@ -46,9 +51,13 @@ export async function rejectTicket(
 
 export async function issueTicketFine(
   ticketId: string,
-  amount: number
+  amount: number,
+  comment: string
 ): Promise<Ticket> {
-  const res = await api.post(`/tickets/${ticketId}/issue-fine`, { amount });
+  const res = await api.post(`/tickets/${ticketId}/issue-fine`, {
+    amount,
+    comment,
+  });
   return res.data as Ticket;
 }
 

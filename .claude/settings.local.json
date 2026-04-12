@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -E \"\\\\.cs$\")",
+      "Bash(grep -E \"Constants\\\\.cs$\")",
+      "Bash(wc -l \"c:/Users/Arlan/Desktop/Проекты/KBTU Diploma Project 2026/frontend/internal/src/views/\"*.vue)"
+    ]
+  }
+}

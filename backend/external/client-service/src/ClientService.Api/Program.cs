@@ -98,6 +98,9 @@ builder.Services.AddAuthorization(options =>
 
     options.AddPolicy("clients:delete", policy =>
         policy.RequireClaim("permissions", PermissionConstants.ClientDelete));
+
+    options.AddPolicy("clients:block", policy =>
+        policy.RequireClaim("permissions", PermissionConstants.ClientBlock));
 });
 
 builder.Services.AddHttpClient<IImageStorageClient, ImageStorageClient>((serviceProvider, client) =>

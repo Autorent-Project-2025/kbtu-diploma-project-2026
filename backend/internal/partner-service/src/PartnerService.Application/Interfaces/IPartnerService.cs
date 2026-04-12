@@ -4,7 +4,7 @@ namespace PartnerService.Application.Interfaces;
 
 public interface IPartnerService
 {
-    Task<IReadOnlyCollection<PartnerResponseDto>> GetAllAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyCollection<PartnerResponseDto>> GetAllAsync(string? search = null, CancellationToken cancellationToken = default);
     Task<PartnerResponseDto?> GetByIdAsync(int id, CancellationToken cancellationToken = default);
     Task<PartnerResponseDto?> GetByRelatedUserIdAsync(string relatedUserId, CancellationToken cancellationToken = default);
     Task<PartnerResponseDto> CreateAsync(PartnerCreateDto dto, CancellationToken cancellationToken = default);

@@ -1,5 +1,8 @@
+using System.Security.Cryptography;
 using AutoRent.Messaging.RabbitMq;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 using PaymentService.Api.Middleware;
 using PaymentService.Api.Messaging;
 using PaymentService.Api.Options;
@@ -56,10 +59,62 @@ builder.Services.AddScoped<IPaymentLedgerService, PaymentLedgerService>();
 builder.Services.AddScoped<IMockPaymentService, MockPaymentService>();
 builder.Services.AddHostedService<BookingPaymentConsumer>();
 
+// JWT auth — optional, only enabled when Jwt:PublicKey is configured.
+// Internal API-key endpoints continue to work via [AllowAnonymous].
+var jwtPublicKey = builder.Configuration["Jwt:PublicKey"];
+if (!string.IsNullOrWhiteSpace(jwtPublicKey))
+{
+    var jwtIssuer = builder.Configuration["Jwt:Issuer"];
+    var jwtAudience = builder.Configuration["Jwt:Audience"];
+    var normalizedPublicKey = jwtPublicKey.Replace("\\n", "\n").Trim();
+
+    RSAParameters publicRsaParameters;
+    using (var rsa = RSA.Create())
+    {
+        rsa.ImportFromPem(normalizedPublicKey);
+        publicRsaParameters = rsa.ExportParameters(false);
+    }
+
+    builder.Services
+        .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+        .AddJwtBearer(options =>
+        {
+            options.RequireHttpsMetadata = !builder.Environment.IsDevelopment();
+            options.TokenValidationParameters = new TokenValidationParameters
+            {
+                ValidateIssuerSigningKey = true,
+                IssuerSigningKey = new RsaSecurityKey(publicRsaParameters),
+                ValidateIssuer = !string.IsNullOrWhiteSpace(jwtIssuer),
+                ValidIssuer = jwtIssuer,
+                ValidateAudience = !string.IsNullOrWhiteSpace(jwtAudience),
+                ValidAudience = jwtAudience,
+                ValidateLifetime = true,
+                ClockSkew = TimeSpan.FromMinutes(1)
+            };
+        });
+
+    builder.Services.AddAuthorization(options =>
+    {
+        options.AddPolicy("payments:view", policy =>
+            policy.RequireClaim("permissions", "Payment.View"));
+        options.AddPolicy("payments:update", policy =>
+            policy.RequireClaim("permissions", "Payment.Update"));
+    });
+}
+else
+{
+    builder.Services.AddAuthorization();
+}
+
 var app = builder.Build();
 
 app.UseMiddleware<ApiExceptionMiddleware>();
 app.UseHttpsRedirection();
+if (!string.IsNullOrWhiteSpace(jwtPublicKey))
+{
+    app.UseAuthentication();
+    app.UseAuthorization();
+}
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 app.MapGet("/healthz", () => Results.Ok(new { status = "ok" }));
 app.MapControllers();

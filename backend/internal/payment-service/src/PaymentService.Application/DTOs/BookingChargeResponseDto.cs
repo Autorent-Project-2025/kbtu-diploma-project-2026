@@ -16,4 +16,5 @@ public sealed class BookingChargeResponseDto
     public DateTimeOffset UpdatedAt { get; set; }
     public DateTimeOffset? PaidAt { get; set; }
     public DateTimeOffset? CanceledAt { get; set; }
+    public DateTimeOffset? RefundedAt { get; set; }
 }

@@ -4,6 +4,10 @@ import { login as apiLogin, refreshAccessToken } from "../api/auth";
 interface JwtPayload {
   sub?: string;
   exp?: number;
+  email?: string;
+  preferred_username?: string;
+  unique_name?: string;
+  upn?: string;
   permissions?: string[] | string;
   actor_type?: string;
   subject_type?: string;
@@ -42,6 +46,7 @@ export const auth = reactive({
     const { accessToken, refreshToken } = await apiLogin(email, password);
     this.token = accessToken;
     localStorage.setItem("token", accessToken);
+    localStorage.setItem("loginEmail", email.trim().toLowerCase());
     if (refreshToken) {
       localStorage.setItem("refreshToken", refreshToken);
     }
@@ -53,6 +58,7 @@ export const auth = reactive({
     localStorage.removeItem("refreshToken");
     localStorage.removeItem("tokenTimestamp");
     localStorage.removeItem("user");
+    localStorage.removeItem("loginEmail");
   },
 
   isTokenExpired(): boolean {
@@ -151,5 +157,18 @@ export const auth = reactive({
     const token = this.token || localStorage.getItem("token") || "";
     const payload = decodeJwtPayload(token);
     return typeof payload?.sub === "string" ? payload.sub : null;
+  },
+
+  getEmail(): string | null {
+    const token = this.token || localStorage.getItem("token") || "";
+    const payload = decodeJwtPayload(token);
+
+    return (
+      readStringClaim(payload?.email) ||
+      readStringClaim(payload?.preferred_username) ||
+      readStringClaim(payload?.unique_name) ||
+      readStringClaim(payload?.upn) ||
+      readStringClaim(localStorage.getItem("loginEmail"))
+    );
   },
 });

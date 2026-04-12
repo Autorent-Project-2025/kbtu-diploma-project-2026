@@ -11,8 +11,8 @@ namespace CarService.Application.Interfaces
         Task<PartnerCarSnapshotDto?> GetSnapshotAsync(int partnerCarId, CancellationToken cancellationToken = default);
         Task<PartnerCarResponseDto> CreateAsync(Guid currentUserId, PartnerCarCreateDto dto, CancellationToken cancellationToken = default);
         Task<PartnerCarResponseDto> ProvisionAsync(PartnerCarProvisionDto dto, CancellationToken cancellationToken = default);
-        Task<PartnerCarResponseDto?> UpdateAsync(Guid currentUserId, int id, PartnerCarUpdateDto dto, CancellationToken cancellationToken = default);
-        Task<bool> DeleteAsync(Guid currentUserId, int id, CancellationToken cancellationToken = default);
+        Task<PartnerCarResponseDto?> UpdateAsync(Guid? currentUserId, int id, PartnerCarUpdateDto dto, CancellationToken cancellationToken = default);
+        Task<bool> DeleteAsync(Guid? currentUserId, int id, CancellationToken cancellationToken = default);
         Task<PartnerCarPricingContextDto?> GetPricingContextAsync(
             int partnerCarId,
             DateTimeOffset startTime,

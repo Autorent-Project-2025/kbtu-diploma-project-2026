@@ -28,7 +28,6 @@ namespace BookingService.Application.Mappers
             CarCommentId = booking.CarCommentId,
             CarCommentSubmittedAt = booking.CarCommentSubmittedAt,
             CanLeaveComment = booking.Status == BookingStatus.Completed && booking.CarCommentId == null,
-            UsedSubscription = booking.UsedSubscription,
             PricingBreakdownJson = booking.PricingBreakdownJson,
             ImageUrlsJson = booking.ImageUrlsJson,
             Status = booking.Status.ToString().ToLowerInvariant()
@@ -62,7 +61,6 @@ namespace BookingService.Application.Mappers
                 CarCommentId = booking.CarCommentId,
                 CarCommentSubmittedAt = booking.CarCommentSubmittedAt,
                 CanLeaveComment = booking.Status == BookingStatus.Completed && booking.CarCommentId is null,
-                UsedSubscription = booking.UsedSubscription,
                 PricingBreakdownJson = booking.PricingBreakdownJson,
                 ImageUrlsJson = booking.ImageUrlsJson,
                 Status = booking.Status.ToString().ToLowerInvariant()

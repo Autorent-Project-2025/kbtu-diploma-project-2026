@@ -20,7 +20,9 @@ type ServiceConfig = {
     | "PARTNER_SERVICE_URL"
     | "INTERNAL_SERVICE_URL"
     | "TICKET_SERVICE_URL"
-    | "FILE_SERVICE_URL";
+    | "FILE_SERVICE_URL"
+    | "CHAT_SERVICE_URL"
+    | "PAYMENT_SERVICE_URL";
 };
 
 type RateLimitBucket = {
@@ -42,7 +44,9 @@ const services: ServiceConfig[] = [
   { route: "/partners", envKey: "PARTNER_SERVICE_URL" },
   { route: "/tickets", envKey: "TICKET_SERVICE_URL" },
   { route: "/files", envKey: "FILE_SERVICE_URL" },
+  { route: "/chat", envKey: "CHAT_SERVICE_URL" },
   { route: "/internal", envKey: "INTERNAL_SERVICE_URL" },
+  { route: "/payments", envKey: "PAYMENT_SERVICE_URL" },
 ];
 
 const defaultAllowedOrigins = [
@@ -417,6 +421,7 @@ for (const service of services) {
       target,
       changeOrigin: true,
       xfwd: true,
+      ws: service.route === "/chat",
       proxyTimeout: proxyTimeoutMs,
       timeout: requestTimeoutMs,
       pathRewrite: {

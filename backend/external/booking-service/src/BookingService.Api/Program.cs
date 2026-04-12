@@ -134,6 +134,12 @@ builder.Services.AddAuthorization(options =>
 {
     options.AddPolicy("bookings:create", policy =>
         policy.RequireClaim("permissions", PermissionConstants.BookingCreate));
+    options.AddPolicy("bookings:view", policy =>
+        policy.RequireClaim("permissions", PermissionConstants.BookingView));
+    options.AddPolicy("bookings:update", policy =>
+        policy.RequireClaim("permissions", PermissionConstants.BookingUpdate));
+    options.AddPolicy("bookings:delete", policy =>
+        policy.RequireClaim("permissions", PermissionConstants.BookingDelete));
 });
 builder.Services.AddHttpClient<IPartnerCarReadClient, PartnerCarReadClient>((serviceProvider, client) =>
 {
@@ -261,7 +267,6 @@ builder.Services.AddHttpClient<IBookingEmailClient, BookingEmailClient>((service
 .AddConfiguredResilience(httpClientResilienceOptions);
 builder.Services.AddScoped<IBookingService, BookingService.Infrastructure.Services.BookingService>();
 builder.Services.AddScoped<IDynamicPricingService, DynamicPricingService>(); // dynamic pricing
-builder.Services.AddScoped<ISubscriptionService, SubscriptionService>();
 builder.Services.AddSingleton<IRabbitMqPublisher, RabbitMqPublisher>();
 builder.Services.AddHostedService<PaymentSyncOutboxDispatcher>();
 builder.Services.AddHostedService<PendingBookingExpirationDispatcher>();

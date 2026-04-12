@@ -33,7 +33,6 @@ export interface Booking {
   carCommentId?: number | null;
   carCommentSubmittedAt?: string | null;
   canLeaveComment?: boolean;
-  usedSubscription?: boolean;
   pricingBreakdown?: BookingPricingBreakdown | null;
   status: BookingStatus;
 }

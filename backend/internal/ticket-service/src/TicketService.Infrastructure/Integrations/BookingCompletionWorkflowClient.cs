@@ -53,6 +53,7 @@ public sealed class BookingCompletionWorkflowClient : IBookingCompletionWorkflow
                 request.TicketId,
                 request.LatePenaltyAmount,
                 request.DamageFineAmount,
+                request.FineComment,
                 request.CustomerEmail,
                 request.CustomerFullName
             },

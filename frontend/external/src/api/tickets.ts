@@ -1,4 +1,5 @@
 import api from "./axios";
+import { auth } from "../store/auth";
 import type { Ticket } from "../types/Ticket";
 
 export interface CreateTicketPayload {
@@ -75,14 +76,28 @@ export interface CreatePartnerCarTicketPayload {
   horsepower?: number | null;
   selectedTags?: string[];
   ownershipDocumentFile: File;
-  carImageFiles: File[];
+  carImages: Array<{
+    file: File;
+    imageType: PartnerCarImageType;
+  }>;
 }
+
+export type PartnerCarImageType =
+  | "front"
+  | "back"
+  | "side"
+  | "interior"
+  | "general";
 
 export async function createPartnerCarTicket(
   payload: CreatePartnerCarTicketPayload
 ): Promise<Ticket> {
   const formData = new FormData();
   formData.append("ticketType", "PartnerCar");
+  const email = auth.getEmail();
+  if (email) {
+    formData.append("email", email);
+  }
   formData.append("carBrand", payload.carBrand);
   formData.append("carModel", payload.carModel);
   formData.append("carYear", String(payload.carYear));
@@ -110,8 +125,9 @@ export async function createPartnerCarTicket(
   }
   formData.append("ownershipDocumentFile", payload.ownershipDocumentFile);
 
-  for (const file of payload.carImageFiles) {
-    formData.append("carImageFiles", file);
+  for (const image of payload.carImages) {
+    formData.append("carImageFiles", image.file);
+    formData.append("carImageTypes", image.imageType);
   }
 
   const res = await api.post("/tickets", formData, {

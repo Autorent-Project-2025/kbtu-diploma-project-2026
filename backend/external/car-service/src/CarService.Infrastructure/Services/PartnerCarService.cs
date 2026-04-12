@@ -92,6 +92,15 @@ namespace CarService.Infrastructure.Services
                 query = query.Where(partnerCar => partnerCar.PartnerUserId == queryParams.PartnerUserId.Value);
             }
 
+            if (!string.IsNullOrWhiteSpace(queryParams.Search))
+            {
+                var q = queryParams.Search.Trim().ToLower();
+                query = query.Where(partnerCar =>
+                    partnerCar.LicensePlate.ToLower().Contains(q) ||
+                    partnerCar.CarModel.Brand.Name.ToLower().Contains(q) ||
+                    partnerCar.CarModel.ModelLookup.Name.ToLower().Contains(q));
+            }
+
             query = query
                 .OrderByDescending(partnerCar => partnerCar.CreatedAt)
                 .ThenByDescending(partnerCar => partnerCar.Id);
@@ -269,6 +278,7 @@ namespace CarService.Infrastructure.Services
                 .Select((image, index) => new NormalizedProvisionImage(
                     NormalizeRequired(image.ImageId, nameof(image.ImageId), 255),
                     NormalizeImageUrl(image.ImageUrl, nameof(image.ImageUrl)),
+                    NormalizeProvisionImageType(image.ImageType, nameof(image.ImageType)),
                     index + 1))
                 .ToList();
 
@@ -319,7 +329,7 @@ namespace CarService.Infrastructure.Services
                 {
                     ImageId = image.ImageId,
                     ImageUrl = image.ImageUrl,
-                    ImageType = CarImageType.General,
+                    ImageType = image.ImageType,
                     DisplayOrder = image.DisplayOrder
                 })
                 .ToList();
@@ -467,7 +477,7 @@ namespace CarService.Infrastructure.Services
         }
 
         public async Task<PartnerCarResponseDto?> UpdateAsync(
-            Guid currentUserId,
+            Guid? currentUserId,
             int id,
             PartnerCarUpdateDto dto,
             CancellationToken cancellationToken = default)
@@ -481,7 +491,7 @@ namespace CarService.Infrastructure.Services
                 return null;
             }
 
-            if (entity.PartnerUserId != currentUserId)
+            if (currentUserId.HasValue && entity.PartnerUserId != currentUserId.Value)
             {
                 throw new UnauthorizedAccessException("You are not allowed to update this partner car.");
             }
@@ -496,7 +506,7 @@ namespace CarService.Infrastructure.Services
             return MapToResponse(entity);
         }
 
-        public async Task<bool> DeleteAsync(Guid currentUserId, int id, CancellationToken cancellationToken = default)
+        public async Task<bool> DeleteAsync(Guid? currentUserId, int id, CancellationToken cancellationToken = default)
         {
             var entity = await _db.PartnerCars.FirstOrDefaultAsync(partnerCar => partnerCar.Id == id, cancellationToken);
             if (entity is null)
@@ -504,7 +514,7 @@ namespace CarService.Infrastructure.Services
                 return false;
             }
 
-            if (entity.PartnerUserId != currentUserId)
+            if (currentUserId.HasValue && entity.PartnerUserId != currentUserId.Value)
             {
                 throw new UnauthorizedAccessException("You are not allowed to delete this partner car.");
             }
@@ -1206,6 +1216,7 @@ namespace CarService.Infrastructure.Services
             {
                 if (!string.Equals(existing[index].ImageId, requested[index].ImageId, StringComparison.Ordinal) ||
                     !string.Equals(existing[index].ImageUrl, requested[index].ImageUrl, StringComparison.Ordinal) ||
+                    existing[index].ImageType != requested[index].ImageType ||
                     existing[index].DisplayOrder != requested[index].DisplayOrder)
                 {
                     return false;
@@ -1215,7 +1226,11 @@ namespace CarService.Infrastructure.Services
             return true;
         }
 
-        private sealed record NormalizedProvisionImage(string ImageId, string ImageUrl, int DisplayOrder);
+        private sealed record NormalizedProvisionImage(
+            string ImageId,
+            string ImageUrl,
+            CarImageType ImageType,
+            int DisplayOrder);
 
         private static string NormalizeImageUrl(string? value, string paramName)
         {
@@ -1226,6 +1241,20 @@ namespace CarService.Infrastructure.Services
             }
 
             return normalized;
+        }
+
+        private static CarImageType NormalizeProvisionImageType(string? value, string paramName)
+        {
+            var normalized = NormalizeRequired(value, paramName, 32).ToLowerInvariant();
+            return normalized switch
+            {
+                "front" => CarImageType.Front,
+                "back" => CarImageType.Back,
+                "side" => CarImageType.Side,
+                "interior" => CarImageType.Interior,
+                "general" => CarImageType.General,
+                _ => throw new ArgumentException($"{paramName} must be one of: front, back, side, interior, general.", paramName)
+            };
         }
 
         private static int NormalizeCarYear(int value, string paramName)

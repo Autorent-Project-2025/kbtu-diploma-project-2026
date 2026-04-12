@@ -30,7 +30,6 @@ namespace BookingService.Application.DTOs.Booking
         public int? CarCommentId { get; set; }
         public DateTimeOffset? CarCommentSubmittedAt { get; set; }
         public bool CanLeaveComment { get; set; }
-        public bool UsedSubscription { get; set; }
         public string? Status { get; set; }
 
         [JsonIgnore]

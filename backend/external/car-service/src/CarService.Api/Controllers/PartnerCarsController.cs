@@ -62,12 +62,11 @@ namespace CarService.Api.Controllers
         public async Task<IActionResult> Update(int id, [FromBody] PartnerCarUpdateDto dto, CancellationToken cancellationToken)
         {
             var currentUserId = User.GetRequiredUserGuid();
-            if (!await IsCurrentUserPartnerAsync(currentUserId, cancellationToken))
-            {
-                return Forbid();
-            }
+            var isPartner = await IsCurrentUserPartnerAsync(currentUserId, cancellationToken);
 
-            var updated = await _partnerCarService.UpdateAsync(currentUserId, id, dto, cancellationToken);
+            var updated = await _partnerCarService.UpdateAsync(
+                isPartner ? currentUserId : null, id, dto, cancellationToken);
+
             if (updated is null)
             {
                 return NotFound(new { error = "Partner car not found" });
@@ -81,12 +80,11 @@ namespace CarService.Api.Controllers
         public async Task<IActionResult> Delete(int id, CancellationToken cancellationToken)
         {
             var currentUserId = User.GetRequiredUserGuid();
-            if (!await IsCurrentUserPartnerAsync(currentUserId, cancellationToken))
-            {
-                return Forbid();
-            }
+            var isPartner = await IsCurrentUserPartnerAsync(currentUserId, cancellationToken);
 
-            var deleted = await _partnerCarService.DeleteAsync(currentUserId, id, cancellationToken);
+            var deleted = await _partnerCarService.DeleteAsync(
+                isPartner ? currentUserId : null, id, cancellationToken);
+
             if (!deleted)
             {
                 return NotFound(new { error = "Partner car not found" });

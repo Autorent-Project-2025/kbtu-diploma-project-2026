@@ -46,4 +46,7 @@ public sealed class BookingCharge
 
     [Column("canceled_at")]
     public DateTimeOffset? CanceledAt { get; set; }
+
+    [Column("refunded_at")]
+    public DateTimeOffset? RefundedAt { get; set; }
 }

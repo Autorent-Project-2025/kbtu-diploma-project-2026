@@ -1,0 +1,1 @@
+ALTER TABLE booking_charges ADD COLUMN IF NOT EXISTS refunded_at TIMESTAMPTZ NULL;

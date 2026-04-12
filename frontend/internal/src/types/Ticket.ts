@@ -8,6 +8,7 @@ export type BookingCompletionPhotoSlot =
 export interface PartnerCarTicketImageData {
   imageId: string;
   imageUrl: string;
+  imageType?: "front" | "back" | "side" | "interior" | "general" | null;
 }
 
 export interface BookingCompletionTicketPhotoData {

@@ -20,4 +20,5 @@ public sealed record PartnerCarProvisionRequested(
 
 public sealed record PartnerCarProvisionRequestedImage(
     string ImageId,
-    string ImageUrl);
+    string ImageUrl,
+    string ImageType);
