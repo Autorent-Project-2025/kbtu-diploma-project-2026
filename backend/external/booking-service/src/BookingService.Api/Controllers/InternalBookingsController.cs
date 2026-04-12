@@ -143,6 +143,20 @@ public sealed class InternalBookingsController : ControllerBase
     }
 
     [AllowAnonymous]
+    [HttpPost("by-user/{userId:guid}/cancel-all")]
+    public async Task<IActionResult> CancelAllByUser(
+        Guid userId,
+        [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] Contracts.Booking.CancelBookingRequest? request,
+        CancellationToken cancellationToken)
+    {
+        if (!IsAuthorizedInternalRequest())
+            return Unauthorized(new { error = "Internal API key is invalid." });
+
+        var count = await _bookingService.CancelActiveBookingsByUserAsync(userId, request?.Reason, cancellationToken);
+        return Ok(new { canceledCount = count });
+    }
+
+    [AllowAnonymous]
     [HttpPost("{id:int}/completion-review/approve")]
     public async Task<IActionResult> ApproveCompletionReview(
         int id,

@@ -10,13 +10,14 @@ EXPOSE 8080
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
-COPY ["IdentityService.Api/IdentityService.Api.csproj", "IdentityService.Api/"]
-COPY ["IdentityService.Application/IdentityService.Application.csproj", "IdentityService.Application/"]
-COPY ["IdentityService.Domain/IdentityService.Domain.csproj", "IdentityService.Domain/"]
-COPY ["IdentityService.Infrastructure/IdentityService.Infrastructure.csproj", "IdentityService.Infrastructure/"]
-RUN dotnet restore "IdentityService.Api/IdentityService.Api.csproj"
+COPY ["shared/identity-service/src/IdentityService.Api/IdentityService.Api.csproj", "shared/identity-service/src/IdentityService.Api/"]
+COPY ["shared/identity-service/src/IdentityService.Application/IdentityService.Application.csproj", "shared/identity-service/src/IdentityService.Application/"]
+COPY ["shared/identity-service/src/IdentityService.Domain/IdentityService.Domain.csproj", "shared/identity-service/src/IdentityService.Domain/"]
+COPY ["shared/identity-service/src/IdentityService.Infrastructure/IdentityService.Infrastructure.csproj", "shared/identity-service/src/IdentityService.Infrastructure/"]
+COPY ["libraries/messaging-dotnet/src/AutoRent.Messaging/AutoRent.Messaging.csproj", "libraries/messaging-dotnet/src/AutoRent.Messaging/"]
+RUN dotnet restore "shared/identity-service/src/IdentityService.Api/IdentityService.Api.csproj"
 COPY . .
-WORKDIR "/src/IdentityService.Api"
+WORKDIR "/src/shared/identity-service/src/IdentityService.Api"
 RUN dotnet build "./IdentityService.Api.csproj" -c $BUILD_CONFIGURATION -o /app/build
 
 FROM build AS publish
