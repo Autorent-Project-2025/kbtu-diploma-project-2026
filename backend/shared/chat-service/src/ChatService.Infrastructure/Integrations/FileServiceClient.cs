@@ -36,7 +36,7 @@ public sealed class FileServiceClient : IFileServiceClient
     {
         using var request = new HttpRequestMessage(HttpMethod.Post, "/api/internal/files/upload");
         request.Headers.Add(InternalApiKeyHeader, _options.InternalApiKey);
-        request.Headers.Add("x-file-name", fileName);
+        request.Headers.Add("x-file-name", Uri.EscapeDataString(fileName));
 
         var content = new StreamContent(fileStream);
         content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(contentType);
