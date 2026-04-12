@@ -11,12 +11,14 @@ class FilesController {
   constructor(private readonly fileService: IFileService) {}
 
   uploadFile = async (req: Request, res: Response) => {
-    const sourceFileName = req.header("x-file-name");
+    const rawFileName = req.header("x-file-name");
     const fileBody = req.body;
 
-    if (!sourceFileName) {
+    if (!rawFileName) {
       return res.status(400).json({ message: "x-file-name header is required" });
     }
+
+    const sourceFileName = decodeURIComponent(rawFileName);
 
     if (!Buffer.isBuffer(fileBody) || fileBody.length === 0) {
       return res.status(400).json({ message: "File body is required" });
