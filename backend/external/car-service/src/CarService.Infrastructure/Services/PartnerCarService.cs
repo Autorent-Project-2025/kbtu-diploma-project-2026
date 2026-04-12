@@ -731,7 +731,7 @@ namespace CarService.Infrastructure.Services
             var availableCars = await _db.PartnerCars
                 .AsNoTracking()
                 .IncludeModelCatalog()
-                .Where(partnerCar => partnerCar.Status == PartnerCarStatus.Available)
+                .Where(partnerCar => partnerCar.IsActive && partnerCar.Status == PartnerCarStatus.Available)
                 .Select(partnerCar => new
                 {
                     partnerCar.CarModelId,
@@ -797,6 +797,7 @@ namespace CarService.Infrastructure.Services
                 .AsNoTracking()
                 .IncludeModelCatalog()
                 .Where(partnerCar =>
+                    partnerCar.IsActive &&
                     partnerCar.CarModelId == dto.ModelId &&
                     partnerCar.Status == PartnerCarStatus.Available)
                 .ToListAsync(cancellationToken);
