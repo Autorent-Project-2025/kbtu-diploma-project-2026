@@ -482,10 +482,11 @@ async function handleBookingConfirm(payloadData: {
 
     closeBookingModal();
     await router.push(`/bookings/${booking.id}/payment`);
-  } catch (e) {
+  } catch (e: any) {
     console.error("Ошибка бронирования:", e);
-    bookingError.value = "Не удалось забронировать машину. Попробуйте снова.";
-    error("Не удалось забронировать машину.");
+    const serverMsg = e?.response?.data?.detail || e?.response?.data?.error || "";
+    bookingError.value = serverMsg || "Не удалось забронировать машину. Попробуйте снова.";
+    error(bookingError.value);
   } finally {
     creatingBooking.value = false;
   }
