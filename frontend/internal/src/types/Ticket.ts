@@ -43,11 +43,16 @@ export interface PartnerTicketData extends TicketDataBase {
 
 export interface PartnerCarTicketData extends TicketDataBase {
   $type: "partner-car";
+  requestKind?: "create" | "update" | string | null;
+  partnerCarId?: number | null;
   relatedPartnerUserId: string;
   carBrand: string;
   carModel: string;
   carYear?: number | null;
   licensePlate: string;
+  color?: string | null;
+  requestedStatus?: number | null;
+  isActive?: boolean | null;
   transmission?: string | null;
   fuelType?: string | null;
   seats?: number | null;
@@ -107,6 +112,8 @@ export interface Ticket {
   driverLicenseFileName?: string | null;
   ownershipDocumentFileName?: string | null;
   avatarUrl?: string | null;
+  partnerCarRequestKind?: string | null;
+  partnerCarId?: number | null;
   relatedPartnerUserId?: string | null;
   bookingId?: number | null;
   plannedStartTime?: string | null;
@@ -120,6 +127,9 @@ export interface Ticket {
   carModel?: string | null;
   carYear?: number | null;
   licensePlate?: string | null;
+  color?: string | null;
+  requestedPartnerCarStatus?: number | null;
+  isActive?: boolean | null;
   carImages?: PartnerCarTicketImageData[];
   status: number;
   decisionReason?: string | null;

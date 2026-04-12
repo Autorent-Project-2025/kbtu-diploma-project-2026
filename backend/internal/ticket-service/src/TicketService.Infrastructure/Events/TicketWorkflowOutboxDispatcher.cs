@@ -195,6 +195,7 @@ public sealed class TicketWorkflowOutboxDispatcher : BackgroundService
         var identityProvisioningClient = serviceProvider.GetRequiredService<IIdentityProvisioningClient>();
         var clientProvisioningClient = serviceProvider.GetRequiredService<IClientProvisioningClient>();
         var partnerProvisioningClient = serviceProvider.GetRequiredService<IPartnerProvisioningClient>();
+        var partnerCarProvisioningClient = serviceProvider.GetRequiredService<IPartnerCarProvisioningClient>();
         var rabbitMqPublisher = serviceProvider.GetRequiredService<IRabbitMqPublisher>();
 
         while (payload.CurrentStep != TicketApprovedWorkflowStep.Completed)
@@ -314,27 +315,46 @@ public sealed class TicketWorkflowOutboxDispatcher : BackgroundService
                         throw new InvalidOperationException($"Approved workflow step '{payload.CurrentStep}' is invalid for ticket type '{ticket.TicketType}'.");
                     }
 
-                    await rabbitMqPublisher.PublishAsync(
-                        BuildPartnerCarProvisionEventId(ticket.Id),
-                        RabbitMqTopology.RoutingKeys.TicketPartnerCarProvisionRequested,
-                        new PartnerCarProvisionRequested(
-                            ticket.Id,
-                            BuildPartnerCarProvisionRequestKey(ticket.Id),
-                            RequireGuid(ticket.RelatedPartnerUserId, nameof(ticket.RelatedPartnerUserId)),
-                            RequireField(ticket.CarBrand, nameof(ticket.CarBrand)),
-                            RequireField(ticket.CarModel, nameof(ticket.CarModel)),
-                            RequireYear(ticket.CarYear, nameof(ticket.CarYear)),
-                            RequireField(ticket.LicensePlate, nameof(ticket.LicensePlate)),
-                            ticket.Transmission,
-                            ticket.FuelType,
-                            ticket.Seats,
-                            ticket.Doors,
-                            ticket.BodyType,
-                            ticket.Horsepower,
-                            ResolveProvisionSemanticTags(ticket),
-                            RequireField(ticket.OwnershipDocumentFileName, nameof(ticket.OwnershipDocumentFileName)),
-                            ticket.CarImages.Select(image => new PartnerCarProvisionRequestedImage(image.ImageId, image.ImageUrl, image.ImageType)).ToArray()),
-                        cancellationToken);
+                    if (string.Equals(ticket.PartnerCarRequestKind, "update", StringComparison.OrdinalIgnoreCase))
+                    {
+                        await partnerCarProvisioningClient.ApplyApprovedUpdateAsync(
+                            new ApplyPartnerCarApprovedUpdateRequest(
+                                RequirePartnerCarId(ticket.PartnerCarId, nameof(ticket.PartnerCarId)),
+                                RequireField(ticket.LicensePlate, nameof(ticket.LicensePlate)),
+                                ticket.Color,
+                                ticket.RequestedPartnerCarStatus,
+                                ticket.IsActive,
+                                ticket.CarImages.Select(image =>
+                                    new ApplyPartnerCarApprovedUpdateImageRequest(
+                                        image.ImageId,
+                                        image.ImageUrl,
+                                        image.ImageType)).ToArray()),
+                            cancellationToken);
+                    }
+                    else
+                    {
+                        await rabbitMqPublisher.PublishAsync(
+                            BuildPartnerCarProvisionEventId(ticket.Id),
+                            RabbitMqTopology.RoutingKeys.TicketPartnerCarProvisionRequested,
+                            new PartnerCarProvisionRequested(
+                                ticket.Id,
+                                BuildPartnerCarProvisionRequestKey(ticket.Id),
+                                RequireGuid(ticket.RelatedPartnerUserId, nameof(ticket.RelatedPartnerUserId)),
+                                RequireField(ticket.CarBrand, nameof(ticket.CarBrand)),
+                                RequireField(ticket.CarModel, nameof(ticket.CarModel)),
+                                RequireYear(ticket.CarYear, nameof(ticket.CarYear)),
+                                RequireField(ticket.LicensePlate, nameof(ticket.LicensePlate)),
+                                ticket.Transmission,
+                                ticket.FuelType,
+                                ticket.Seats,
+                                ticket.Doors,
+                                ticket.BodyType,
+                                ticket.Horsepower,
+                                ResolveProvisionSemanticTags(ticket),
+                                RequireField(ticket.OwnershipDocumentFileName, nameof(ticket.OwnershipDocumentFileName)),
+                                ticket.CarImages.Select(image => new PartnerCarProvisionRequestedImage(image.ImageId, image.ImageUrl, image.ImageType)).ToArray()),
+                            cancellationToken);
+                    }
 
                     payload.CurrentStep = TicketApprovedWorkflowStep.PublishPartnerCarApprovedEmail;
                     break;
@@ -758,6 +778,16 @@ public sealed class TicketWorkflowOutboxDispatcher : BackgroundService
     }
 
     private static int RequireBookingId(int? value, string fieldName)
+    {
+        if (!value.HasValue || value.Value <= 0)
+        {
+            throw new InvalidOperationException($"{fieldName} is required.");
+        }
+
+        return value.Value;
+    }
+
+    private static int RequirePartnerCarId(int? value, string fieldName)
     {
         if (!value.HasValue || value.Value <= 0)
         {

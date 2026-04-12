@@ -15,6 +15,7 @@ namespace CarService.Application.DTOs.PartnerCars
         public decimal? PriceHour { get; set; }
         public decimal? PriceDay { get; set; }
         public PartnerCarStatus Status { get; set; }
+        public bool IsActive { get; set; }
         public DateTimeOffset CreatedAt { get; set; }
         public decimal? Rating { get; set; }
         public int RatingsCount { get; set; }

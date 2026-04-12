@@ -53,11 +53,16 @@ public sealed class TicketConfiguration : IEntityTypeConfiguration<Ticket>
         builder.Ignore(ticket => ticket.AvatarUrl);
         builder.Ignore(ticket => ticket.CompanyName);
         builder.Ignore(ticket => ticket.ContactEmail);
+        builder.Ignore(ticket => ticket.PartnerCarRequestKind);
+        builder.Ignore(ticket => ticket.PartnerCarId);
         builder.Ignore(ticket => ticket.RelatedPartnerUserId);
         builder.Ignore(ticket => ticket.CarBrand);
         builder.Ignore(ticket => ticket.CarModel);
         builder.Ignore(ticket => ticket.CarYear);
         builder.Ignore(ticket => ticket.LicensePlate);
+        builder.Ignore(ticket => ticket.Color);
+        builder.Ignore(ticket => ticket.RequestedPartnerCarStatus);
+        builder.Ignore(ticket => ticket.IsActive);
         builder.Ignore(ticket => ticket.Transmission);
         builder.Ignore(ticket => ticket.FuelType);
         builder.Ignore(ticket => ticket.Seats);
@@ -169,11 +174,16 @@ public sealed class TicketConfiguration : IEntityTypeConfiguration<Ticket>
                 FullName = fullName,
                 PhoneNumber = phoneNumber,
                 IdentityDocumentFileName = identityDocumentFileName,
+                RequestKind = GetString(root, "requestKind", "create"),
+                PartnerCarId = GetOptionalInt(root, "partnerCarId"),
                 RelatedPartnerUserId = relatedPartnerUserId ?? Guid.Empty,
                 CarBrand = carBrand ?? string.Empty,
                 CarModel = carModel ?? string.Empty,
                 CarYear = carYear,
                 LicensePlate = licensePlate ?? string.Empty,
+                Color = GetOptionalString(root, "color"),
+                RequestedStatus = GetOptionalInt(root, "requestedStatus"),
+                IsActive = GetOptionalBool(root, "isActive"),
                 Transmission = GetOptionalString(root, "transmission"),
                 FuelType = GetOptionalString(root, "fuelType"),
                 Seats = GetOptionalInt(root, "seats"),
@@ -295,6 +305,32 @@ public sealed class TicketConfiguration : IEntityTypeConfiguration<Ticket>
         }
 
         if (value.ValueKind == JsonValueKind.String && int.TryParse(value.GetString(), out var parsedValue))
+        {
+            return parsedValue;
+        }
+
+        return null;
+    }
+
+    private static bool? GetOptionalBool(JsonElement root, string propertyName)
+    {
+        if (!root.TryGetProperty(propertyName, out var value))
+        {
+            return null;
+        }
+
+        if (value.ValueKind == JsonValueKind.True)
+        {
+            return true;
+        }
+
+        if (value.ValueKind == JsonValueKind.False)
+        {
+            return false;
+        }
+
+        if (value.ValueKind == JsonValueKind.String &&
+            bool.TryParse(value.GetString(), out var parsedValue))
         {
             return parsedValue;
         }

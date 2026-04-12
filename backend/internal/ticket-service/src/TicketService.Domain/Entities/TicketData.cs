@@ -35,11 +35,16 @@ public sealed record PartnerTicketData : TicketData
 
 public sealed record PartnerCarTicketData : TicketData
 {
+    public string RequestKind { get; init; } = "create";
+    public int? PartnerCarId { get; init; }
     public Guid RelatedPartnerUserId { get; init; }
     public string CarBrand { get; init; } = string.Empty;
     public string CarModel { get; init; } = string.Empty;
     public int? CarYear { get; init; }
     public string LicensePlate { get; init; } = string.Empty;
+    public string? Color { get; init; }
+    public int? RequestedStatus { get; init; }
+    public bool? IsActive { get; init; }
     public string? Transmission { get; init; }
     public string? FuelType { get; init; }
     public int? Seats { get; init; }

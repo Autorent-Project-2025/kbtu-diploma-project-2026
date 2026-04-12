@@ -44,6 +44,7 @@ public sealed class CreateTicketCommandHandler
         Guid? relatedPartnerUserId = null;
         IReadOnlyCollection<PartnerCarTicketImageData>? carImages = null;
         IReadOnlyCollection<BookingCompletionTicketPhotoData>? completionPhotos = null;
+        var partnerCarRequestKind = ResolvePartnerCarRequestKind(command.PartnerCarRequestKind);
 
         if (command.TicketType == TicketType.PartnerCar)
         {
@@ -53,12 +54,15 @@ public sealed class CreateTicketCommandHandler
             phoneNumber = partnerContext.PhoneNumber;
             relatedPartnerUserId = partnerContext.RelatedUserId;
 
-            ownershipDocumentFileName = await _fileStorageClient.UploadFileAsync(
-                command.OwnershipDocumentFile!,
-                cancellationToken);
+            if (partnerCarRequestKind == "create")
+            {
+                ownershipDocumentFileName = await _fileStorageClient.UploadFileAsync(
+                    command.OwnershipDocumentFile!,
+                    cancellationToken);
+            }
 
             carImages = await UploadPartnerCarImagesAsync(
-                command.CarImageFiles!,
+                command.CarImageFiles,
                 command.CarImageTypes,
                 command.AuthorizationHeader!,
                 cancellationToken);
@@ -121,6 +125,32 @@ public sealed class CreateTicketCommandHandler
                 command.BookingEndTime ?? default,
                 command.PartnerReason ?? string.Empty,
                 DateTime.UtcNow),
+            TicketType.PartnerCar => Ticket.CreatePartnerCar(
+                Guid.NewGuid(),
+                firstName,
+                lastName,
+                email,
+                phoneNumber,
+                relatedPartnerUserId ?? Guid.Empty,
+                partnerCarRequestKind,
+                command.PartnerCarId,
+                command.CarBrand ?? string.Empty,
+                command.CarModel ?? string.Empty,
+                command.CarYear,
+                command.LicensePlate ?? string.Empty,
+                command.Color,
+                command.RequestedStatus,
+                command.IsActive,
+                command.Transmission,
+                command.FuelType,
+                command.Seats,
+                command.Doors,
+                command.BodyType,
+                command.Horsepower,
+                command.SelectedTags,
+                ownershipDocumentFileName,
+                carImages ?? [],
+                DateTime.UtcNow),
             _ => new Ticket(
                 Guid.NewGuid(),
                 command.TicketType,
@@ -176,11 +206,16 @@ public sealed class CreateTicketCommandHandler
     }
 
     private async Task<IReadOnlyCollection<PartnerCarTicketImageData>> UploadPartnerCarImagesAsync(
-        IReadOnlyCollection<TicketDocumentFilePayload> imageFiles,
+        IReadOnlyCollection<TicketDocumentFilePayload>? imageFiles,
         IReadOnlyCollection<string>? imageTypes,
         string authorizationHeader,
         CancellationToken cancellationToken)
     {
+        if (imageFiles is null || imageFiles.Count == 0)
+        {
+            return [];
+        }
+
         if (imageTypes is null || imageTypes.Count != imageFiles.Count)
         {
             throw new ValidationException("Each partner car image must include a matching image type.");
@@ -404,29 +439,43 @@ public sealed class CreateTicketCommandHandler
                 throw new ValidationException($"Car year must be between 1886 and {maxAllowedCarYear}.");
             }
 
-            if (command.OwnershipDocumentFile is null)
+            var partnerCarRequestKind = ResolvePartnerCarRequestKind(command.PartnerCarRequestKind);
+
+            if (partnerCarRequestKind == "create" && command.OwnershipDocumentFile is null)
             {
                 throw new ValidationException($"{nameof(command.OwnershipDocumentFile)} is required.");
             }
 
-            if (command.CarImageFiles is null || command.CarImageFiles.Count == 0)
+            if (partnerCarRequestKind == "create" &&
+                (command.CarImageFiles is null || command.CarImageFiles.Count == 0))
             {
                 throw new ValidationException("At least one partner car image is required.");
             }
 
-            if (command.CarImageTypes is null || command.CarImageTypes.Count != command.CarImageFiles.Count)
+            if (partnerCarRequestKind == "update" &&
+                (!command.PartnerCarId.HasValue || command.PartnerCarId.Value <= 0))
+            {
+                throw new ValidationException("PartnerCarId is required for partner car update tickets.");
+            }
+
+            if (command.CarImageFiles is not null &&
+                command.CarImageFiles.Count > 0 &&
+                (command.CarImageTypes is null || command.CarImageTypes.Count != command.CarImageFiles.Count))
             {
                 throw new ValidationException("Each partner car image must include a matching image type.");
             }
 
-            ValidatePdf(command.OwnershipDocumentFile, nameof(command.OwnershipDocumentFile));
+            if (command.OwnershipDocumentFile is not null)
+            {
+                ValidatePdf(command.OwnershipDocumentFile, nameof(command.OwnershipDocumentFile));
+            }
 
-            foreach (var file in command.CarImageFiles)
+            foreach (var file in command.CarImageFiles ?? [])
             {
                 ValidateImage(file, nameof(command.CarImageFiles));
             }
 
-            foreach (var imageType in command.CarImageTypes)
+            foreach (var imageType in command.CarImageTypes ?? [])
             {
                 ValidatePartnerCarImageType(imageType);
             }
@@ -575,5 +624,16 @@ public sealed class CreateTicketCommandHandler
         {
             throw new ValidationException($"{fieldName} must not exceed 10000000.");
         }
+    }
+
+    private static string ResolvePartnerCarRequestKind(string? requestKind)
+    {
+        var normalized = (requestKind ?? string.Empty).Trim().ToLowerInvariant();
+        return normalized switch
+        {
+            "" or "create" => "create",
+            "update" => "update",
+            _ => throw new ValidationException("PartnerCarRequestKind must be either 'create' or 'update'.")
+        };
     }
 }

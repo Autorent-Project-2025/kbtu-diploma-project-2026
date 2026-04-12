@@ -138,3 +138,83 @@ export async function createPartnerCarTicket(
 
   return res.data as Ticket;
 }
+
+export interface CreatePartnerCarUpdateTicketPayload {
+  partnerCarId: number;
+  carBrand: string;
+  carModel: string;
+  carYear: number;
+  licensePlate: string;
+  color?: string | null;
+  requestedStatus: number;
+  isActive: boolean;
+  transmission?: string | null;
+  fuelType?: string | null;
+  seats?: number | null;
+  doors?: number | null;
+  bodyType?: string | null;
+  horsepower?: number | null;
+  selectedTags?: string[];
+  newImages: Array<{
+    file: File;
+    imageType: PartnerCarImageType;
+  }>;
+}
+
+export async function createPartnerCarUpdateTicket(
+  payload: CreatePartnerCarUpdateTicketPayload
+): Promise<Ticket> {
+  const formData = new FormData();
+  formData.append("ticketType", "PartnerCar");
+  formData.append("partnerCarRequestKind", "update");
+  formData.append("partnerCarId", String(payload.partnerCarId));
+
+  const email = auth.getEmail();
+  if (email) {
+    formData.append("email", email);
+  }
+
+  formData.append("carBrand", payload.carBrand);
+  formData.append("carModel", payload.carModel);
+  formData.append("carYear", String(payload.carYear));
+  formData.append("licensePlate", payload.licensePlate);
+  formData.append("requestedStatus", String(payload.requestedStatus));
+  formData.append("isActive", String(payload.isActive));
+
+  if (payload.color) {
+    formData.append("color", payload.color);
+  }
+  if (payload.transmission) {
+    formData.append("transmission", payload.transmission);
+  }
+  if (payload.fuelType) {
+    formData.append("fuelType", payload.fuelType);
+  }
+  if (payload.seats != null) {
+    formData.append("seats", String(payload.seats));
+  }
+  if (payload.doors != null) {
+    formData.append("doors", String(payload.doors));
+  }
+  if (payload.bodyType) {
+    formData.append("bodyType", payload.bodyType);
+  }
+  if (payload.horsepower != null) {
+    formData.append("horsepower", String(payload.horsepower));
+  }
+  for (const tag of payload.selectedTags ?? []) {
+    formData.append("selectedTags", tag);
+  }
+  for (const image of payload.newImages) {
+    formData.append("carImageFiles", image.file);
+    formData.append("carImageTypes", image.imageType);
+  }
+
+  const res = await api.post("/tickets", formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
+
+  return res.data as Ticket;
+}

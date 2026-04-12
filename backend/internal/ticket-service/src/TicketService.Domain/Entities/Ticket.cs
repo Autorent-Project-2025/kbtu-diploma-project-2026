@@ -4,6 +4,9 @@ namespace TicketService.Domain.Entities;
 
 public sealed class Ticket
 {
+    private const string PartnerCarRequestKindCreate = "create";
+    private const string PartnerCarRequestKindUpdate = "update";
+
     private static readonly HashSet<string> AllowedSemanticTags = new(StringComparer.OrdinalIgnoreCase)
     {
         "econom",
@@ -32,6 +35,12 @@ public sealed class Ticket
     public string? AvatarUrl => Data is ClientTicketData clientData ? clientData.AvatarUrl : null;
     public string? CompanyName => Data is PartnerTicketData partnerData ? partnerData.CompanyName : null;
     public string? ContactEmail => Data is PartnerTicketData partnerData ? partnerData.ContactEmail : null;
+    public string? PartnerCarRequestKind => Data is PartnerCarTicketData partnerCarData
+        ? partnerCarData.RequestKind
+        : null;
+    public int? PartnerCarId => Data is PartnerCarTicketData partnerCarData
+        ? partnerCarData.PartnerCarId
+        : null;
     public Guid? RelatedPartnerUserId => Data switch
     {
         PartnerCarTicketData partnerCarData => partnerCarData.RelatedPartnerUserId,
@@ -52,6 +61,11 @@ public sealed class Ticket
     };
     public int? CarYear => Data is PartnerCarTicketData partnerCarData ? partnerCarData.CarYear : null;
     public string? LicensePlate => Data is PartnerCarTicketData partnerCarData ? partnerCarData.LicensePlate : null;
+    public string? Color => Data is PartnerCarTicketData partnerCarData ? partnerCarData.Color : null;
+    public int? RequestedPartnerCarStatus => Data is PartnerCarTicketData partnerCarData
+        ? partnerCarData.RequestedStatus
+        : null;
+    public bool? IsActive => Data is PartnerCarTicketData partnerCarData ? partnerCarData.IsActive : null;
     public string? Transmission => Data is PartnerCarTicketData partnerCarData ? partnerCarData.Transmission : null;
     public string? FuelType => Data is PartnerCarTicketData partnerCarData ? partnerCarData.FuelType : null;
     public int? Seats => Data is PartnerCarTicketData partnerCarData ? partnerCarData.Seats : null;
@@ -255,11 +269,99 @@ public sealed class Ticket
         return ticket;
     }
 
+    public static Ticket CreatePartnerCar(
+        Guid id,
+        string firstName,
+        string lastName,
+        string email,
+        string phoneNumber,
+        Guid relatedPartnerUserId,
+        string requestKind,
+        int? partnerCarId,
+        string carBrand,
+        string carModel,
+        int? carYear,
+        string licensePlate,
+        string? color,
+        int? requestedStatus,
+        bool? isActive,
+        string? transmission,
+        string? fuelType,
+        int? seats,
+        int? doors,
+        string? bodyType,
+        int? horsepower,
+        IReadOnlyCollection<string>? selectedTags,
+        string? ownershipDocumentFileName,
+        IReadOnlyCollection<PartnerCarTicketImageData>? carImages,
+        DateTime createdAt)
+    {
+        var normalizedRequestKind = NormalizePartnerCarRequestKind(requestKind);
+        var ticket = new Ticket
+        {
+            Id = id == Guid.Empty ? Guid.NewGuid() : id,
+            TicketType = TicketType.PartnerCar,
+            CreatedAt = createdAt
+        };
+
+        ticket.SetEmail(email);
+        var normalizedName = NormalizeName(firstName, lastName);
+        var normalizedFuelType = NormalizeFuelType(fuelType);
+        var normalizedTransmission = NormalizeTransmission(transmission);
+        var normalizedSeats = NormalizeSeats(seats);
+        var normalizedBodyType = NormalizeBodyType(bodyType);
+        var normalizedHorsepower = NormalizeHorsepower(horsepower);
+
+        ticket.Data = new PartnerCarTicketData
+        {
+            FirstName = normalizedName.FirstName,
+            LastName = normalizedName.LastName,
+            FullName = normalizedName.FullName,
+            PhoneNumber = NormalizePhoneNumber(phoneNumber),
+            IdentityDocumentFileName = null,
+            RequestKind = normalizedRequestKind,
+            PartnerCarId = NormalizeOptionalPartnerCarId(partnerCarId, normalizedRequestKind),
+            RelatedPartnerUserId = NormalizePartnerUserId(relatedPartnerUserId),
+            CarBrand = NormalizeCarBrand(carBrand),
+            CarModel = NormalizeCarModel(carModel),
+            CarYear = NormalizeCarYear(carYear),
+            LicensePlate = NormalizeLicensePlate(licensePlate),
+            Color = NormalizeColor(color),
+            RequestedStatus = NormalizeRequestedPartnerCarStatus(requestedStatus, normalizedRequestKind),
+            IsActive = NormalizePartnerCarIsActive(isActive, normalizedRequestKind),
+            Transmission = normalizedTransmission,
+            FuelType = normalizedFuelType,
+            Seats = normalizedSeats,
+            Doors = NormalizeDoors(doors),
+            BodyType = normalizedBodyType,
+            Horsepower = normalizedHorsepower,
+            SelectedTags = NormalizeSemanticTags(selectedTags, nameof(selectedTags)),
+            SuggestedTags = SuggestSemanticTags(
+                normalizedFuelType,
+                normalizedSeats,
+                normalizedBodyType,
+                normalizedHorsepower),
+            ConfirmedTags = [],
+            OwnershipDocumentFileName = normalizedRequestKind == PartnerCarRequestKindCreate
+                ? NormalizeOwnershipDocumentFileName(ownershipDocumentFileName)
+                : NormalizeOptional(ownershipDocumentFileName, nameof(ownershipDocumentFileName), 255) ?? string.Empty,
+            CarImages = NormalizePartnerCarImages(carImages),
+            DecisionReason = null,
+            ReviewedByManagerId = null,
+            ReviewedAt = null
+        };
+        ticket.Status = TicketStatus.Pending;
+        return ticket;
+    }
+
     public void UpdatePartnerCarDetailsForReview(
         string? carBrand,
         string? carModel,
         int? carYear,
         string? licensePlate,
+        string? color,
+        int? requestedStatus,
+        bool? isActive,
         string? transmission,
         string? fuelType,
         int? seats,
@@ -279,6 +381,13 @@ public sealed class Ticket
         var nextCarModel = carModel is null ? partnerCarData.CarModel : NormalizeCarModel(carModel);
         var nextCarYear = carYear is null ? partnerCarData.CarYear : NormalizeCarYear(carYear);
         var nextLicensePlate = licensePlate is null ? partnerCarData.LicensePlate : NormalizeLicensePlate(licensePlate);
+        var nextColor = color is null ? partnerCarData.Color : NormalizeColor(color);
+        var nextRequestedStatus = requestedStatus is null
+            ? partnerCarData.RequestedStatus
+            : NormalizeRequestedPartnerCarStatus(requestedStatus, partnerCarData.RequestKind);
+        var nextIsActive = isActive.HasValue
+            ? NormalizePartnerCarIsActive(isActive, partnerCarData.RequestKind)
+            : partnerCarData.IsActive;
         var nextTransmission = transmission is null ? partnerCarData.Transmission : NormalizeTransmission(transmission);
         var nextFuelType = fuelType is null ? partnerCarData.FuelType : NormalizeFuelType(fuelType);
         var nextSeats = seats is null ? partnerCarData.Seats : NormalizeSeats(seats);
@@ -293,6 +402,9 @@ public sealed class Ticket
             CarModel = nextCarModel,
             CarYear = nextCarYear,
             LicensePlate = nextLicensePlate,
+            Color = nextColor,
+            RequestedStatus = nextRequestedStatus,
+            IsActive = nextIsActive,
             Transmission = nextTransmission,
             FuelType = nextFuelType,
             Seats = nextSeats,
@@ -631,6 +743,62 @@ public sealed class Ticket
     private static string NormalizeLicensePlate(string? licensePlate)
     {
         return NormalizeRequired(licensePlate, nameof(licensePlate), 20).ToUpperInvariant();
+    }
+
+    private static string NormalizePartnerCarRequestKind(string? requestKind)
+    {
+        var normalized = NormalizeOptional(requestKind, nameof(requestKind), 20)?.ToLowerInvariant();
+        return normalized switch
+        {
+            null or "" or PartnerCarRequestKindCreate => PartnerCarRequestKindCreate,
+            PartnerCarRequestKindUpdate => PartnerCarRequestKindUpdate,
+            _ => throw new ArgumentException("partnerCarRequestKind must be either 'create' or 'update'.", nameof(requestKind))
+        };
+    }
+
+    private static int? NormalizeOptionalPartnerCarId(int? partnerCarId, string requestKind)
+    {
+        if (requestKind != PartnerCarRequestKindUpdate)
+        {
+            return null;
+        }
+
+        if (!partnerCarId.HasValue || partnerCarId.Value <= 0)
+        {
+            throw new ArgumentException("partnerCarId is required for partner car update requests.", nameof(partnerCarId));
+        }
+
+        return partnerCarId.Value;
+    }
+
+    private static string? NormalizeColor(string? color)
+    {
+        return NormalizeOptional(color, nameof(color), 50);
+    }
+
+    private static int? NormalizeRequestedPartnerCarStatus(int? requestedStatus, string requestKind)
+    {
+        if (!requestedStatus.HasValue)
+        {
+            return requestKind == PartnerCarRequestKindCreate ? 0 : null;
+        }
+
+        if (requestedStatus.Value < 0 || requestedStatus.Value > 3)
+        {
+            throw new ArgumentException("requestedStatus must be between 0 and 3.", nameof(requestedStatus));
+        }
+
+        return requestedStatus.Value;
+    }
+
+    private static bool? NormalizePartnerCarIsActive(bool? isActive, string requestKind)
+    {
+        if (isActive.HasValue)
+        {
+            return isActive.Value;
+        }
+
+        return requestKind == PartnerCarRequestKindCreate ? true : null;
     }
 
     private static string? NormalizeTransmission(string? transmission)
