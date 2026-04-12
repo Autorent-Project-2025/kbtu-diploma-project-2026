@@ -1097,6 +1097,11 @@ namespace BookingService.Infrastructure.Services
                 throw new InvalidOperationException("Car is already booked for this time.");
             }
 
+            if (await HasOverlappingUserBookings(userId, startTime, endTime))
+            {
+                throw new InvalidOperationException("You already have a booking for this time period.");
+            }
+
             var displaySnapshot = await GetBookingDisplaySnapshotAsync(
                 partnerCarId,
                 priceQuote.PartnerUserId);
@@ -1239,6 +1244,16 @@ namespace BookingService.Infrastructure.Services
             return _db.Bookings
                 .AnyAsync(b =>
                     b.PartnerCarId == partnerCarId &&
+                    (b.Status == BookingStatus.Pending || b.Status == BookingStatus.Confirmed || b.Status == BookingStatus.Active) &&
+                    startTime < b.EndTime &&
+                    endTime > b.StartTime);
+        }
+
+        private Task<bool> HasOverlappingUserBookings(Guid userId, DateTimeOffset startTime, DateTimeOffset endTime)
+        {
+            return _db.Bookings
+                .AnyAsync(b =>
+                    b.UserId == userId &&
                     (b.Status == BookingStatus.Pending || b.Status == BookingStatus.Confirmed || b.Status == BookingStatus.Active) &&
                     startTime < b.EndTime &&
                     endTime > b.StartTime);
