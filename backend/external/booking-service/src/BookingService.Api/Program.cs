@@ -1,4 +1,5 @@
 using AutoRent.Messaging.RabbitMq;
+using BookingService.Api.Messaging;
 using BookingService.Api.Middleware;
 using BookingService.Api.Options;
 using BookingService.Application.Constants;
@@ -286,6 +287,7 @@ builder.Services.AddSingleton<IRabbitMqPublisher, RabbitMqPublisher>();
 builder.Services.AddHostedService<PaymentSyncOutboxDispatcher>();
 builder.Services.AddHostedService<PendingBookingExpirationDispatcher>();
 builder.Services.AddHostedService<UnstartedBookingExpirationDispatcher>();
+builder.Services.AddHostedService<UserDeletedConsumer>();
 
 var app = builder.Build();
 

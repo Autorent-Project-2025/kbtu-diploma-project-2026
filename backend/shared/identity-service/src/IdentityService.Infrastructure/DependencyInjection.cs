@@ -1,4 +1,6 @@
+using AutoRent.Messaging.RabbitMq;
 using IdentityService.Application.Interfaces;
+using IdentityService.Infrastructure.Events;
 using IdentityService.Infrastructure.Options;
 using IdentityService.Infrastructure.Persistence;
 using IdentityService.Infrastructure.Persistence.Repositories;
@@ -45,6 +47,10 @@ public static class DependencyInjection
         services.AddScoped<IActivationTokenRepository, ActivationTokenRepository>();
         services.AddScoped<IPasswordHasher, BCryptPasswordHasher>();
         services.AddSingleton<IJwtProvider, JwtProvider>();
+
+        services.Configure<RabbitMqOptions>(configuration.GetSection(RabbitMqOptions.SectionName));
+        services.AddSingleton<IRabbitMqPublisher, RabbitMqPublisher>();
+        services.AddScoped<IEventPublisher, RabbitMqEventPublisher>();
 
         return services;
     }

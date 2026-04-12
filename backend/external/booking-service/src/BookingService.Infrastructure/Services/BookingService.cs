@@ -863,6 +863,41 @@ namespace BookingService.Infrastructure.Services
             return true;
         }
 
+        public async Task<int> CancelActiveBookingsByUserAsync(
+            Guid userId,
+            string? reason = null,
+            CancellationToken cancellationToken = default)
+        {
+            EnsureValidUserId(userId);
+
+            var activeBookings = await _db.Bookings
+                .Where(b =>
+                    b.UserId == userId &&
+                    (b.Status == BookingStatus.Pending ||
+                     b.Status == BookingStatus.Confirmed ||
+                     b.Status == BookingStatus.Active))
+                .ToListAsync(cancellationToken);
+
+            if (activeBookings.Count == 0)
+                return 0;
+
+            var cancelReason = string.IsNullOrWhiteSpace(reason)
+                ? "Бронирование отменено в связи с удалением аккаунта."
+                : reason;
+
+            foreach (var booking in activeBookings)
+            {
+                await CancelBookingWithMetadataAsync(
+                    booking,
+                    CancellationActorManager,
+                    cancelReason,
+                    notifyCustomer: false,
+                    cancellationToken);
+            }
+
+            return activeBookings.Count;
+        }
+
         public async Task ProcessCompletionReviewApproved(
             int bookingId,
             Guid ticketId,

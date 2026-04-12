@@ -40,6 +40,7 @@ namespace BookingService.Application.Interfaces
         Task<BookingChargeResponseDto> PayBookingCharge(int id, long chargeId, Guid userId, CancellationToken cancellationToken = default);
         Task<BookingResponseDto?> GetBookingById(int id, CancellationToken cancellationToken = default);
         Task<bool> CancelBookingByAdmin(int id, string? cancellationReason = null, CancellationToken cancellationToken = default);
+        Task<int> CancelActiveBookingsByUserAsync(Guid userId, string? reason = null, CancellationToken cancellationToken = default);
         Task ProcessCompletionReviewApproved(
             int bookingId,
             Guid ticketId,
