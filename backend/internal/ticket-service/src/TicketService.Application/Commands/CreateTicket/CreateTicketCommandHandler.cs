@@ -389,6 +389,14 @@ public sealed class CreateTicketCommandHandler
             {
                 throw new ValidationException("Birth date cannot be in the future.");
             }
+
+            var today = DateOnly.FromDateTime(DateTime.UtcNow);
+            var age = today.Year - command.BirthDate.Value.Year;
+            if (command.BirthDate.Value > today.AddYears(-age)) age--;
+            if (age < 18)
+            {
+                throw new ValidationException("You must be at least 18 years old to register.");
+            }
         }
 
         if (command.IdentityDocumentFile is null)
