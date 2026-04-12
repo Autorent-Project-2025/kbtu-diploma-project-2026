@@ -229,6 +229,14 @@ namespace CarService.Infrastructure.Services
                 throw new UnauthorizedAccessException("You are not allowed to delete this partner car image.");
             }
 
+            var totalImages = await _db.PartnerCarImages
+                .CountAsync(img => img.CarId == entity.CarId, cancellationToken);
+
+            if (totalImages <= 1)
+            {
+                throw new InvalidOperationException("Cannot delete the last image. At least one photo is required.");
+            }
+
             if (!string.IsNullOrWhiteSpace(entity.ImageId))
             {
                 await _imageStorageClient.DeleteAsync(entity.ImageId, authorizationHeader, cancellationToken);

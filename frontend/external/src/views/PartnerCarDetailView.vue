@@ -52,27 +52,41 @@
               </div>
 
               <div
-                v-if="car.images.length > 1"
+                v-if="car.images.length > 0"
                 class="grid grid-cols-4 gap-3"
               >
-                <button
+                <div
                   v-for="(image, index) in car.images.slice(0, 8)"
                   :key="`${image.id}-${index}`"
-                  type="button"
-                  :class="[
-                    'relative overflow-hidden rounded-2xl border transition-all',
-                    currentImageIndex === index
-                      ? 'border-primary-500 ring-2 ring-primary-500/30'
-                      : 'border-gray-200 dark:border-gray-700',
-                  ]"
-                  @click="currentImageIndex = index"
+                  class="relative"
                 >
-                  <img
-                    :src="image.imageUrl"
-                    :alt="carTitle"
-                    class="h-20 w-full object-cover"
-                  />
-                </button>
+                  <button
+                    type="button"
+                    :class="[
+                      'relative overflow-hidden rounded-2xl border transition-all w-full',
+                      currentImageIndex === index
+                        ? 'border-primary-500 ring-2 ring-primary-500/30'
+                        : 'border-gray-200 dark:border-gray-700',
+                    ]"
+                    @click="currentImageIndex = index"
+                  >
+                    <img
+                      :src="image.imageUrl"
+                      :alt="carTitle"
+                      class="h-20 w-full object-cover"
+                    />
+                  </button>
+                  <button
+                    v-if="car.images.length > 1"
+                    type="button"
+                    class="absolute -top-1.5 -right-1.5 z-10 w-6 h-6 flex items-center justify-center rounded-full bg-red-500 text-white text-xs font-bold hover:bg-red-600 transition-colors shadow"
+                    :disabled="deletingImageId === image.id"
+                    title="Удалить фото"
+                    @click.stop="onDeleteImage(image.id)"
+                  >
+                    {{ deletingImageId === image.id ? '...' : '×' }}
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -358,7 +372,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, reactive, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { getMyPartnerCarDetails, type PartnerCarDetails } from "../api/partnerCars";
+import { getMyPartnerCarDetails, deletePartnerCarImage, type PartnerCarDetails } from "../api/partnerCars";
 import {
   createPartnerCarUpdateTicket,
   type PartnerCarImageType,
@@ -379,6 +393,7 @@ const { success, error } = useToast();
 
 const loading = ref(true);
 const submitting = ref(false);
+const deletingImageId = ref<number | null>(null);
 const errorMessage = ref("");
 const car = ref<PartnerCarDetails | null>(null);
 const currentImageIndex = ref(0);
@@ -519,6 +534,30 @@ function removeNewImage(index: number) {
   const [removed] = form.newImages.splice(index, 1);
   if (removed) {
     URL.revokeObjectURL(removed.previewUrl);
+  }
+}
+
+async function onDeleteImage(imageId: number) {
+  if (!car.value || deletingImageId.value) return;
+
+  if (car.value.images.length <= 1) {
+    error("Нельзя удалить последнюю фотографию.");
+    return;
+  }
+
+  deletingImageId.value = imageId;
+  try {
+    await deletePartnerCarImage(imageId);
+    car.value.images = car.value.images.filter(img => img.id !== imageId);
+    if (currentImageIndex.value >= car.value.images.length) {
+      currentImageIndex.value = Math.max(0, car.value.images.length - 1);
+    }
+    success("Фото удалено.");
+  } catch (e: any) {
+    const msg = e?.response?.data?.detail || e?.response?.data?.error || "Не удалось удалить фото.";
+    error(msg);
+  } finally {
+    deletingImageId.value = null;
   }
 }
 

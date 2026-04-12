@@ -144,6 +144,10 @@ export async function getCarBrands(): Promise<string[]> {
   return (response.data ?? []) as string[];
 }
 
+export async function deletePartnerCarImage(imageId: number): Promise<void> {
+  await api.delete(`/cars/images/partner-cars/${imageId}`);
+}
+
 export async function getCarModelNames(brand?: string | null): Promise<string[]> {
   const response = await api.get("/cars/catalog/models", {
     params: {
