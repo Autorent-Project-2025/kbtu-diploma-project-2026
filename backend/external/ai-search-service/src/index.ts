@@ -6,6 +6,7 @@ import { getChatHistory, saveChatHistory } from "./chat/chatHistoryRepository";
 import { config } from "./config/env";
 import { observabilityLogger } from "./observability/logger";
 import { ensureSchemaReachable, reindexEverything, reindexPartnerCar } from "./indexing/searchIndexer";
+import { loadTaxonomyFromDatabase } from "./queryTaxonomy";
 import { parseRecommendationQuery } from "./ai/queryParser";
 import { searchCars } from "./search/searchService";
 import {
@@ -84,6 +85,8 @@ async function main() {
     await reindexEverything();
   }
 
+  await loadTaxonomyFromDatabase();
+
   const rabbitConnection = await startIndexingConsumer();
   const app = express();
   app.disable("x-powered-by");
@@ -148,6 +151,7 @@ async function main() {
 
   app.post("/internal/reindex", async (_req, res) => {
     const indexedCount = await reindexEverything();
+    await loadTaxonomyFromDatabase();
     res.status(200).json({ indexedCount });
   });
 
