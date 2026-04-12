@@ -66,7 +66,6 @@
                 <th class="text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider px-6 py-3">Период</th>
                 <th class="text-right text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider px-6 py-3">Стоимость</th>
                 <th class="text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider px-6 py-3">Статус</th>
-                <th class="text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider px-6 py-3">Подписка</th>
                 <th class="text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider px-6 py-3">Создано</th>
               </tr>
             </thead>
@@ -90,12 +89,6 @@
                   <span :class="['px-2.5 py-1 text-xs font-semibold rounded-full', bookingStatusBadge(b.status)]">
                     {{ bookingStatusLabel(b.status) }}
                   </span>
-                </td>
-                <td class="px-6 py-4">
-                  <span v-if="b.usedSubscription" class="px-2 py-0.5 text-xs font-medium rounded-full bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400">
-                    Подписка
-                  </span>
-                  <span v-else class="text-xs text-gray-400">—</span>
                 </td>
                 <td class="px-6 py-4 text-sm text-gray-400">{{ formatDateTime(b.createdAt) }}</td>
               </tr>

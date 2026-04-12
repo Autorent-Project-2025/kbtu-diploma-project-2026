@@ -93,33 +93,123 @@
             <p class="text-sm font-bold uppercase tracking-[0.18em] text-primary-600 dark:text-primary-400">
               Форма завершения
             </p>
-            <h2 class="text-2xl font-bold text-gray-900 dark:text-white">
-              Загрузите фото машины после поездки
-            </h2>
-            <p class="text-sm text-gray-600 dark:text-gray-400">
-              Нужны ровно 5 обязательных фото: спереди, сзади, левый бок, правый бок и салон.
-            </p>
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div class="space-y-2">
+                <h2 class="text-2xl font-bold text-gray-900 dark:text-white">
+                  Загрузите фото машины после поездки
+                </h2>
+                <p class="text-sm text-gray-600 dark:text-gray-400">
+                  Нужны ровно 5 обязательных фото: спереди, сзади, левый бок, правый бок и салон.
+                </p>
+              </div>
+              <div class="rounded-2xl border border-primary-200 dark:border-primary-500/30 bg-primary-50 dark:bg-primary-500/10 px-4 py-3 text-sm font-semibold text-primary-700 dark:text-primary-300">
+                Загружено {{ completedPhotoCount }} / {{ completionPhotoFields.length }}
+              </div>
+            </div>
           </div>
 
           <div class="grid gap-4 md:grid-cols-2">
-            <label
+            <article
               v-for="field in completionPhotoFields"
               :key="field.key"
-              class="rounded-2xl border border-dashed border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 p-4 space-y-3 cursor-pointer hover:border-primary-500 transition-colors"
+              class="rounded-3xl border-2 p-4 sm:p-5 transition-colors"
+              :class="
+                activeDropzoneKey === field.key
+                  ? 'border-primary-500 bg-primary-50 dark:border-primary-500 dark:bg-primary-500/10'
+                  : selectedFiles[field.key]
+                    ? 'border-emerald-300 bg-emerald-50 dark:border-emerald-500/40 dark:bg-emerald-500/10'
+                    : 'border-dashed border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50'
+              "
+              @dragover.prevent="activeDropzoneKey = field.key"
+              @dragleave.prevent="activeDropzoneKey = null"
+              @drop.prevent="onFileDrop(field.key, $event)"
             >
-              <div class="space-y-1">
-                <p class="font-semibold text-gray-900 dark:text-white">{{ field.label }}</p>
-                <p class="text-sm text-gray-500 dark:text-gray-400">
-                  {{ selectedFileName(field.key) || "Файл не выбран" }}
-                </p>
+              <div class="flex items-start justify-between gap-3">
+                <div class="space-y-1">
+                  <p class="font-semibold text-gray-900 dark:text-white">{{ field.label }}</p>
+                  <p class="text-sm text-gray-500 dark:text-gray-400">
+                    {{ selectedFileName(field.key) || "Перетащите файл сюда или выберите вручную" }}
+                  </p>
+                </div>
+                <span
+                  class="shrink-0 rounded-full px-3 py-1 text-xs font-bold uppercase tracking-[0.16em]"
+                  :class="
+                    selectedFiles[field.key]
+                      ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
+                      : 'bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-300'
+                  "
+                >
+                  {{ selectedFiles[field.key] ? "Готово" : "Нужно" }}
+                </span>
               </div>
+
+              <div
+                class="overflow-hidden rounded-2xl border border-gray-200/80 dark:border-gray-700/80 bg-white/80 dark:bg-gray-900/60"
+              >
+                <div
+                  v-if="photoPreviewUrls[field.key]"
+                  class="aspect-[4/3] bg-gray-100 dark:bg-gray-800"
+                >
+                  <img
+                    :src="photoPreviewUrls[field.key] || undefined"
+                    :alt="field.label"
+                    class="h-full w-full object-cover"
+                  />
+                </div>
+                <div
+                  v-else
+                  class="aspect-[4/3] flex flex-col items-center justify-center gap-3 px-6 text-center text-gray-400 dark:text-gray-500"
+                >
+                  <svg
+                    class="h-10 w-10"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.6"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3 10.5a7.5 7.5 0 1115 0 7.5 7.5 0 01-15 0z"
+                    />
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      d="M12 16.5v-9m-4.5 4.5h9"
+                    />
+                  </svg>
+                  <p class="text-sm font-medium">
+                    JPG, PNG или WEBP
+                  </p>
+                </div>
+              </div>
+
+              <div class="flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  class="px-4 py-2.5 rounded-2xl bg-gray-900 text-white dark:bg-white dark:text-gray-900 text-sm font-semibold transition-colors hover:opacity-90"
+                  @click="openFilePicker(field.key)"
+                >
+                  {{ selectedFiles[field.key] ? "Заменить фото" : "Выбрать фото" }}
+                </button>
+                <button
+                  v-if="selectedFiles[field.key]"
+                  type="button"
+                  class="px-4 py-2.5 rounded-2xl border border-gray-300 dark:border-gray-700 text-sm font-semibold text-gray-700 dark:text-gray-300 transition-colors hover:border-red-400 hover:text-red-600 dark:hover:text-red-400"
+                  @click="clearSelectedFile(field.key)"
+                >
+                  Удалить
+                </button>
+              </div>
+
               <input
+                :id="`completion-input-${field.key}`"
                 type="file"
                 accept="image/*"
-                class="block w-full text-sm text-gray-700 dark:text-gray-300"
+                class="hidden"
                 @change="onFileSelected(field.key, $event)"
               />
-            </label>
+            </article>
           </div>
 
           <div class="flex flex-col sm:flex-row sm:items-center gap-3">
@@ -313,13 +403,33 @@ const completionPhotoFields: Array<{ key: CompletionPhotoKey; label: string }> =
   { key: "completionInteriorPhotoFile", label: "Салон" },
 ];
 
-const selectedFiles = ref<Record<CompletionPhotoKey, File | null>>({
-  completionFrontPhotoFile: null,
-  completionBackPhotoFile: null,
-  completionSideLeftPhotoFile: null,
-  completionSideRightPhotoFile: null,
-  completionInteriorPhotoFile: null,
-});
+function createEmptySelectedFiles(): Record<CompletionPhotoKey, File | null> {
+  return {
+    completionFrontPhotoFile: null,
+    completionBackPhotoFile: null,
+    completionSideLeftPhotoFile: null,
+    completionSideRightPhotoFile: null,
+    completionInteriorPhotoFile: null,
+  };
+}
+
+function createEmptyPreviewUrls(): Record<CompletionPhotoKey, string | null> {
+  return {
+    completionFrontPhotoFile: null,
+    completionBackPhotoFile: null,
+    completionSideLeftPhotoFile: null,
+    completionSideRightPhotoFile: null,
+    completionInteriorPhotoFile: null,
+  };
+}
+
+const selectedFiles = ref<Record<CompletionPhotoKey, File | null>>(
+  createEmptySelectedFiles()
+);
+const photoPreviewUrls = ref<Record<CompletionPhotoKey, string | null>>(
+  createEmptyPreviewUrls()
+);
+const activeDropzoneKey = ref<CompletionPhotoKey | null>(null);
 
 let timerId: number | null = null;
 
@@ -376,6 +486,10 @@ const canSubmitCompletionReview = computed(() =>
   completionPhotoFields.every((field) => selectedFiles.value[field.key] instanceof File)
 );
 
+const completedPhotoCount = computed(
+  () => completionPhotoFields.filter((field) => selectedFiles.value[field.key]).length
+);
+
 const reviewSubject = computed(() => ({
   brand: booking.value?.carBrand ?? "",
   model: booking.value?.carModel ?? "",
@@ -399,6 +513,8 @@ onBeforeUnmount(() => {
   if (timerId !== null) {
     window.clearInterval(timerId);
   }
+
+  revokeAllPreviewUrls();
 });
 
 async function loadBookingDetails() {
@@ -425,9 +541,57 @@ async function loadBookingDetails() {
   }
 }
 
-function onFileSelected(key: CompletionPhotoKey, event: Event) {
-  const file = (event.target as HTMLInputElement).files?.[0] ?? null;
+function revokePreviewUrl(key: CompletionPhotoKey) {
+  const previewUrl = photoPreviewUrls.value[key];
+  if (previewUrl) {
+    URL.revokeObjectURL(previewUrl);
+    photoPreviewUrls.value[key] = null;
+  }
+}
+
+function revokeAllPreviewUrls() {
+  completionPhotoFields.forEach((field) => revokePreviewUrl(field.key));
+}
+
+function setSelectedFile(key: CompletionPhotoKey, file: File | null) {
+  revokePreviewUrl(key);
+  selectedFiles.value[key] = null;
+
+  if (!file) {
+    return;
+  }
+
+  if (!file.type.startsWith("image/")) {
+    error("Можно загрузить только изображения.");
+    return;
+  }
+
   selectedFiles.value[key] = file;
+  photoPreviewUrls.value[key] = URL.createObjectURL(file);
+}
+
+function onFileSelected(key: CompletionPhotoKey, event: Event) {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0] ?? null;
+  input.value = "";
+  setSelectedFile(key, file);
+}
+
+function onFileDrop(key: CompletionPhotoKey, event: DragEvent) {
+  activeDropzoneKey.value = null;
+  const file = event.dataTransfer?.files?.[0] ?? null;
+  setSelectedFile(key, file);
+}
+
+function openFilePicker(key: CompletionPhotoKey) {
+  const input = document.getElementById(`completion-input-${key}`) as
+    | HTMLInputElement
+    | null;
+  input?.click();
+}
+
+function clearSelectedFile(key: CompletionPhotoKey) {
+  setSelectedFile(key, null);
 }
 
 function selectedFileName(key: CompletionPhotoKey): string {
@@ -463,6 +627,9 @@ async function submitCompletion() {
 
     booking.value = result.booking;
     charges.value = [];
+    revokeAllPreviewUrls();
+    selectedFiles.value = createEmptySelectedFiles();
+    photoPreviewUrls.value = createEmptyPreviewUrls();
     success(
       result.latePenaltyAmount > 0
         ? `Поездка отправлена на проверку. Предварительная пеня: ${formatMoney(result.latePenaltyAmount)}`

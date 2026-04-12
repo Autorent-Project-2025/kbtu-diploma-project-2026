@@ -693,6 +693,7 @@ async function handleSubmit() {
 
     if (payment.value.paymentStatus === "succeeded") {
       success("Оплата успешна. Бронь подтверждена.");
+      await router.push("/bookings");
       return;
     }
 

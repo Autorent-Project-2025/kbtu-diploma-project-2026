@@ -115,12 +115,6 @@
                 </div>
                 <div class="flex flex-col items-end gap-1.5 flex-shrink-0">
                   <span
-                    v-if="b.usedSubscription"
-                    class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
-                  >
-                    SUB
-                  </span>
-                  <span
                     v-if="b.carCommentId"
                     class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300"
                   >
@@ -197,25 +191,7 @@
               <!-- Price row -->
               <div class="flex items-end justify-between gap-4 flex-wrap">
                 <div>
-                  <div v-if="b.usedSubscription">
-                    <span
-                      class="text-lg font-bold text-emerald-600 dark:text-emerald-400"
-                      >Покрыто подпиской</span
-                    >
-                    <p
-                      v-if="b.pricingBreakdown"
-                      class="text-xs text-gray-400 mt-0.5"
-                    >
-                      Стоимость без подписки:
-                      {{
-                        formatMoney(
-                          b.pricingBreakdown.quotedTotalPrice,
-                          b.pricingBreakdown.currency,
-                        )
-                      }}
-                    </p>
-                  </div>
-                  <div v-else-if="b.price">
+                  <div v-if="b.price">
                     <div class="flex items-baseline gap-2">
                       <span
                         class="text-2xl font-extrabold text-gray-900 dark:text-white"
@@ -261,7 +237,8 @@
                     v-if="
                       canCancel(b) ||
                       b.canLeaveComment ||
-                      canOpenCompletionDetails(b)
+                      canOpenCompletionDetails(b) ||
+                      canFileComplaint(b)
                     "
                     class="relative"
                   >
@@ -649,6 +626,8 @@ function getPrimaryActionProps(booking: BookingWithComputedStatus) {
   if (canPay(booking)) return { to: `/bookings/${booking.id}/payment` };
   if (canCompleteTripAction(booking) || canOpenCompletionDetails(booking))
     return { to: `/bookings/${booking.id}/complete` };
+  if (!canStartTripAction(booking) && !booking.canLeaveComment)
+    return { to: `/bookings/${booking.id}` };
   return { type: "button" };
 }
 
@@ -657,7 +636,8 @@ function getPrimaryAction(booking: BookingWithComputedStatus) {
     to:
       canPay(booking) ||
       canCompleteTripAction(booking) ||
-      canOpenCompletionDetails(booking),
+      canOpenCompletionDetails(booking) ||
+      (!canStartTripAction(booking) && !booking.canLeaveComment),
   };
 }
 
@@ -674,7 +654,8 @@ function handlePrimaryAction(
   if (
     canPay(booking) ||
     canCompleteTripAction(booking) ||
-    canOpenCompletionDetails(booking)
+    canOpenCompletionDetails(booking) ||
+    (!canStartTripAction(booking) && !booking.canLeaveComment)
   )
     return;
   event?.preventDefault();

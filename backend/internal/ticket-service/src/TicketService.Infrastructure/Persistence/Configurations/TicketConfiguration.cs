@@ -242,7 +242,8 @@ public sealed class TicketConfiguration : IEntityTypeConfiguration<Ticket>
             images.Add(new PartnerCarTicketImageData
             {
                 ImageId = GetString(item, "imageId"),
-                ImageUrl = GetString(item, "imageUrl")
+                ImageUrl = GetString(item, "imageUrl"),
+                ImageType = GetString(item, "imageType", "general")
             });
         }
 

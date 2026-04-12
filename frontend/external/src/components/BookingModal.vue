@@ -151,45 +151,6 @@
             </div>
 
             <div
-              v-if="mySubscription"
-              class="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-800 dark:bg-emerald-950/30"
-            >
-              <div class="flex items-start justify-between gap-4">
-                <div>
-                  <p
-                    class="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-600 dark:text-emerald-400"
-                  >
-                    Active subscription
-                  </p>
-                  <p class="mt-1 text-lg font-bold text-gray-900 dark:text-white">
-                    {{ mySubscription.planName }}
-                  </p>
-                  <p class="text-sm text-gray-600 dark:text-gray-300">
-                    Remaining bookings: {{ mySubscription.remainingBookings }}
-                  </p>
-                </div>
-              </div>
-
-              <label
-                class="mt-4 flex cursor-pointer items-center gap-3"
-                :class="{
-                  'cursor-not-allowed opacity-50':
-                    mySubscription.remainingBookings <= 0,
-                }"
-              >
-                <input
-                  v-model="useSubscription"
-                  :disabled="mySubscription.remainingBookings <= 0"
-                  class="rounded"
-                  type="checkbox"
-                />
-                <span class="text-sm font-medium text-gray-700 dark:text-gray-200">
-                  Use subscription for this booking
-                </span>
-              </label>
-            </div>
-
-            <div
               v-if="loadingPrice"
               class="mt-4 text-sm text-gray-500 dark:text-gray-400"
             >
@@ -205,15 +166,12 @@
                   Estimated total
                 </span>
                 <span class="text-xl font-bold text-blue-600 dark:text-blue-400">
-                  {{ useSubscription ? 0 : pricePreview.finalPrice }}
+                  {{ pricePreview.finalPrice }}
                   {{ pricePreview.currency }}
                 </span>
               </div>
 
-              <div
-                v-if="!useSubscription"
-                class="space-y-1 text-sm text-gray-600 dark:text-gray-400"
-              >
+              <div class="space-y-1 text-sm text-gray-600 dark:text-gray-400">
                 <p>
                   Базовая цена за час: {{ formatPriceAmount(basePriceHour, pricePreview.currency) }}
                 </p>
@@ -233,13 +191,6 @@
                 >
                   Рыночная стоимость устарела, цена рассчитана по последнему доступному снапшоту.
                 </p>
-              </div>
-
-              <div
-                v-else
-                class="text-sm font-medium text-emerald-700 dark:text-emerald-300"
-              >
-                Это бронирование будет оформлено по активной подписке.
               </div>
 
               <p
@@ -295,7 +246,6 @@ import {
   type BookingPricePreview,
 } from "../api/booking";
 import { matchCarByModel } from "../api/cars";
-import api from "../api/axios";
 import type { BookingBusySlot, BookingSelection } from "../types/Car";
 import { formatMoney } from "../utils/formatMoney";
 
@@ -313,24 +263,10 @@ interface Emits {
     payload: {
       startDate: string;
       endDate: string;
-      useSubscription: boolean;
       partnerCarId: number;
     },
   ): void;
 }
-
-type MySubscription = {
-  id: number;
-  subscriptionPlanId: number;
-  planName: string;
-  status: string;
-  startDate: string;
-  endDate: string;
-  autoRenew: boolean;
-  includedBookings: number;
-  usedBookings: number;
-  remainingBookings: number;
-};
 
 type RefreshSelectionResult = "ready" | "changed" | "unavailable" | "stale";
 
@@ -353,8 +289,6 @@ const validationError = ref("");
 const availabilityError = ref("");
 const pricePreview = ref<BookingPricePreview | null>(null);
 const loadingPrice = ref(false);
-const mySubscription = ref<MySubscription | null>(null);
-const useSubscription = ref(false);
 const matchedPartnerCarId = ref<number | null>(null);
 const validatingSelection = ref(false);
 let previewRequestId = 0;
@@ -457,18 +391,13 @@ watch(
       pricePreview.value = null;
       matchedPartnerCarId.value = null;
       validatingSelection.value = false;
-      useSubscription.value = false;
-
-      await loadMySubscription();
     } else {
       previewRequestId += 1;
       pricePreview.value = null;
       matchedPartnerCarId.value = null;
       loadingPrice.value = false;
       availabilityError.value = "";
-      mySubscription.value = null;
       validatingSelection.value = false;
-      useSubscription.value = false;
     }
   },
 );
@@ -549,15 +478,6 @@ const isValid = computed(() => {
   validationError.value = "";
   return true;
 });
-
-async function loadMySubscription() {
-  try {
-    const { data } = await api.get("/subscriptions/my");
-    mySubscription.value = data;
-  } catch {
-    mySubscription.value = null;
-  }
-}
 
 async function refreshSelectionAvailability(options?: {
   expectedPartnerCarId?: number | null;
@@ -692,7 +612,6 @@ async function confirmBooking() {
     emit("confirm", {
       startDate: new Date(startDate.value).toISOString(),
       endDate: new Date(endDate.value).toISOString(),
-      useSubscription: useSubscription.value,
       partnerCarId: matchedPartnerCarId.value,
     });
   } finally {

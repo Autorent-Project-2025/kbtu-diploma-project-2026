@@ -6,6 +6,7 @@ import PartnerApplyView from "../views/PartnerApplyView.vue";
 import ActivateAccountView from "../views/ActivateAccountView.vue";
 import CarsView from "../views/CarsView.vue";
 import MyBookingsView from "../views/MyBookingsView.vue";
+import BookingDetailView from "../views/BookingDetailView.vue";
 import BookingPaymentView from "../views/BookingPaymentView.vue";
 import BookingCompletionView from "../views/BookingCompletionView.vue";
 import NotFoundView from "../views/NotFoundView.vue";
@@ -19,7 +20,6 @@ import ProfileView from "../views/ProfileView.vue";
 import ProfileRouterView from "../views/ProfileRouterView.vue";
 import ForbiddenView from "../views/ForbiddenView.vue";
 import { auth } from "../store/auth";
-import SubscriptionPlansView from "../views/SubscriptionPlansView.vue";
 import AiView from "../views/AiView.vue";
 import MyComplaintsView from "../views/MyComplaintsView.vue";
 import ComplaintDetailView from "../views/ComplaintDetailView.vue";
@@ -29,11 +29,6 @@ const routes = [
     path: "/",
     component: HomeView,
     meta: { requiresAuth: false },
-  },
-  {
-    path: "/subscriptions",
-    component: SubscriptionPlansView,
-    meta: { requiresAuth: true },
   },
   {
     path: "/login",
@@ -68,6 +63,11 @@ const routes = [
   {
     path: "/bookings",
     component: MyBookingsView,
+    meta: { requiresAuth: true },
+  },
+  {
+    path: "/bookings/:id",
+    component: BookingDetailView,
     meta: { requiresAuth: true },
   },
   {

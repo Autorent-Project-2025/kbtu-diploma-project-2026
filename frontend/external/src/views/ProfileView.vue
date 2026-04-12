@@ -161,70 +161,6 @@
 
         <!-- ── Stats strip ──────────────────────────────────────────────── -->
 
-        <section
-          v-if="mySubscription"
-          class="rounded-3xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/30 shadow-xl p-6"
-        >
-          <div
-            class="flex flex-col md:flex-row md:items-center md:justify-between gap-6"
-          >
-            <div>
-              <p
-                class="text-xs uppercase tracking-[0.3em] text-emerald-600 dark:text-emerald-400 font-bold"
-              >
-                Active subscription
-              </p>
-
-              <h2
-                class="mt-2 text-2xl font-extrabold text-gray-900 dark:text-white"
-              >
-                {{ mySubscription.planName }}
-              </h2>
-
-              <p class="text-sm text-gray-600 dark:text-gray-300 mt-1">
-                {{ formatDate(mySubscription.startDate) }} —
-                {{ formatDate(mySubscription.endDate) }}
-              </p>
-            </div>
-
-            <div class="grid grid-cols-3 gap-4">
-              <div
-                class="bg-white dark:bg-gray-900 rounded-xl p-4 shadow text-center"
-              >
-                <p class="text-xs text-gray-400">Included</p>
-                <p class="text-xl font-bold">
-                  {{ mySubscription.includedBookings }}
-                </p>
-              </div>
-
-              <div
-                class="bg-white dark:bg-gray-900 rounded-xl p-4 shadow text-center"
-              >
-                <p class="text-xs text-gray-400">Used</p>
-                <p class="text-xl font-bold">
-                  {{ mySubscription.usedBookings }}
-                </p>
-              </div>
-
-              <div
-                class="bg-white dark:bg-gray-900 rounded-xl p-4 shadow text-center"
-              >
-                <p class="text-xs text-gray-400">Remaining</p>
-                <p class="text-xl font-bold text-emerald-600">
-                  {{ mySubscription.remainingBookings }}
-                </p>
-              </div>
-            </div>
-
-            <router-link
-              to="/subscriptions"
-              class="px-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
-            >
-              Manage
-            </router-link>
-          </div>
-        </section>
-
         <section class="grid sm:grid-cols-2 xl:grid-cols-4 gap-4">
           <article
             class="rounded-3xl border border-emerald-200/70 dark:border-emerald-700/40 bg-white dark:bg-gray-900 shadow-xl p-6 space-y-3"
@@ -767,19 +703,6 @@ import { useToast } from "../composables/useToast";
 import type { Booking } from "../types/Booking";
 import { resolveAssetUrl } from "../utils/resolveAssetUrl";
 
-import api from "../api/axios";
-
-const mySubscription = ref<any | null>(null);
-
-async function loadSubscription() {
-  try {
-    const { data } = await api.get("/subscriptions/my");
-    mySubscription.value = data;
-  } catch {
-    mySubscription.value = null;
-  }
-}
-
 const { success, error } = useToast();
 
 // ─── State ────────────────────────────────────────────────────────────────────
@@ -871,7 +794,6 @@ function dismissOnboarding() {
 
 // ─── Lifecycle ────────────────────────────────────────────────────────────────
 onMounted(async () => {
-  await loadSubscription();
   await Promise.all([
     loadProfile(),
     loadStats(),

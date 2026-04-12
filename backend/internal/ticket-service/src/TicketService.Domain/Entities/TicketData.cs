@@ -56,6 +56,7 @@ public sealed record PartnerCarTicketImageData
 {
     public string ImageId { get; init; } = string.Empty;
     public string ImageUrl { get; init; } = string.Empty;
+    public string ImageType { get; init; } = "general";
 }
 
 public sealed record BookingCompletionTicketData : TicketData

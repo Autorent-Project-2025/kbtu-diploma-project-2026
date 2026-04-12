@@ -85,6 +85,7 @@ public sealed class TicketsController : ControllerBase
                 request.SelectedTags,
                 await MapToOptionalFilePayloadAsync(request.OwnershipDocumentFile, cancellationToken),
                 await MapToFilePayloadCollectionAsync(request.CarImageFiles, cancellationToken),
+                request.CarImageTypes,
                 request.BookingId,
                 request.PlannedStartTime,
                 request.PlannedEndTime,
@@ -187,7 +188,7 @@ public sealed class TicketsController : ControllerBase
     {
         var managerId = ResolveManagerId();
         var result = await _issueTicketFineCommandHandler.Handle(
-            new IssueTicketFineCommand(id, managerId, request.Amount),
+            new IssueTicketFineCommand(id, managerId, request.Amount, request.Comment),
             cancellationToken);
 
         return Ok(result.Ticket);

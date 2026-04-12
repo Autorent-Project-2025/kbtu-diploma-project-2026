@@ -449,7 +449,6 @@ function goToLogin() {
 async function handleBookingConfirm(payloadData: {
   startDate: string;
   endDate: string;
-  useSubscription: boolean;
 }) {
   if (!payload.value) {
     return;
@@ -478,22 +477,14 @@ async function handleBookingConfirm(payloadData: {
       matchResult.partnerCarId,
       payloadData.startDate,
       payloadData.endDate,
-      payloadData.useSubscription,
     );
 
     success(
-      payloadData.useSubscription
-        ? `${payload.value.model.brand} ${payload.value.model.model}: бронь создана по подписке.`
-        : `${payload.value.model.brand} ${payload.value.model.model}: бронь создана, завершите оплату.`,
+      `${payload.value.model.brand} ${payload.value.model.model}: бронь создана, завершите оплату.`,
     );
 
     closeBookingModal();
-
-    if (payloadData.useSubscription) {
-      await router.push("/bookings");
-    } else {
-      await router.push(`/bookings/${booking.id}/payment`);
-    }
+    await router.push(`/bookings/${booking.id}/payment`);
   } catch (e) {
     console.error("Ошибка бронирования:", e);
     bookingError.value = "Не удалось забронировать машину. Попробуйте снова.";

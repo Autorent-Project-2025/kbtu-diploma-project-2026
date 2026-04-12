@@ -51,7 +51,6 @@ export interface BookingDto {
   carCommentId?: number;
   canLeaveComment?: boolean;
   status?: string;
-  usedSubscription: boolean;
   pricingBreakdown?: BookingPricingBreakdown;
   imageUrls?: string[];
 }

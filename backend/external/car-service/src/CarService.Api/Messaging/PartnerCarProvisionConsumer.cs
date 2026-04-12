@@ -109,7 +109,8 @@ public sealed class PartnerCarProvisionConsumer : BackgroundService
                         .Select(image => new PartnerCarProvisionImageDto
                         {
                             ImageId = image.ImageId,
-                            ImageUrl = image.ImageUrl
+                            ImageUrl = image.ImageUrl,
+                            ImageType = image.ImageType
                         })
                         .ToArray()
                 },

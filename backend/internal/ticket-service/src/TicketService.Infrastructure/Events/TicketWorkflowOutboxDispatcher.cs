@@ -319,7 +319,7 @@ public sealed class TicketWorkflowOutboxDispatcher : BackgroundService
                             ticket.Horsepower,
                             ResolveProvisionSemanticTags(ticket),
                             RequireField(ticket.OwnershipDocumentFileName, nameof(ticket.OwnershipDocumentFileName)),
-                            ticket.CarImages.Select(image => new PartnerCarProvisionRequestedImage(image.ImageId, image.ImageUrl)).ToArray()),
+                            ticket.CarImages.Select(image => new PartnerCarProvisionRequestedImage(image.ImageId, image.ImageUrl, image.ImageType)).ToArray()),
                         cancellationToken);
 
                     payload.CurrentStep = TicketApprovedWorkflowStep.PublishPartnerCarApprovedEmail;
@@ -491,6 +491,7 @@ public sealed class TicketWorkflowOutboxDispatcher : BackgroundService
                             ticket.Id,
                             ticket.LatePenaltyAmount,
                             RequireChargeAmount(ticket.DamageFineAmount, nameof(ticket.DamageFineAmount)),
+                            RequireField(ticket.DecisionReason, nameof(ticket.DecisionReason)),
                             RequireField(ticket.Email, nameof(ticket.Email)),
                             RequireField(ticket.FullName, nameof(ticket.FullName))),
                         cancellationToken);

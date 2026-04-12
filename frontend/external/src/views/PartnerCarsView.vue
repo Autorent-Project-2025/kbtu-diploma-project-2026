@@ -473,7 +473,7 @@
             </div>
           </div>
 
-          <div class="space-y-3 md:col-span-2">
+          <div class="space-y-4 md:col-span-2">
             <label
               class="block text-sm font-semibold text-gray-700 dark:text-gray-300"
               >Фото машины</label
@@ -516,7 +516,7 @@
                 или перетащите фото сюда
               </p>
               <p class="text-xs text-gray-400 dark:text-gray-500">
-                До 12 изображений
+                До 12 изображений. Для каждого фото выберите тип, чтобы менеджеру было проще проверить заявку.
               </p>
               <input
                 ref="imageInputRef"
@@ -528,38 +528,72 @@
               />
             </div>
             <div
-              v-if="form.carImageFiles.length > 0"
-              class="grid grid-cols-4 sm:grid-cols-6 gap-2"
+              v-if="form.carImages.length > 0"
+              class="grid gap-3 md:grid-cols-2 xl:grid-cols-3"
             >
               <div
-                v-for="(file, index) in form.carImageFiles"
+                v-for="(image, index) in form.carImages"
                 :key="index"
-                class="relative group aspect-square rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700"
+                class="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-hidden shadow-sm"
               >
                 <img
-                  :src="imagePreviewUrls[index]"
+                  :src="image.previewUrl"
                   :alt="`Фото ${index + 1}`"
-                  class="h-full w-full object-cover"
+                  class="h-44 w-full object-cover"
                 />
-                <button
-                  type="button"
-                  class="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity"
-                  @click.stop="removeImage(index)"
-                >
-                  <svg
-                    class="h-5 w-5 text-white"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2.5"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      d="M6 18L18 6M6 6l12 12"
-                    />
-                  </svg>
-                </button>
+                <div class="p-4 space-y-3">
+                  <div class="flex items-start justify-between gap-3">
+                    <div class="min-w-0">
+                      <p class="text-sm font-semibold text-gray-900 dark:text-white">
+                        Фото {{ index + 1 }}
+                      </p>
+                      <p class="text-xs text-gray-500 dark:text-gray-400 truncate">
+                        {{ image.file.name }}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      class="shrink-0 rounded-full p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
+                      @click.stop="removeImage(index)"
+                    >
+                      <svg
+                        class="h-4 w-4"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2.5"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          d="M6 18L18 6M6 6l12 12"
+                        />
+                      </svg>
+                    </button>
+                  </div>
+
+                  <div class="space-y-1.5">
+                    <label
+                      :for="`partner-car-image-type-${index}`"
+                      class="block text-xs font-bold uppercase tracking-[0.12em] text-gray-500 dark:text-gray-400"
+                    >
+                      Тип фото
+                    </label>
+                    <select
+                      :id="`partner-car-image-type-${index}`"
+                      v-model="image.imageType"
+                      class="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-3 py-2.5 text-sm text-gray-900 dark:text-white focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 transition-colors"
+                    >
+                      <option
+                        v-for="option in partnerCarImageTypeOptions"
+                        :key="option.value"
+                        :value="option.value"
+                      >
+                        {{ option.label }}
+                      </option>
+                    </select>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -640,7 +674,10 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from "vue";
-import { createPartnerCarTicket } from "../api/tickets";
+import {
+  createPartnerCarTicket,
+  type PartnerCarImageType,
+} from "../api/tickets";
 import { getCarPriceEstimate } from "../api/cars";
 import {
   getCarBrands,
@@ -653,6 +690,7 @@ import {
   bodyTypeOptions,
   fuelTypeOptions,
   getSemanticTagLabel,
+  type SemanticTag,
   semanticTagOptions,
   suggestSemanticTags,
   transmissionOptions,
@@ -673,9 +711,25 @@ const imageInputRef = ref<HTMLInputElement | null>(null);
 const pdfInputRef = ref<HTMLInputElement | null>(null);
 const imageDragging = ref(false);
 const pdfDragging = ref(false);
-const imagePreviewUrls = ref<string[]>([]);
 const customOptionValue = "__custom__";
 const maxAllowedCarYear = new Date().getUTCFullYear() + 1;
+
+interface LocalPartnerCarImage {
+  file: File;
+  previewUrl: string;
+  imageType: PartnerCarImageType;
+}
+
+const partnerCarImageTypeOptions: Array<{
+  value: PartnerCarImageType;
+  label: string;
+}> = [
+  { value: "front", label: "Спереди" },
+  { value: "back", label: "Сзади" },
+  { value: "side", label: "Сбоку" },
+  { value: "interior", label: "Салон" },
+  { value: "general", label: "Общий вид" },
+];
 
 const form = reactive({
   brandSelection: "",
@@ -690,9 +744,9 @@ const form = reactive({
   doors: null as number | null,
   bodyType: "",
   horsepower: null as number | null,
-  selectedTags: [] as string[],
+  selectedTags: [] as SemanticTag[],
   ownershipDocumentFile: null as File | null,
-  carImageFiles: [] as File[],
+  carImages: [] as LocalPartnerCarImage[],
 });
 
 const isCustomBrandSelected = computed(
@@ -800,7 +854,7 @@ async function runPriceEstimate() {
   }
 }
 
-function toggleTag(value: string) {
+function toggleTag(value: SemanticTag) {
   const index = form.selectedTags.indexOf(value);
   if (index === -1) {
     form.selectedTags.push(value);
@@ -809,7 +863,7 @@ function toggleTag(value: string) {
   }
 }
 
-function selectTag(value: string) {
+function selectTag(value: SemanticTag) {
   if (!form.selectedTags.includes(value)) {
     form.selectedTags.push(value);
   }
@@ -875,15 +929,26 @@ function onPdfDrop(event: DragEvent) {
   applyPdfFile(file);
 }
 
+function getDefaultPartnerCarImageType(index: number): PartnerCarImageType {
+  if (index === 0) return "front";
+  if (index === 1) return "back";
+  if (index === 2 || index === 3) return "side";
+  if (index === 4) return "interior";
+  return "general";
+}
+
+function revokeCarImagePreview(image?: LocalPartnerCarImage) {
+  if (image?.previewUrl) {
+    URL.revokeObjectURL(image.previewUrl);
+  }
+}
+
+function revokeAllCarImagePreviews() {
+  form.carImages.forEach(revokeCarImagePreview);
+}
+
 function applyImageFiles(files: File[]) {
   if (files.length === 0) return;
-
-  const combined = [...form.carImageFiles, ...files];
-
-  if (combined.length > 12) {
-    error("Можно загрузить не более 12 фотографий.");
-    return;
-  }
 
   const invalidFile = files.find((file) => !file.type.startsWith("image/"));
   if (invalidFile) {
@@ -891,9 +956,19 @@ function applyImageFiles(files: File[]) {
     return;
   }
 
-  imagePreviewUrls.value.forEach((url) => URL.revokeObjectURL(url));
-  form.carImageFiles = combined;
-  imagePreviewUrls.value = combined.map((f) => URL.createObjectURL(f));
+  const currentCount = form.carImages.length;
+  if (currentCount + files.length > 12) {
+    error("Можно загрузить не более 12 фотографий.");
+    return;
+  }
+
+  const nextImages = files.map((file, index) => ({
+    file,
+    previewUrl: URL.createObjectURL(file),
+    imageType: getDefaultPartnerCarImageType(currentCount + index),
+  }));
+
+  form.carImages.push(...nextImages);
 }
 
 function onCarImagesChange(event: Event) {
@@ -910,9 +985,8 @@ function onImageDrop(event: DragEvent) {
 }
 
 function removeImage(index: number) {
-  URL.revokeObjectURL(imagePreviewUrls.value[index]);
-  form.carImageFiles.splice(index, 1);
-  imagePreviewUrls.value.splice(index, 1);
+  const [removedImage] = form.carImages.splice(index, 1);
+  revokeCarImagePreview(removedImage);
 }
 
 async function loadCars() {
@@ -991,9 +1065,8 @@ function resetForm() {
   form.horsepower = null;
   form.selectedTags = [];
   form.ownershipDocumentFile = null;
-  form.carImageFiles = [];
-  imagePreviewUrls.value.forEach((url) => URL.revokeObjectURL(url));
-  imagePreviewUrls.value = [];
+  revokeAllCarImagePreviews();
+  form.carImages = [];
 }
 
 async function submitTicket() {
@@ -1039,7 +1112,7 @@ async function submitTicket() {
     return;
   }
 
-  if (form.carImageFiles.length === 0) {
+  if (form.carImages.length === 0) {
     error("Добавьте хотя бы одну фотографию машины.");
     return;
   }
@@ -1061,7 +1134,10 @@ async function submitTicket() {
         ...new Set([...form.selectedTags, ...suggestedTags.value]),
       ],
       ownershipDocumentFile: form.ownershipDocumentFile,
-      carImageFiles: form.carImageFiles,
+      carImages: form.carImages.map((image) => ({
+        file: image.file,
+        imageType: image.imageType,
+      })),
     });
     submitted.value = true;
     success("Заявка успешно отправлена.");
@@ -1084,5 +1160,6 @@ onMounted(async () => {
 
 onUnmounted(() => {
   document.removeEventListener("mousedown", onDocumentClick);
+  revokeAllCarImagePreviews();
 });
 </script>

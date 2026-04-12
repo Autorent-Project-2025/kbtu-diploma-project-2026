@@ -46,6 +46,7 @@ namespace BookingService.Application.Interfaces
             Guid ticketId,
             decimal? latePenaltyAmount,
             decimal damageFineAmount,
+            string fineComment,
             string customerEmail,
             string customerFullName,
             CancellationToken cancellationToken = default);

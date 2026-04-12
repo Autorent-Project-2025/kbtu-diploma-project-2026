@@ -35,6 +35,11 @@ public sealed class IssueTicketFineCommandHandler
             throw new ValidationException("Manager id is required.");
         }
 
+        if (string.IsNullOrWhiteSpace(command.Comment))
+        {
+            throw new ValidationException("Fine comment is required.");
+        }
+
         var ticket = await _ticketRepository.GetByIdAsync(command.TicketId, cancellationToken);
         if (ticket is null)
         {
@@ -42,7 +47,7 @@ public sealed class IssueTicketFineCommandHandler
         }
 
         var reviewedAtUtc = DateTime.UtcNow;
-        ticket.IssueFine(command.ManagerId, command.Amount, reviewedAtUtc);
+        ticket.IssueFine(command.ManagerId, command.Amount, command.Comment, reviewedAtUtc);
         await _ticketEventPublisher.PublishFineIssuedAsync(
             new TicketFineIssuedEvent(
                 ticket.Id,

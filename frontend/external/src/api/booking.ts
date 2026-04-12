@@ -58,7 +58,6 @@ interface BookingApiDto {
   carCommentId?: number | null;
   carCommentSubmittedAt?: string | null;
   canLeaveComment?: boolean | null;
-  usedSubscription?: boolean | null;
   pricingBreakdown?: BookingPricingBreakdown | null;
   status?: string | null;
 }
@@ -155,7 +154,6 @@ function mapBooking(dto: BookingApiDto): Booking {
     carCommentId: dto.carCommentId ?? null,
     carCommentSubmittedAt: dto.carCommentSubmittedAt ?? null,
     canLeaveComment: Boolean(dto.canLeaveComment),
-    usedSubscription: dto.usedSubscription ?? false,
     pricingBreakdown: dto.pricingBreakdown ?? null,
     status: normalizeStatus(dto.status),
   };
@@ -303,13 +301,11 @@ export async function createBooking(
   partnerCarId: number,
   start: string,
   end: string,
-  useSubscription = false,
 ): Promise<Booking> {
   const response = await api.post("/bookings", {
     partnerCarId,
     startTime: start,
     endTime: end,
-    useSubscription,
   });
 
   return mapBooking(response.data as BookingApiDto);

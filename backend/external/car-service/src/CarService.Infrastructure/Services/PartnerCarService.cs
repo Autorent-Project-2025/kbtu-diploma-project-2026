@@ -278,6 +278,7 @@ namespace CarService.Infrastructure.Services
                 .Select((image, index) => new NormalizedProvisionImage(
                     NormalizeRequired(image.ImageId, nameof(image.ImageId), 255),
                     NormalizeImageUrl(image.ImageUrl, nameof(image.ImageUrl)),
+                    NormalizeProvisionImageType(image.ImageType, nameof(image.ImageType)),
                     index + 1))
                 .ToList();
 
@@ -328,7 +329,7 @@ namespace CarService.Infrastructure.Services
                 {
                     ImageId = image.ImageId,
                     ImageUrl = image.ImageUrl,
-                    ImageType = CarImageType.General,
+                    ImageType = image.ImageType,
                     DisplayOrder = image.DisplayOrder
                 })
                 .ToList();
@@ -1215,6 +1216,7 @@ namespace CarService.Infrastructure.Services
             {
                 if (!string.Equals(existing[index].ImageId, requested[index].ImageId, StringComparison.Ordinal) ||
                     !string.Equals(existing[index].ImageUrl, requested[index].ImageUrl, StringComparison.Ordinal) ||
+                    existing[index].ImageType != requested[index].ImageType ||
                     existing[index].DisplayOrder != requested[index].DisplayOrder)
                 {
                     return false;
@@ -1224,7 +1226,11 @@ namespace CarService.Infrastructure.Services
             return true;
         }
 
-        private sealed record NormalizedProvisionImage(string ImageId, string ImageUrl, int DisplayOrder);
+        private sealed record NormalizedProvisionImage(
+            string ImageId,
+            string ImageUrl,
+            CarImageType ImageType,
+            int DisplayOrder);
 
         private static string NormalizeImageUrl(string? value, string paramName)
         {
@@ -1235,6 +1241,20 @@ namespace CarService.Infrastructure.Services
             }
 
             return normalized;
+        }
+
+        private static CarImageType NormalizeProvisionImageType(string? value, string paramName)
+        {
+            var normalized = NormalizeRequired(value, paramName, 32).ToLowerInvariant();
+            return normalized switch
+            {
+                "front" => CarImageType.Front,
+                "back" => CarImageType.Back,
+                "side" => CarImageType.Side,
+                "interior" => CarImageType.Interior,
+                "general" => CarImageType.General,
+                _ => throw new ArgumentException($"{paramName} must be one of: front, back, side, interior, general.", paramName)
+            };
         }
 
         private static int NormalizeCarYear(int value, string paramName)

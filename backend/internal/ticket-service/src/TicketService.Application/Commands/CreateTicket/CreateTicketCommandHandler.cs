@@ -59,8 +59,14 @@ public sealed class CreateTicketCommandHandler
 
             carImages = await UploadPartnerCarImagesAsync(
                 command.CarImageFiles!,
+                command.CarImageTypes,
                 command.AuthorizationHeader!,
                 cancellationToken);
+
+            if (string.IsNullOrWhiteSpace(email))
+            {
+                throw new ValidationException("Partner email is required for partner car tickets.");
+            }
         }
         else if (command.TicketType == TicketType.BookingCompletion)
         {
@@ -150,18 +156,28 @@ public sealed class CreateTicketCommandHandler
 
     private async Task<IReadOnlyCollection<PartnerCarTicketImageData>> UploadPartnerCarImagesAsync(
         IReadOnlyCollection<TicketDocumentFilePayload> imageFiles,
+        IReadOnlyCollection<string>? imageTypes,
         string authorizationHeader,
         CancellationToken cancellationToken)
     {
+        if (imageTypes is null || imageTypes.Count != imageFiles.Count)
+        {
+            throw new ValidationException("Each partner car image must include a matching image type.");
+        }
+
+        var imageTypeList = imageTypes.ToArray();
         var uploadedImages = new List<PartnerCarTicketImageData>(imageFiles.Count);
+        var index = 0;
         foreach (var imageFile in imageFiles)
         {
             var uploaded = await _imageStorageClient.UploadAsync(imageFile, authorizationHeader, cancellationToken);
             uploadedImages.Add(new PartnerCarTicketImageData
             {
                 ImageId = uploaded.ImageId,
-                ImageUrl = uploaded.ImageUrl
+                ImageUrl = uploaded.ImageUrl,
+                ImageType = imageTypeList[index]
             });
+            index += 1;
         }
 
         return uploadedImages;
@@ -203,7 +219,7 @@ public sealed class CreateTicketCommandHandler
 
     private static void Validate(CreateTicketCommand command)
     {
-        if (string.IsNullOrWhiteSpace(command.Email))
+        if (command.TicketType != TicketType.PartnerCar && string.IsNullOrWhiteSpace(command.Email))
         {
             throw new ValidationException("Email is required.");
         }
@@ -317,11 +333,21 @@ public sealed class CreateTicketCommandHandler
                 throw new ValidationException("At least one partner car image is required.");
             }
 
+            if (command.CarImageTypes is null || command.CarImageTypes.Count != command.CarImageFiles.Count)
+            {
+                throw new ValidationException("Each partner car image must include a matching image type.");
+            }
+
             ValidatePdf(command.OwnershipDocumentFile, nameof(command.OwnershipDocumentFile));
 
             foreach (var file in command.CarImageFiles)
             {
                 ValidateImage(file, nameof(command.CarImageFiles));
+            }
+
+            foreach (var imageType in command.CarImageTypes)
+            {
+                ValidatePartnerCarImageType(imageType);
             }
 
             return;
@@ -432,6 +458,15 @@ public sealed class CreateTicketCommandHandler
             !(string.Equals(contentType, "application/octet-stream", StringComparison.OrdinalIgnoreCase) && hasKnownImageExtension))
         {
             throw new ValidationException($"{fieldName} files must be images.");
+        }
+    }
+
+    private static void ValidatePartnerCarImageType(string? imageType)
+    {
+        var normalized = imageType?.Trim().ToLowerInvariant();
+        if (normalized is not "front" and not "back" and not "side" and not "interior" and not "general")
+        {
+            throw new ValidationException("Partner car image type must be one of: front, back, side, interior, general.");
         }
     }
 

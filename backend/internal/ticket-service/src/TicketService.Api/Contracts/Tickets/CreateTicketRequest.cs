@@ -28,6 +28,7 @@ public sealed class CreateTicketRequest
     public List<string>? SelectedTags { get; init; }
     public IFormFile? OwnershipDocumentFile { get; init; }
     public List<IFormFile>? CarImageFiles { get; init; }
+    public List<string>? CarImageTypes { get; init; }
     public int? BookingId { get; init; }
     public DateTimeOffset? PlannedStartTime { get; init; }
     public DateTimeOffset? PlannedEndTime { get; init; }

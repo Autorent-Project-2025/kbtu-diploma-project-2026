@@ -29,6 +29,7 @@ public sealed record CreateTicketCommand(
     IReadOnlyCollection<string>? SelectedTags,
     TicketDocumentFilePayload? OwnershipDocumentFile,
     IReadOnlyCollection<TicketDocumentFilePayload>? CarImageFiles,
+    IReadOnlyCollection<string>? CarImageTypes,
     int? BookingId,
     DateTimeOffset? PlannedStartTime,
     DateTimeOffset? PlannedEndTime,

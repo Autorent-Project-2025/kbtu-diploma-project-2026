@@ -178,6 +178,7 @@ public sealed class InternalBookingsController : ControllerBase
             request.TicketId,
             request.LatePenaltyAmount,
             request.DamageFineAmount,
+            request.FineComment,
             request.CustomerEmail,
             request.CustomerFullName,
             cancellationToken);

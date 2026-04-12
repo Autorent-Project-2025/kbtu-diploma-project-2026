@@ -55,12 +55,6 @@ namespace BookingService.Domain.Entities
         [Column("total_price")]
         public decimal? TotalPrice { get; set; }
 
-        [Column("subscription_id")]
-        public int? SubscriptionId { get; set; }
-
-        [Column("used_subscription")]
-        public bool UsedSubscription { get; set; }
-
         [Column("created_at")]
         public DateTimeOffset CreatedAt { get; set; }
 

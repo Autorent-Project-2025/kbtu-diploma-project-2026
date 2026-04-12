@@ -8,7 +8,9 @@
       "Bash(xargs grep:*)",
       "Bash(dotnet build:*)",
       "Bash(ls \"c:/Users/Arlan/Desktop/Проекты/KBTU Diploma Project 2026/backend/internal/ticket-service/src/\"*.sln)",
-      "Bash(ls \"c:/Users/Arlan/Desktop/Проекты/KBTU Diploma Project 2026/backend/internal/ticket-service/\"*.sln)"
+      "Bash(ls \"c:/Users/Arlan/Desktop/Проекты/KBTU Diploma Project 2026/backend/internal/ticket-service/\"*.sln)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" \"http://localhost:9186/bookings/my?page=1&pageSize=100\")",
+      "Bash(docker compose:*)"
     ]
   }
 }

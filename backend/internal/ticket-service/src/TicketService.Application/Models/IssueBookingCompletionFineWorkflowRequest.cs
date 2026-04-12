@@ -5,5 +5,6 @@ public sealed record IssueBookingCompletionFineWorkflowRequest(
     Guid TicketId,
     decimal? LatePenaltyAmount,
     decimal DamageFineAmount,
+    string FineComment,
     string CustomerEmail,
     string CustomerFullName);

@@ -51,9 +51,13 @@ export async function rejectTicket(
 
 export async function issueTicketFine(
   ticketId: string,
-  amount: number
+  amount: number,
+  comment: string
 ): Promise<Ticket> {
-  const res = await api.post(`/tickets/${ticketId}/issue-fine`, { amount });
+  const res = await api.post(`/tickets/${ticketId}/issue-fine`, {
+    amount,
+    comment,
+  });
   return res.data as Ticket;
 }
 

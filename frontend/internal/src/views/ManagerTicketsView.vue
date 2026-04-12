@@ -421,7 +421,7 @@
                     @click="openImage(image.imageUrl)"
                     class="px-4 py-2 rounded-xl border border-gray-300 dark:border-gray-700 text-sm font-semibold text-gray-700 dark:text-gray-300 hover:border-emerald-500 transition-colors"
                   >
-                    Фото {{ index + 1 }}
+                    {{ partnerCarImageTypeLabel(image.imageType, index) }}
                   </button>
                 </div>
               </div>
@@ -465,7 +465,8 @@
                 </h3>
                 <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">
                   Причину нужно указать только для отказа. Для завершения
-                  поездки вместо отказа можно выставить штраф.
+                  поездки вынесите решение в отдельном блоке: либо одобрение,
+                  либо штраф с комментарием.
                 </p>
               </div>
 
@@ -486,24 +487,77 @@
                 />
               </div>
 
-              <div v-else class="space-y-1.5">
-                <label
-                  for="fineAmount"
-                  class="block text-xs font-bold uppercase tracking-[0.1em] text-gray-500 dark:text-gray-400"
-                  >Сумма штрафа</label
-                >
-                <input
-                  id="fineAmount"
-                  v-model="fineAmount"
-                  type="number"
-                  min="0.01"
-                  step="0.01"
-                  placeholder="Например 15000"
-                  class="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-colors placeholder-gray-400"
-                />
+              <div v-else class="space-y-4">
+                <div class="rounded-2xl border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50/70 dark:bg-emerald-500/10 p-4 space-y-3">
+                  <div>
+                    <p class="text-xs font-bold uppercase tracking-[0.14em] text-emerald-700 dark:text-emerald-300">
+                      Одобрение без штрафа
+                    </p>
+                    <p class="text-xs text-emerald-700/80 dark:text-emerald-200/80 mt-1">
+                      Кнопка активна только когда блок штрафа пустой.
+                    </p>
+                  </div>
+                  <button
+                    @click="approveSelected"
+                    :disabled="actionLoading || !canApproveSelected"
+                    class="w-full px-5 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed text-white font-bold shadow-lg shadow-emerald-500/20 transition-colors"
+                  >
+                    {{ actionLoading ? "Обработка..." : "✓ Одобрить завершение" }}
+                  </button>
+                </div>
+
+                <div class="rounded-2xl border border-red-200 dark:border-red-500/30 bg-red-50/70 dark:bg-red-500/10 p-4 space-y-4">
+                  <div>
+                    <p class="text-xs font-bold uppercase tracking-[0.14em] text-red-700 dark:text-red-300">
+                      Выставление штрафа
+                    </p>
+                    <p class="text-xs text-red-700/80 dark:text-red-200/80 mt-1">
+                      Укажите сумму и обязательно добавьте комментарий, чтобы клиент видел причину начисления.
+                    </p>
+                  </div>
+
+                  <div class="space-y-1.5">
+                    <label
+                      for="fineAmount"
+                      class="block text-xs font-bold uppercase tracking-[0.1em] text-gray-500 dark:text-gray-400"
+                      >Сумма штрафа</label
+                    >
+                    <input
+                      id="fineAmount"
+                      v-model="fineAmount"
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      placeholder="Например 15000"
+                      class="w-full px-4 py-3 rounded-xl border border-red-200 dark:border-red-500/30 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:border-red-500 focus:ring-2 focus:ring-red-500/20 transition-colors placeholder-gray-400"
+                    />
+                  </div>
+
+                  <div class="space-y-1.5">
+                    <label
+                      for="fineComment"
+                      class="block text-xs font-bold uppercase tracking-[0.1em] text-gray-500 dark:text-gray-400"
+                      >Комментарий к штрафу</label
+                    >
+                    <textarea
+                      id="fineComment"
+                      v-model="fineComment"
+                      placeholder="Опишите повреждение, недостающие элементы или иную причину начисления"
+                      class="w-full px-4 py-3 rounded-xl border border-red-200 dark:border-red-500/30 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm min-h-[110px] resize-y focus:outline-none focus:border-red-500 focus:ring-2 focus:ring-red-500/20 transition-colors placeholder-gray-400"
+                    />
+                  </div>
+
+                  <button
+                    @click="issueFineSelected"
+                    :disabled="actionLoading"
+                    class="w-full px-5 py-3 rounded-2xl border border-red-300 dark:border-red-700 text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-60 disabled:cursor-not-allowed font-bold transition-colors"
+                  >
+                    {{ actionLoading ? "Обработка..." : "Выставить штраф" }}
+                  </button>
+                </div>
               </div>
 
-              <div class="flex flex-col gap-3">
+              <div v-if="!isBookingCompletionTicket(selectedTicket)" class="flex flex-col gap-3">
                 <button
                   @click="approveSelected"
                   :disabled="actionLoading"
@@ -512,21 +566,11 @@
                   {{ actionLoading ? "Обработка..." : "✓ Одобрить" }}
                 </button>
                 <button
-                  @click="
-                    isBookingCompletionTicket(selectedTicket)
-                      ? issueFineSelected()
-                      : rejectSelected()
-                  "
+                  @click="rejectSelected"
                   :disabled="actionLoading"
                   class="w-full px-5 py-3 rounded-2xl border border-red-300 dark:border-red-700 text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-60 disabled:cursor-not-allowed font-bold transition-colors"
                 >
-                  {{
-                    actionLoading
-                      ? "Обработка..."
-                      : isBookingCompletionTicket(selectedTicket)
-                        ? "Выставить штраф"
-                        : "✕ Отклонить"
-                  }}
+                  {{ actionLoading ? "Обработка..." : "✕ Отклонить" }}
                 </button>
               </div>
             </div>
@@ -563,6 +607,7 @@ const selectedTicket = ref<Ticket | null>(null);
 const selectedTicketId = ref<string>("");
 const rejectReason = ref("");
 const fineAmount = ref("");
+const fineComment = ref("");
 const loading = ref(false);
 const actionLoading = ref(false);
 const toast = useToast();
@@ -571,7 +616,7 @@ const maxAllowedCarYear = new Date().getUTCFullYear() + 1;
 
 type PartnerCarFormField = {
   id: string;
-  key: "carBrand" | "carModel" | "carYear" | "licensePlate" | "email";
+  key: "carBrand" | "carModel" | "carYear" | "licensePlate";
   label: string;
   type?: string;
   min?: string;
@@ -584,7 +629,6 @@ const partnerCarForm = reactive({
   carModel: "",
   carYear: null as number | null,
   licensePlate: "",
-  email: "",
 });
 
 const carFormFields: PartnerCarFormField[] = [
@@ -599,7 +643,6 @@ const carFormFields: PartnerCarFormField[] = [
     max: String(maxAllowedCarYear),
   },
   { id: "licensePlate", key: "licensePlate", label: "Госномер" },
-  { id: "contactEmail", key: "email", label: "Email партнёра", type: "email" },
 ];
 
 const partnerCarImages = computed<PartnerCarTicketImageData[]>(() => {
@@ -729,6 +772,14 @@ const summaryRows = computed(() => {
   return rows;
 });
 
+const canApproveSelected = computed(() => {
+  if (!isBookingCompletionTicket(selectedTicket.value)) {
+    return true;
+  }
+
+  return !fineAmount.value.trim() && !fineComment.value.trim();
+});
+
 function statusLabel(status: number) {
   if (status === 1) return "На рассмотрении";
   if (status === 2) return "Одобрена";
@@ -776,6 +827,15 @@ function completionPhotoLabel(slot: string) {
   return slot;
 }
 
+function partnerCarImageTypeLabel(imageType?: string | null, index?: number) {
+  if (imageType === "front") return "Фото спереди";
+  if (imageType === "back") return "Фото сзади";
+  if (imageType === "side") return "Фото сбоку";
+  if (imageType === "interior") return "Фото салона";
+  if (imageType === "general") return "Общий вид";
+  return `Фото ${(index ?? 0) + 1}`;
+}
+
 function syncPartnerCarForm(ticket: Ticket | null) {
   if (!ticket || !isPartnerCarTicket(ticket)) {
     Object.assign(partnerCarForm, {
@@ -783,7 +843,6 @@ function syncPartnerCarForm(ticket: Ticket | null) {
       carModel: "",
       carYear: null,
       licensePlate: "",
-      email: "",
     });
     return;
   }
@@ -797,7 +856,6 @@ function syncPartnerCarForm(ticket: Ticket | null) {
     data?.licensePlate ??
     ""
   ).trim();
-  partnerCarForm.email = (ticket.email ?? "").trim();
 }
 
 function buildPartnerCarPayload(): PartnerCarReviewPayload | null | undefined {
@@ -807,16 +865,9 @@ function buildPartnerCarPayload(): PartnerCarReviewPayload | null | undefined {
   const carModel = partnerCarForm.carModel.trim();
   const carYear = Number(partnerCarForm.carYear);
   const licensePlate = partnerCarForm.licensePlate.trim();
-  const email = partnerCarForm.email.trim();
 
-  if (
-    !carBrand ||
-    !carModel ||
-    !licensePlate ||
-    !email ||
-    !Number.isInteger(carYear)
-  ) {
-    toast.error("Заполните марку, модель, год, госномер и email.");
+  if (!carBrand || !carModel || !licensePlate || !Number.isInteger(carYear)) {
+    toast.error("Заполните марку, модель, год и госномер.");
     return null;
   }
   if (carYear < 1886 || carYear > maxAllowedCarYear) {
@@ -828,8 +879,13 @@ function buildPartnerCarPayload(): PartnerCarReviewPayload | null | undefined {
     carModel,
     carYear,
     licensePlate,
-    email,
   };
+}
+
+function resetDecisionForm() {
+  rejectReason.value = "";
+  fineAmount.value = "";
+  fineComment.value = "";
 }
 
 async function loadPending() {
@@ -841,6 +897,7 @@ async function loadPending() {
     if (data.length === 0) {
       selectedTicket.value = null;
       selectedTicketId.value = "";
+      resetDecisionForm();
       syncPartnerCarForm(null);
       return;
     }
@@ -848,6 +905,7 @@ async function loadPending() {
     if (!fallback) {
       selectedTicket.value = null;
       selectedTicketId.value = "";
+      resetDecisionForm();
       syncPartnerCarForm(null);
       return;
     }
@@ -864,7 +922,7 @@ async function loadPending() {
 
 async function selectTicket(ticketId: string) {
   selectedTicketId.value = ticketId;
-  rejectReason.value = "";
+  resetDecisionForm();
   try {
     selectedTicket.value = await getTicketById(ticketId);
     syncPartnerCarForm(selectedTicket.value);
@@ -875,6 +933,10 @@ async function selectTicket(ticketId: string) {
 
 async function approveSelected() {
   if (!selectedTicket.value || actionLoading.value) return;
+  if (!canApproveSelected.value) {
+    toast.error("Очистите блок штрафа, если хотите одобрить завершение поездки без начислений.");
+    return;
+  }
   actionLoading.value = true;
   try {
     const payload = buildPartnerCarPayload();
@@ -920,12 +982,17 @@ async function issueFineSelected() {
     toast.error("Укажите корректную сумму штрафа.");
     return;
   }
+  if (!fineComment.value.trim()) {
+    toast.error("Добавьте комментарий к штрафу.");
+    return;
+  }
 
   actionLoading.value = true;
   try {
-    await issueTicketFine(selectedTicket.value.id, amount);
+    await issueTicketFine(selectedTicket.value.id, amount, fineComment.value.trim());
     toast.success("Штраф выставлен");
     fineAmount.value = "";
+    fineComment.value = "";
     await loadPending();
   } catch (e: any) {
     toast.error(e?.response?.data?.error || "Не удалось выставить штраф.");

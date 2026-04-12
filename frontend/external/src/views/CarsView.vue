@@ -25,47 +25,47 @@
             <p
               class="text-xs font-bold uppercase tracking-[0.3em] text-emerald-600 dark:text-emerald-400"
             >
-              Subscription advantage
+              Гибкое бронирование
             </p>
 
             <h2
               class="text-3xl sm:text-4xl font-extrabold text-gray-900 dark:text-white"
             >
-              Rent often? A subscription can save you money
+              Подберите подходящую модель и сразу переходите к бронированию
             </h2>
 
             <p
               class="text-base text-gray-600 dark:text-gray-400 leading-relaxed"
             >
-              Choose a recurring plan, get included bookings, and skip the usual
-              payment flow for every trip.
+              Каталог показывает доступные модели, примерную стоимость и
+              помогает быстро найти подходящий вариант под даты поездки.
             </p>
 
             <div class="flex flex-wrap gap-3 pt-2">
               <div
                 class="px-4 py-2 rounded-2xl bg-white/80 dark:bg-gray-900/80 border border-gray-200 dark:border-gray-800 text-sm font-semibold text-gray-700 dark:text-gray-300"
               >
-                Included bookings
+                Автоподбор машины
               </div>
               <div
                 class="px-4 py-2 rounded-2xl bg-white/80 dark:bg-gray-900/80 border border-gray-200 dark:border-gray-800 text-sm font-semibold text-gray-700 dark:text-gray-300"
               >
-                Faster booking flow
+                Прозрачная цена
               </div>
               <div
                 class="px-4 py-2 rounded-2xl bg-white/80 dark:bg-gray-900/80 border border-gray-200 dark:border-gray-800 text-sm font-semibold text-gray-700 dark:text-gray-300"
               >
-                Better for frequent users
+                История всех броней
               </div>
             </div>
           </div>
 
           <div class="flex flex-col sm:flex-row gap-3 shrink-0">
             <router-link
-              to="/subscriptions"
+              to="/bookings"
               class="px-6 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-lg shadow-emerald-500/20 transition-colors text-center"
             >
-              View plans
+              Мои бронирования
             </router-link>
 
             <router-link
@@ -394,7 +394,6 @@ function goToLogin() {
 async function handleBookingConfirm(payloadData: {
   startDate: string;
   endDate: string;
-  useSubscription: boolean;
   partnerCarId: number;
 }) {
   if (!selectedModel.value) {
@@ -409,20 +408,13 @@ async function handleBookingConfirm(payloadData: {
       payloadData.partnerCarId,
       payloadData.startDate,
       payloadData.endDate,
-      payloadData.useSubscription,
     );
 
     success(
-      payloadData.useSubscription
-        ? `${selectedModel.value.brand} ${selectedModel.value.model}: бронь создана по подписке.`
-        : `${selectedModel.value.brand} ${selectedModel.value.model}: бронь создана, завершите оплату.`,
+      `${selectedModel.value.brand} ${selectedModel.value.model}: бронь создана, завершите оплату.`,
     );
     closeBookingModal();
-    if (payloadData.useSubscription) {
-      await router.push("/bookings");
-    } else {
-      await router.push(`/bookings/${booking.id}/payment`);
-    }
+    await router.push(`/bookings/${booking.id}/payment`);
   } catch (e) {
     console.error("Ошибка автоподбора и бронирования:", e);
     bookingError.value = "Не удалось забронировать машину. Попробуйте снова.";

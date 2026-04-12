@@ -266,7 +266,7 @@ public sealed class Ticket
         };
     }
 
-    public void IssueFine(Guid managerId, decimal amount, DateTime reviewedAt)
+    public void IssueFine(Guid managerId, decimal amount, string comment, DateTime reviewedAt)
     {
         EnsurePendingStatus();
         EnsureManagerId(managerId);
@@ -276,11 +276,22 @@ public sealed class Ticket
             throw new InvalidOperationException("Fine can be issued only for booking completion tickets.");
         }
 
+        if (string.IsNullOrWhiteSpace(comment))
+        {
+            throw new ArgumentException("Fine comment is required.", nameof(comment));
+        }
+
+        var normalizedComment = comment.Trim();
+        if (normalizedComment.Length > 1000)
+        {
+            throw new ArgumentException("Fine comment length must not exceed 1000.", nameof(comment));
+        }
+
         Status = TicketStatus.FineIssued;
         Data = bookingCompletionData with
         {
             DamageFineAmount = NormalizeRequiredFineAmount(amount, nameof(amount)),
-            DecisionReason = null,
+            DecisionReason = normalizedComment,
             ReviewedByManagerId = managerId,
             ReviewedAt = reviewedAt
         };
@@ -761,9 +772,24 @@ public sealed class Ticket
             .Select(image => new PartnerCarTicketImageData
             {
                 ImageId = NormalizeRequired(image.ImageId, nameof(image.ImageId), 255),
-                ImageUrl = NormalizeImageUrl(image.ImageUrl, nameof(image.ImageUrl))
+                ImageUrl = NormalizeImageUrl(image.ImageUrl, nameof(image.ImageUrl)),
+                ImageType = NormalizePartnerCarImageType(image.ImageType, nameof(image.ImageType))
             })
             .ToArray();
+    }
+
+    private static string NormalizePartnerCarImageType(string? imageType, string paramName)
+    {
+        var normalized = NormalizeRequired(imageType, paramName, 32).ToLowerInvariant();
+        return normalized switch
+        {
+            "front" => "front",
+            "back" => "back",
+            "side" => "side",
+            "interior" => "interior",
+            "general" => "general",
+            _ => throw new ArgumentException($"Unsupported partner car image type '{imageType}'.", paramName)
+        };
     }
 
     private static string NormalizeImageUrl(string? value, string paramName)
