@@ -5,9 +5,12 @@ import {
   canonicalizeStyleLabel,
   canonicalizeTransmissionLabel,
 } from "./heuristicQueryParser";
-import { STYLE_LABELS_TEXT, TRANSMISSION_LABELS_TEXT } from "../queryTaxonomy";
+import { STYLE_LABELS_TEXT, TRANSMISSION_LABELS_TEXT, getCatalogSummary } from "../queryTaxonomy";
+import { sql } from "../db/sql";
 
-const systemPrompt = `
+function buildSystemPrompt(): string {
+  const catalog = getCatalogSummary();
+  return `
 You extract structured filters for car recommendation search.
 Return only valid JSON.
 Schema:
@@ -27,13 +30,15 @@ Schema:
 }
 Allowed style labels: ${STYLE_LABELS_TEXT}.
 Allowed transmission labels: ${TRANSMISSION_LABELS_TEXT}.
+${catalog ? catalog + "\n" : ""}If the user mentions a car model name (e.g. "cobalt", "кобальт", "camry", "камри"), put the corresponding brand into "preferredBrands".
 If a value is not explicitly or reasonably inferable, return null or [].
 Do not invent budget, passenger count, transmission, or dates when they are not explicitly present in the user request.
 If the user asks for rating threshold like "рейтинг больше 4.5", put it into "minRating".
 Use "minYear" for requests like "от 2020 года", "2020+" or "не старше 2020".
 Use "maxYear" for requests like "до 2020 года", "по 2020 год" or "не новее 2020".
 Do not put year values into "maxBudgetPerHour".
-`;
+`.trim();
+}
 
 type OllamaChatResponse = {
   message?: {
@@ -103,12 +108,52 @@ function unwrapJson(content: string): string {
     .trim();
 }
 
+async function retrieveRagContext(prompt: string): Promise<string> {
+  try {
+    const words = prompt.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, "").split(/\s+/).filter(w => w.length >= 2);
+    if (words.length === 0) return "";
+
+    const searchTerm = `%${words.join("%")}%`;
+
+    const rows = await sql<{ brand: string; model: string; year: number }[]>`
+      select distinct brand, model, year
+      from ai_car_documents
+      where lower(brand || ' ' || model || ' ' || coalesce(tags::text, '')) like ${searchTerm}
+      limit 10
+    `;
+
+    if (rows.length === 0) {
+      const aliasRows = await sql<{ alias: string; canonical_brand: string; canonical_model: string | null }[]>`
+        select alias, canonical_brand, canonical_model from brand_model_aliases
+        where lower(alias) like ${searchTerm}
+        limit 5
+      `;
+      if (aliasRows.length === 0) return "";
+      return "Known aliases: " + aliasRows.map(r =>
+        `${r.alias} = ${r.canonical_brand}${r.canonical_model ? " " + r.canonical_model : ""}`
+      ).join(", ");
+    }
+
+    return "Matching cars in catalog:\n" + rows.map(r =>
+      `- ${r.brand} ${r.model} (${r.year})`
+    ).join("\n");
+  } catch {
+    return "";
+  }
+}
+
 export async function parseQueryWithLocalLlm(
   prompt: string,
 ): Promise<ParsedRecommendationQuery> {
   if (!config.localLlmBaseUrl) {
     throw new Error("LOCAL_LLM_BASE_URL is not configured.");
   }
+
+  const ragContext = await retrieveRagContext(prompt);
+
+  const userMessage = ragContext
+    ? `${prompt}\n\n[Context from catalog]\n${ragContext}`
+    : prompt;
 
   const payload = await postToOllama<OllamaChatResponse>("/api/chat", {
     model: config.localLlmChatModel,
@@ -120,11 +165,11 @@ export async function parseQueryWithLocalLlm(
     messages: [
       {
         role: "system",
-        content: systemPrompt.trim(),
+        content: buildSystemPrompt(),
       },
       {
         role: "user",
-        content: prompt,
+        content: userMessage,
       },
     ],
   });

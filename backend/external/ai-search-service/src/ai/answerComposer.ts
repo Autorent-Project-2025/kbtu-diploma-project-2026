@@ -96,12 +96,6 @@ const genericPromptTokens = new Set([
   "please",
 ]);
 
-function hasSpecificSearchToken(normalizedPrompt: string): boolean {
-  return tokenizePrompt(normalizedPrompt).some(
-    (token) => token.length >= 3 && !genericPromptTokens.has(token),
-  );
-}
-
 function hasSearchSignals(query: ParsedRecommendationQuery): boolean {
   return (
     query.maxBudgetPerHour != null ||
@@ -120,34 +114,16 @@ function hasSearchSignals(query: ParsedRecommendationQuery): boolean {
 export function shouldAskClarifyingQuestion(
   query: ParsedRecommendationQuery,
 ): boolean {
+  // If the query parser (heuristic + LLM) found any concrete search filter,
+  // proceed to search — the intent is clear enough.
   if (hasSearchSignals(query)) {
     return false;
   }
 
-  const normalizedPrompt = normalizePrompt(query.prompt);
-  if (!normalizedPrompt) {
-    return true;
-  }
-
-  if (greetingPhrases.includes(normalizedPrompt)) {
-    return true;
-  }
-
-  if (normalizedPrompt.includes("как дела")) {
-    return true;
-  }
-
-  const words = normalizedPrompt.split(" ").filter(Boolean);
-  const hasCarIntentKeyword = carIntentKeywords.some((keyword) =>
-    normalizedPrompt.includes(keyword),
-  );
-  const hasSpecificToken = hasSpecificSearchToken(normalizedPrompt);
-
-  if (hasSpecificToken) {
-    return false;
-  }
-
-  return words.length <= 3 && !hasCarIntentKeyword;
+  // No search signals detected — let LLM handle the conversation.
+  // It will figure out whether the prompt is a greeting, gibberish, or
+  // a vague request, and respond naturally.
+  return true;
 }
 
 function composeDeterministicRecommendationText(
@@ -448,7 +424,10 @@ export async function composeRecommendationResponse(
 export async function composeClarificationResponse(
   query: ParsedRecommendationQuery,
 ): Promise<AiRecommendationResponse> {
-  const assistantText = composeDeterministicClarificationText();
+  let assistantText = await generateClarificationWithLlm(query.prompt);
+  if (!assistantText) {
+    assistantText = composeDeterministicClarificationText();
+  }
 
   return {
     assistantText,
@@ -456,4 +435,35 @@ export async function composeClarificationResponse(
     totalCandidates: 0,
     cars: [],
   };
+}
+
+async function generateClarificationWithLlm(userPrompt: string): Promise<string | null> {
+  const llm = describeConfiguredLlm();
+  if (!llm) return null;
+
+  try {
+    const completion = await completeWithPreferredLlm({
+      systemPrompt: `Ты — AI-ассистент сервиса аренды автомобилей AutoRent.
+Отвечай на русском, дружелюбно и кратко (1-2 предложения).
+Твоя задача — помочь пользователю подобрать машину.
+Если пользователь просто здоровается — поприветствуй и предложи помочь с подбором.
+Если сообщение непонятное или бессмысленное — вежливо попроси уточнить запрос.
+Всегда направляй разговор к подбору машины: спроси про бюджет, тип машины, даты или предпочтения.
+Не выдумывай наличие машин. Не используй markdown.`,
+      userPrompt,
+      responseType: "text",
+      temperature: 0.5,
+      maxOutputTokens: 150,
+      timeoutMs: 6000,
+    });
+
+    if (!completion?.content) return null;
+
+    const text = completion.content.trim();
+    if (text.length < 5) return null;
+
+    return text;
+  } catch {
+    return null;
+  }
 }

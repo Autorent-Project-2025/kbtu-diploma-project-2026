@@ -287,6 +287,8 @@ services:
       POSTGRES_DB: postgres_db
     expose:
       - "5432"
+    ports:
+      - "${AI_SEARCH_DB_PORT:-1836}:5432"
     volumes:
       - ai_search_pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -343,20 +345,31 @@ services:
       OLLAMA_BASE_URL: http://ollama:11434
       OLLAMA_CHAT_MODEL: ${LOCAL_LLM_CHAT_MODEL:-qwen2.5:1.5b}
       OLLAMA_EMBEDDING_MODEL: ${LOCAL_LLM_EMBEDDING_MODEL:-nomic-embed-text}
-    entrypoint:
-      - /bin/sh
-      - -ec
-    command: |
-      echo "Pulling Ollama model: $$OLLAMA_CHAT_MODEL"
-      curl -fsS "$$OLLAMA_BASE_URL/api/pull" \
-        -H "Content-Type: application/json" \
-        -d "{\"model\":\"$$OLLAMA_CHAT_MODEL\",\"stream\":false}"
-      echo
-      echo "Pulling Ollama model: $$OLLAMA_EMBEDDING_MODEL"
-      curl -fsS "$$OLLAMA_BASE_URL/api/pull" \
-        -H "Content-Type: application/json" \
-        -d "{\"model\":\"$$OLLAMA_EMBEDDING_MODEL\",\"stream\":false}"
-      echo
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -e
+        for MODEL in "$$OLLAMA_CHAT_MODEL" "$$OLLAMA_EMBEDDING_MODEL"; do
+          ATTEMPT=1
+          while [ "$$ATTEMPT" -le 3 ]; do
+            echo "Pulling $$MODEL (attempt $$ATTEMPT/3)..."
+            if curl -fsSL --connect-timeout 30 --max-time 300 "$$OLLAMA_BASE_URL/api/pull" -H "Content-Type: application/json" -d "{\"model\":\"$$MODEL\",\"stream\":false}"; then
+              echo "$$MODEL pulled OK"
+              break
+            fi
+            echo "Retry in 5s..."
+            sleep 5
+            ATTEMPT=$$((ATTEMPT + 1))
+          done
+          if [ "$$ATTEMPT" -gt 3 ]; then
+            echo "FATAL: failed to pull $$MODEL"
+            exit 1
+          fi
+        done
+        echo "Verifying..."
+        curl -fsS "$$OLLAMA_BASE_URL/api/tags" | grep -q "$$OLLAMA_CHAT_MODEL" || { echo "FATAL: $$OLLAMA_CHAT_MODEL missing"; exit 1; }
+        curl -fsS "$$OLLAMA_BASE_URL/api/tags" | grep -q "$$OLLAMA_EMBEDDING_MODEL" || { echo "FATAL: $$OLLAMA_EMBEDDING_MODEL missing"; exit 1; }
+        echo "All models ready."
     networks:
       - backend
 

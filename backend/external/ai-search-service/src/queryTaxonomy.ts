@@ -19,7 +19,7 @@ export const TRANSMISSION_DICTIONARY: Array<{ label: string; variants: string[] 
   { label: "manual", variants: ["manual", "механик", "мкпп"] },
 ];
 
-// Dynamic dictionaries loaded from ai_car_documents at startup
+// Dynamic dictionaries — loaded from DB at startup, zero hardcoded brands/models
 let _brands: string[] = [];
 let _modelToBrand: Record<string, string> = {};
 
@@ -31,21 +31,62 @@ export function getModelToBrandDictionary(): Record<string, string> {
   return _modelToBrand;
 }
 
+export function getCatalogSummary(): string {
+  if (_brands.length === 0) return "";
+  const seen = new Set<string>();
+  const entries: string[] = [];
+  for (const [model, brand] of Object.entries(_modelToBrand)) {
+    const key = `${brand} ${model}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      entries.push(key);
+    }
+  }
+  return entries.length > 0 ? `Available cars in catalog: ${entries.join(", ")}` : "";
+}
+
 export async function loadTaxonomyFromDatabase(): Promise<void> {
-  const rows = await sql<{ brand: string; model: string }[]>`
+  const brandSet = new Set<string>();
+  const modelMap: Record<string, string> = {};
+
+  // 1. Brands and models from indexed car documents
+  const carRows = await sql<{ brand: string; model: string }[]>`
     select distinct lower(brand) as brand, lower(model) as model
     from ai_car_documents
     where brand is not null and model is not null
   `;
 
-  const brandSet = new Set<string>();
-  const modelMap: Record<string, string> = {};
-
-  for (const row of rows) {
+  for (const row of carRows) {
     const brand = row.brand.trim();
     const model = row.model.trim();
     if (brand) brandSet.add(brand);
     if (model && brand) modelMap[model] = brand;
+  }
+
+  // 2. Aliases from brand_model_aliases table (cyrillic, abbreviations, etc.)
+  //    Managed via SQL migration — no hardcoded aliases in code.
+  try {
+    const aliasRows = await sql<{ alias: string; canonical_brand: string; canonical_model: string | null }[]>`
+      select lower(alias) as alias, lower(canonical_brand) as canonical_brand,
+             lower(coalesce(canonical_model, '')) as canonical_model
+      from brand_model_aliases
+    `;
+
+    for (const row of aliasRows) {
+      const alias = row.alias.trim();
+      const brand = row.canonical_brand.trim();
+      if (!alias || !brand) continue;
+
+      // Alias for a brand (e.g. "тойота" → toyota)
+      brandSet.add(alias);
+
+      // Alias for a model (e.g. "кобальт" → chevrolet cobalt)
+      if (row.canonical_model?.trim()) {
+        modelMap[alias] = brand;
+      }
+    }
+  } catch {
+    // Table may not exist on first migration run
   }
 
   _brands = [...brandSet];
