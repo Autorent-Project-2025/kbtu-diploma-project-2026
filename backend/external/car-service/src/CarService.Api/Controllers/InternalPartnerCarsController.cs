@@ -142,6 +142,58 @@ namespace CarService.Api.Controllers
         }
 
         [AllowAnonymous]
+        [HttpPost("{partnerCarId:int}/apply-approved-update")]
+        public async Task<IActionResult> ApplyApprovedUpdate(
+            int partnerCarId,
+            [FromBody] ApplyApprovedPartnerCarUpdateRequest request,
+            CancellationToken cancellationToken)
+        {
+            if (!IsAuthorizedInternalRequest())
+            {
+                return Unauthorized(new { error = "Internal API key is invalid." });
+            }
+
+            if (partnerCarId <= 0)
+            {
+                return BadRequest(new { error = "PartnerCarId must be greater than zero." });
+            }
+
+            if (request.RequestedStatus.HasValue &&
+                (request.RequestedStatus.Value < 0 || request.RequestedStatus.Value > 3))
+            {
+                return BadRequest(new { error = "RequestedStatus must be between 0 and 3." });
+            }
+
+            var updated = await _partnerCarService.ApplyApprovedUpdateAsync(
+                partnerCarId,
+                new PartnerCarApprovedUpdateDto
+                {
+                    LicensePlate = request.LicensePlate,
+                    Color = request.Color,
+                    RequestedStatus = request.RequestedStatus.HasValue
+                        ? (Domain.Enums.PartnerCarStatus?)request.RequestedStatus.Value
+                        : null,
+                    IsActive = request.IsActive,
+                    Images = (request.Images ?? [])
+                        .Select(image => new PartnerCarApprovedUpdateImageDto
+                        {
+                            ImageId = image.ImageId,
+                            ImageUrl = image.ImageUrl,
+                            ImageType = image.ImageType
+                        })
+                        .ToArray()
+                },
+                cancellationToken);
+
+            if (updated is null)
+            {
+                return NotFound(new { error = "Partner car not found." });
+            }
+
+            return Ok(updated);
+        }
+
+        [AllowAnonymous]
         [HttpPost("by-partner/{partnerUserId:guid}/set-active")]
         public async Task<IActionResult> SetPartnerCarsActive(
             Guid partnerUserId,

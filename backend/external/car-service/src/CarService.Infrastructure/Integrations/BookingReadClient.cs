@@ -93,6 +93,34 @@ namespace CarService.Infrastructure.Integrations
                 .ToList();
         }
 
+        public async Task CancelBookingAsync(
+            int bookingId,
+            string cancellationReason,
+            CancellationToken cancellationToken = default)
+        {
+            using var message = new HttpRequestMessage(HttpMethod.Post, $"/internal/bookings/{bookingId}/cancel");
+            message.Headers.Add(InternalApiKeyHeader, _options.InternalApiKey);
+            message.Content = JsonContent.Create(new
+            {
+                reason = cancellationReason
+            });
+
+            using var response = await _httpClient.SendAsync(message, cancellationToken);
+            if (response.StatusCode == HttpStatusCode.NotFound)
+            {
+                return;
+            }
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var raw = await response.Content.ReadAsStringAsync(cancellationToken);
+                throw new InvalidOperationException(
+                    string.IsNullOrWhiteSpace(raw)
+                        ? $"Booking service request failed with status {(int)response.StatusCode}."
+                        : raw);
+            }
+        }
+
         public async Task<IReadOnlyCollection<CarAvailabilityDto>> CheckAvailabilityByCarIdsAsync(
             IReadOnlyCollection<int> carIds,
             DateTimeOffset startTime,

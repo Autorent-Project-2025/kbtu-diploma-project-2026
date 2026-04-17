@@ -12,6 +12,11 @@ namespace CarService.Application.Interfaces.Integrations
             int carId,
             CancellationToken cancellationToken = default);
 
+        Task CancelBookingAsync(
+            int bookingId,
+            string cancellationReason,
+            CancellationToken cancellationToken = default);
+
         Task<IReadOnlyCollection<CarAvailabilityDto>> CheckAvailabilityByCarIdsAsync(
             IReadOnlyCollection<int> carIds,
             DateTimeOffset startTime,

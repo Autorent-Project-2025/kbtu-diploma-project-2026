@@ -6,6 +6,9 @@ public sealed class PartnerCarTicketReviewDataRequest
     public string? CarModel { get; init; }
     public int? CarYear { get; init; }
     public string? LicensePlate { get; init; }
+    public string? Color { get; init; }
+    public int? RequestedStatus { get; init; }
+    public bool? IsActive { get; init; }
     public string? Transmission { get; init; }
     public string? FuelType { get; init; }
     public int? Seats { get; init; }

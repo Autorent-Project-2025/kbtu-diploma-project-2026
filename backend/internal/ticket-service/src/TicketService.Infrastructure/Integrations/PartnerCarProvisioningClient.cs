@@ -56,6 +56,38 @@ public sealed class PartnerCarProvisioningClient : IPartnerCarProvisioningClient
         }
     }
 
+    public async Task ApplyApprovedUpdateAsync(
+        ApplyPartnerCarApprovedUpdateRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        using var message = new HttpRequestMessage(
+            HttpMethod.Post,
+            $"/internal/partner-cars/{request.PartnerCarId}/apply-approved-update")
+        {
+            Content = JsonContent.Create(new
+            {
+                request.LicensePlate,
+                request.Color,
+                requestedStatus = request.RequestedStatus,
+                request.IsActive,
+                images = request.Images.Select(image => new
+                {
+                    image.ImageId,
+                    image.ImageUrl,
+                    image.ImageType
+                })
+            })
+        };
+
+        message.Headers.Add(InternalApiKeyHeader, _carServiceOptions.InternalApiKey);
+
+        using var response = await _httpClient.SendAsync(message, cancellationToken);
+        if (!response.IsSuccessStatusCode)
+        {
+            await ThrowResponseExceptionAsync(response, cancellationToken);
+        }
+    }
+
     private static async Task ThrowResponseExceptionAsync(HttpResponseMessage response, CancellationToken cancellationToken)
     {
         var errorMessage = await TryReadErrorMessageAsync(response, cancellationToken)

@@ -507,6 +507,80 @@ namespace CarService.Infrastructure.Services
             return MapToResponse(entity);
         }
 
+        public async Task<PartnerCarResponseDto?> ApplyApprovedUpdateAsync(
+            int id,
+            PartnerCarApprovedUpdateDto dto,
+            CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(dto);
+
+            var entity = await _db.PartnerCars
+                .IncludeModelCatalog()
+                .Include(partnerCar => partnerCar.Images)
+                .FirstOrDefaultAsync(partnerCar => partnerCar.Id == id, cancellationToken);
+
+            if (entity is null)
+            {
+                return null;
+            }
+
+            var wasActive = entity.IsActive;
+
+            entity.LicensePlate = NormalizeRequired(dto.LicensePlate, nameof(dto.LicensePlate), 20).ToUpperInvariant();
+            entity.Color = NormalizeOptional(dto.Color, 50);
+
+            if (dto.RequestedStatus.HasValue)
+            {
+                entity.Status = dto.RequestedStatus.Value;
+            }
+
+            if (dto.IsActive.HasValue)
+            {
+                entity.IsActive = dto.IsActive.Value;
+            }
+
+            var nextDisplayOrder = entity.Images.Count == 0
+                ? 0
+                : entity.Images.Max(image => image.DisplayOrder) + 1;
+
+            foreach (var image in NormalizeApprovedUpdateImages(dto.Images))
+            {
+                if (entity.Images.Any(existingImage =>
+                        string.Equals(existingImage.ImageId, image.ImageId, StringComparison.Ordinal)))
+                {
+                    continue;
+                }
+
+                entity.Images.Add(new PartnerCarImage
+                {
+                    CarId = entity.Id,
+                    ImageId = image.ImageId,
+                    ImageUrl = image.ImageUrl,
+                    ImageType = image.ImageType,
+                    DisplayOrder = nextDisplayOrder
+                });
+
+                nextDisplayOrder += 1;
+            }
+
+            await _db.SaveChangesAsync(cancellationToken);
+
+            if (wasActive && !entity.IsActive)
+            {
+                var linkedBookings = await _bookingReadClient.GetBookingsByCarIdAsync(entity.Id, cancellationToken);
+                foreach (var booking in linkedBookings.Where(booking => IsCancelableBookingStatus(booking.Status)))
+                {
+                    await _bookingReadClient.CancelBookingAsync(
+                        booking.Id,
+                        $"Бронирование отменено, потому что машина #{entity.Id} была деактивирована после согласованного изменения.",
+                        cancellationToken);
+                }
+            }
+
+            await _carSearchIndexEventPublisher.PublishUpsertRequestedAsync(entity.Id, cancellationToken);
+            return MapToResponse(entity);
+        }
+
         public async Task<bool> DeleteAsync(Guid? currentUserId, int id, CancellationToken cancellationToken = default)
         {
             var entity = await _db.PartnerCars.FirstOrDefaultAsync(partnerCar => partnerCar.Id == id, cancellationToken);
@@ -695,6 +769,7 @@ namespace CarService.Infrastructure.Services
                 PriceHour = entity.PriceHour,
                 PriceDay = entity.PriceDay,
                 Status = entity.Status,
+                IsActive = entity.IsActive,
                 CreatedAt = entity.CreatedAt,
                 Rating = entity.Rating,
                 RatingsCount = entity.RatingsCount,
@@ -1254,6 +1329,35 @@ namespace CarService.Infrastructure.Services
             string ImageUrl,
             CarImageType ImageType,
             int DisplayOrder);
+
+        private static IReadOnlyCollection<NormalizedApprovedUpdateImage> NormalizeApprovedUpdateImages(
+            IReadOnlyCollection<PartnerCarApprovedUpdateImageDto>? images)
+        {
+            if (images is null || images.Count == 0)
+            {
+                return [];
+            }
+
+            return images
+                .Select((image, index) => new NormalizedApprovedUpdateImage(
+                    NormalizeRequired(image.ImageId, nameof(image.ImageId), 255),
+                    NormalizeImageUrl(image.ImageUrl, nameof(image.ImageUrl)),
+                    NormalizeProvisionImageType(image.ImageType, nameof(image.ImageType)),
+                    index))
+                .ToArray();
+        }
+
+        private sealed record NormalizedApprovedUpdateImage(
+            string ImageId,
+            string ImageUrl,
+            CarImageType ImageType,
+            int DisplayOrder);
+
+        private static bool IsCancelableBookingStatus(string? status)
+        {
+            var normalized = status?.Trim().ToLowerInvariant();
+            return normalized is "pending" or "confirmed" or "active" or "awaitingreview" or "awaiting_review";
+        }
 
         private static string NormalizeImageUrl(string? value, string paramName)
         {

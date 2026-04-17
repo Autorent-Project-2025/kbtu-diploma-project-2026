@@ -6,6 +6,9 @@ export interface PartnerCarReviewPayload {
   carModel?: string;
   carYear?: number;
   licensePlate?: string;
+  color?: string | null;
+  requestedStatus?: number | null;
+  isActive?: boolean | null;
   transmission?: string | null;
   fuelType?: string | null;
   seats?: number | null;

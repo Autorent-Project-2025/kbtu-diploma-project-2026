@@ -43,6 +43,7 @@ export interface PartnerCarDetails {
   priceHour?: number | null;
   priceDay?: number | null;
   status: number;
+  isActive: boolean;
   createdAt: string;
   rating?: number | null;
   ratingsCount: number;
@@ -55,9 +56,20 @@ export interface PartnerCarDetails {
   seats?: number | null;
   fuelType?: string | null;
   doors?: number | null;
+  bodyType?: string | null;
+  horsepower?: number | null;
   description?: string | null;
   images: PartnerCarImage[];
   comments: PartnerCarComment[];
+  bookings: Array<{
+    id: number;
+    carId: number;
+    userId: string;
+    startDate: string;
+    endDate: string;
+    price?: number | null;
+    status?: string | null;
+  }>;
 }
 
 export interface PublicPartnerCarDetails {
@@ -108,6 +120,7 @@ export async function getMyPartnerCarDetails(carId: number): Promise<PartnerCarD
       ...comment,
       avatarUrl: resolveAssetUrl(comment.avatarUrl ?? null) ?? comment.avatarUrl,
     })),
+    bookings: payload.bookings ?? [],
   };
 }
 
@@ -129,6 +142,10 @@ export async function getPublicPartnerCarDetails(
 export async function getCarBrands(): Promise<string[]> {
   const response = await api.get("/cars/catalog/brands");
   return (response.data ?? []) as string[];
+}
+
+export async function deletePartnerCarImage(imageId: number): Promise<void> {
+  await api.delete(`/cars/images/partner-cars/${imageId}`);
 }
 
 export async function getCarModelNames(brand?: string | null): Promise<string[]> {
