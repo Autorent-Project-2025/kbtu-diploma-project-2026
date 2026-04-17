@@ -61,8 +61,8 @@ services:
 
   identity-service:
     build:
-      context: ./backend/shared/identity-service/src
-      dockerfile: ./IdentityService.Api/Dockerfile
+      context: ./backend
+      dockerfile: ./shared/identity-service/src/IdentityService.Api/Dockerfile
     restart: unless-stopped
     env_file:
       - path: ./backend/shared/identity-service/.env.example
@@ -73,6 +73,11 @@ services:
       ASPNETCORE_ENVIRONMENT: Development
       ConnectionStrings__DbConnection: Host=identity-db;Port=5432;Database=postgres_db;Username=postgres;Password=postgres
       InternalAuth__ApiKey: local-identity-service-key
+      RabbitMq__HostName: rabbitmq
+      RabbitMq__Port: 5672
+      RabbitMq__UserName: ${RABBITMQ_DEFAULT_USER:-autorent}
+      RabbitMq__Password: ${RABBITMQ_DEFAULT_PASS:-autorent}
+      RabbitMq__ExchangeName: ${RABBITMQ_EXCHANGE_NAME:-autorent.events}
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
       Observability__LogPath: /tmp/autorent/identity-service/identity-service.jsonl
     expose:
@@ -82,6 +87,8 @@ services:
         condition: service_healthy
       identity-flyway:
         condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/healthz"]
       interval: 10s
@@ -379,6 +386,8 @@ services:
       LOCAL_LLM_CHAT_MODEL: ${LOCAL_LLM_CHAT_MODEL:-qwen2.5:1.5b}
       LOCAL_LLM_EMBEDDING_MODEL: ${LOCAL_LLM_EMBEDDING_MODEL:-nomic-embed-text}
       LOCAL_LLM_TIMEOUT_SECONDS: 90
+      LLM_RECOMMENDATION_SUMMARY_ENABLED: "true"
+      LLM_RECOMMENDATION_SUMMARY_TIMEOUT_MS: 8000
     expose:
       - "8080"
     depends_on:

@@ -44,6 +44,9 @@ namespace CarService.Domain.Entities
         [Column("provision_request_key")]
         public string? ProvisionRequestKey { get; set; }
 
+        [Column("is_active")]
+        public bool IsActive { get; set; } = true;
+
         public Car CarModel { get; set; } = null!;
         public List<PartnerCarImage> Images { get; set; } = [];
         public List<CarComment> Comments { get; set; } = [];

@@ -67,6 +67,18 @@ namespace BookingService.Domain.Entities
         [Column("completion_review_ticket_id")]
         public Guid? CompletionReviewTicketId { get; set; }
 
+        [Column("partner_cancellation_ticket_id")]
+        public Guid? PartnerCancellationTicketId { get; set; }
+
+        [Column("partner_cancellation_requested_at")]
+        public DateTimeOffset? PartnerCancellationRequestedAt { get; set; }
+
+        [Column("cancellation_actor")]
+        public string? CancellationActor { get; set; }
+
+        [Column("cancellation_reason")]
+        public string? CancellationReason { get; set; }
+
         [Column("car_comment_id")]
         public int? CarCommentId { get; set; }
 

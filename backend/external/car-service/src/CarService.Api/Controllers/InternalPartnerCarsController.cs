@@ -141,6 +141,25 @@ namespace CarService.Api.Controllers
             return Ok(payload);
         }
 
+        [AllowAnonymous]
+        [HttpPost("by-partner/{partnerUserId:guid}/set-active")]
+        public async Task<IActionResult> SetPartnerCarsActive(
+            Guid partnerUserId,
+            [FromBody] SetPartnerCarsActiveRequest request,
+            CancellationToken cancellationToken)
+        {
+            if (!IsAuthorizedInternalRequest())
+                return Unauthorized(new { error = "Internal API key is invalid." });
+
+            if (partnerUserId == Guid.Empty)
+                return BadRequest(new { error = "PartnerUserId is required." });
+
+            var count = await _partnerCarService.SetPartnerCarsActiveAsync(
+                partnerUserId, request.IsActive, cancellationToken);
+
+            return Ok(new { updatedCount = count });
+        }
+
         private bool IsAuthorizedInternalRequest()
         {
             if (string.IsNullOrWhiteSpace(_internalAuthOptions.ApiKey))

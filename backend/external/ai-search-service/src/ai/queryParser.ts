@@ -188,20 +188,18 @@ function reconcileWithHeuristics(
   heuristicQuery: ParsedRecommendationQuery,
 ): ParsedRecommendationQuery {
   const hasYearIntent = hasExplicitYearIntent(modelQuery.prompt);
-  const normalizedPrompt = normalizePrompt(modelQuery.prompt);
-  const canExpandWithModel = !isShortOrFollowUpPrompt(normalizedPrompt, heuristicQuery);
+  // Trust LLM for styles/brands when heuristic found nothing — no prompt-length gate.
   const modelPreferredStyles =
-    canExpandWithModel &&
     heuristicQuery.preferredStyles.length === 0 &&
     heuristicQuery.excludedStyles.length === 0
       ? modelQuery.preferredStyles
       : [];
   const modelExcludedStyles =
-    canExpandWithModel && heuristicQuery.excludedStyles.length === 0
+    heuristicQuery.excludedStyles.length === 0
       ? modelQuery.excludedStyles
       : [];
   const modelPreferredBrands =
-    canExpandWithModel && heuristicQuery.preferredBrands.length === 0
+    heuristicQuery.preferredBrands.length === 0
       ? modelQuery.preferredBrands
       : [];
   const excludedStyles = unique([

@@ -1,0 +1,5 @@
+ALTER TABLE partners ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE partners ADD COLUMN IF NOT EXISTS deactivated_at TIMESTAMPTZ NULL;
+ALTER TABLE partners ADD COLUMN IF NOT EXISTS deactivation_reason VARCHAR(2000) NULL;
+
+CREATE INDEX IF NOT EXISTS idx_partners_is_active ON partners (is_active);

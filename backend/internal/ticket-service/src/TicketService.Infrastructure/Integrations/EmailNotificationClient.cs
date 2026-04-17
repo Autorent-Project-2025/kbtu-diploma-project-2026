@@ -125,6 +125,24 @@ public sealed class EmailNotificationClient : IEmailNotificationClient
         }
     }
 
+    public async Task SendCustomAsync(
+        SendCustomEmailRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.PostAsJsonAsync("/emails/custom", new
+        {
+            to = request.To,
+            subject = request.Subject,
+            text = request.Text,
+            html = request.Html
+        }, cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            await ThrowResponseExceptionAsync(response, cancellationToken);
+        }
+    }
+
     private static async Task ThrowResponseExceptionAsync(HttpResponseMessage response, CancellationToken cancellationToken)
     {
         var errorMessage = await TryReadErrorMessageAsync(response, cancellationToken)

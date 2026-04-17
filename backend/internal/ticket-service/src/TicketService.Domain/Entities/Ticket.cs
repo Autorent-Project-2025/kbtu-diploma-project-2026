@@ -32,9 +32,24 @@ public sealed class Ticket
     public string? AvatarUrl => Data is ClientTicketData clientData ? clientData.AvatarUrl : null;
     public string? CompanyName => Data is PartnerTicketData partnerData ? partnerData.CompanyName : null;
     public string? ContactEmail => Data is PartnerTicketData partnerData ? partnerData.ContactEmail : null;
-    public Guid? RelatedPartnerUserId => Data is PartnerCarTicketData partnerCarData ? partnerCarData.RelatedPartnerUserId : null;
-    public string? CarBrand => Data is PartnerCarTicketData partnerCarData ? partnerCarData.CarBrand : null;
-    public string? CarModel => Data is PartnerCarTicketData partnerCarData ? partnerCarData.CarModel : null;
+    public Guid? RelatedPartnerUserId => Data switch
+    {
+        PartnerCarTicketData partnerCarData => partnerCarData.RelatedPartnerUserId,
+        PartnerBookingCancellationTicketData bookingCancellationData => bookingCancellationData.RelatedPartnerUserId,
+        _ => null
+    };
+    public string? CarBrand => Data switch
+    {
+        PartnerCarTicketData partnerCarData => partnerCarData.CarBrand,
+        PartnerBookingCancellationTicketData bookingCancellationData => bookingCancellationData.CarBrand,
+        _ => null
+    };
+    public string? CarModel => Data switch
+    {
+        PartnerCarTicketData partnerCarData => partnerCarData.CarModel,
+        PartnerBookingCancellationTicketData bookingCancellationData => bookingCancellationData.CarModel,
+        _ => null
+    };
     public int? CarYear => Data is PartnerCarTicketData partnerCarData ? partnerCarData.CarYear : null;
     public string? LicensePlate => Data is PartnerCarTicketData partnerCarData ? partnerCarData.LicensePlate : null;
     public string? Transmission => Data is PartnerCarTicketData partnerCarData ? partnerCarData.Transmission : null;
@@ -50,7 +65,12 @@ public sealed class Ticket
     public IReadOnlyCollection<PartnerCarTicketImageData> CarImages => Data is PartnerCarTicketData partnerCarData
         ? partnerCarData.CarImages
         : [];
-    public int? BookingId => Data is BookingCompletionTicketData bookingCompletionData ? bookingCompletionData.BookingId : null;
+    public int? BookingId => Data switch
+    {
+        BookingCompletionTicketData bookingCompletionData => bookingCompletionData.BookingId,
+        PartnerBookingCancellationTicketData bookingCancellationData => bookingCancellationData.BookingId,
+        _ => null
+    };
     public DateTimeOffset? PlannedStartTime => Data is BookingCompletionTicketData bookingCompletionData ? bookingCompletionData.PlannedStartTime : null;
     public DateTimeOffset? PlannedEndTime => Data is BookingCompletionTicketData bookingCompletionData ? bookingCompletionData.PlannedEndTime : null;
     public DateTimeOffset? TripStartedAt => Data is BookingCompletionTicketData bookingCompletionData ? bookingCompletionData.TripStartedAt : null;
@@ -60,6 +80,18 @@ public sealed class Ticket
     public IReadOnlyCollection<BookingCompletionTicketPhotoData> CompletionPhotos => Data is BookingCompletionTicketData bookingCompletionData
         ? bookingCompletionData.CompletionPhotos
         : [];
+    public string? BookingStatusSnapshot => Data is PartnerBookingCancellationTicketData bookingCancellationData
+        ? bookingCancellationData.BookingStatus
+        : null;
+    public DateTimeOffset? BookingStartTime => Data is PartnerBookingCancellationTicketData bookingCancellationData
+        ? bookingCancellationData.BookingStartTime
+        : null;
+    public DateTimeOffset? BookingEndTime => Data is PartnerBookingCancellationTicketData bookingCancellationData
+        ? bookingCancellationData.BookingEndTime
+        : null;
+    public string? PartnerReason => Data is PartnerBookingCancellationTicketData bookingCancellationData
+        ? bookingCancellationData.PartnerReason
+        : null;
     public string? DecisionReason => Data.DecisionReason;
     public Guid? ReviewedByManagerId => Data.ReviewedByManagerId;
     public DateTime? ReviewedAt => Data.ReviewedAt;
@@ -168,6 +200,53 @@ public sealed class Ticket
             LatePenaltyAmount = NormalizeOptionalFineAmount(latePenaltyAmount, nameof(latePenaltyAmount)),
             DamageFineAmount = null,
             CompletionPhotos = NormalizeCompletionPhotos(completionPhotos),
+            DecisionReason = null,
+            ReviewedByManagerId = null,
+            ReviewedAt = null
+        };
+        ticket.Status = TicketStatus.Pending;
+        return ticket;
+    }
+
+    public static Ticket CreatePartnerBookingCancellation(
+        Guid id,
+        string firstName,
+        string lastName,
+        string email,
+        string phoneNumber,
+        Guid relatedPartnerUserId,
+        int bookingId,
+        string carBrand,
+        string carModel,
+        string bookingStatus,
+        DateTimeOffset bookingStartTime,
+        DateTimeOffset bookingEndTime,
+        string partnerReason,
+        DateTime createdAt)
+    {
+        var ticket = new Ticket
+        {
+            Id = id == Guid.Empty ? Guid.NewGuid() : id,
+            TicketType = TicketType.PartnerBookingCancellation,
+            CreatedAt = createdAt
+        };
+
+        ticket.SetEmail(email);
+        var normalizedName = NormalizeName(firstName, lastName);
+        ticket.Data = new PartnerBookingCancellationTicketData
+        {
+            FirstName = normalizedName.FirstName,
+            LastName = normalizedName.LastName,
+            FullName = normalizedName.FullName,
+            PhoneNumber = NormalizePhoneNumber(phoneNumber),
+            RelatedPartnerUserId = NormalizePartnerUserId(relatedPartnerUserId),
+            BookingId = NormalizeBookingId(bookingId),
+            CarBrand = NormalizeCarBrand(carBrand),
+            CarModel = NormalizeCarModel(carModel),
+            BookingStatus = NormalizeBookingStatusSnapshot(bookingStatus),
+            BookingStartTime = NormalizeBookingCancellationWindowStart(bookingStartTime),
+            BookingEndTime = NormalizeBookingCancellationWindowEnd(bookingStartTime, bookingEndTime),
+            PartnerReason = NormalizeRequired(partnerReason, nameof(partnerReason), 1000),
             DecisionReason = null,
             ReviewedByManagerId = null,
             ReviewedAt = null
@@ -822,6 +901,48 @@ public sealed class Ticket
         }
 
         return bookingId;
+    }
+
+    private static string NormalizeBookingStatusSnapshot(string? bookingStatus)
+    {
+        var normalized = NormalizeRequired(bookingStatus, nameof(bookingStatus), 64).ToLowerInvariant();
+        return normalized switch
+        {
+            "pending" => "pending",
+            "confirmed" => "confirmed",
+            "active" => "active",
+            "awaitingreview" or "awaiting_review" => "awaitingreview",
+            "completed" => "completed",
+            "canceled" => "canceled",
+            _ => throw new ArgumentException($"Unsupported booking status snapshot '{bookingStatus}'.", nameof(bookingStatus))
+        };
+    }
+
+    private static DateTimeOffset NormalizeBookingCancellationWindowStart(DateTimeOffset bookingStartTime)
+    {
+        if (bookingStartTime == default)
+        {
+            throw new ArgumentException("bookingStartTime is required.", nameof(bookingStartTime));
+        }
+
+        return bookingStartTime;
+    }
+
+    private static DateTimeOffset NormalizeBookingCancellationWindowEnd(
+        DateTimeOffset bookingStartTime,
+        DateTimeOffset bookingEndTime)
+    {
+        if (bookingEndTime == default)
+        {
+            throw new ArgumentException("bookingEndTime is required.", nameof(bookingEndTime));
+        }
+
+        if (bookingEndTime < bookingStartTime)
+        {
+            throw new ArgumentException("bookingEndTime must be greater than or equal to bookingStartTime.", nameof(bookingEndTime));
+        }
+
+        return bookingEndTime;
     }
 
     private static DateTimeOffset NormalizeTripWindow(DateTimeOffset start, DateTimeOffset end, string paramName)

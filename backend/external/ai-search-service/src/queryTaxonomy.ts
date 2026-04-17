@@ -1,3 +1,5 @@
+import { sql } from "./db/sql";
+
 export const STYLE_DICTIONARY: Array<{ label: string; variants: string[] }> = [
   {
     label: "sport",
@@ -17,16 +19,38 @@ export const TRANSMISSION_DICTIONARY: Array<{ label: string; variants: string[] 
   { label: "manual", variants: ["manual", "механик", "мкпп"] },
 ];
 
-export const BRAND_DICTIONARY = [
-  "toyota",
-  "nissan",
-  "kia",
-  "mazda",
-  "bmw",
-  "mercedes",
-  "lexus",
-  "audi",
-];
+// Dynamic dictionaries loaded from ai_car_documents at startup
+let _brands: string[] = [];
+let _modelToBrand: Record<string, string> = {};
+
+export function getBrandDictionary(): string[] {
+  return _brands;
+}
+
+export function getModelToBrandDictionary(): Record<string, string> {
+  return _modelToBrand;
+}
+
+export async function loadTaxonomyFromDatabase(): Promise<void> {
+  const rows = await sql<{ brand: string; model: string }[]>`
+    select distinct lower(brand) as brand, lower(model) as model
+    from ai_car_documents
+    where brand is not null and model is not null
+  `;
+
+  const brandSet = new Set<string>();
+  const modelMap: Record<string, string> = {};
+
+  for (const row of rows) {
+    const brand = row.brand.trim();
+    const model = row.model.trim();
+    if (brand) brandSet.add(brand);
+    if (model && brand) modelMap[model] = brand;
+  }
+
+  _brands = [...brandSet];
+  _modelToBrand = modelMap;
+}
 
 export const STYLE_LABELS_TEXT = STYLE_DICTIONARY.map((item) => item.label).join(", ");
 export const TRANSMISSION_LABELS_TEXT = TRANSMISSION_DICTIONARY.map((item) => item.label).join(", ");

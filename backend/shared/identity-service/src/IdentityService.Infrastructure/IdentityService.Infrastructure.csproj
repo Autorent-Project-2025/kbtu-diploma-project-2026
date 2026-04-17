@@ -19,6 +19,7 @@
   <ItemGroup>
     <ProjectReference Include="..\IdentityService.Application\IdentityService.Application.csproj" />
     <ProjectReference Include="..\IdentityService.Domain\IdentityService.Domain.csproj" />
+    <ProjectReference Include="..\..\..\..\libraries\messaging-dotnet\src\AutoRent.Messaging\AutoRent.Messaging.csproj" />
   </ItemGroup>
 
 </Project>

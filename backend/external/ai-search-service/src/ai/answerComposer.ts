@@ -281,7 +281,7 @@ function assertRecommendationSummaryIsAcceptable(content: string) {
     throw new Error("LLM recommendation summary contains invalid artifacts.");
   }
 
-  if (countSentences(content) > 2) {
+  if (countSentences(content) > 3) {
     throw new Error("LLM recommendation summary is too long.");
   }
 }
@@ -330,15 +330,14 @@ async function generateRecommendationSummaryWithLlm(
   }
 
   const systemPrompt = `
-You are AutoRent AI assistant.
+You are AutoRent AI assistant helping users find rental cars.
 Return only valid JSON.
 Reply in Russian and use Cyrillic in assistantText.
-Summarize the already-ranked recommendation result in one or two concise natural sentences.
-Stay grounded strictly in the provided filters and candidate cars.
-You may mention at most two car titles from the provided list.
+Summarize the recommendation in up to three concise natural sentences.
+Use the provided car data (tags, description, features) to give a helpful, grounded answer.
+You may mention at most three car titles from the provided list.
 Do not invent facts, brands, availability, missing data, prices, or counts.
 Do not use bullet points, markdown, or English explanatory phrases.
-Do not write phrases like "Based on the user's request" or "meet the criteria".
 If a price is mentioned, keep the provided format unchanged.
 Schema:
 {
@@ -369,13 +368,14 @@ ${JSON.stringify({
 
 Top cars:
 ${JSON.stringify(
-  cars.slice(0, 4).map((car, index) => ({
+  cars.slice(0, 6).map((car, index) => ({
     rank: index + 1,
     partnerCarId: car.partnerCarId,
     title: car.title,
     priceHourLabel: car.priceHour != null ? `${car.priceHour} ₸/час` : "цена не указана",
     ratingLabel: car.rating != null ? `рейтинг ${car.rating}` : "без рейтинга",
     carrierName: car.carrierName,
+    tags: car.tags ?? [],
     reasons: car.reasons,
   })),
   null,
@@ -389,7 +389,7 @@ ${JSON.stringify(
       userPrompt,
       responseType: "json",
       temperature: 0.2,
-      maxOutputTokens: 160,
+      maxOutputTokens: 300,
       timeoutMs: config.llmRecommendationSummaryTimeoutMs,
     });
 
@@ -407,7 +407,7 @@ ${JSON.stringify(
 
     const referencedPartnerCarIds = normalizeReferencedPartnerCarIds(
       payload.referencedPartnerCarIds,
-      cars.slice(0, 4),
+      cars.slice(0, 6),
     );
 
     observabilityLogger.info("llm_recommendation_summary_succeeded", {

@@ -87,7 +87,10 @@ public sealed class InternalPartnersController : ControllerBase
             return Ok(new PublicPartnerProfileResponse
             {
                 RelatedUserId = partner.RelatedUserId,
-                CarrierName = $"{partner.OwnerFirstName} {partner.OwnerLastName}".Trim()
+                CarrierName = $"{partner.OwnerFirstName} {partner.OwnerLastName}".Trim(),
+                OwnerFirstName = partner.OwnerFirstName,
+                OwnerLastName = partner.OwnerLastName,
+                PhoneNumber = partner.PhoneNumber
             });
         }
 

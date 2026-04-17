@@ -134,6 +134,20 @@ public sealed class TicketWorkflowOutboxDispatcher : BackgroundService
                     break;
                 }
 
+                case TicketWorkflowOutboxEventTypes.PartnerBookingCancellationApproved:
+                {
+                    var payload = TicketWorkflowPayloadSerializer.Deserialize<PartnerBookingCancellationApprovedWorkflowPayload>(message.Payload);
+                    await ProcessPartnerBookingCancellationApprovedWorkflowAsync(serviceProvider, db, message, payload, cancellationToken);
+                    break;
+                }
+
+                case TicketWorkflowOutboxEventTypes.PartnerBookingCancellationRejected:
+                {
+                    var payload = TicketWorkflowPayloadSerializer.Deserialize<PartnerBookingCancellationRejectedWorkflowPayload>(message.Payload);
+                    await ProcessPartnerBookingCancellationRejectedWorkflowAsync(serviceProvider, db, message, payload, cancellationToken);
+                    break;
+                }
+
                 case TicketWorkflowOutboxEventTypes.Rejected:
                 {
                     var payload = TicketWorkflowPayloadSerializer.Deserialize<TicketRejectedWorkflowPayload>(message.Payload);
@@ -508,6 +522,124 @@ public sealed class TicketWorkflowOutboxDispatcher : BackgroundService
         }
     }
 
+    private async Task ProcessPartnerBookingCancellationApprovedWorkflowAsync(
+        IServiceProvider serviceProvider,
+        TicketDbContext db,
+        TicketWorkflowOutboxMessage message,
+        PartnerBookingCancellationApprovedWorkflowPayload payload,
+        CancellationToken cancellationToken)
+    {
+        var ticket = await LoadRequiredTicketAsync(db, payload.TicketId, cancellationToken);
+        if (ticket.TicketType != TicketType.PartnerBookingCancellation)
+        {
+            throw new InvalidOperationException("Partner booking cancellation approval workflow is valid only for partner booking cancellation tickets.");
+        }
+
+        var bookingAdminClient = serviceProvider.GetRequiredService<IBookingAdminClient>();
+        var emailNotificationClient = serviceProvider.GetRequiredService<IEmailNotificationClient>();
+        while (payload.CurrentStep != PartnerBookingCancellationApprovedWorkflowStep.Completed)
+        {
+            switch (payload.CurrentStep)
+            {
+                case PartnerBookingCancellationApprovedWorkflowStep.NotifyBookingService:
+                {
+                    var bookingId = RequireBookingId(ticket.BookingId, nameof(ticket.BookingId));
+                    var approved = await bookingAdminClient.ApprovePartnerCancellationAsync(
+                        bookingId,
+                        ticket.Id,
+                        RequireField(ticket.PartnerReason, nameof(ticket.PartnerReason)),
+                        cancellationToken);
+                    if (!approved)
+                    {
+                        throw new InvalidOperationException($"Failed to approve partner cancellation for booking {bookingId}.");
+                    }
+
+                    payload.CurrentStep = PartnerBookingCancellationApprovedWorkflowStep.SendPartnerNotification;
+                    message.Payload = TicketWorkflowPayloadSerializer.Serialize(payload);
+                    break;
+                }
+
+                case PartnerBookingCancellationApprovedWorkflowStep.SendPartnerNotification:
+                {
+                    var bookingId = RequireBookingId(ticket.BookingId, nameof(ticket.BookingId));
+                    await emailNotificationClient.SendCustomAsync(
+                        new SendCustomEmailRequest(
+                            RequireField(ticket.Email, nameof(ticket.Email)),
+                            $"Запрос на отмену бронирования #{bookingId} одобрен",
+                            BuildPartnerCancellationApprovedEmailText(ticket)),
+                        cancellationToken);
+
+                    payload.CurrentStep = PartnerBookingCancellationApprovedWorkflowStep.Completed;
+                    message.Payload = TicketWorkflowPayloadSerializer.Serialize(payload);
+                    break;
+                }
+
+                default:
+                    throw new InvalidOperationException(
+                        $"Unsupported partner booking cancellation approved workflow step '{payload.CurrentStep}'.");
+            }
+        }
+    }
+
+    private async Task ProcessPartnerBookingCancellationRejectedWorkflowAsync(
+        IServiceProvider serviceProvider,
+        TicketDbContext db,
+        TicketWorkflowOutboxMessage message,
+        PartnerBookingCancellationRejectedWorkflowPayload payload,
+        CancellationToken cancellationToken)
+    {
+        var ticket = await LoadRequiredTicketAsync(db, payload.TicketId, cancellationToken);
+        if (ticket.TicketType != TicketType.PartnerBookingCancellation)
+        {
+            throw new InvalidOperationException("Partner booking cancellation rejection workflow is valid only for partner booking cancellation tickets.");
+        }
+
+        var bookingAdminClient = serviceProvider.GetRequiredService<IBookingAdminClient>();
+        var emailNotificationClient = serviceProvider.GetRequiredService<IEmailNotificationClient>();
+        while (payload.CurrentStep != PartnerBookingCancellationRejectedWorkflowStep.Completed)
+        {
+            switch (payload.CurrentStep)
+            {
+                case PartnerBookingCancellationRejectedWorkflowStep.NotifyBookingService:
+                {
+                    var bookingId = RequireBookingId(ticket.BookingId, nameof(ticket.BookingId));
+                    var rejected = await bookingAdminClient.RejectPartnerCancellationAsync(
+                        bookingId,
+                        ticket.Id,
+                        RequireField(ticket.DecisionReason, nameof(ticket.DecisionReason)),
+                        cancellationToken);
+                    if (!rejected)
+                    {
+                        throw new InvalidOperationException($"Failed to reject partner cancellation for booking {bookingId}.");
+                    }
+
+                    payload.CurrentStep = PartnerBookingCancellationRejectedWorkflowStep.SendPartnerNotification;
+                    message.Payload = TicketWorkflowPayloadSerializer.Serialize(payload);
+                    break;
+                }
+
+                case PartnerBookingCancellationRejectedWorkflowStep.SendPartnerNotification:
+                {
+                    var bookingId = RequireBookingId(ticket.BookingId, nameof(ticket.BookingId));
+                    await emailNotificationClient.SendCustomAsync(
+                        new SendCustomEmailRequest(
+                            RequireField(ticket.Email, nameof(ticket.Email)),
+                            $"Запрос на отмену бронирования #{bookingId} отклонен",
+                            BuildPartnerCancellationRejectedEmailText(ticket)),
+                        cancellationToken);
+
+                    payload.CurrentStep = PartnerBookingCancellationRejectedWorkflowStep.Completed;
+                    message.Payload = TicketWorkflowPayloadSerializer.Serialize(payload);
+                    break;
+                }
+
+                default:
+                    throw new InvalidOperationException(
+                        $"Unsupported partner booking cancellation rejected workflow step '{payload.CurrentStep}'.");
+            }
+        }
+    }
+
     private static async Task<Ticket> LoadRequiredTicketAsync(
         TicketDbContext db,
         Guid ticketId,
@@ -557,6 +689,38 @@ public sealed class TicketWorkflowOutboxDispatcher : BackgroundService
     };
 
     private static string BuildPartnerCarProvisionEventId(Guid ticketId) => $"ticket:{ticketId}:partner-car-provision";
+
+    private static string BuildPartnerCancellationApprovedEmailText(Ticket ticket)
+    {
+        var partnerName = string.IsNullOrWhiteSpace(ticket.FullName) ? "Партнер" : ticket.FullName.Trim();
+        var bookingId = RequireBookingId(ticket.BookingId, nameof(ticket.BookingId));
+        var carTitle = BuildBookingTitle(ticket.CarBrand, ticket.CarModel);
+        var reason = RequireField(ticket.PartnerReason, nameof(ticket.PartnerReason));
+
+        return $"{partnerName}, ваш запрос на отмену бронирования #{bookingId} был одобрен. " +
+               $"Бронирование по автомобилю {carTitle} отменено, клиенту отправлено уведомление, а возврат средств инициирован автоматически. " +
+               $"Причина, указанная в запросе: {reason}.";
+    }
+
+    private static string BuildPartnerCancellationRejectedEmailText(Ticket ticket)
+    {
+        var partnerName = string.IsNullOrWhiteSpace(ticket.FullName) ? "Партнер" : ticket.FullName.Trim();
+        var bookingId = RequireBookingId(ticket.BookingId, nameof(ticket.BookingId));
+        var carTitle = BuildBookingTitle(ticket.CarBrand, ticket.CarModel);
+        var decisionReason = RequireField(ticket.DecisionReason, nameof(ticket.DecisionReason));
+
+        return $"{partnerName}, ваш запрос на отмену бронирования #{bookingId} по автомобилю {carTitle} был отклонен менеджером. " +
+               $"Комментарий менеджера: {decisionReason}. Бронирование остается активным в текущем статусе.";
+    }
+
+    private static string BuildBookingTitle(string? carBrand, string? carModel)
+    {
+        var parts = new[] { carBrand?.Trim(), carModel?.Trim() }
+            .Where(value => !string.IsNullOrWhiteSpace(value));
+
+        var title = string.Join(" ", parts);
+        return string.IsNullOrWhiteSpace(title) ? "без указанного автомобиля" : title;
+    }
 
     private TimeSpan ComputeRetryDelay(int attemptCount)
     {

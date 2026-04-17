@@ -24,6 +24,12 @@ namespace BookingService.Application.Interfaces
         Task<BookingPaymentStatusResponseDto> SubmitPayment(int id, Guid userId, BookingPaymentSubmitRequestDto dto);
         Task<bool> CancelBooking(int id, Guid userId);
         Task<bool> CancelBookingByPartner(int id, Guid partnerUserId);
+        Task<PartnerBookingCancellationRequestResultDto> RequestPartnerCancellation(
+            int id,
+            Guid partnerUserId,
+            string requesterEmail,
+            string reason,
+            CancellationToken cancellationToken = default);
         Task<bool> ConfirmBooking(int id, Guid userId);
         Task<bool> StartTrip(int id, Guid userId);
         Task<BookingCompletionSubmissionResponseDto> SubmitCompletionReview(int id, Guid userId, BookingCompletionSubmissionDto dto);
@@ -33,7 +39,8 @@ namespace BookingService.Application.Interfaces
         Task<IReadOnlyCollection<BookingChargeResponseDto>> GetAllBookingCharges(int id, CancellationToken cancellationToken = default);
         Task<BookingChargeResponseDto> PayBookingCharge(int id, long chargeId, Guid userId, CancellationToken cancellationToken = default);
         Task<BookingResponseDto?> GetBookingById(int id, CancellationToken cancellationToken = default);
-        Task<bool> CancelBookingByAdmin(int id, CancellationToken cancellationToken = default);
+        Task<bool> CancelBookingByAdmin(int id, string? cancellationReason = null, CancellationToken cancellationToken = default);
+        Task<int> CancelActiveBookingsByUserAsync(Guid userId, string? reason = null, CancellationToken cancellationToken = default);
         Task ProcessCompletionReviewApproved(
             int bookingId,
             Guid ticketId,
@@ -49,6 +56,16 @@ namespace BookingService.Application.Interfaces
             string fineComment,
             string customerEmail,
             string customerFullName,
+            CancellationToken cancellationToken = default);
+        Task ProcessPartnerCancellationApproved(
+            int bookingId,
+            Guid ticketId,
+            string partnerReason,
+            CancellationToken cancellationToken = default);
+        Task ProcessPartnerCancellationRejected(
+            int bookingId,
+            Guid ticketId,
+            string decisionReason,
             CancellationToken cancellationToken = default);
 
         // Profile stats

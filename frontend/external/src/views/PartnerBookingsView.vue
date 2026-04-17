@@ -590,12 +590,20 @@
                     </p>
                   </td>
                   <td class="px-4 py-4 align-top">
-                    <span
-                      :class="getBookingStatusClass(booking.status)"
-                      class="inline-flex px-3 py-1 rounded-full text-xs font-bold uppercase tracking-[0.12em]"
-                    >
-                      {{ getBookingStatusLabel(booking.status) }}
-                    </span>
+                    <div class="flex flex-col items-start gap-2">
+                      <span
+                        :class="getBookingStatusClass(booking.status)"
+                        class="inline-flex px-3 py-1 rounded-full text-xs font-bold uppercase tracking-[0.12em]"
+                      >
+                        {{ getBookingStatusLabel(booking.status) }}
+                      </span>
+                      <span
+                        v-if="hasPendingPartnerCancellation(booking)"
+                        class="inline-flex px-3 py-1 rounded-full text-[11px] font-bold tracking-[0.08em] bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300"
+                      >
+                        Запрос на отмену отправлен
+                      </span>
+                    </div>
                   </td>
                   <td class="px-4 py-4 align-top hidden lg:table-cell">
                     <p class="font-medium text-gray-900 dark:text-white">
@@ -605,17 +613,29 @@
                   <td class="px-4 py-4 align-top">
                     <button
                       v-if="
-                        booking.status === 'pending' ||
-                        booking.status === 'confirmed'
+                        (booking.status === 'pending' ||
+                          booking.status === 'confirmed') &&
+                        !hasPendingPartnerCancellation(booking)
                       "
-                      @click="handlePartnerCancel(booking.id)"
+                      @click="openPartnerCancelModal(booking)"
                       :disabled="cancelingId === booking.id"
                       class="px-3 py-1.5 rounded-xl border border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 text-xs font-bold hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50 transition-colors"
                     >
                       {{
-                        cancelingId === booking.id ? "Отмена..." : "Отменить"
+                        cancelingId === booking.id
+                          ? "Отправка..."
+                          : "Запросить отмену"
                       }}
                     </button>
+                    <p
+                      v-else-if="hasPendingPartnerCancellation(booking)"
+                      class="text-xs text-amber-700 dark:text-amber-300 leading-5 max-w-[180px]"
+                    >
+                      На рассмотрении менеджера
+                      <span v-if="booking.partnerCancellationRequestedAt">
+                        с {{ formatDateTime(booking.partnerCancellationRequestedAt) }}
+                      </span>
+                    </p>
                   </td>
                 </tr>
               </tbody>
@@ -623,6 +643,85 @@
           </div>
         </section>
       </template>
+
+      <Teleport to="body">
+        <Transition
+          enter-active-class="transition duration-200"
+          enter-from-class="opacity-0"
+          enter-to-class="opacity-100"
+          leave-active-class="transition duration-150"
+          leave-from-class="opacity-100"
+          leave-to-class="opacity-0"
+        >
+          <div
+            v-if="showCancelModal"
+            class="fixed inset-0 z-50 flex items-center justify-center bg-black/45 backdrop-blur-sm px-4"
+            @click.self="closePartnerCancelModal()"
+          >
+            <div class="w-full max-w-lg rounded-3xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-2xl p-6 space-y-5">
+              <div>
+                <p class="text-xs font-bold uppercase tracking-[0.22em] text-red-600 dark:text-red-400">
+                  Partner Cancellation Review
+                </p>
+                <h3 class="mt-2 text-2xl font-extrabold text-gray-900 dark:text-white">
+                  Запрос на отмену бронирования
+                </h3>
+                <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                  Заявка уйдет менеджеру на проверку. Бронирование не отменится мгновенно.
+                </p>
+              </div>
+
+              <div
+                v-if="cancelBookingDraft"
+                class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-950 p-4"
+              >
+                <p class="text-sm font-bold text-gray-900 dark:text-white">
+                  {{ resolveCarName(cancelBookingDraft) }}
+                </p>
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  Бронь #{{ cancelBookingDraft.id }} ·
+                  {{ formatDateTime(cancelBookingDraft.startTime) }} -
+                  {{ formatDateTime(cancelBookingDraft.endTime) }}
+                </p>
+              </div>
+
+              <div class="space-y-2">
+                <label
+                  for="partnerCancelReason"
+                  class="block text-xs font-bold uppercase tracking-[0.14em] text-gray-500 dark:text-gray-400"
+                >
+                  Причина отмены
+                </label>
+                <textarea
+                  id="partnerCancelReason"
+                  v-model="cancelReason"
+                  placeholder="Опишите, почему это бронирование нужно отменить"
+                  class="w-full min-h-[140px] rounded-2xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-3 text-sm text-gray-900 dark:text-white resize-y focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-colors placeholder-gray-400"
+                />
+              </div>
+
+              <div class="flex flex-col sm:flex-row gap-3 sm:justify-end">
+                <button
+                  type="button"
+                  @click="closePartnerCancelModal()"
+                  :disabled="cancelingId !== null"
+                  class="px-4 py-2.5 rounded-2xl border border-gray-300 dark:border-gray-700 text-sm font-semibold text-gray-700 dark:text-gray-300 hover:border-gray-400 transition-colors disabled:opacity-60"
+                >
+                  Закрыть
+                </button>
+                <button
+                  type="button"
+                  @click="submitPartnerCancelRequest"
+                  :disabled="cancelingId !== null"
+                  class="px-4 py-2.5 rounded-2xl bg-red-600 hover:bg-red-700 text-sm font-bold text-white transition-colors disabled:opacity-60"
+                >
+                  {{ cancelingId !== null ? "Отправка..." : "Отправить на проверку" }}
+                </button>
+              </div>
+            </div>
+          </div>
+        </Transition>
+      </Teleport>
     </div>
   </div>
 </template>
@@ -661,6 +760,9 @@ interface ChartPoint {
 const periodOptions: AnalyticsPeriod[] = [7, 14, 30];
 const { error, success } = useToast();
 const cancelingId = ref<number | null>(null);
+const showCancelModal = ref(false);
+const cancelBookingDraft = ref<PartnerBooking | null>(null);
+const cancelReason = ref("");
 
 const loading = ref(true);
 const errorMessage = ref("");
@@ -1147,6 +1249,14 @@ function getBookingStatusClass(status: BookingStatus) {
   }
 }
 
+function hasPendingPartnerCancellation(booking: PartnerBooking) {
+  return Boolean(
+    booking.partnerCancellationTicketId &&
+      booking.status !== "canceled" &&
+      booking.status !== "completed",
+  );
+}
+
 function resolveErrorMessage(value: unknown, fallback: string) {
   if (axios.isAxiosError(value)) {
     const detail =
@@ -1166,15 +1276,48 @@ function resolveErrorMessage(value: unknown, fallback: string) {
   return fallback;
 }
 
-async function handlePartnerCancel(bookingId: number) {
-  if (cancelingId.value !== null) return;
-  cancelingId.value = bookingId;
+function openPartnerCancelModal(booking: PartnerBooking) {
+  if (cancelingId.value !== null || hasPendingPartnerCancellation(booking)) {
+    return;
+  }
+
+  cancelBookingDraft.value = booking;
+  cancelReason.value = "";
+  showCancelModal.value = true;
+}
+
+function closePartnerCancelModal(force = false) {
+  if (!force && cancelingId.value !== null) return;
+  showCancelModal.value = false;
+  cancelBookingDraft.value = null;
+  cancelReason.value = "";
+}
+
+async function submitPartnerCancelRequest() {
+  const booking = cancelBookingDraft.value;
+  if (!booking || cancelingId.value !== null) return;
+
+  if (!cancelReason.value.trim()) {
+    error("Укажите причину отмены.");
+    return;
+  }
+
+  cancelingId.value = booking.id;
   try {
-    await cancelPartnerBooking(bookingId);
-    success("Бронирование отменено");
+    const result = await cancelPartnerBooking(booking.id, cancelReason.value.trim());
+    success(
+      result.alreadyPending
+        ? "Запрос уже находится на рассмотрении"
+        : "Запрос на отмену отправлен менеджеру",
+    );
+    closePartnerCancelModal(true);
     await loadDashboard();
   } catch (e: any) {
-    error(e?.response?.data?.error ?? "Не удалось отменить бронирование");
+    error(
+      e?.response?.data?.detail ??
+        e?.response?.data?.error ??
+        "Не удалось отправить запрос на отмену",
+    );
   } finally {
     cancelingId.value = null;
   }

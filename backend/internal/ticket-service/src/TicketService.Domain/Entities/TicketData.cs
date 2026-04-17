@@ -7,6 +7,7 @@ namespace TicketService.Domain.Entities;
 [JsonDerivedType(typeof(PartnerTicketData), typeDiscriminator: "partner")]
 [JsonDerivedType(typeof(PartnerCarTicketData), typeDiscriminator: "partner-car")]
 [JsonDerivedType(typeof(BookingCompletionTicketData), typeDiscriminator: "booking-completion")]
+[JsonDerivedType(typeof(PartnerBookingCancellationTicketData), typeDiscriminator: "partner-booking-cancellation")]
 public abstract record TicketData
 {
     public string FirstName { get; init; } = string.Empty;
@@ -69,6 +70,18 @@ public sealed record BookingCompletionTicketData : TicketData
     public decimal? LatePenaltyAmount { get; init; }
     public decimal? DamageFineAmount { get; init; }
     public IReadOnlyCollection<BookingCompletionTicketPhotoData> CompletionPhotos { get; init; } = [];
+}
+
+public sealed record PartnerBookingCancellationTicketData : TicketData
+{
+    public int BookingId { get; init; }
+    public Guid RelatedPartnerUserId { get; init; }
+    public string CarBrand { get; init; } = string.Empty;
+    public string CarModel { get; init; } = string.Empty;
+    public string BookingStatus { get; init; } = string.Empty;
+    public DateTimeOffset BookingStartTime { get; init; }
+    public DateTimeOffset BookingEndTime { get; init; }
+    public string PartnerReason { get; init; } = string.Empty;
 }
 
 public sealed record BookingCompletionTicketPhotoData

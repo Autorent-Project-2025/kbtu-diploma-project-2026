@@ -12,4 +12,7 @@ public sealed class PartnerResponseDto
     public DateOnly PartnershipEndDate { get; set; }
     public string RelatedUserId { get; set; } = string.Empty;
     public string PhoneNumber { get; set; } = string.Empty;
+    public bool IsActive { get; set; } = true;
+    public DateTime? DeactivatedAt { get; set; }
+    public string? DeactivationReason { get; set; }
 }

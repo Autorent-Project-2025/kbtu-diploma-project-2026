@@ -10,4 +10,6 @@ public interface IPartnerService
     Task<PartnerResponseDto> CreateAsync(PartnerCreateDto dto, CancellationToken cancellationToken = default);
     Task<PartnerResponseDto?> UpdateAsync(int id, PartnerUpdateDto dto, CancellationToken cancellationToken = default);
     Task<bool> DeleteAsync(int id, CancellationToken cancellationToken = default);
+    Task<PartnerResponseDto?> DeactivateAsync(int id, string reason, CancellationToken cancellationToken = default);
+    Task<PartnerResponseDto?> ActivateAsync(int id, CancellationToken cancellationToken = default);
 }

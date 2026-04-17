@@ -23,5 +23,6 @@ namespace CarService.Application.Interfaces
         Task<IReadOnlyCollection<AvailableCarModelDto>> GetAvailableModelsAsync(CancellationToken cancellationToken = default);
         Task<MatchPartnerCarResponseDto> MatchPartnerCarAsync(MatchPartnerCarRequestDto dto, CancellationToken cancellationToken = default);
         Task RecalculateRatingAsync(int partnerCarId, CancellationToken cancellationToken = default);
+        Task<int> SetPartnerCarsActiveAsync(Guid partnerUserId, bool isActive, CancellationToken cancellationToken = default);
     }
 }

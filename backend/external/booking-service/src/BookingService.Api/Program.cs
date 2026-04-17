@@ -1,4 +1,5 @@
 using AutoRent.Messaging.RabbitMq;
+using BookingService.Api.Messaging;
 using BookingService.Api.Middleware;
 using BookingService.Api.Options;
 using BookingService.Application.Constants;
@@ -250,6 +251,21 @@ builder.Services.AddHttpClient<IBookingCompletionTicketClient, BookingCompletion
 })
 .AddHttpMessageHandler<ObservabilityHttpClientHandler>()
 .AddConfiguredResilience(httpClientResilienceOptions);
+builder.Services.AddHttpClient<IPartnerBookingCancellationTicketClient, PartnerBookingCancellationTicketClient>((serviceProvider, client) =>
+{
+    var options = serviceProvider
+        .GetRequiredService<Microsoft.Extensions.Options.IOptions<TicketServiceOptions>>()
+        .Value;
+
+    if (!string.IsNullOrWhiteSpace(options.BaseUrl))
+    {
+        client.BaseAddress = new Uri(options.BaseUrl, UriKind.Absolute);
+    }
+
+    client.Timeout = Timeout.InfiniteTimeSpan;
+})
+.AddHttpMessageHandler<ObservabilityHttpClientHandler>()
+.AddConfiguredResilience(httpClientResilienceOptions);
 builder.Services.AddHttpClient<IBookingEmailClient, BookingEmailClient>((serviceProvider, client) =>
 {
     var options = serviceProvider
@@ -271,6 +287,7 @@ builder.Services.AddSingleton<IRabbitMqPublisher, RabbitMqPublisher>();
 builder.Services.AddHostedService<PaymentSyncOutboxDispatcher>();
 builder.Services.AddHostedService<PendingBookingExpirationDispatcher>();
 builder.Services.AddHostedService<UnstartedBookingExpirationDispatcher>();
+builder.Services.AddHostedService<UserDeletedConsumer>();
 
 var app = builder.Build();
 

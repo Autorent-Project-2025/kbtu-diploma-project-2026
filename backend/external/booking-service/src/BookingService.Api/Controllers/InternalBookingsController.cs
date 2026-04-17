@@ -7,6 +7,7 @@ using BookingService.Api.Contracts.Internal;
 using BookingService.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.Extensions.Options;
 
 namespace BookingService.Api.Controllers;
@@ -122,20 +123,37 @@ public sealed class InternalBookingsController : ControllerBase
 
     [AllowAnonymous]
     [HttpPost("{id:int}/cancel")]
-    public async Task<IActionResult> CancelBooking(int id, CancellationToken cancellationToken)
+    public async Task<IActionResult> CancelBooking(
+        int id,
+        [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] Contracts.Booking.CancelBookingRequest? request,
+        CancellationToken cancellationToken)
     {
         if (!IsAuthorizedInternalRequest())
         {
             return Unauthorized(new { error = "Internal API key is invalid." });
         }
 
-        var result = await _bookingService.CancelBookingByAdmin(id, cancellationToken);
+        var result = await _bookingService.CancelBookingByAdmin(id, request?.Reason, cancellationToken);
         if (!result)
         {
             return NotFound(new { error = "Booking not found or cannot be canceled." });
         }
 
         return Ok(new CommonResponseDto { Message = "Booking canceled." });
+    }
+
+    [AllowAnonymous]
+    [HttpPost("by-user/{userId:guid}/cancel-all")]
+    public async Task<IActionResult> CancelAllByUser(
+        Guid userId,
+        [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] Contracts.Booking.CancelBookingRequest? request,
+        CancellationToken cancellationToken)
+    {
+        if (!IsAuthorizedInternalRequest())
+            return Unauthorized(new { error = "Internal API key is invalid." });
+
+        var count = await _bookingService.CancelActiveBookingsByUserAsync(userId, request?.Reason, cancellationToken);
+        return Ok(new { canceledCount = count });
     }
 
     [AllowAnonymous]
@@ -184,6 +202,48 @@ public sealed class InternalBookingsController : ControllerBase
             cancellationToken);
 
         return Ok(new CommonResponseDto { Message = "Booking completion fine issued." });
+    }
+
+    [AllowAnonymous]
+    [HttpPost("{id:int}/partner-cancellation/approve")]
+    public async Task<IActionResult> ApprovePartnerCancellation(
+        int id,
+        [FromBody] ApprovePartnerBookingCancellationRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!IsAuthorizedInternalRequest())
+        {
+            return Unauthorized(new { error = "Internal API key is invalid." });
+        }
+
+        await _bookingService.ProcessPartnerCancellationApproved(
+            id,
+            request.TicketId,
+            request.PartnerReason,
+            cancellationToken);
+
+        return Ok(new CommonResponseDto { Message = "Partner cancellation request approved." });
+    }
+
+    [AllowAnonymous]
+    [HttpPost("{id:int}/partner-cancellation/reject")]
+    public async Task<IActionResult> RejectPartnerCancellation(
+        int id,
+        [FromBody] RejectPartnerBookingCancellationRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!IsAuthorizedInternalRequest())
+        {
+            return Unauthorized(new { error = "Internal API key is invalid." });
+        }
+
+        await _bookingService.ProcessPartnerCancellationRejected(
+            id,
+            request.TicketId,
+            request.DecisionReason,
+            cancellationToken);
+
+        return Ok(new CommonResponseDto { Message = "Partner cancellation request rejected." });
     }
 
     private static IReadOnlyCollection<int> ParseIds(string? raw)

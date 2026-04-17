@@ -284,6 +284,59 @@
               </div>
             </section>
 
+            <section
+              v-if="isPartnerBookingCancellationTicket(selectedTicket)"
+              class="rounded-2xl border border-rose-100 dark:border-rose-900/40 p-5 space-y-4"
+            >
+              <div>
+                <h3
+                  class="text-sm font-bold uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400"
+                >
+                  Запрос на отмену бронирования
+                </h3>
+                <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                  Одобрение этого тикета отправит команду на отмену брони в booking-service.
+                </p>
+              </div>
+
+              <dl class="grid sm:grid-cols-2 gap-4">
+                <div class="rounded-2xl border border-gray-100 dark:border-gray-800 p-4">
+                  <dt class="text-xs font-bold uppercase tracking-[0.1em] text-gray-500 dark:text-gray-400">
+                    Бронирование
+                  </dt>
+                  <dd class="mt-2 text-lg font-bold text-gray-900 dark:text-white">
+                    #{{ selectedTicket.bookingId }}
+                  </dd>
+                  <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                    {{ selectedTicket.carBrand }} {{ selectedTicket.carModel }}
+                  </p>
+                </div>
+
+                <div class="rounded-2xl border border-gray-100 dark:border-gray-800 p-4">
+                  <dt class="text-xs font-bold uppercase tracking-[0.1em] text-gray-500 dark:text-gray-400">
+                    Статус на момент запроса
+                  </dt>
+                  <dd class="mt-2 text-lg font-bold text-gray-900 dark:text-white">
+                    {{ partnerBookingStatusLabel(partnerBookingCancellationData?.bookingStatus) }}
+                  </dd>
+                  <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                    {{ formatDateTime(partnerBookingCancellationData?.bookingStartTime || "") }}
+                    -
+                    {{ formatDateTime(partnerBookingCancellationData?.bookingEndTime || "") }}
+                  </p>
+                </div>
+              </dl>
+
+              <div class="rounded-2xl border border-rose-200 dark:border-rose-500/30 bg-rose-50/70 dark:bg-rose-500/10 p-4">
+                <p class="text-xs font-bold uppercase tracking-[0.14em] text-rose-700 dark:text-rose-300">
+                  Причина партнёра
+                </p>
+                <p class="mt-3 text-sm leading-6 text-gray-700 dark:text-gray-200 whitespace-pre-line">
+                  {{ partnerBookingCancellationData?.partnerReason }}
+                </p>
+              </div>
+            </section>
+
             <!-- Documents -->
             <section
               class="rounded-2xl border border-gray-100 dark:border-gray-800 p-5 space-y-4"
@@ -563,14 +616,26 @@
                   :disabled="actionLoading"
                   class="w-full px-5 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed text-white font-bold shadow-lg shadow-emerald-500/20 transition-colors"
                 >
-                  {{ actionLoading ? "Обработка..." : "✓ Одобрить" }}
+                  {{
+                    actionLoading
+                      ? "Обработка..."
+                      : isPartnerBookingCancellationTicket(selectedTicket)
+                        ? "✓ Одобрить отмену"
+                        : "✓ Одобрить"
+                  }}
                 </button>
                 <button
                   @click="rejectSelected"
                   :disabled="actionLoading"
                   class="w-full px-5 py-3 rounded-2xl border border-red-300 dark:border-red-700 text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-60 disabled:cursor-not-allowed font-bold transition-colors"
                 >
-                  {{ actionLoading ? "Обработка..." : "✕ Отклонить" }}
+                  {{
+                    actionLoading
+                      ? "Обработка..."
+                      : isPartnerBookingCancellationTicket(selectedTicket)
+                        ? "✕ Отклонить запрос"
+                        : "✕ Отклонить"
+                  }}
                 </button>
               </div>
             </div>
@@ -596,6 +661,7 @@ import { useToast } from "../composables/useToast";
 import type {
   BookingCompletionTicketData,
   BookingCompletionTicketPhotoData,
+  PartnerBookingCancellationTicketData,
   PartnerCarTicketData,
   PartnerCarTicketImageData,
   Ticket,
@@ -687,6 +753,27 @@ const completionTicketPhotos = computed<BookingCompletionTicketPhotoData[]>(
   },
 );
 
+const partnerBookingCancellationData =
+  computed<PartnerBookingCancellationTicketData | null>(() => {
+    if (
+      !selectedTicket.value ||
+      !isPartnerBookingCancellationTicket(selectedTicket.value)
+    ) {
+      return null;
+    }
+
+    const data = selectedTicket.value.data;
+    if (
+      data &&
+      (data as PartnerBookingCancellationTicketData).$type ===
+        "partner-booking-cancellation"
+    ) {
+      return data as PartnerBookingCancellationTicketData;
+    }
+
+    return null;
+  });
+
 const ticketStats = computed(() => {
   let client = 0,
     partner = 0,
@@ -769,6 +856,18 @@ const summaryRows = computed(() => {
         : "Не назначен",
     });
   }
+  if (isPartnerBookingCancellationTicket(selectedTicket.value)) {
+    rows.push({
+      label: "Бронирование",
+      value: `#${selectedTicket.value.bookingId ?? "?"}`,
+    });
+    rows.push({
+      label: "Статус брони",
+      value: partnerBookingStatusLabel(
+        partnerBookingCancellationData.value?.bookingStatus,
+      ),
+    });
+  }
   return rows;
 });
 
@@ -792,6 +891,7 @@ function ticketTypeLabel(ticketType: number) {
   if (ticketType === 2) return "Партнёр";
   if (ticketType === 3) return "Авто партнёра";
   if (ticketType === 4) return "Завершение поездки";
+  if (ticketType === 5) return "Отмена бронирования";
   return "Клиент";
 }
 
@@ -802,6 +902,8 @@ function getTicketTypeBadgeClass(ticketType: number) {
     return "bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-300";
   if (ticketType === 4)
     return "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300";
+  if (ticketType === 5)
+    return "bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-300";
   return "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300";
 }
 
@@ -816,6 +918,9 @@ function isPartnerCarTicket(ticket: Ticket) {
 }
 function isBookingCompletionTicket(ticket: Ticket | null | undefined) {
   return ticket?.ticketType === 4;
+}
+function isPartnerBookingCancellationTicket(ticket: Ticket | null | undefined) {
+  return ticket?.ticketType === 5;
 }
 
 function completionPhotoLabel(slot: string) {
@@ -834,6 +939,17 @@ function partnerCarImageTypeLabel(imageType?: string | null, index?: number) {
   if (imageType === "interior") return "Фото салона";
   if (imageType === "general") return "Общий вид";
   return `Фото ${(index ?? 0) + 1}`;
+}
+
+function partnerBookingStatusLabel(status?: string | null) {
+  const normalized = (status ?? "").trim().toLowerCase();
+  if (normalized === "pending") return "Ожидает оплаты";
+  if (normalized === "confirmed") return "Подтверждено";
+  if (normalized === "active") return "Активно";
+  if (normalized === "awaitingreview") return "Ожидает проверки";
+  if (normalized === "completed") return "Завершено";
+  if (normalized === "canceled") return "Отменено";
+  return status || "Неизвестно";
 }
 
 function syncPartnerCarForm(ticket: Ticket | null) {

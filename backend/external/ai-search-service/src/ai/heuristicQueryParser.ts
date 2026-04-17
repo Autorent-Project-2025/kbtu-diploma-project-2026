@@ -1,6 +1,7 @@
 import { ParsedRecommendationQuery } from "../types";
 import {
-  BRAND_DICTIONARY,
+  getBrandDictionary,
+  getModelToBrandDictionary,
   STYLE_DICTIONARY,
   TRANSMISSION_DICTIONARY,
 } from "../queryTaxonomy";
@@ -333,7 +334,21 @@ function parseTransmission(prompt: string): string | null {
 
 function parsePreferredBrands(prompt: string): string[] {
   const normalized = normalizePrompt(prompt);
-  return BRAND_DICTIONARY.filter((brand) => normalized.includes(brand));
+  const brands = new Set<string>();
+
+  for (const brand of getBrandDictionary()) {
+    if (normalized.includes(brand)) {
+      brands.add(brand);
+    }
+  }
+
+  for (const [model, brand] of Object.entries(getModelToBrandDictionary())) {
+    if (normalized.includes(model)) {
+      brands.add(brand);
+    }
+  }
+
+  return [...brands];
 }
 
 export function parseQueryHeuristically(prompt: string): ParsedRecommendationQuery {

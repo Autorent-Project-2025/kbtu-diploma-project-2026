@@ -5,5 +5,6 @@ public enum TicketType
     Client = 1,
     Partner = 2,
     PartnerCar = 3,
-    BookingCompletion = 4
+    BookingCompletion = 4,
+    PartnerBookingCancellation = 5
 }

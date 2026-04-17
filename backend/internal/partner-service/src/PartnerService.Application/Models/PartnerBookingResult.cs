@@ -12,4 +12,6 @@ public sealed record PartnerBookingResult(
     decimal? PriceHour,
     decimal? TotalPrice,
     DateTimeOffset CreatedAt,
-    string? Status);
+    string? Status,
+    Guid? PartnerCancellationTicketId = null,
+    DateTimeOffset? PartnerCancellationRequestedAt = null);

@@ -37,6 +37,12 @@ namespace BookingService.Infrastructure.Persistence.Configurations
             builder.Property(b => b.CoverImageUrl)
                 .HasMaxLength(2048);
 
+            builder.Property(b => b.CancellationActor)
+                .HasMaxLength(32);
+
+            builder.Property(b => b.CancellationReason)
+                .HasMaxLength(2000);
+
             builder.Ignore(b => b.PricingBreakdown);
             builder.Ignore(b => b.ImageUrls);
 

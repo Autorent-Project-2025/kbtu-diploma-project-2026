@@ -4,6 +4,7 @@ import { isPartnerCarAvailableOnDates } from "../integrations/catalogClient";
 import { ParsedRecommendationQuery, SearchCandidate } from "../types";
 import { rerankCarsWithLlm } from "./llmReranker";
 import { hasExplicitPreferredStyleIntent } from "../ai/heuristicQueryParser";
+import { getModelToBrandDictionary } from "../queryTaxonomy";
 
 type RawSearchRow = {
   partnerCarId: number;
@@ -157,8 +158,19 @@ function computeBusinessScore(row: RankedSearchRow, query: ParsedRecommendationQ
 }
 
 function buildRetrievalPrompt(prompt: string, query: ParsedRecommendationQuery): string {
+  // Enrich with model→brand expansions so embeddings match car documents better.
+  // E.g. "cobalt" in prompt → add "chevrolet cobalt" for vector similarity.
+  const modelExpansions: string[] = [];
+  const normalizedPrompt = prompt.toLowerCase();
+  for (const [model, brand] of Object.entries(getModelToBrandDictionary())) {
+    if (normalizedPrompt.includes(model)) {
+      modelExpansions.push(`${brand} ${model}`);
+    }
+  }
+
   const parts = [
     prompt.trim(),
+    ...modelExpansions,
     ...query.preferredStyles,
     ...query.preferredBrands,
     query.transmission,

@@ -49,4 +49,6 @@ export interface PartnerBooking {
   totalPrice?: number | null;
   createdAt: string;
   status: BookingStatus;
+  partnerCancellationTicketId?: string | null;
+  partnerCancellationRequestedAt?: string | null;
 }
