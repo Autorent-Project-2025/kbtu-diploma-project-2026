@@ -65,7 +65,7 @@ export const config = {
     process.env.AUTO_REFRESH_INTERVAL_SECONDS,
     900,
   ),
-  embeddingDimensions: 128,
+  embeddingDimensions: 1024,
   localLlmBaseUrl: process.env.LOCAL_LLM_BASE_URL?.trim() || null,
   localLlmChatModel: required("LOCAL_LLM_CHAT_MODEL", "qwen2.5:1.5b"),
   localLlmEmbeddingModel: required(

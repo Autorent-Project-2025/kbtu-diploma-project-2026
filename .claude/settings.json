@@ -37,7 +37,10 @@
       "Bash(node dist/tests/llmRecommendations.test.js)",
       "Bash(curl -s http://localhost:9186/ai/recommendations -H \"Content-Type: application/json\" -d '{\"prompt\": \"I need supra\"}')",
       "Bash(npm install *)",
-      "Bash(curl -s -w \"\\\\nTime: %{time_total}s\\\\n\" http://localhost:9186/ai/recommendations -H \"Content-Type: application/json\" -d '{\"prompt\": \"нужна камри\"}')"
+      "Bash(curl -s -w \"\\\\nTime: %{time_total}s\\\\n\" http://localhost:9186/ai/recommendations -H \"Content-Type: application/json\" -d '{\"prompt\": \"нужна камри\"}')",
+      "Bash(curl -s http://localhost:9186/ai/recommendations -H \"Content-Type: application/json\" -d '{\"prompt\": \"нужна камри\"}')",
+      "Bash(python generate_dataset.py --output dataset.jsonl)",
+      "Bash(curl -s -X POST http://localhost:9186/ai/internal/reindex)"
     ]
   }
 }

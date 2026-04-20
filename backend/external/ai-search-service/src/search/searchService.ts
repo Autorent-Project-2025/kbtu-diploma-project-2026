@@ -4,7 +4,11 @@ import { isPartnerCarAvailableOnDates } from "../integrations/catalogClient";
 import { ParsedRecommendationQuery, SearchCandidate } from "../types";
 import { rerankCarsWithLlm } from "./llmReranker";
 import { hasExplicitPreferredStyleIntent } from "../ai/heuristicQueryParser";
-import { getModelToBrandDictionary } from "../queryTaxonomy";
+import {
+  getAliasToCanonicalBrand,
+  getAliasToCanonicalModel,
+  getModelToBrandDictionary,
+} from "../queryTaxonomy";
 
 type RawSearchRow = {
   partnerCarId: number;
@@ -157,20 +161,83 @@ function computeBusinessScore(row: RankedSearchRow, query: ParsedRecommendationQ
   return Math.min(score, 1);
 }
 
-export function buildBaseRetrievalPrompt(prompt: string): string {
-  // Prompt form that does not depend on LLM-parsed query. Safe to compute
-  // in parallel with the LLM parser. Uses only the raw user text plus
-  // static model→brand expansions (e.g. "cobalt" → "chevrolet cobalt").
-  const modelExpansions: string[] = [];
+function computeQueryExpansions(prompt: string): string[] {
+  const expansions: string[] = [];
   const normalizedPrompt = prompt.toLowerCase();
-  for (const [model, brand] of Object.entries(getModelToBrandDictionary())) {
-    if (normalizedPrompt.includes(model)) {
-      modelExpansions.push(`${brand} ${model}`);
+
+  const aliasToModel = getAliasToCanonicalModel();
+  for (const [alias, canonicalModel] of Object.entries(aliasToModel)) {
+    if (normalizedPrompt.includes(alias)) {
+      const brand = getModelToBrandDictionary()[alias];
+      if (brand) {
+        expansions.push(`${brand} ${canonicalModel}`);
+      } else {
+        expansions.push(canonicalModel);
+      }
     }
   }
 
-  const parts = [prompt.trim(), ...modelExpansions].filter((p) => p && p.trim());
+  const aliasToBrand = getAliasToCanonicalBrand();
+  for (const [alias, canonicalBrand] of Object.entries(aliasToBrand)) {
+    if (!(alias in aliasToModel) && normalizedPrompt.includes(alias)) {
+      expansions.push(canonicalBrand);
+    }
+  }
+
+  for (const [model, brand] of Object.entries(getModelToBrandDictionary())) {
+    if (model in aliasToModel) continue;
+    if (normalizedPrompt.includes(model)) {
+      expansions.push(`${brand} ${model}`);
+    }
+  }
+
+  return expansions;
+}
+
+export function buildBaseRetrievalPrompt(prompt: string): string {
+  // Embedding-facing retrieval prompt: raw user text plus alias/model
+  // expansions so cyrillic queries ("нужна камри") also match english
+  // documents ("toyota camry"). Used for the vector channel of hybrid search.
+  const expansions = computeQueryExpansions(prompt);
+  const parts = [prompt.trim(), ...expansions].filter((p) => p && p.trim());
   return parts.join(" ").trim() || "car";
+}
+
+function buildLexicalQueryTokens(prompt: string, query: ParsedRecommendationQuery): string[] {
+  // BM25-facing tokens: a distilled set of high-signal terms. Strips the
+  // user's filler words (articles, verbs) that torpedo AND-based
+  // websearch_to_tsquery recall. We feed this to to_tsquery with OR
+  // semantics so any single matching token still activates the lexical
+  // channel of hybrid search.
+  const tokens = new Set<string>();
+
+  for (const expansion of computeQueryExpansions(prompt)) {
+    for (const word of expansion.split(/\s+/)) {
+      const clean = word.trim().toLowerCase();
+      if (clean && /^[\p{L}\p{N}]+$/u.test(clean)) tokens.add(clean);
+    }
+  }
+
+  for (const brand of query.preferredBrands) {
+    const clean = brand.trim().toLowerCase();
+    if (clean) tokens.add(clean);
+  }
+  for (const style of query.preferredStyles) {
+    const clean = style.trim().toLowerCase();
+    if (clean) tokens.add(clean);
+  }
+  if (query.transmission) {
+    tokens.add(query.transmission.toLowerCase());
+  }
+
+  // As a safety net — if no expansions/filters matched, fall back to the
+  // longest alphabetic tokens from the raw prompt so lexical isn't empty.
+  if (tokens.size === 0) {
+    const words = prompt.toLowerCase().match(/[\p{L}\p{N}]{3,}/gu) ?? [];
+    for (const w of words.slice(0, 5)) tokens.add(w);
+  }
+
+  return [...tokens];
 }
 
 function buildRetrievalPrompt(prompt: string, query: ParsedRecommendationQuery): string {
@@ -191,34 +258,49 @@ function buildRetrievalPrompt(prompt: string, query: ParsedRecommendationQuery):
 }
 
 async function fetchCandidates(
-  retrievalPrompt: string,
+  prompt: string,
   embedding: number[],
   query: ParsedRecommendationQuery,
 ): Promise<RawSearchRow[]> {
-  const lexicalQuery = retrievalPrompt.trim() || "car";
+  const lexicalTokens = buildLexicalQueryTokens(prompt, query);
+  // to_tsquery('simple', 'toyota | camry | sedan') — OR semantics so any
+  // of the high-signal tokens activates the lexical channel.
+  const lexicalQuery = lexicalTokens.length > 0 ? lexicalTokens.join(" | ") : "car";
+  const vectorLiteral = toVectorLiteral(embedding);
+  const brandsArray = sql.array(query.preferredBrands, 25);
+  const RRF_K = 60;
+  const CANDIDATE_POOL = 60;
+  const FINAL_LIMIT = 24;
+
+  // Hybrid search via Reciprocal Rank Fusion: each document receives
+  // rank-based scores from both the vector neighborhood (by cosine distance)
+  // and the BM25-style lexical match (ts_rank_cd). Fused score is
+  // sum(1 / (k + rank)). This is resilient to weak signals on either side —
+  // a document that ranks well in lexical-only ("cobalt" exact token match)
+  // survives even when the embedding is noisy, and vice versa.
   const rows = await sql<RawSearchRow[]>`
-    with ranked_documents as (
+    with filtered as (
       select
-        partner_car_id as "partnerCarId",
-        car_model_id as "carModelId",
+        partner_car_id,
+        car_model_id,
         brand,
         model,
         year,
         title,
-        image_url as "imageUrl",
-        details_url as "detailsUrl",
-        booking_url as "bookingUrl",
-        price_hour as "priceHour",
-        price_day as "priceDay",
+        image_url,
+        details_url,
+        booking_url,
+        price_hour,
+        price_day,
         rating,
-        ratings_count as "ratingsCount",
-        carrier_name as "carrierName",
-        array(select jsonb_array_elements_text(tags)) as tags,
-        searchable_text as "searchableText",
+        ratings_count,
+        carrier_name,
+        tags,
+        searchable_text,
         transmission,
         seats,
-        (vector_embedding <=> ${toVectorLiteral(embedding)}::vector) as "vectorDistance",
-        ts_rank_cd(lexical_document, websearch_to_tsquery('simple', ${lexicalQuery})) as "lexicalScore"
+        vector_embedding,
+        lexical_document
       from ai_car_documents
       where (${query.maxBudgetPerHour ?? null}::numeric is null or price_hour is null or price_hour <= ${query.maxBudgetPerHour ?? null} * 1.25)
         and (${query.passengers ?? null}::int is null or seats is null or seats >= ${query.passengers ?? null})
@@ -227,16 +309,74 @@ async function fetchCandidates(
         and (${query.transmission ?? null}::text is null or lower(coalesce(transmission, '')) = ${query.transmission ?? null})
         and (${query.minRating ?? null}::numeric is null or (rating is not null and rating >= ${query.minRating ?? null}))
         and (
-          cardinality(${sql.array(query.preferredBrands, 25)}) = 0
-          or lower(brand) = any(${sql.array(query.preferredBrands, 25)})
+          cardinality(${brandsArray}) = 0
+          or lower(brand) = any(${brandsArray})
         )
-      order by
-        (vector_embedding <=> ${toVectorLiteral(embedding)}::vector) asc,
-        ts_rank_cd(lexical_document, websearch_to_tsquery('simple', ${lexicalQuery})) desc
-      limit 24
+    ),
+    vector_ranked as (
+      select
+        partner_car_id,
+        (vector_embedding <=> ${vectorLiteral}::vector) as vector_distance,
+        row_number() over (order by vector_embedding <=> ${vectorLiteral}::vector) as vec_rank
+      from filtered
+      order by vector_embedding <=> ${vectorLiteral}::vector
+      limit ${CANDIDATE_POOL}
+    ),
+    lexical_ranked as (
+      select
+        partner_car_id,
+        ts_rank_cd(lexical_document, to_tsquery('simple', ${lexicalQuery})) as lexical_score,
+        row_number() over (order by ts_rank_cd(lexical_document, to_tsquery('simple', ${lexicalQuery})) desc) as lex_rank
+      from filtered
+      where lexical_document @@ to_tsquery('simple', ${lexicalQuery})
+      order by ts_rank_cd(lexical_document, to_tsquery('simple', ${lexicalQuery})) desc
+      limit ${CANDIDATE_POOL}
+    ),
+    fused as (
+      select
+        partner_car_id,
+        sum(score) as rrf_score,
+        max(vector_distance) as vector_distance,
+        max(lexical_score) as lexical_score
+      from (
+        -- Vector channel (weight 0.4): semantic similarity.
+        select partner_car_id, 0.4 / (${RRF_K} + vec_rank) as score, vector_distance, null::real as lexical_score
+        from vector_ranked
+        union all
+        -- Lexical channel (weight 0.6): exact/stem token match. Weighted
+        -- higher because named-entity queries ("camry", "cobalt") are
+        -- discriminated far better by BM25 than by weak multilingual
+        -- embeddings that tend to blur siblings of the same brand.
+        select partner_car_id, 0.6 / (${RRF_K} + lex_rank) as score, null::float8 as vector_distance, lexical_score
+        from lexical_ranked
+      ) ranks
+      group by partner_car_id
     )
-    select *
-    from ranked_documents
+    select
+      f.partner_car_id as "partnerCarId",
+      f.car_model_id as "carModelId",
+      f.brand,
+      f.model,
+      f.year,
+      f.title,
+      f.image_url as "imageUrl",
+      f.details_url as "detailsUrl",
+      f.booking_url as "bookingUrl",
+      f.price_hour as "priceHour",
+      f.price_day as "priceDay",
+      f.rating,
+      f.ratings_count as "ratingsCount",
+      f.carrier_name as "carrierName",
+      array(select jsonb_array_elements_text(f.tags)) as tags,
+      f.searchable_text as "searchableText",
+      f.transmission,
+      f.seats,
+      fused.vector_distance as "vectorDistance",
+      coalesce(fused.lexical_score, 0) as "lexicalScore"
+    from fused
+    join filtered f on f.partner_car_id = fused.partner_car_id
+    order by fused.rrf_score desc
+    limit ${FINAL_LIMIT}
   `;
 
   return rows;
@@ -323,7 +463,7 @@ export async function searchCars(
 ): Promise<SearchCandidate[]> {
   const retrievalPrompt = buildRetrievalPrompt(prompt, query);
   const embedding = precomputedEmbedding ?? (await createEmbedding(retrievalPrompt));
-  const candidates = await fetchCandidates(retrievalPrompt, embedding, query);
+  const candidates = await fetchCandidates(prompt, embedding, query);
   const availableCandidates = await applyAvailabilityFilter(candidates, query);
   const styleFilteredCandidates = applyPreferredStyleFilter(availableCandidates, query);
   const excludedStyleFilteredCandidates = applyExcludedStyleFilter(styleFilteredCandidates, query);

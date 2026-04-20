@@ -183,18 +183,42 @@ function mergeWithConversationContext(
   };
 }
 
+// Defensive anti-hallucination guard. The small local LLM sometimes fills
+// in transmission/rating when the user never mentioned them (e.g. "нужна
+// камри" → transmission=manual). We only accept the LLM's value if the
+// raw prompt actually contains a related keyword.
+const TRANSMISSION_KEYWORDS = [
+  "автомат", "акпп", "автомате", "automatic", "auto",
+  "механик", "мкпп", "механике", "manual", "stick",
+  "коробк", "gearbox",
+];
+const RATING_KEYWORDS = [
+  "рейтинг", "ratings", "rating", "звёзд", "звезд", "stars", "оцен",
+];
+
+function promptMentionsAny(prompt: string, keywords: string[]): boolean {
+  const normalized = prompt.toLowerCase();
+  return keywords.some((kw) => normalized.includes(kw));
+}
+
 function reconcileWithHeuristics(
   modelQuery: ParsedRecommendationQuery,
   heuristicQuery: ParsedRecommendationQuery,
 ): ParsedRecommendationQuery {
   // LLM is the primary source — it understands context (e.g. "2020" is a year, not a price).
   // Heuristic only supplements for datetime parsing (ISO regex is more reliable than LLM).
+  const prompt = modelQuery.prompt;
+  const transmission =
+    heuristicQuery.transmission ??
+    (promptMentionsAny(prompt, TRANSMISSION_KEYWORDS) ? modelQuery.transmission : null);
+  const minRating =
+    promptMentionsAny(prompt, RATING_KEYWORDS) ? modelQuery.minRating : null;
   return {
     prompt: modelQuery.prompt,
     maxBudgetPerHour: modelQuery.maxBudgetPerHour,
     passengers: modelQuery.passengers,
-    transmission: modelQuery.transmission ?? heuristicQuery.transmission,
-    minRating: modelQuery.minRating,
+    transmission,
+    minRating,
     preferredStyles: unique([
       ...modelQuery.preferredStyles,
     ]).filter((style) => !modelQuery.excludedStyles.includes(style)),

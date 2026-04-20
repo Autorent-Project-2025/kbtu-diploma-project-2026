@@ -378,6 +378,159 @@ def gen_negative() -> list[dict]:
     return out
 
 
+# ---------------------------------------------------------------------------
+# 6. ANTI-HALLUCINATION — model/brand mentioned alone should NOT fill
+# transmission, year, budget or rating. This is the #1 source of real-world
+# errors ("нужна камри" incorrectly gets transmission=manual).
+# ---------------------------------------------------------------------------
+def gen_anti_hallucination(cars: list[Car]) -> list[dict]:
+    out = []
+    # Cyrillic aliases — use only brand name in response, no other filters.
+    cyrillic_models = [
+        ("камри", "toyota"), ("кобальт", "chevrolet"), ("супра", "toyota"),
+        ("королла", "toyota"), ("скайлайн", "nissan"), ("мазда", "mazda"),
+        ("ауди", "audi"), ("мерседес", "mercedes"), ("киа", "kia"),
+    ]
+    templates = [
+        "{m}", "нужна {m}", "есть {m}", "есть {m}?", "покажи {m}",
+        "хочу {m}", "ищу {m}", "а {m} есть?", "подбери {m}",
+        "есть у вас {m}", "{m} хочу", "дай {m}", "{m} плиз",
+        "{m} нужна", "можно {m}?", "{m} пожалуйста",
+        "привет, есть {m}?", "здравствуйте, {m} есть?",
+        "добрый день, нужна {m}", "хай, {m} есть в наличии?",
+    ]
+    for alias, brand in cyrillic_models:
+        for tmpl in templates:
+            q = tmpl.format(m=alias)
+            out.append(ex(q, resp(preferredBrands=[brand])))
+
+    # Latin model names alone — no year/transmission/budget inference.
+    seen_models = set()
+    for car in cars:
+        model_lower = car.model.lower()
+        if model_lower in seen_models:
+            continue
+        seen_models.add(model_lower)
+        brand_lower = car.brand.lower()
+        for tmpl in [
+            "{m}", "need {m}", "i need {m}", "want {m}", "show me {m}",
+            "есть {m}?", "{m} please", "any {m}?",
+            "привет, есть {m}?", "hi, do you have {m}?",
+        ]:
+            q = tmpl.format(m=model_lower)
+            out.append(ex(q, resp(preferredBrands=[brand_lower])))
+
+    # Brand-only mentions (no model).
+    for brand in ["toyota", "chevrolet", "audi", "mercedes", "bmw", "kia",
+                  "nissan", "mazda", "honda", "hyundai", "ford", "lexus"]:
+        for tmpl in [
+            "{b}", "нужен {b}", "есть {b}?", "хочу {b}",
+            "показать {b}", "подбери {b}", "{b} plz", "need {b}",
+        ]:
+            out.append(ex(tmpl.format(b=brand), resp(preferredBrands=[brand])))
+
+    return out
+
+
+# ---------------------------------------------------------------------------
+# 7. Colloquial & typo-ridden real queries
+# ---------------------------------------------------------------------------
+def gen_colloquial() -> list[dict]:
+    out = []
+    # Common typos/slang — brand/model intent should still extract.
+    typo_cases = [
+        ("хачу камри", resp(preferredBrands=["toyota"])),
+        ("хочю кобальт", resp(preferredBrands=["chevrolet"])),
+        ("нада тойоту", resp(preferredBrands=["toyota"])),
+        ("падгани kamry", resp(preferredBrands=["toyota"])),
+        ("камрик есть?", resp(preferredBrands=["toyota"])),
+        ("кобалт нужен", resp(preferredBrands=["chevrolet"])),
+        ("шеврик", resp(preferredBrands=["chevrolet"])),
+        ("мэрс есть?", resp(preferredBrands=["mercedes"])),
+        ("БМВ хочу", resp(preferredBrands=["bmw"])),
+        ("AUDI", resp(preferredBrands=["audi"])),
+        ("Toyota Camry", resp(preferredBrands=["toyota"])),
+        ("Chevrolet  Cobalt", resp(preferredBrands=["chevrolet"])),  # extra space
+    ]
+    for q, r in typo_cases:
+        out.append(ex(q, r))
+    return out
+
+
+# ---------------------------------------------------------------------------
+# 8. Conversational / superlative — must stay within schema
+# ---------------------------------------------------------------------------
+def gen_conversational() -> list[dict]:
+    out = []
+    # "Cheapest / most affordable" — no numeric budget, so leave null.
+    for q in ["самая дешёвая", "подешевле", "что подешевле есть?",
+              "самый бюджетный вариант", "cheapest", "affordable"]:
+        out.append(ex(q, resp()))
+
+    # "Cheap" as a style keyword — budget stays null (no concrete number).
+    for q in ["дешёвая машина", "бюджетная", "что-нибудь недорогое",
+              "cheap car", "inexpensive"]:
+        out.append(ex(q, resp()))
+
+    # Tenure phrases — must NOT leak into budget or year.
+    tenure = [
+        "на выходные", "на неделю", "на день", "на месяц", "на сутки",
+        "на час", "на 3 дня", "на 5 дней", "for a weekend", "for a day",
+    ]
+    for q in tenure:
+        out.append(ex(q, resp()))
+
+    # Combined: "камри на выходные" — only brand, NOT budget/time.
+    for alias, brand in [("камри", "toyota"), ("кобальт", "chevrolet"),
+                         ("супру", "toyota")]:
+        for phrase in ["на выходные", "на неделю", "на день"]:
+            out.append(ex(f"{alias} {phrase}", resp(preferredBrands=[brand])))
+
+    # Reassurance/clarification — empty.
+    for q in ["не знаю что", "что посоветуете?", "посоветуй",
+              "что-нибудь нормальное", "любую", "всё равно какую"]:
+        out.append(ex(q, resp()))
+
+    return out
+
+
+# ---------------------------------------------------------------------------
+# 9. Mixed-language and multi-query
+# ---------------------------------------------------------------------------
+def gen_mixed_language() -> list[dict]:
+    out = []
+    cases = [
+        ("нужна camry", resp(preferredBrands=["toyota"])),
+        ("I need камри", resp(preferredBrands=["toyota"])),
+        ("хочу Toyota Camry 2020+", resp(preferredBrands=["toyota"], minYear=2020)),
+        ("Chevrolet кобальт на автомате", resp(preferredBrands=["chevrolet"], transmission="automatic")),
+        ("mercedes с хорошим рейтингом", resp(preferredBrands=["mercedes"], minRating=4.0)),
+        ("luxury ауди до 10000", resp(preferredBrands=["audi"], preferredStyles=["luxury"], maxBudgetPerHour=10000)),
+        ("семейную toyota", resp(preferredBrands=["toyota"], preferredStyles=["family"])),
+    ]
+    for q, r in cases:
+        out.append(ex(q, r))
+    return out
+
+
+# ---------------------------------------------------------------------------
+# 10. Negation — "not X", "except X"
+# ---------------------------------------------------------------------------
+def gen_negation() -> list[dict]:
+    out = []
+    cases = [
+        ("не хочу спортивную", resp(excludedStyles=["sport"])),
+        ("без спорткаров", resp(excludedStyles=["sport"])),
+        ("кроме бизнес класса", resp(excludedStyles=["business"])),
+        ("any except luxury", resp(excludedStyles=["luxury"])),
+        ("не люкс", resp(excludedStyles=["luxury"])),
+        ("не семейную но спортивную", resp(preferredStyles=["sport"], excludedStyles=["family"])),
+    ]
+    for q, r in cases:
+        out.append(ex(q, r))
+    return out
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--db-url", default=None, help="PostgreSQL URL (requires psycopg2)")
@@ -398,6 +551,11 @@ def main():
         "other_filters": gen_other_filters(),
         "combined": gen_combined(),
         "negative": gen_negative(),
+        "anti_hallucination": gen_anti_hallucination(cars),
+        "colloquial": gen_colloquial(),
+        "conversational": gen_conversational(),
+        "mixed_language": gen_mixed_language(),
+        "negation": gen_negation(),
     }
 
     all_examples = []
@@ -405,7 +563,10 @@ def main():
         print(f"  {name}: {len(examples)} examples")
         all_examples.extend(examples)
 
-    # Duplicate critical sections for training balance
+    # Duplicate critical sections for training balance. Anti-hallucination
+    # is the most failure-prone skill, so 3x weight; year/negative 2x.
+    all_examples.extend(sections["anti_hallucination"])
+    all_examples.extend(sections["anti_hallucination"])
     all_examples.extend(sections["year"])
     all_examples.extend(sections["negative"])
     all_examples.extend(sections["transliteration"])

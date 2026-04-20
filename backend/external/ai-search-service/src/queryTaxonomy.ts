@@ -22,6 +22,12 @@ export const TRANSMISSION_DICTIONARY: Array<{ label: string; variants: string[] 
 // Dynamic dictionaries — loaded from DB at startup, zero hardcoded brands/models
 let _brands: string[] = [];
 let _modelToBrand: Record<string, string> = {};
+// Maps cyrillic/variant aliases back to their canonical english model token.
+// E.g. "камри" → "camry", "кобальт" → "cobalt". Used for query expansion
+// so that retrieval vocabulary matches the indexed documents.
+let _aliasToCanonicalModel: Record<string, string> = {};
+// Maps aliases back to their canonical english brand token. E.g. "тойота" → "toyota".
+let _aliasToCanonicalBrand: Record<string, string> = {};
 
 export function getBrandDictionary(): string[] {
   return _brands;
@@ -29,6 +35,14 @@ export function getBrandDictionary(): string[] {
 
 export function getModelToBrandDictionary(): Record<string, string> {
   return _modelToBrand;
+}
+
+export function getAliasToCanonicalModel(): Record<string, string> {
+  return _aliasToCanonicalModel;
+}
+
+export function getAliasToCanonicalBrand(): Record<string, string> {
+  return _aliasToCanonicalBrand;
 }
 
 export function getCatalogSummary(): string {
@@ -65,6 +79,8 @@ export async function loadTaxonomyFromDatabase(): Promise<void> {
 
   // 2. Aliases from brand_model_aliases table (cyrillic, abbreviations, etc.)
   //    Managed via SQL migration — no hardcoded aliases in code.
+  const aliasToModel: Record<string, string> = {};
+  const aliasToBrand: Record<string, string> = {};
   try {
     const aliasRows = await sql<{ alias: string; canonical_brand: string; canonical_model: string | null }[]>`
       select lower(alias) as alias, lower(canonical_brand) as canonical_brand,
@@ -77,12 +93,15 @@ export async function loadTaxonomyFromDatabase(): Promise<void> {
       const brand = row.canonical_brand.trim();
       if (!alias || !brand) continue;
 
-      // Alias for a brand (e.g. "тойота" → toyota)
-      brandSet.add(alias);
-
-      // Alias for a model (e.g. "кобальт" → chevrolet cobalt)
-      if (row.canonical_model?.trim()) {
+      const canonicalModel = row.canonical_model?.trim();
+      if (canonicalModel) {
+        // Alias for a model (e.g. "камри" → toyota camry)
         modelMap[alias] = brand;
+        aliasToModel[alias] = canonicalModel;
+      } else {
+        // Alias for a brand only (e.g. "тойота" → toyota)
+        brandSet.add(alias);
+        aliasToBrand[alias] = brand;
       }
     }
   } catch {
@@ -91,6 +110,8 @@ export async function loadTaxonomyFromDatabase(): Promise<void> {
 
   _brands = [...brandSet];
   _modelToBrand = modelMap;
+  _aliasToCanonicalModel = aliasToModel;
+  _aliasToCanonicalBrand = aliasToBrand;
 }
 
 export const STYLE_LABELS_TEXT = STYLE_DICTIONARY.map((item) => item.label).join(", ");
