@@ -1,3 +1,4 @@
+using System.Text.Json;
 using TicketService.Application.Exceptions;
 using TicketService.Application.Interfaces;
 using TicketService.Application.Models;
@@ -72,6 +73,11 @@ public sealed class CreateTicketCommandHandler
         {
             completionPhotos = await UploadBookingCompletionPhotosAsync(command, cancellationToken);
         }
+        BookingCompletionAiAssessmentData? aiAssessment = null;
+        if (command.TicketType == TicketType.BookingCompletion)
+        {
+            aiAssessment = ParseAiAssessment(command.DamageAssessmentJson);
+        }
         else if (command.TicketType == TicketType.PartnerBookingCancellation)
         {
             relatedPartnerUserId = command.RelatedPartnerUserId;
@@ -105,6 +111,7 @@ public sealed class CreateTicketCommandHandler
                 command.TripCompletedAt ?? default,
                 command.LatePenaltyAmount,
                 completionPhotos ?? [],
+                aiAssessment,
                 DateTime.UtcNow),
             TicketType.PartnerBookingCancellation => Ticket.CreatePartnerBookingCancellation(
                 Guid.NewGuid(),
@@ -556,6 +563,31 @@ public sealed class CreateTicketCommandHandler
         if (normalized is not "front" and not "back" and not "side" and not "interior" and not "general")
         {
             throw new ValidationException("Partner car image type must be one of: front, back, side, interior, general.");
+        }
+    }
+
+    private static readonly JsonSerializerOptions AiAssessmentJsonOptions = new(JsonSerializerDefaults.Web);
+
+    private static BookingCompletionAiAssessmentData? ParseAiAssessment(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return null;
+        }
+
+        try
+        {
+            // Booking-service is the authoritative shape-owner; we
+            // deserialise with PascalCase mapping via the Web defaults
+            // so both camelCase and PascalCase payloads parse.
+            return JsonSerializer.Deserialize<BookingCompletionAiAssessmentData>(json, AiAssessmentJsonOptions);
+        }
+        catch (JsonException)
+        {
+            // An invalid assessment should never block ticket creation —
+            // the manager can still decide without AI context. We choose
+            // to persist "no assessment" rather than reject.
+            return null;
         }
     }
 

@@ -105,6 +105,18 @@ def verify_attributes(
     expected_model: str,
     expected_color: str,
 ) -> tuple[bool, str, list[str]]:
+    """Validate that the uploaded photo shows the expected car.
+
+    The caller (booking-service) is the authoritative source for
+    car_model/car_color — it reads them from car-service snapshots. We
+    only verify that the photo is consistent with the *caller-supplied*
+    attributes (car is present, detected color roughly matches).
+
+    The optional local JSON registry is kept for dev smoke-tests; it is
+    disabled in production via the USE_REGISTRY_VALIDATION flag.
+    """
+    settings = get_settings()
+
     normalized_car_id = car_id.strip()
     if not normalized_car_id:
         return False, "Car ID is empty", ["car_id must not be blank"]
@@ -119,22 +131,28 @@ def verify_attributes(
     if not expected_color:
         return False, "Car color is empty", ["car_color must not be blank"]
 
-    registry = load_car_registry()
-    registry_entry = registry.get(normalized_car_id)
-    if not registry_entry:
-        return False, "Car is missing in registry", [f"register {normalized_car_id} in config/car_registry.json"]
-
-    registered_model = registry_entry.get("model", "")
-    if _normalize_text(registered_model) != _normalize_text(expected_model):
-        return False, "Car model mismatch", [f"registered model: {registered_model or 'unknown'}"]
-
-    inferred_color = infer_car_color(image, car_bbox)
     normalized_expected_color = _normalize_color(expected_color)
-    normalized_registered_color = _normalize_color(registry_entry.get("color", ""))
-    normalized_inferred_color = _normalize_color(inferred_color)
 
-    if normalized_registered_color and normalized_registered_color != normalized_expected_color:
-        return False, "Car color mismatch with registry", [f"registered color: {registry_entry['color']}"]
+    # Optional local registry cross-check — only in dev/smoke-test mode.
+    if settings.use_registry_validation:
+        registry = load_car_registry()
+        registry_entry = registry.get(normalized_car_id)
+        if not registry_entry:
+            return False, "Car is missing in registry", [f"register {normalized_car_id} in config/car_registry.json"]
+
+        registered_model = registry_entry.get("model", "")
+        if _normalize_text(registered_model) != _normalize_text(expected_model):
+            return False, "Car model mismatch", [f"registered model: {registered_model or 'unknown'}"]
+
+        normalized_registered_color = _normalize_color(registry_entry.get("color", ""))
+        if normalized_registered_color and normalized_registered_color != normalized_expected_color:
+            return False, "Car color mismatch with registry", [f"registered color: {registry_entry['color']}"]
+
+    # Image-level colour sanity check — compares caller-provided colour
+    # to what the model sees. This is the only check that runs in the
+    # production (non-registry) path.
+    inferred_color = infer_car_color(image, car_bbox)
+    normalized_inferred_color = _normalize_color(inferred_color)
 
     if normalized_inferred_color != normalized_expected_color:
         return False, "Car color mismatch", [f"detected color: {inferred_color}"]

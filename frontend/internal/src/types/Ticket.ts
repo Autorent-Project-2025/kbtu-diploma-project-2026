@@ -71,6 +71,36 @@ export interface BookingCompletionTicketData extends TicketDataBase {
   latePenaltyAmount?: number | null;
   damageFineAmount?: number | null;
   completionPhotos: BookingCompletionTicketPhotoData[];
+  aiAssessment?: BookingCompletionAiAssessment | null;
+}
+
+// Advisory output from the AI damage inspection service. The manager
+// uses this as one input among many when deciding whether to issue a
+// fine — it is never applied automatically.
+export interface BookingCompletionAiAssessment {
+  status: "ok" | "invalid_session" | "error" | "unavailable";
+  verdict?: "ok" | "damages_found" | "invalid_session" | null;
+  validPhotosCount: number;
+  processedAtUtc: string;
+  errorMessage?: string | null;
+  damages: BookingCompletionAiDamage[];
+  rejectedPhotos: BookingCompletionAiRejectedPhoto[];
+}
+
+export interface BookingCompletionAiDamage {
+  type: string;
+  confidence: number;
+  boundingBox: number[];
+  slot?: string | null;
+  sourceFile?: string | null;
+}
+
+export interface BookingCompletionAiRejectedPhoto {
+  slot?: string | null;
+  fileName: string;
+  step: number;
+  reason: string;
+  details: string[];
 }
 
 export interface PartnerBookingCancellationTicketData extends TicketDataBase {

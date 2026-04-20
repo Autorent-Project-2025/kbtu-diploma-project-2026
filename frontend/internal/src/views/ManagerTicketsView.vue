@@ -455,6 +455,123 @@
                 К заявке не прикреплены документы.
               </p>
 
+              <!-- AI damage assessment — advisory only. -->
+              <div
+                v-if="isBookingCompletionTicket(selectedTicket) && aiAssessment"
+                class="pt-4 border-t border-gray-100 dark:border-gray-800 space-y-3"
+              >
+                <div class="flex items-center justify-between gap-3">
+                  <h4
+                    class="text-xs font-bold uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400"
+                  >
+                    AI-оценка повреждений
+                  </h4>
+                  <span
+                    class="rounded-full px-3 py-1 text-xs font-bold uppercase tracking-[0.12em]"
+                    :class="{
+                      'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300':
+                        aiStatusBadge(aiAssessment.status).tone === 'ok',
+                      'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300':
+                        aiStatusBadge(aiAssessment.status).tone === 'warn',
+                      'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300':
+                        aiStatusBadge(aiAssessment.status).tone === 'error',
+                      'bg-gray-200 text-gray-600 dark:bg-gray-800 dark:text-gray-300':
+                        aiStatusBadge(aiAssessment.status).tone === 'muted',
+                    }"
+                  >
+                    {{ aiStatusBadge(aiAssessment.status).label }}
+                  </span>
+                </div>
+
+                <p class="text-sm text-gray-700 dark:text-gray-300">
+                  <span class="font-semibold">Вердикт:</span>
+                  {{ aiVerdictLabel(aiAssessment.verdict) }}
+                  <span class="text-gray-400 dark:text-gray-500">
+                    ·
+                    {{ aiAssessment.validPhotosCount }}/5 фото принято
+                  </span>
+                </p>
+
+                <p
+                  v-if="
+                    aiAssessment.status === 'unavailable' ||
+                    aiAssessment.status === 'error'
+                  "
+                  class="rounded-2xl bg-amber-50 dark:bg-amber-900/20 p-3 text-xs text-amber-700 dark:text-amber-300"
+                >
+                  AI-анализ не был выполнен, решение принимается вручную. Это
+                  не блокирует подтверждение завершения — используйте фотографии
+                  ниже и свой опыт.
+                  <span
+                    v-if="aiAssessment.errorMessage"
+                    class="block mt-1 text-amber-600/80 dark:text-amber-400/70"
+                  >
+                    Детали: {{ aiAssessment.errorMessage }}
+                  </span>
+                </p>
+
+                <div
+                  v-if="
+                    aiAssessment.damages && aiAssessment.damages.length > 0
+                  "
+                  class="space-y-2"
+                >
+                  <p class="text-xs font-bold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
+                    Найденные повреждения
+                  </p>
+                  <ul class="space-y-1">
+                    <li
+                      v-for="(damage, index) in aiAssessment.damages"
+                      :key="index"
+                      class="rounded-xl bg-red-50 dark:bg-red-900/20 px-3 py-2 text-xs"
+                    >
+                      <div class="flex items-center justify-between gap-2">
+                        <span class="font-semibold text-red-700 dark:text-red-300">
+                          {{ damage.type }}
+                        </span>
+                        <span class="text-red-600/70 dark:text-red-400/70">
+                          {{ formatConfidencePercent(damage.confidence) }}
+                        </span>
+                      </div>
+                      <p
+                        v-if="damage.slot"
+                        class="text-red-600/80 dark:text-red-400/80 mt-0.5"
+                      >
+                        Фото: {{ completionPhotoLabel(damage.slot) }}
+                      </p>
+                    </li>
+                  </ul>
+                </div>
+
+                <div
+                  v-if="
+                    aiAssessment.rejectedPhotos &&
+                    aiAssessment.rejectedPhotos.length > 0
+                  "
+                  class="space-y-2"
+                >
+                  <p class="text-xs font-bold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
+                    Отклонённые фото
+                  </p>
+                  <ul class="space-y-1">
+                    <li
+                      v-for="(rejected, index) in aiAssessment.rejectedPhotos"
+                      :key="index"
+                      class="rounded-xl bg-amber-50 dark:bg-amber-900/20 px-3 py-2 text-xs text-amber-700 dark:text-amber-300"
+                    >
+                      <span class="font-semibold">
+                        {{
+                          rejected.slot
+                            ? completionPhotoLabel(rejected.slot)
+                            : rejected.fileName
+                        }}:
+                      </span>
+                      {{ rejected.reason }}
+                    </li>
+                  </ul>
+                </div>
+              </div>
+
               <div
                 v-if="
                   isPartnerCarTicket(selectedTicket) &&
@@ -752,6 +869,51 @@ const completionTicketPhotos = computed<BookingCompletionTicketPhotoData[]>(
     return [];
   },
 );
+
+const aiAssessment = computed(() => {
+  if (
+    !selectedTicket.value ||
+    !isBookingCompletionTicket(selectedTicket.value)
+  ) {
+    return null;
+  }
+
+  const data = selectedTicket.value.data as BookingCompletionTicketData | undefined;
+  return data?.aiAssessment ?? null;
+});
+
+function aiVerdictLabel(verdict?: string | null): string {
+  switch (verdict) {
+    case "ok":
+      return "Повреждений не найдено";
+    case "damages_found":
+      return "AI нашёл повреждения";
+    case "invalid_session":
+      return "Сессия отклонена";
+    default:
+      return "Вердикт недоступен";
+  }
+}
+
+function aiStatusBadge(status?: string | null): { label: string; tone: "ok" | "warn" | "error" | "muted" } {
+  switch (status) {
+    case "ok":
+      return { label: "AI-анализ выполнен", tone: "ok" };
+    case "invalid_session":
+      return { label: "AI отклонил сессию", tone: "warn" };
+    case "error":
+      return { label: "Ошибка AI-анализа", tone: "error" };
+    case "unavailable":
+      return { label: "AI недоступен", tone: "muted" };
+    default:
+      return { label: "AI-анализ не выполнялся", tone: "muted" };
+  }
+}
+
+function formatConfidencePercent(confidence: number): string {
+  if (!Number.isFinite(confidence)) return "—";
+  return `${Math.round(confidence * 100)}%`;
+}
 
 const partnerBookingCancellationData =
   computed<PartnerBookingCancellationTicketData | null>(() => {

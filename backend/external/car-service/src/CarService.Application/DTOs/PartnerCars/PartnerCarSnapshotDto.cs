@@ -8,6 +8,7 @@ namespace CarService.Application.DTOs.PartnerCars
         public string CarModel { get; set; } = string.Empty;
         public int ModelYear { get; set; }
         public string? LicensePlate { get; set; }
+        public string? Color { get; set; }
         public decimal? PriceHour { get; set; }
         public decimal? Rating { get; set; }
         public string? CoverImageUrl { get; set; }

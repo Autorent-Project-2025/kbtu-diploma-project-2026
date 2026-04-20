@@ -31,6 +31,7 @@ builder.Services.Configure<ClientServiceOptions>(builder.Configuration.GetSectio
 builder.Services.Configure<IdentityServiceOptions>(builder.Configuration.GetSection(IdentityServiceOptions.SectionName));
 builder.Services.Configure<PartnerServiceOptions>(builder.Configuration.GetSection(PartnerServiceOptions.SectionName));
 builder.Services.Configure<TicketServiceOptions>(builder.Configuration.GetSection(TicketServiceOptions.SectionName));
+builder.Services.Configure<DamageEvalServiceOptions>(builder.Configuration.GetSection(DamageEvalServiceOptions.SectionName));
 builder.Services.Configure<EmailServiceOptions>(builder.Configuration.GetSection(EmailServiceOptions.SectionName));
 builder.Services.AddOptions<RabbitMqOptions>()
     .Bind(builder.Configuration.GetSection(RabbitMqOptions.SectionName))
@@ -251,6 +252,25 @@ builder.Services.AddHttpClient<IBookingCompletionTicketClient, BookingCompletion
 })
 .AddHttpMessageHandler<ObservabilityHttpClientHandler>()
 .AddConfiguredResilience(httpClientResilienceOptions);
+// Damage evaluation client talks to the internal AI inspection service.
+// We do NOT attach the standard resilience policy: that policy retries
+// on 5xx and network errors, but for this client we want a single
+// attempt and a short-ish timeout — if the AI is unavailable we fall
+// open and create the ticket without an assessment.
+builder.Services.AddHttpClient<IDamageEvaluationClient, DamageEvaluationClient>((serviceProvider, client) =>
+{
+    var options = serviceProvider
+        .GetRequiredService<Microsoft.Extensions.Options.IOptions<DamageEvalServiceOptions>>()
+        .Value;
+
+    if (!string.IsNullOrWhiteSpace(options.BaseUrl))
+    {
+        client.BaseAddress = new Uri(options.BaseUrl, UriKind.Absolute);
+    }
+
+    client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds > 0 ? options.TimeoutSeconds : 60);
+})
+.AddHttpMessageHandler<ObservabilityHttpClientHandler>();
 builder.Services.AddHttpClient<IPartnerBookingCancellationTicketClient, PartnerBookingCancellationTicketClient>((serviceProvider, client) =>
 {
     var options = serviceProvider

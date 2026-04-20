@@ -33,7 +33,18 @@ class Settings(BaseSettings):
 
     coco_weights_path: Path = Field(default=BASE_DIR / "weights" / "yolov8n.pt")
     damage_weights_path: Path = Field(default=BASE_DIR / "weights" / "yolov8m_damage_v1.pt")
+
+    # Static registry kept only for local development smoke-tests. In
+    # production the booking-service is authoritative — it passes
+    # car_model / car_color in the request and we validate against that,
+    # not against the JSON file.
     car_registry_path: Path = Field(default=BASE_DIR / "config" / "car_registry.json")
+    use_registry_validation: bool = False
+
+    # Shared-secret internal auth. Matches the X-Internal-Api-Key pattern
+    # used by the rest of the monorepo. When unset, auth is disabled
+    # (local development). Set in docker-compose env for real deployments.
+    internal_api_key: str | None = None
 
 
 @lru_cache(maxsize=1)
