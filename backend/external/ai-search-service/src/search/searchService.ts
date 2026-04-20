@@ -157,9 +157,10 @@ function computeBusinessScore(row: RankedSearchRow, query: ParsedRecommendationQ
   return Math.min(score, 1);
 }
 
-function buildRetrievalPrompt(prompt: string, query: ParsedRecommendationQuery): string {
-  // Enrich with model→brand expansions so embeddings match car documents better.
-  // E.g. "cobalt" in prompt → add "chevrolet cobalt" for vector similarity.
+export function buildBaseRetrievalPrompt(prompt: string): string {
+  // Prompt form that does not depend on LLM-parsed query. Safe to compute
+  // in parallel with the LLM parser. Uses only the raw user text plus
+  // static model→brand expansions (e.g. "cobalt" → "chevrolet cobalt").
   const modelExpansions: string[] = [];
   const normalizedPrompt = prompt.toLowerCase();
   for (const [model, brand] of Object.entries(getModelToBrandDictionary())) {
@@ -168,9 +169,13 @@ function buildRetrievalPrompt(prompt: string, query: ParsedRecommendationQuery):
     }
   }
 
+  const parts = [prompt.trim(), ...modelExpansions].filter((p) => p && p.trim());
+  return parts.join(" ").trim() || "car";
+}
+
+function buildRetrievalPrompt(prompt: string, query: ParsedRecommendationQuery): string {
   const parts = [
-    prompt.trim(),
-    ...modelExpansions,
+    buildBaseRetrievalPrompt(prompt),
     ...query.preferredStyles,
     ...query.preferredBrands,
     query.transmission,
@@ -314,9 +319,10 @@ function applyBudgetFilter(
 export async function searchCars(
   prompt: string,
   query: ParsedRecommendationQuery,
+  precomputedEmbedding?: number[] | null,
 ): Promise<SearchCandidate[]> {
   const retrievalPrompt = buildRetrievalPrompt(prompt, query);
-  const embedding = await createEmbedding(retrievalPrompt);
+  const embedding = precomputedEmbedding ?? (await createEmbedding(retrievalPrompt));
   const candidates = await fetchCandidates(retrievalPrompt, embedding, query);
   const availableCandidates = await applyAvailabilityFilter(candidates, query);
   const styleFilteredCandidates = applyPreferredStyleFilter(availableCandidates, query);

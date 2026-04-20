@@ -8,7 +8,9 @@ import { observabilityLogger } from "./observability/logger";
 import { ensureSchemaReachable, reindexEverything, reindexPartnerCar } from "./indexing/searchIndexer";
 import { loadTaxonomyFromDatabase } from "./queryTaxonomy";
 import { parseRecommendationQuery } from "./ai/queryParser";
-import { searchCars } from "./search/searchService";
+import { buildBaseRetrievalPrompt, searchCars } from "./search/searchService";
+import { createEmbedding } from "./embeddings";
+import { getCachedRecommendation, setCachedRecommendation } from "./cache/recommendationCache";
 import {
   composeClarificationResponse,
   composeRecommendationResponse,
@@ -129,14 +131,37 @@ async function main() {
     }
 
     const history = normalizeChatMessages(req.body?.messages ?? []);
-    const parsedQuery = await parseRecommendationQuery(prompt, history);
-    if (shouldAskClarifyingQuestion(parsedQuery)) {
-      res.status(200).json(await composeClarificationResponse(parsedQuery));
+
+    const cached = getCachedRecommendation<object>(prompt, history);
+    if (cached) {
+      observabilityLogger.info("recommendation_cache_hit", { prompt });
+      res.status(200).json(cached);
       return;
     }
 
-    const cars = await searchCars(prompt, parsedQuery);
-    res.status(200).json(await composeRecommendationResponse(parsedQuery, cars));
+    const baseRetrievalPrompt = buildBaseRetrievalPrompt(prompt);
+    const embeddingPromise = createEmbedding(baseRetrievalPrompt).catch((error) => {
+      observabilityLogger.warn("embedding_precompute_failed", {
+        errorMessage: error instanceof Error ? error.message : String(error),
+      });
+      return null;
+    });
+    const [parsedQuery, precomputedEmbedding] = await Promise.all([
+      parseRecommendationQuery(prompt, history),
+      embeddingPromise,
+    ]);
+
+    if (shouldAskClarifyingQuestion(parsedQuery)) {
+      const clarification = await composeClarificationResponse(parsedQuery);
+      setCachedRecommendation(prompt, history, clarification);
+      res.status(200).json(clarification);
+      return;
+    }
+
+    const cars = await searchCars(prompt, parsedQuery, precomputedEmbedding);
+    const response = await composeRecommendationResponse(parsedQuery, cars);
+    setCachedRecommendation(prompt, history, response);
+    res.status(200).json(response);
   });
 
   app.get("/history", authenticateJwt, async (_req, res) => {

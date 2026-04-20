@@ -29,7 +29,13 @@
       "Bash(curl -s http://localhost:9186/ai/recommendations -H \"Content-Type: application/json\" -d '{\"prompt\": \"I need cobalt\"}')",
       "Bash(curl -sv http://localhost:9186/ai/recommendations -H \"Content-Type: application/json\" -d '{\"prompt\": \"Привет, есть cobalt\"}')",
       "Bash(curl -s -w \"\\\\n---\\\\nHTTP %{http_code}, Time: %{time_total}s\\\\n\" http://localhost:9186/ai/recommendations -H \"Content-Type: application/json\" -d '{\"prompt\": \"Привет, есть cobalt\"}')",
-      "Bash(python3 -c ' *)"
+      "Bash(python3 -c ' *)",
+      "Bash(curl -s -w \"\\\\nTime: %{time_total}s\\\\n\" http://localhost:9186/ai/recommendations -H \"Content-Type: application/json\" -d '{\"prompt\": \"есть cobalt\"}')",
+      "Bash(python3 -c \" import sys, json raw = sys.stdin.read\\(\\) idx = raw.rfind\\('Time:'\\) body = raw[:idx] meta = raw[idx:] d = json.loads\\(body\\) af = d.get\\('appliedFilters', {}\\) print\\('Text:', \\(d.get\\('assistantText'\\) or ''\\)[:120]\\) print\\('Transmission:', af.get\\('transmission'\\), 'minYear:', af.get\\('minYear'\\), 'maxBudget:', af.get\\('maxBudgetPerHour'\\)\\) print\\('Brands:', af.get\\('preferredBrands'\\)\\) print\\('Cars:', [\\(c['brand'], c['model']\\) for c in d.get\\('cars', []\\)]\\) print\\(meta.strip\\(\\)\\) \")",
+      "Bash(curl -s http://localhost:9186/ai/recommendations -H \"Content-Type: application/json\" -d '{\"prompt\": \"есть cobalt\"}')",
+      "Bash(npx tsc *)",
+      "Bash(node dist/tests/llmRecommendations.test.js)",
+      "Bash(curl -s http://localhost:9186/ai/recommendations -H \"Content-Type: application/json\" -d '{\"prompt\": \"I need supra\"}')"
     ]
   }
 }

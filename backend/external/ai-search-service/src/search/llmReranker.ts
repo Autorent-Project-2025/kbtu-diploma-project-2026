@@ -103,11 +103,13 @@ function normalizeRankedIds(
   return orderedIds;
 }
 
+const MIN_CANDIDATES_FOR_RERANK = 4;
+
 export async function rerankCarsWithLlm(
   query: ParsedRecommendationQuery,
   candidates: SearchCandidate[],
 ): Promise<SearchCandidate[]> {
-  if (candidates.length <= 1) {
+  if (candidates.length < MIN_CANDIDATES_FOR_RERANK) {
     return candidates;
   }
 
