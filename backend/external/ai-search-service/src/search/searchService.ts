@@ -9,6 +9,7 @@ import {
   getAliasToCanonicalModel,
   getModelToBrandDictionary,
 } from "../queryTaxonomy";
+import { cosineSimilarity, getUserEmbedding } from "../personalization/userEmbeddings";
 
 type RawSearchRow = {
   partnerCarId: number;
@@ -456,10 +457,44 @@ function applyBudgetFilter(
   return exactBudgetRows.length > 0 ? exactBudgetRows : rows;
 }
 
+async function applyPersonalizationBoost(
+  candidates: SearchCandidate[],
+  userId: string | null | undefined,
+): Promise<SearchCandidate[]> {
+  if (!userId || candidates.length === 0) return candidates;
+  const userVector = await getUserEmbedding(userId);
+  if (!userVector) return candidates;
+
+  const ids = candidates.map((c) => c.partnerCarId);
+  const docs = await sql<{ partner_car_id: number; vector_embedding: number[] }[]>`
+    select partner_car_id, vector_embedding::text::real[] as vector_embedding
+    from ai_car_documents
+    where partner_car_id = any(${sql.array(ids, 23)})
+  `;
+  if (docs.length === 0) return candidates;
+
+  const vecByCar = new Map(docs.map((d) => [d.partner_car_id, d.vector_embedding]));
+  const boosted = candidates.map((candidate) => {
+    const docVec = vecByCar.get(candidate.partnerCarId);
+    if (!docVec) return candidate;
+    const similarity = cosineSimilarity(userVector, docVec);
+    const personalBoost = Math.max(0, similarity) * 0.15;
+    return {
+      ...candidate,
+      finalScore: Number((candidate.finalScore + personalBoost).toFixed(6)),
+      reasons: similarity > 0.6
+        ? [...candidate.reasons.slice(0, 2), "похоже на ваши прошлые выборы"].slice(0, 3)
+        : candidate.reasons,
+    };
+  });
+  return [...boosted].sort((a, b) => b.finalScore - a.finalScore);
+}
+
 export async function searchCars(
   prompt: string,
   query: ParsedRecommendationQuery,
   precomputedEmbedding?: number[] | null,
+  userId?: string | null,
 ): Promise<SearchCandidate[]> {
   const retrievalPrompt = buildRetrievalPrompt(prompt, query);
   const embedding = precomputedEmbedding ?? (await createEmbedding(retrievalPrompt));
@@ -502,5 +537,7 @@ export async function searchCars(
     })
     .sort((left, right) => right.finalScore - left.finalScore);
 
-  return (await rerankCarsWithLlm(query, scoredCandidates)).slice(0, 6);
+  const rerankedByLlm = await rerankCarsWithLlm(query, scoredCandidates);
+  const personalized = await applyPersonalizationBoost(rerankedByLlm, userId);
+  return personalized.slice(0, 6);
 }

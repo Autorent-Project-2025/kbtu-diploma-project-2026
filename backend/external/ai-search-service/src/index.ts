@@ -8,6 +8,9 @@ import { observabilityLogger } from "./observability/logger";
 import { ensureSchemaReachable, reindexEverything, reindexPartnerCar } from "./indexing/searchIndexer";
 import { loadTaxonomyFromDatabase } from "./queryTaxonomy";
 import { parseRecommendationQuery } from "./ai/queryParser";
+import { classifyIntent } from "./ai/intentClassifier";
+import { recordRecommendationClick } from "./feedback/clickTracking";
+import { refreshUserEmbeddings } from "./personalization/userEmbeddings";
 import { buildBaseRetrievalPrompt, searchCars } from "./search/searchService";
 import { createEmbedding } from "./embeddings";
 import { closeCache, getCachedRecommendation, setCachedRecommendation } from "./cache/recommendationCache";
@@ -139,6 +142,32 @@ async function main() {
       return;
     }
 
+    // Fast-path intent classification: skip the 20s LLM call for pure
+    // greetings and obvious gibberish.
+    const intent = classifyIntent(prompt);
+    if (intent === "greeting" || intent === "gibberish") {
+      observabilityLogger.info("recommendation_intent_fast_path", { intent, prompt });
+      const emptyQuery = {
+        prompt,
+        maxBudgetPerHour: null,
+        passengers: null,
+        transmission: null,
+        minRating: null,
+        preferredStyles: [],
+        excludedStyles: [],
+        preferredBrands: [],
+        minYear: null,
+        maxYear: null,
+        startTime: null,
+        endTime: null,
+        requiresAvailableOnDates: false,
+      };
+      const clarification = await composeClarificationResponse(emptyQuery);
+      void setCachedRecommendation(prompt, history, clarification);
+      res.status(200).json(clarification);
+      return;
+    }
+
     const baseRetrievalPrompt = buildBaseRetrievalPrompt(prompt);
     const embeddingPromise = createEmbedding(baseRetrievalPrompt).catch((error) => {
       observabilityLogger.warn("embedding_precompute_failed", {
@@ -158,10 +187,29 @@ async function main() {
       return;
     }
 
-    const cars = await searchCars(prompt, parsedQuery, precomputedEmbedding);
+    const userIdFromBody = typeof req.body?.userId === "string" && req.body.userId.trim()
+      ? req.body.userId.trim()
+      : null;
+    const cars = await searchCars(prompt, parsedQuery, precomputedEmbedding, userIdFromBody);
     const response = await composeRecommendationResponse(parsedQuery, cars);
     void setCachedRecommendation(prompt, history, response);
     res.status(200).json(response);
+  });
+
+  app.post("/click", async (req, res) => {
+    const body = req.body ?? {};
+    const partnerCarId = Number(body.partnerCarId);
+    const position = Number(body.position);
+    const prompt = typeof body.prompt === "string" ? body.prompt.trim().slice(0, 500) : "";
+    if (!Number.isInteger(partnerCarId) || partnerCarId <= 0 || !Number.isInteger(position) || position < 0 || !prompt) {
+      res.status(400).json({ message: "partnerCarId, position and prompt are required." });
+      return;
+    }
+    const userId = typeof body.userId === "string" && body.userId.trim() ? body.userId.trim() : null;
+    const sessionId = typeof body.sessionId === "string" && body.sessionId.trim() ? body.sessionId.trim().slice(0, 100) : null;
+
+    void recordRecommendationClick({ userId, sessionId, prompt, partnerCarId, position });
+    res.status(202).json({ status: "accepted" });
   });
 
   app.get("/history", authenticateJwt, async (_req, res) => {
@@ -178,6 +226,11 @@ async function main() {
     const indexedCount = await reindexEverything();
     await loadTaxonomyFromDatabase();
     res.status(200).json({ indexedCount });
+  });
+
+  app.post("/internal/refresh-user-embeddings", async (_req, res) => {
+    const updated = await refreshUserEmbeddings();
+    res.status(200).json({ updated });
   });
 
   app.post("/internal/reindex/partner-cars/:partnerCarId", async (req, res) => {

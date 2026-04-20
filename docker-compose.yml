@@ -322,6 +322,10 @@ services:
     restart: unless-stopped
     environment:
       OLLAMA_KEEP_ALIVE: 30m
+    # GPU acceleration is opt-in via the override file docker-compose.gpu.yml:
+    #   docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d
+    # Requires nvidia-container-toolkit on the host (Linux) or Docker
+    # Desktop with WSL2 + NVIDIA driver (Windows). ~10x faster than CPU.
     expose:
       - "11434"
     volumes:
