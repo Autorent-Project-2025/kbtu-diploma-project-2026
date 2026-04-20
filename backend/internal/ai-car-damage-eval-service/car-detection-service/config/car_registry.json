@@ -1,0 +1,10 @@
+{
+  "CAR_001": {
+    "model": "Toyota Camry",
+    "color": "white"
+  },
+  "CAR_002": {
+    "model": "Hyundai Elantra",
+    "color": "black"
+  }
+}
