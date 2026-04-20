@@ -11,7 +11,25 @@
       "Bash(ls \"c:/Users/Arlan/Desktop/Проекты/KBTU Diploma Project 2026/backend/internal/ticket-service/\"*.sln)",
       "Bash(curl -s -o /dev/null -w \"%{http_code}\" \"http://localhost:9186/bookings/my?page=1&pageSize=100\")",
       "Bash(docker compose:*)",
-      "Bash(docker exec:*)"
+      "Bash(docker exec:*)",
+      "Bash(docker cp *)",
+      "Bash(curl -s http://localhost:11434/api/chat -d '{ *)",
+      "Bash(docker port *)",
+      "Bash(curl -s http://localhost:9186/ai/recommendations -H \"Content-Type: application/json\" -d '{\"query\": \"кобальт нужен\"}')",
+      "Bash(python3 -m json.tool)",
+      "Bash(curl -s http://localhost:9186/ai/recommendations -H \"Content-Type: application/json\" -d '{\"prompt\": \"кобальт нужен\"}')",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('Filters:', json.dumps\\(d['appliedFilters'], ensure_ascii=False, indent=2\\)\\); print\\('Cars:', [\\(c['brand'], c['model'], c['year'], round\\(c.get\\('finalScore',0\\),3\\)\\) for c in d['cars']]\\)\")",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('Filters:', json.dumps\\(d['appliedFilters'], ensure_ascii=False, indent=2\\)\\); print\\('Top cars:', [\\(c['brand'], c['model'], c['year'], round\\(c.get\\('finalScore',0\\),3\\)\\) for c in d['cars'][:3]]\\); print\\('Total:', d['totalCandidates']\\)\")",
+      "Bash(curl -s http://localhost:9186/ai/recommendations -H \"Content-Type: application/json\" -d '{\"prompt\": \"привет\"}')",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('Response:', d.get\\('assistantText',''\\)\\); print\\('Cars:', len\\(d.get\\('cars',[]\\)\\)\\)\")",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('Brands:', d['appliedFilters']['preferredBrands']\\); print\\('Cars:', [\\(c['brand'], c['model']\\) for c in d['cars']]\\)\")",
+      "Bash(curl -s http://localhost:9186/ai/recommendations -H \"Content-Type: application/json\" -d '{\"prompt\": \"спортивную до 3000\"}')",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); f=d['appliedFilters']; print\\('Styles:', f['preferredStyles'], 'Budget:', f['maxBudgetPerHour']\\); print\\('Cars:', [\\(c['brand'], c['model'], c['priceHour']\\) for c in d['cars']]\\)\")",
+      "Bash(curl -s http://localhost:9186/ai/recommendations -H \"Content-Type: application/json\" -d '{\"prompt\": \"лафждлфыа\"}')",
+      "Bash(curl -s http://localhost:9186/ai/recommendations -H \"Content-Type: application/json\" -d '{\"prompt\": \"I need cobalt\"}')",
+      "Bash(curl -sv http://localhost:9186/ai/recommendations -H \"Content-Type: application/json\" -d '{\"prompt\": \"Привет, есть cobalt\"}')",
+      "Bash(curl -s -w \"\\\\n---\\\\nHTTP %{http_code}, Time: %{time_total}s\\\\n\" http://localhost:9186/ai/recommendations -H \"Content-Type: application/json\" -d '{\"prompt\": \"Привет, есть cobalt\"}')",
+      "Bash(python3 -c ' *)"
     ]
   }
 }

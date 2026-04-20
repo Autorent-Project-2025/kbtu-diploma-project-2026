@@ -82,7 +82,7 @@ export const config = {
   ),
   llmRecommendationSummaryTimeoutMs: parsePositiveInteger(
     process.env.LLM_RECOMMENDATION_SUMMARY_TIMEOUT_MS,
-    8000,
+    5000,
   ),
   openAiApiKey: process.env.OPENAI_API_KEY?.trim() || null,
   openAiBaseUrl: required("OPENAI_BASE_URL", "https://api.openai.com/v1"),

@@ -360,3 +360,11 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 unsloth_compiled_cache
+
+# Fine-tuning artifacts
+fine-tuning/training-checkpoints/
+fine-tuning/autorent-model/
+fine-tuning/autorent-assistant/
+fine-tuning/*_gguf/
+fine-tuning/*.gguf
+fine-tuning/Modelfile.*

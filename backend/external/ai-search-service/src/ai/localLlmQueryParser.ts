@@ -31,9 +31,10 @@ Schema:
 Allowed style labels: ${STYLE_LABELS_TEXT}.
 Allowed transmission labels: ${TRANSMISSION_LABELS_TEXT}.
 ${catalog ? catalog + "\n" : ""}If the user mentions a car model name (e.g. "cobalt", "кобальт", "camry", "камри"), put the corresponding brand into "preferredBrands".
-If a value is not explicitly or reasonably inferable, return null or [].
-Do not invent budget, passenger count, transmission, or dates when they are not explicitly present in the user request.
-If the user asks for rating threshold like "рейтинг больше 4.5", put it into "minRating".
+CRITICAL: If a value is not EXPLICITLY stated in the user message, return null or []. Never guess or infer default values.
+If the user message is a greeting (привет, hello, etc.), off-topic, or gibberish, return ALL fields as null or [].
+Do not invent budget, passenger count, transmission, rating, or dates when they are not explicitly present in the user request.
+If the user asks for rating threshold like "рейтинг больше 4.5", put it into "minRating". Otherwise minRating must be null.
 Use "minYear" for requests like "от 2020 года", "2020+" or "не старше 2020".
 Use "maxYear" for requests like "до 2020 года", "по 2020 год" or "не новее 2020".
 Do not put year values into "maxBudgetPerHour".
@@ -113,8 +114,22 @@ async function retrieveRagContext(prompt: string): Promise<string> {
     const words = prompt.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, "").split(/\s+/).filter(w => w.length >= 2);
     if (words.length === 0) return "";
 
-    const searchTerm = `%${words.join("%")}%`;
+    const parts: string[] = [];
 
+    // Search each word against brand_model_aliases
+    for (const word of words) {
+      const aliasRows = await sql<{ alias: string; canonical_brand: string; canonical_model: string | null }[]>`
+        select alias, canonical_brand, canonical_model from brand_model_aliases
+        where lower(alias) = ${word}
+        limit 3
+      `;
+      for (const r of aliasRows) {
+        parts.push(`"${r.alias}" means ${r.canonical_brand}${r.canonical_model ? " " + r.canonical_model : ""}`);
+      }
+    }
+
+    // Search combined term against car documents
+    const searchTerm = `%${words.join("%")}%`;
     const rows = await sql<{ brand: string; model: string; year: number }[]>`
       select distinct brand, model, year
       from ai_car_documents
@@ -122,21 +137,25 @@ async function retrieveRagContext(prompt: string): Promise<string> {
       limit 10
     `;
 
-    if (rows.length === 0) {
-      const aliasRows = await sql<{ alias: string; canonical_brand: string; canonical_model: string | null }[]>`
-        select alias, canonical_brand, canonical_model from brand_model_aliases
-        where lower(alias) like ${searchTerm}
-        limit 5
-      `;
-      if (aliasRows.length === 0) return "";
-      return "Known aliases: " + aliasRows.map(r =>
-        `${r.alias} = ${r.canonical_brand}${r.canonical_model ? " " + r.canonical_model : ""}`
-      ).join(", ");
+    if (rows.length === 0 && words.length > 1) {
+      // Try each word individually against car documents
+      for (const word of words) {
+        const wordRows = await sql<{ brand: string; model: string; year: number }[]>`
+          select distinct brand, model, year
+          from ai_car_documents
+          where lower(brand || ' ' || model) like ${"%" + word + "%"}
+          limit 5
+        `;
+        rows.push(...wordRows);
+      }
     }
 
-    return "Matching cars in catalog:\n" + rows.map(r =>
-      `- ${r.brand} ${r.model} (${r.year})`
-    ).join("\n");
+    if (rows.length > 0) {
+      const unique = [...new Map(rows.map(r => [`${r.brand} ${r.model}`, r])).values()];
+      parts.push("Cars in catalog: " + unique.map(r => `${r.brand} ${r.model} (${r.year})`).join(", "));
+    }
+
+    return parts.join("\n");
   } catch {
     return "";
   }

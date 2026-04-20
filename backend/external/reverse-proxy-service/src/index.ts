@@ -415,6 +415,7 @@ for (const service of services) {
     throw new Error(`Missing required environment variable: ${service.envKey}`);
   }
 
+  const isSlowRoute = service.route === "/ai";
   app.use(
     service.route,
     createProxyMiddleware({
@@ -422,8 +423,8 @@ for (const service of services) {
       changeOrigin: true,
       xfwd: true,
       ws: service.route === "/chat",
-      proxyTimeout: proxyTimeoutMs,
-      timeout: requestTimeoutMs,
+      proxyTimeout: isSlowRoute ? 60_000 : proxyTimeoutMs,
+      timeout: isSlowRoute ? 60_000 : requestTimeoutMs,
       pathRewrite: {
         [`^${service.route}`]: "",
       },
