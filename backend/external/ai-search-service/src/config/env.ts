@@ -91,4 +91,9 @@ export const config = {
     "OPENAI_EMBEDDING_MODEL",
     "text-embedding-3-small",
   ),
+  redisUrl: process.env.REDIS_URL?.trim() || null,
+  redisCacheTtlSeconds: parsePositiveInteger(
+    process.env.REDIS_CACHE_TTL_SECONDS,
+    300,
+  ),
 };

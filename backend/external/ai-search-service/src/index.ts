@@ -10,7 +10,7 @@ import { loadTaxonomyFromDatabase } from "./queryTaxonomy";
 import { parseRecommendationQuery } from "./ai/queryParser";
 import { buildBaseRetrievalPrompt, searchCars } from "./search/searchService";
 import { createEmbedding } from "./embeddings";
-import { getCachedRecommendation, setCachedRecommendation } from "./cache/recommendationCache";
+import { closeCache, getCachedRecommendation, setCachedRecommendation } from "./cache/recommendationCache";
 import {
   composeClarificationResponse,
   composeRecommendationResponse,
@@ -132,7 +132,7 @@ async function main() {
 
     const history = normalizeChatMessages(req.body?.messages ?? []);
 
-    const cached = getCachedRecommendation<object>(prompt, history);
+    const cached = await getCachedRecommendation<object>(prompt, history);
     if (cached) {
       observabilityLogger.info("recommendation_cache_hit", { prompt });
       res.status(200).json(cached);
@@ -153,14 +153,14 @@ async function main() {
 
     if (shouldAskClarifyingQuestion(parsedQuery)) {
       const clarification = await composeClarificationResponse(parsedQuery);
-      setCachedRecommendation(prompt, history, clarification);
+      void setCachedRecommendation(prompt, history, clarification);
       res.status(200).json(clarification);
       return;
     }
 
     const cars = await searchCars(prompt, parsedQuery, precomputedEmbedding);
     const response = await composeRecommendationResponse(parsedQuery, cars);
-    setCachedRecommendation(prompt, history, response);
+    void setCachedRecommendation(prompt, history, response);
     res.status(200).json(response);
   });
 
@@ -207,6 +207,7 @@ async function main() {
     clearInterval(refreshInterval);
     server.close();
     await rabbitConnection?.close().catch(() => undefined);
+    await closeCache().catch(() => undefined);
     await closeSql().catch(() => undefined);
     process.exit(0);
   };

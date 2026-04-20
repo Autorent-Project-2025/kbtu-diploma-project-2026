@@ -373,6 +373,23 @@ services:
     networks:
       - backend
 
+  ai-search-redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--maxmemory", "128mb", "--maxmemory-policy", "allkeys-lru", "--save", ""]
+    expose:
+      - "6379"
+    ports:
+      - "${AI_SEARCH_REDIS_PORT:-6380}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    networks:
+      - data
+
   ai-search-service:
     build:
       context: ./backend/external/ai-search-service/src
@@ -401,6 +418,8 @@ services:
       LOCAL_LLM_TIMEOUT_SECONDS: 90
       LLM_RECOMMENDATION_SUMMARY_ENABLED: "true"
       LLM_RECOMMENDATION_SUMMARY_TIMEOUT_MS: 5000
+      REDIS_URL: redis://ai-search-redis:6379
+      REDIS_CACHE_TTL_SECONDS: 300
     expose:
       - "8080"
     depends_on:
@@ -410,6 +429,8 @@ services:
         condition: service_healthy
       ai-search-flyway:
         condition: service_completed_successfully
+      ai-search-redis:
+        condition: service_healthy
       ollama:
         condition: service_healthy
       ollama-pull:
