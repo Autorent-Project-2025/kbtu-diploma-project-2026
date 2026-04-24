@@ -319,18 +319,55 @@ namespace BookingService.Api.Controllers
             return Ok(new { available }); // profileCommentsDTO + get-set 2 api
         }
 
+        // Hard cap per completion photo. 20 MB is generous for phone
+        // camera output (JPEGs typically 3-8 MB). Rejecting larger files
+        // early keeps five-photo sessions under 100 MB of resident memory
+        // and makes accidental multi-gig uploads a fast 413 instead of
+        // an OOM.
+        private const long MaxCompletionPhotoBytes = 20L * 1024 * 1024;
+
         private static async Task<FileUploadPayload> MapToFileUploadPayloadAsync(
             IFormFile? file,
             CancellationToken cancellationToken)
         {
-            if (file is null)
+            if (file is null || file.Length == 0)
             {
                 return new FileUploadPayload();
             }
 
+            if (file.Length > MaxCompletionPhotoBytes)
+            {
+                throw new ArgumentException(
+                    $"Completion photo '{file.FileName}' exceeds the {MaxCompletionPhotoBytes / (1024 * 1024)} MB limit.");
+            }
+
+            // IFormFile.Length is known up-front, so we allocate the
+            // exact buffer and read straight into it — avoids the
+            // MemoryStream -> ToArray() double-copy that the default
+            // pattern incurs. The resulting byte[] is referenced (not
+            // copied) by the two downstream multipart clients.
+            var buffer = new byte[file.Length];
             await using var stream = file.OpenReadStream();
-            using var memoryStream = new MemoryStream();
-            await stream.CopyToAsync(memoryStream, cancellationToken);
+            var totalRead = 0;
+            while (totalRead < buffer.Length)
+            {
+                var read = await stream.ReadAsync(
+                    buffer.AsMemory(totalRead, buffer.Length - totalRead),
+                    cancellationToken);
+                if (read == 0)
+                {
+                    break;
+                }
+                totalRead += read;
+            }
+
+            // Trim defensively if the stream returned short — shouldn't
+            // happen for IFormFile, but we don't want to ship garbage
+            // bytes downstream.
+            if (totalRead < buffer.Length)
+            {
+                Array.Resize(ref buffer, totalRead);
+            }
 
             return new FileUploadPayload
             {
@@ -338,7 +375,7 @@ namespace BookingService.Api.Controllers
                 ContentType = string.IsNullOrWhiteSpace(file.ContentType)
                     ? "application/octet-stream"
                     : file.ContentType,
-                Content = memoryStream.ToArray()
+                Content = buffer
             };
         }
     }

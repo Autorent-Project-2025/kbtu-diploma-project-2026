@@ -27,15 +27,20 @@ class PhotoSlot(str, Enum):
 
 
 class Damage(BaseModel):
+    # Slot is mandatory: the API guarantees every damage was produced on
+    # a known slot, so the downstream UI can render findings without
+    # fallback to fragile filename parsing. source_file is advisory only.
+    slot: PhotoSlot
     type: str
     confidence: float = Field(ge=0, le=1)
     bbox: list[int] = Field(min_length=4, max_length=4)
-    slot: PhotoSlot | None = None
     source_file: str | None = None
 
 
 class RejectedPhoto(BaseModel):
-    slot: PhotoSlot | None = None
+    # Slot is mandatory for the same reason: the UI never needs to guess
+    # which photo card to flag based on filename heuristics.
+    slot: PhotoSlot
     filename: str
     step: int
     reason: str

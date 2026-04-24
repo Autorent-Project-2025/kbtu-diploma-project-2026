@@ -20,6 +20,7 @@ namespace BookingService.Application.Interfaces.Integrations
 
     public sealed record DamageEvaluationRequest(
         int PartnerCarId,
+        string? LicensePlate,
         string CarBrand,
         string CarModel,
         string CarColor,

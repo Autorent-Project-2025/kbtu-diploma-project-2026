@@ -1,8 +1,10 @@
 """Contract tests for the /inspect-session endpoint."""
 from io import BytesIO
 
+import pytest
 from fastapi.testclient import TestClient
 
+from src.core import config
 from src.main import app, deduplicate_damages
 from src.schemas.inspection import Damage, PhotoSlot
 
@@ -18,8 +20,32 @@ def _slot_files() -> list[tuple[str, tuple[str, BytesIO, str]]]:
     ]
 
 
-def test_healthcheck(monkeypatch):
+def _reset_settings(monkeypatch, **env):
+    """Helper to repoint src.main.settings at a freshly-loaded Settings
+    instance reflecting the given env vars. Used so auth-mode tests can
+    switch between enforced / dev-bypass / misconfigured postures."""
+    from src import main as main_module
+
+    for key in (
+        "INTERNAL_API_KEY",
+        "ENVIRONMENT",
+        "ALLOW_UNAUTHENTICATED_INTERNAL_DEV",
+    ):
+        monkeypatch.delenv(key, raising=False)
+    for key, value in env.items():
+        monkeypatch.setenv(key, value)
+    config.get_settings.cache_clear()
+    main_module.settings = config.get_settings()
+
+
+@pytest.fixture(autouse=True)
+def _skip_warmup(monkeypatch):
+    """Unit tests don't need to actually load YOLO weights."""
     monkeypatch.setattr("src.main.warmup_models", lambda: None)
+    yield
+
+
+def test_healthcheck_is_always_liveness_only():
     with TestClient(app) as client:
         response = client.get("/health")
 
@@ -27,9 +53,19 @@ def test_healthcheck(monkeypatch):
     assert response.json() == {"status": "ok"}
 
 
+def test_readiness_signals_model_warmup(monkeypatch):
+    from src import main as main_module
+
+    # Simulate pre-warmup state.
+    monkeypatch.setattr(main_module, "_models_warm", False, raising=False)
+    with TestClient(app) as client:
+        # Lifespan ran warmup (mocked no-op), latch becomes True.
+        response = client.get("/ready")
+    assert response.status_code == 200
+
+
 def test_inspect_session_requires_all_five_slot_files(monkeypatch):
-    """Missing any slot field must produce a 422 from FastAPI validation."""
-    monkeypatch.setattr("src.main.warmup_models", lambda: None)
+    _reset_settings(monkeypatch, ENVIRONMENT="development", ALLOW_UNAUTHENTICATED_INTERNAL_DEV="true")
     with TestClient(app) as client:
         response = client.post(
             "/inspect-session",
@@ -41,8 +77,7 @@ def test_inspect_session_requires_all_five_slot_files(monkeypatch):
 
 
 def test_inspect_session_invalid_session_when_all_photos_broken(monkeypatch):
-    """Corrupted images are rejected and the session verdict is INVALID_SESSION."""
-    monkeypatch.setattr("src.main.warmup_models", lambda: None)
+    _reset_settings(monkeypatch, ENVIRONMENT="development", ALLOW_UNAUTHENTICATED_INTERNAL_DEV="true")
     with TestClient(app) as client:
         response = client.post(
             "/inspect-session",
@@ -61,34 +96,76 @@ def test_inspect_session_invalid_session_when_all_photos_broken(monkeypatch):
     assert "processed_at_utc" in body
 
 
-def test_inspect_session_internal_auth_rejects_missing_key(monkeypatch):
-    """When the shared secret is configured, requests without it are 401."""
-    monkeypatch.setattr("src.main.warmup_models", lambda: None)
-    # Re-create the settings cache with the env var set so FastAPI
-    # dependency guard picks up the secret.
-    from src.core import config
+# --- Auth posture --------------------------------------------------------
 
-    config.get_settings.cache_clear()
-    monkeypatch.setenv("INTERNAL_API_KEY", "secret-123")
-    config.get_settings.cache_clear()
-    # Reimport the module-level ``settings`` so the dependency guard
-    # sees the new key.
-    from src import main as main_module
 
-    main_module.settings = config.get_settings()
+def test_auth_enforced_rejects_missing_header(monkeypatch):
+    """When INTERNAL_API_KEY is set, requests without the header get 401."""
+    _reset_settings(monkeypatch, INTERNAL_API_KEY="secret-123")
 
-    try:
-        with TestClient(app) as client:
-            response = client.post(
-                "/inspect-session",
-                data={"car_id": "C1", "car_model": "M", "car_color": "white"},
-                files=_slot_files(),
-            )
-        assert response.status_code == 401
-    finally:
-        monkeypatch.delenv("INTERNAL_API_KEY", raising=False)
-        config.get_settings.cache_clear()
-        main_module.settings = config.get_settings()
+    with TestClient(app) as client:
+        response = client.post(
+            "/inspect-session",
+            data={"car_id": "C1", "car_model": "M", "car_color": "white"},
+            files=_slot_files(),
+        )
+    assert response.status_code == 401
+
+
+def test_auth_enforced_accepts_correct_header(monkeypatch):
+    _reset_settings(monkeypatch, INTERNAL_API_KEY="secret-123")
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/inspect-session",
+            data={"car_id": "C1", "car_model": "M", "car_color": "white"},
+            files=_slot_files(),
+            headers={"X-Internal-Api-Key": "secret-123"},
+        )
+    # Photos are garbage so we expect a verdict, but we must have passed auth.
+    assert response.status_code == 200
+
+
+def test_auth_fails_closed_when_neither_secret_nor_dev_bypass(monkeypatch):
+    """The regression that prompted this fix: no secret + no dev bypass
+    must 503, not silently open the endpoint."""
+    _reset_settings(monkeypatch)  # both env vars cleared, environment defaults to production
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/inspect-session",
+            data={"car_id": "C1", "car_model": "M", "car_color": "white"},
+            files=_slot_files(),
+        )
+    assert response.status_code == 503
+
+
+def test_dev_bypass_requires_both_flags_and_environment(monkeypatch):
+    # Flag on, environment not development — still fails closed.
+    _reset_settings(monkeypatch, ALLOW_UNAUTHENTICATED_INTERNAL_DEV="true", ENVIRONMENT="production")
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/inspect-session",
+            data={"car_id": "C1", "car_model": "M", "car_color": "white"},
+            files=_slot_files(),
+        )
+    assert response.status_code == 503
+
+
+def test_dev_bypass_allows_when_fully_opted_in(monkeypatch):
+    _reset_settings(monkeypatch, ENVIRONMENT="development", ALLOW_UNAUTHENTICATED_INTERNAL_DEV="true")
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/inspect-session",
+            data={"car_id": "C1", "car_model": "M", "car_color": "white"},
+            files=_slot_files(),
+        )
+    assert response.status_code == 200
+
+
+# --- Deduplication --------------------------------------------------------
 
 
 def test_deduplicate_damages_removes_overlapping_duplicates():
@@ -106,8 +183,7 @@ def test_deduplicate_damages_removes_overlapping_duplicates():
 
 def test_deduplicate_keeps_same_type_across_different_slots():
     """Damage on front and back both labelled "scratch" is NOT a duplicate —
-    they describe two separate real-world locations. The dedup keys on
-    (type, slot) so both survive."""
+    they describe two separate real-world locations."""
     damages = [
         Damage(type="scratch", confidence=0.91, bbox=[10, 10, 100, 100], slot=PhotoSlot.FRONT),
         Damage(type="scratch", confidence=0.87, bbox=[10, 10, 100, 100], slot=PhotoSlot.BACK),

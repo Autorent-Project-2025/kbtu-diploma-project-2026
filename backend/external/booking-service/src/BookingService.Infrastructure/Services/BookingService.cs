@@ -2238,6 +2238,7 @@ namespace BookingService.Infrastructure.Services
             {
                 return await _damageEvaluationClient.InspectSessionAsync(new DamageEvaluationRequest(
                     PartnerCarId: booking.PartnerCarId,
+                    LicensePlate: carSnapshot.LicensePlate,
                     CarBrand: carSnapshot.CarBrand,
                     CarModel: carSnapshot.CarModel,
                     CarColor: carSnapshot.Color ?? string.Empty,

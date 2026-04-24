@@ -61,23 +61,64 @@ ai-damage-eval-service:
     dockerfile: ./Dockerfile
   environment:
     INTERNAL_API_KEY: local-ai-damage-eval-service-key
+    ENVIRONMENT: production
+    ALLOW_UNAUTHENTICATED_INTERNAL_DEV: "false"
     USE_REGISTRY_VALIDATION: "false"
   expose:
     - "8000"
   healthcheck:
-    test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/health"]
+    # /ready is backed by a warmup latch — only 200 once weights are loaded
+    test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/ready"]
+    start_period: 120s
 ```
 
-Booking-service does **not** list this service in `depends_on` — the AI service does model warmup for ~30 seconds on start, and the booking flow tolerates AI being unavailable (fail-open).
+Booking-service does **not** list this service in `depends_on` — the AI service does model warmup for up to ~2 minutes on CPU, and the booking flow tolerates AI being unavailable (fail-open).
+
+## Authentication policy
+
+The service is **fail-closed by default**. Three possible modes:
+
+| Mode                    | Trigger                                                                                                       | Behaviour                              |
+|-------------------------|---------------------------------------------------------------------------------------------------------------|----------------------------------------|
+| Enforced (production)   | `INTERNAL_API_KEY` set                                                                                        | Every request must carry matching header; else 401. |
+| Dev-bypass              | `ALLOW_UNAUTHENTICATED_INTERNAL_DEV=true` **and** `ENVIRONMENT=development`                                   | Requests accepted without header. WARN-level startup log. |
+| Misconfigured (fail-closed) | Neither of the above                                                                                      | Every request → 503. ERROR-level startup log. |
+
+There is **no silent open mode**: forgetting to set `INTERNAL_API_KEY` in deploy does not make the service accessible. Booking-service's `DamageEvaluationClient` attaches the header automatically when its `DamageEvalService__InternalApiKey` is populated.
+
+## Timeout budget
+
+The AI call is advisory, so the end-to-end budget is deliberately short:
+
+- Gateway `PROXY_TIMEOUT_MS` = 60 s
+- Booking-service → AI `DamageEvalService__TimeoutSeconds` = **15 s** (must stay < gateway)
+- On timeout / 5xx / network error → `DamageEvaluationStatus.Unavailable` → ticket is still created, manager decides manually.
 
 ## Environment variables
 
-- `INTERNAL_API_KEY` — shared secret for the `X-Internal-Api-Key` header. Unset = auth disabled.
-- `USE_REGISTRY_VALIDATION` — when `true`, additionally cross-checks `car_id`/`car_model` against `config/car_registry.json`. Default `false`.
+- `INTERNAL_API_KEY` — shared secret for the `X-Internal-Api-Key` header. See the table above for how it interacts with dev-bypass.
+- `ENVIRONMENT` — `production` (default) or `development`. Only `development` allows dev-bypass.
+- `ALLOW_UNAUTHENTICATED_INTERNAL_DEV` — must be `true` **and** `ENVIRONMENT=development` to disable auth for local work. Default `false`.
+- `USE_REGISTRY_VALIDATION` — when `true`, additionally cross-checks `car_id`/`car_model` against `config/car_registry.json`. Default `false`. Do NOT enable in production.
 - `MIN_PHOTOS` — minimum valid photos required for session to be valid. Default `4`.
 - `MAX_PHOTOS` — cap (unused in slot-based API, retained for backward compat).
 - `MIN_WIDTH`, `MIN_HEIGHT`, `MIN_SHARPNESS`, `MIN_BRIGHTNESS`, `MAX_BRIGHTNESS` — quality thresholds.
 - `COCO_WEIGHTS_PATH`, `DAMAGE_WEIGHTS_PATH` — model checkpoint paths.
+
+## Color validation policy
+
+Production path uses a family-based tolerance model rather than strict label equality:
+
+| Caller / Detected   | Outcome         |
+|---------------------|-----------------|
+| Exact label match   | Accept          |
+| Both neutral family (white/silver/gray/black) | Accept |
+| Same non-neutral family (red+yellow both "warm"; blue+green both "cool") | Accept |
+| Detected low confidence (very dark, overexposed, or low saturation scene) | Accept |
+| Detected "unknown" (crop empty/out of bounds) | Accept |
+| Different non-neutral families (e.g. red vs blue, yellow vs green, white vs red) | **Reject** |
+
+This specifically eliminates the common false-positive of a silver car under warm indoor lighting being mis-detected as "gray" while the registry says "silver".
 
 ## Run locally
 
@@ -97,8 +138,8 @@ Place these files in `car-detection-service/weights/`:
 
 ## Health endpoints
 
-- `GET /health` — 200 always
-- `GET /ready` — 200 once models are loaded, 503 otherwise
+- `GET /health` — **liveness** only. Returns 200 as long as the process is up. Does not assert model readiness. Safe to use as a Docker liveness probe.
+- `GET /ready` — **readiness**, backed by a one-shot warmup latch. Returns 200 only after the lifespan hook has successfully loaded YOLO weights; 503 until then. This is what compose `healthcheck` targets so booking-service only sees the AI as "up" once inference can actually run.
 
 ## Tests
 

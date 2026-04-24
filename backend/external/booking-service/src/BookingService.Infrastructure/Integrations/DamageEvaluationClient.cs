@@ -40,7 +40,7 @@ namespace BookingService.Infrastructure.Integrations
             }
 
             using var form = new MultipartFormDataContent();
-            form.Add(new StringContent(request.PartnerCarId.ToString(System.Globalization.CultureInfo.InvariantCulture)), "car_id");
+            form.Add(new StringContent(BuildCarIdField(request)), "car_id");
             form.Add(new StringContent(string.IsNullOrWhiteSpace(request.CarBrand) ? request.CarModel : $"{request.CarBrand} {request.CarModel}"), "car_model");
             form.Add(new StringContent(request.CarColor ?? string.Empty), "car_color");
 
@@ -174,6 +174,40 @@ namespace BookingService.Infrastructure.Integrations
                 Array.Empty<DamageEvaluationDamage>(),
                 Array.Empty<DamageEvaluationRejectedPhoto>(),
                 DateTimeOffset.UtcNow, message);
+
+        // AI service's car_id field expects a human-readable identifier
+        // — semantically the license plate. We sanitise the raw plate
+        // so it matches the service-side regex `[A-Za-z0-9_-]{3,64}`:
+        // uppercase, strip whitespace and ANY non-ASCII-alphanumeric
+        // characters (so cyrillic plates like "А123ВС" become "123" and
+        // fall back, rather than sneaking past as a unicode-latin mix).
+        // Falls back to the partner_car_id PK (prefixed "PCAR-") when
+        // the plate is missing or sanitises to under 3 chars.
+        private static string BuildCarIdField(DamageEvaluationRequest request)
+        {
+            if (!string.IsNullOrWhiteSpace(request.LicensePlate))
+            {
+                var sanitized = new string(
+                    request.LicensePlate
+                        .Trim()
+                        .ToUpperInvariant()
+                        .Where(IsSafeCarIdChar)
+                        .ToArray());
+
+                if (sanitized.Length >= 3)
+                {
+                    return sanitized;
+                }
+            }
+
+            return $"PCAR-{request.PartnerCarId.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
+        }
+
+        private static bool IsSafeCarIdChar(char c)
+            => (c >= 'A' && c <= 'Z')
+                || (c >= '0' && c <= '9')
+                || c == '-'
+                || c == '_';
 
         private static void AddFile(MultipartFormDataContent form, FileUploadPayload file, string fieldName)
         {

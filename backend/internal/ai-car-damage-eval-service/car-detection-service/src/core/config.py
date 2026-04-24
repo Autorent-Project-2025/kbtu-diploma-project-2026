@@ -42,9 +42,38 @@ class Settings(BaseSettings):
     use_registry_validation: bool = False
 
     # Shared-secret internal auth. Matches the X-Internal-Api-Key pattern
-    # used by the rest of the monorepo. When unset, auth is disabled
-    # (local development). Set in docker-compose env for real deployments.
+    # used by the rest of the monorepo. Must be set in every real
+    # deployment (docker-compose wires it in automatically). Missing the
+    # secret is fail-closed unless the explicit dev-bypass opt-in below
+    # is active.
     internal_api_key: str | None = None
+
+    # Runtime environment tag. Only "development" permits the dev-bypass
+    # flag. Any other value (including empty) is treated as production.
+    environment: str = "production"
+
+    # Dev-bypass: explicitly allow unauthenticated requests during local
+    # development. Takes effect only when both:
+    #   ALLOW_UNAUTHENTICATED_INTERNAL_DEV=true
+    #   ENVIRONMENT=development
+    # Any other combination fails closed.
+    allow_unauthenticated_internal_dev: bool = False
+
+    def auth_is_enforced(self) -> bool:
+        """True when the request guard must check X-Internal-Api-Key."""
+        if self.internal_api_key:
+            return True
+        # No secret set: enforce auth (=> all requests 503) unless the
+        # explicit dev-bypass combo is active.
+        if self.is_dev_bypass_active():
+            return False
+        return True
+
+    def is_dev_bypass_active(self) -> bool:
+        return (
+            self.allow_unauthenticated_internal_dev
+            and self.environment.strip().lower() == "development"
+        )
 
 
 @lru_cache(maxsize=1)

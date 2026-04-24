@@ -1,3 +1,4 @@
+import logging
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
@@ -16,13 +17,55 @@ from src.services.verification import verify_attributes
 INTERNAL_API_KEY_HEADER = "x-internal-api-key"
 
 
+logger = logging.getLogger(__name__)
 settings = get_settings()
+
+
+# Readiness latch: flipped True once the model warmup has completed
+# successfully. /ready consults this instead of re-running warmup on
+# every probe — avoids stampeding the model path and gives compose
+# healthchecks an authoritative "models loaded" signal.
+_models_warm: bool = False
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    await run_in_threadpool(warmup_models)
+    global _models_warm
+    _log_auth_mode()
+    try:
+        await run_in_threadpool(warmup_models)
+        _models_warm = True
+    except Exception:
+        _models_warm = False
+        logger.exception("model warmup failed during startup")
+        raise
     yield
+
+
+def _log_auth_mode() -> None:
+    """Emit a clear one-line startup signal describing the auth posture."""
+    if settings.internal_api_key:
+        logger.info("ai-damage-eval: internal auth ENFORCED (INTERNAL_API_KEY set)")
+        return
+
+    if settings.is_dev_bypass_active():
+        # Warn-level so it stands out in logs — dev convenience must be
+        # obvious to anyone watching.
+        logger.warning(
+            "ai-damage-eval: DEV-BYPASS ACTIVE — accepting unauthenticated requests "
+            "(ALLOW_UNAUTHENTICATED_INTERNAL_DEV=true + ENVIRONMENT=development). "
+            "NEVER use this combination outside local development.",
+        )
+        return
+
+    # No secret AND no explicit dev-bypass. The service boots but every
+    # /inspect-session request will be 503'd by the guard. We log this
+    # loudly so the misconfiguration is diagnosable.
+    logger.error(
+        "ai-damage-eval: MISCONFIGURED — INTERNAL_API_KEY is not set and "
+        "dev-bypass is inactive. All /inspect-session requests will fail 503. "
+        "Set INTERNAL_API_KEY or enable dev-bypass for local development.",
+    )
 
 
 app = FastAPI(title=settings.app_title, lifespan=lifespan)
@@ -30,12 +73,24 @@ app = FastAPI(title=settings.app_title, lifespan=lifespan)
 
 async def require_internal_auth(request: Request) -> None:
     """Shared-secret guard matching the X-Internal-Api-Key pattern used by
-    the rest of the monorepo. If no secret is configured the guard is a
-    no-op — useful for local development. In docker-compose the secret is
-    always set, so production paths are always protected.
+    the rest of the monorepo.
+
+    Fails closed by default: if the service has no INTERNAL_API_KEY set
+    and the explicit dev-bypass combo is not active, every request gets
+    503 Service Unavailable. This prevents accidentally deploying the
+    service "open" because an env variable was forgotten.
     """
-    if not settings.internal_api_key:
+    if not settings.auth_is_enforced():
+        # Dev-bypass path — warning is logged once at startup, not per-request.
         return
+
+    if not settings.internal_api_key:
+        # Auth enforced but no secret configured. Fail closed; do NOT
+        # reveal whether a key exists via the error body.
+        raise HTTPException(
+            status_code=503,
+            detail="internal auth is not configured",
+        )
 
     provided = request.headers.get(INTERNAL_API_KEY_HEADER)
     if not provided or provided != settings.internal_api_key:
@@ -210,14 +265,20 @@ async def inspect_session(
 
 @app.get("/health")
 async def healthcheck() -> dict[str, str]:
+    """Liveness signal: process is up. Does not assert model readiness —
+    use /ready for that. A separate liveness endpoint lets orchestrators
+    distinguish "still warming up" (503 ready, 200 live) from "crashed"
+    (no response at all)."""
     return {"status": "ok"}
 
 
 @app.get("/ready")
 async def readiness_check() -> dict[str, str]:
-    try:
-        await run_in_threadpool(warmup_models)
-    except Exception as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
-
+    """Readiness signal backed by a one-shot warmup latch. Returns 503
+    until the lifespan hook has successfully loaded the YOLO weights.
+    Compose healthchecks hit this so the caller (booking-service) only
+    sees the AI service "up" after model weights are in GPU/CPU memory.
+    Never re-runs warmup — that is the lifespan's job."""
+    if not _models_warm:
+        raise HTTPException(status_code=503, detail="models are still warming up")
     return {"status": "ready"}
