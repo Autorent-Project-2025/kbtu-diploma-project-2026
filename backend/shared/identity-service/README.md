@@ -10,7 +10,97 @@
 - публикацию JWKS (`/.well-known/jwks.json`).
 
 ### ERM Диаграмма
-![ERM](./docs/images/erm.png)
+
+```mermaid
+erDiagram
+  USERS {
+    uuid id PK
+    string username UK
+    string email UK
+    string password_hash
+    boolean is_active
+    uuid subject_type_id FK
+    uuid actor_type_id FK
+  }
+
+  SUBJECT_TYPES {
+    uuid id PK
+    string name UK
+    string description
+  }
+
+  ACTOR_TYPES {
+    uuid id PK
+    string name UK
+    string description
+  }
+
+  ROLES {
+    uuid id PK
+    string name UK
+  }
+
+  PERMISSIONS {
+    uuid id PK
+    string name UK
+    string description
+  }
+
+  USER_ROLES {
+    uuid user_id PK
+    uuid role_id PK
+  }
+
+  ROLE_PERMISSIONS {
+    uuid role_id PK
+    uuid permission_id PK
+  }
+
+  ROLE_INHERITANCE {
+    uuid child_role_id PK
+    uuid parent_role_id PK
+  }
+
+  REFRESH_TOKENS {
+    uuid id PK
+    uuid user_id FK
+    string token_hash UK
+    timestamptz created_at_utc
+    timestamptz expires_at_utc
+    timestamptz revoked_at_utc
+  }
+
+  ACTIVATION_TOKENS {
+    uuid id PK
+    uuid user_id FK
+    string token_hash UK
+    timestamptz created_at_utc
+    timestamptz expires_at_utc
+    timestamptz used_at_utc
+  }
+
+  USER_PROVISION_REQUESTS {
+    uuid id PK
+    uuid user_id FK
+    string request_key UK
+    string email
+    string subject_type
+    string actor_type
+    timestamptz created_at_utc
+  }
+
+  SUBJECT_TYPES ||--o{ USERS : classifies
+  ACTOR_TYPES ||--o{ USERS : classifies
+  USERS ||--o{ USER_ROLES : has
+  ROLES ||--o{ USER_ROLES : assigned
+  ROLES ||--o{ ROLE_PERMISSIONS : grants
+  PERMISSIONS ||--o{ ROLE_PERMISSIONS : included
+  ROLES ||--o{ ROLE_INHERITANCE : child
+  ROLES ||--o{ ROLE_INHERITANCE : parent
+  USERS ||--o{ REFRESH_TOKENS : owns
+  USERS ||--o{ ACTIVATION_TOKENS : owns
+  USERS ||--o{ USER_PROVISION_REQUESTS : provisioned_by
+```
 
 ## Стек
 - ASP.NET Core (`net10.0`)

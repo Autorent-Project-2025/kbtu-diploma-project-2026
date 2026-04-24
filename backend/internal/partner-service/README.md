@@ -13,7 +13,34 @@
 - номер телефона.
 
 ### ERM Диаграмма
-![ERM](./docs/images/erm.png)
+
+```mermaid
+erDiagram
+  PARTNERS {
+    int id PK
+    string owner_first_name
+    string owner_last_name
+    timestamptz created_on
+    string contract_file_name
+    string owner_identity_file_name
+    date registration_date
+    date partnership_end_date
+    string related_user_id UK
+    string phone_number
+  }
+
+  IDENTITY_USERS {
+    string id PK
+  }
+
+  FILE_OBJECTS {
+    string file_name PK
+  }
+
+  IDENTITY_USERS ||--o| PARTNERS : related_user_id
+  FILE_OBJECTS ||--o{ PARTNERS : contract
+  FILE_OBJECTS ||--o{ PARTNERS : owner_identity
+```
 
 ## Стек
 - ASP.NET Core (`net10.0`)

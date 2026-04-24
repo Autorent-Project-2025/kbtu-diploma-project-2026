@@ -4,6 +4,26 @@ Internal FastAPI service that inspects the five booking-completion photos, verif
 
 Called synchronously by `booking-service` during `SubmitCompletionReview`. The service is **advisory-only** — the human manager still makes the final call on fines.
 
+## Processing Diagram
+
+```mermaid
+flowchart TD
+  Booking["booking-service<br/>SubmitCompletionReview"] --> Inspect["POST /inspect-session<br/>5 slot-labelled photos"]
+  Inspect --> Auth{"X-Internal-Api-Key valid?"}
+  Auth -->|no| Unauthorized["401 / 503 depending on auth mode"]
+  Auth -->|yes| Validate["format, quality, obstruction,<br/>color and car context checks"]
+  Validate --> Count{"valid photos >= MIN_PHOTOS?"}
+  Count -->|no| Invalid["INVALID_SESSION<br/>booking-service returns 400"]
+  Count -->|yes| Detect["YOLO damage detector"]
+  Detect --> Dedupe["dedupe overlapping detections per slot"]
+  Dedupe --> Verdict{"damages found?"}
+  Verdict -->|no| Ok["OK"]
+  Verdict -->|yes| Damages["DAMAGES_FOUND"]
+  Ok --> Ticket["booking-service creates review ticket"]
+  Damages --> Ticket
+  Ticket --> Manager["manager makes final decision"]
+```
+
 ## What it does
 
 - Accepts **five slot-labelled photos** (`front`, `back`, `side_left`, `side_right`, `interior`) in a single multipart POST.

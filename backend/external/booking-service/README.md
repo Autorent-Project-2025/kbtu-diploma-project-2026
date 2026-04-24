@@ -30,7 +30,98 @@
   - статусы блокировки: `pending`, `confirmed`, `active`.
 
 ### ERM Диаграмма
-![ERM](./docs/images/erm.png) 
+
+```mermaid
+erDiagram
+  BOOKINGS {
+    int id PK
+    uuid user_id
+    int partner_car_id
+    uuid partner_user_id
+    timestamptz start_time
+    timestamptz end_time
+    tstzrange booking_range
+    decimal price_hour
+    decimal total_price
+    string status
+    timestamptz created_at
+    timestamptz trip_started_at
+    timestamptz trip_completed_at
+    uuid completion_review_ticket_id
+    uuid partner_cancellation_ticket_id
+    timestamptz partner_cancellation_requested_at
+    string cancellation_actor
+    string cancellation_reason
+    int car_comment_id
+    timestamptz car_comment_submitted_at
+    jsonb pricing_breakdown
+    string car_brand
+    string car_model
+    string partner_name
+    string cover_image_url
+    jsonb image_urls
+    int subscription_id FK
+    boolean used_subscription
+  }
+
+  SUBSCRIPTION_PLANS {
+    int id PK
+    string name
+    string plan_type
+    decimal price
+    int included_bookings
+    boolean is_active
+    timestamptz created_at
+  }
+
+  SUBSCRIPTIONS {
+    int id PK
+    uuid user_id
+    int subscription_plan_id FK
+    string status
+    timestamptz start_date
+    timestamptz end_date
+    boolean auto_renew
+    int included_bookings
+    int used_bookings
+    timestamptz created_at
+  }
+
+  PAYMENT_SYNC_OUTBOX_MESSAGES {
+    bigint id PK
+    int booking_id
+    string event_key UK
+    string event_type
+    jsonb payload
+    int attempt_count
+    string last_error
+    timestamptz created_at
+    timestamptz next_attempt_at
+    timestamptz processed_at
+    timestamptz locked_until
+  }
+
+  IDENTITY_USERS {
+    uuid id PK
+  }
+
+  PARTNER_CARS {
+    int id PK
+  }
+
+  TICKETS {
+    uuid id PK
+  }
+
+  SUBSCRIPTION_PLANS ||--o{ SUBSCRIPTIONS : offers
+  SUBSCRIPTIONS ||--o{ BOOKINGS : applied_to
+  BOOKINGS ||--o{ PAYMENT_SYNC_OUTBOX_MESSAGES : emits
+  IDENTITY_USERS ||--o{ BOOKINGS : customer
+  IDENTITY_USERS ||--o{ BOOKINGS : partner
+  PARTNER_CARS ||--o{ BOOKINGS : reserved
+  TICKETS |o--o{ BOOKINGS : completion_review
+  TICKETS |o--o{ BOOKINGS : partner_cancellation
+```
 
 ## API
 Нативный base path сервиса: `/`.

@@ -39,6 +39,29 @@ Edge-сервис, который является единственной вн
 Gateway удаляет префикс перед проксированием.
 Пример: `/identity/auth/login` -> `{IDENTITY_SERVICE_URL}/auth/login`.
 
+### Диаграмма маршрутизации
+
+```mermaid
+flowchart LR
+  FE["Frontend apps"] --> GW["api-gateway<br/>HTTP :9186 / HTTPS :9443"]
+
+  GW -->|/identity/*| ID["identity-service"]
+  GW -->|/cars/*| CAR["car-service"]
+  GW -->|/ai/*| AI["ai-search-service"]
+  GW -->|/bookings/*| BOOKING["booking-service"]
+  GW -->|/clients/*| CLIENT["client-service"]
+  GW -->|/partners/*| PARTNER["partner-service"]
+  GW -->|/tickets/*| TICKET["ticket-service"]
+  GW -->|/files/*| FILE["file-service"]
+  GW -->|/chat/* + ws| CHAT["chat-service"]
+  GW -->|/payments/*| PAYMENT["payment-service"]
+  GW -->|/internal/*| IMAGE["image-service"]
+
+  GW -. metrics .-> PROM["Prometheus"]
+  GW -. traces .-> OTEL["OpenTelemetry Collector"]
+  GW -. json logs .-> LOKI["Loki via Promtail"]
+```
+
 ## Переменные окружения
 См. `./.env.example` и `src/index.ts`:
 - `IDENTITY_SERVICE_URL`

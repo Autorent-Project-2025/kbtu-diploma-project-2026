@@ -18,7 +18,139 @@
 - создание/миграция chat conversations для complaint context.
 
 ### ERM Диаграмма
-![ERM](./docs/images/erm.png)
+
+```mermaid
+erDiagram
+  TICKETS {
+    uuid id PK
+    int ticket_type
+    string email
+    int status
+    timestamptz created_at
+    jsonb data
+  }
+
+  TICKET_WORKFLOW_OUTBOX_MESSAGES {
+    bigint id PK
+    uuid ticket_id FK
+    string event_key UK
+    string event_type
+    jsonb payload
+    int attempt_count
+    string last_error
+    timestamptz created_at
+    timestamptz next_attempt_at
+    timestamptz processed_at
+    timestamptz locked_until
+  }
+
+  COMPLAINTS {
+    uuid id PK
+    int booking_id
+    bigint charge_id
+    int reporter_actor_type
+    int target_type
+    int category
+    int status
+    int priority
+    uuid created_by_user_id
+    string subject
+    string description
+    uuid assigned_to_manager_id
+    string info_request_text
+    timestamptz info_request_at
+    string info_response_text
+    timestamptz info_response_at
+    string manager_note
+    int resolution_type
+    string resolution_note
+    timestamptz resolved_at
+    string rejection_reason
+    timestamptz rejected_at
+    boolean is_escalated
+    string escalation_reason
+    jsonb snapshot_data
+    timestamptz created_at
+    timestamptz updated_at
+  }
+
+  COMPLAINT_ATTACHMENTS {
+    uuid id PK
+    uuid complaint_id FK
+    string file_name
+    string original_file_name
+    string file_type
+    uuid uploaded_by_user_id
+    int attachment_phase
+    timestamptz created_at
+  }
+
+  COMPLAINT_BOOKING_ACCESS_REQUESTS {
+    uuid id PK
+    uuid complaint_id FK
+    int booking_id
+    uuid requested_by_manager_id
+    int status
+    string reason
+    timestamptz requested_at
+    uuid reviewed_by_supermanager_id
+    timestamptz reviewed_at
+    string decision_note
+    timestamptz expires_at
+  }
+
+  COMPLAINT_REOPEN_REQUESTS {
+    uuid id PK
+    uuid complaint_id FK
+    uuid requested_by_user_id
+    string reason
+    int status
+    uuid reviewed_by_manager_id
+    timestamptz reviewed_at
+    string decision_note
+    timestamptz created_at
+  }
+
+  COMPLAINT_ACTION_LOGS {
+    uuid id PK
+    uuid complaint_id FK
+    string action_type
+    uuid performed_by
+    string comment
+    string target_entity_type
+    string target_entity_id
+    timestamptz created_at
+  }
+
+  BOOKINGS {
+    int id PK
+  }
+
+  PAYMENT_CHARGES {
+    bigint id PK
+  }
+
+  IDENTITY_USERS {
+    uuid id PK
+  }
+
+  FILE_OBJECTS {
+    string file_name PK
+  }
+
+  TICKETS ||--o{ TICKET_WORKFLOW_OUTBOX_MESSAGES : emits
+  COMPLAINTS ||--o{ COMPLAINT_ATTACHMENTS : has
+  COMPLAINTS ||--o{ COMPLAINT_BOOKING_ACCESS_REQUESTS : access_requests
+  COMPLAINTS ||--o{ COMPLAINT_REOPEN_REQUESTS : reopen_requests
+  COMPLAINTS ||--o{ COMPLAINT_ACTION_LOGS : audit_log
+  BOOKINGS ||--o{ COMPLAINTS : related_booking
+  PAYMENT_CHARGES |o--o{ COMPLAINTS : disputed_charge
+  IDENTITY_USERS ||--o{ COMPLAINTS : created_by
+  IDENTITY_USERS |o--o{ COMPLAINTS : assigned_manager
+  IDENTITY_USERS ||--o{ COMPLAINT_ATTACHMENTS : uploaded_by
+  IDENTITY_USERS ||--o{ COMPLAINT_BOOKING_ACCESS_REQUESTS : requested_by
+  FILE_OBJECTS ||--o{ COMPLAINT_ATTACHMENTS : stores
+```
 
 
 ## Стек

@@ -45,6 +45,20 @@ Routing keys:
 - `ticket.email.partner-car-rejected`
 - `chat.email.new-message`
 
+### Диаграмма доставки
+
+```mermaid
+flowchart LR
+  TICKET["ticket-service"] -->|ticket.email.*| RABBIT["RabbitMQ<br/>autorent.events"]
+  CHAT["chat-service"] -->|chat.email.new-message| RABBIT
+  BOOKING["booking/ticket custom flows"] -->|POST /emails/custom| API["email-service HTTP API"]
+
+  RABBIT -->|queue: email-service.notifications| EMAIL["email-service"]
+  API --> EMAIL
+  EMAIL -->|SMTP| PROVIDER["SMTP provider"]
+  EMAIL -. json logs .-> LOKI["Loki via Promtail"]
+```
+
 Пример `POST /emails/approved`:
 
 ```json

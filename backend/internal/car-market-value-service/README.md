@@ -10,6 +10,18 @@
 
 Сервис не считает стоимость аренды. Он возвращает именно `market value`, который дальше можно использовать в `car-service` или `booking-service`.
 
+## Диаграмма потока
+
+```mermaid
+flowchart LR
+  CAR["car-service"] -->|brand/model/year| MARKET["car-market-value-service"]
+  MARKET --> CACHE{"in-process / HTTP request"}
+  CACHE --> SCRAPER["kolesa.kz listings fetch"]
+  SCRAPER --> NORMALIZE["parse prices + remove outliers"]
+  NORMALIZE --> ESTIMATE["median / average / confidence"]
+  ESTIMATE --> CAR
+```
+
 ## API
 
 ### `GET /market-value/estimate`

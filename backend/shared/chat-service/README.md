@@ -31,6 +31,70 @@ SignalR hub доступен через:
 /chat/hubs/conversation
 ```
 
+## Диаграмма данных
+
+```mermaid
+erDiagram
+  CONVERSATIONS {
+    string id PK
+    string context_type
+    string context_id
+    string source_service
+    string status
+    datetime created_at
+    datetime updated_at
+    datetime closed_at
+  }
+
+  CONVERSATION_PARTICIPANTS {
+    string conversation_id FK
+    string user_id
+    string actor_type
+    string role
+    boolean can_read
+    boolean can_write
+    boolean can_send_internal
+    datetime joined_at
+    datetime left_at
+    string last_read_message_id
+    datetime last_read_at
+    string email
+    string display_name
+  }
+
+  MESSAGES {
+    string id PK
+    string conversation_id FK
+    string sender_user_id
+    string sender_actor_type
+    string message_type
+    string visibility
+    string body
+    datetime created_at
+  }
+
+  MESSAGE_ATTACHMENTS {
+    string id PK
+    string message_id FK
+    string file_name
+    string original_file_name
+    string mime_type
+    string uploaded_by_user_id
+    datetime created_at
+  }
+
+  FILE_OBJECTS {
+    string file_name PK
+  }
+
+  CONVERSATIONS ||--o{ CONVERSATION_PARTICIPANTS : has
+  CONVERSATIONS ||--o{ MESSAGES : contains
+  MESSAGES ||--o{ MESSAGE_ATTACHMENTS : has
+  FILE_OBJECTS ||--o{ MESSAGE_ATTACHMENTS : stores
+```
+
+В MongoDB участники вложены в документ conversation, а attachments вложены в message. Mermaid-диаграмма показывает логическую модель для чтения контрактов и связей.
+
 ## Public API
 Все public endpoints требуют валидный JWT.
 

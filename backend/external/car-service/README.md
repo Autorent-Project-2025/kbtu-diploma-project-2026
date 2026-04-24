@@ -18,7 +18,113 @@
 - `car_models` - основная сущность каталога, содержит тех. характеристики/год и ссылки на `brands` + `models`.
 
 ### ERM Диаграмма
-![ERM](./docs/images/erm.png)
+
+```mermaid
+erDiagram
+  BRANDS {
+    int id PK
+    string name UK
+  }
+
+  MODELS {
+    int id PK
+    int brand_id FK
+    string name
+  }
+
+  CAR_MODELS {
+    int id PK
+    int brand_id FK
+    int model_id FK
+    int year
+    string engine
+    string transmission
+    int seats
+    string fuel_type
+    int doors
+    string description
+    decimal rating
+    int ratings_count
+  }
+
+  PARTNER_CARS {
+    int id PK
+    uuid partner_user_id
+    int car_model_id FK
+    string license_plate UK
+    string ownership_file_name
+    string color
+    decimal price_hour
+    decimal price_day
+    int status
+    timestamptz created_at
+    decimal rating
+    int ratings_count
+  }
+
+  CAR_MODEL_IMAGES {
+    int id PK
+    int model_id FK
+    string image_url
+    string image_id
+    int image_type
+    int display_order
+  }
+
+  PARTNER_CAR_IMAGES {
+    int id PK
+    int car_id FK
+    string image_url
+    string image_id
+    int image_type
+    int display_order
+  }
+
+  FEATURES {
+    int id PK
+    string name UK
+    timestamp created_on
+  }
+
+  CAR_FEATURES {
+    int id PK
+    int car_id FK
+    int feature_id FK
+  }
+
+  CAR_COMMENTS {
+    int id PK
+    string user_id
+    string user_name
+    int car_id FK
+    int partner_car_id FK
+    string content
+    int rating
+    timestamp created_on
+  }
+
+  FILE_OBJECTS {
+    string file_name PK
+  }
+
+  IMAGE_OBJECTS {
+    string image_id PK
+  }
+
+  BRANDS ||--o{ MODELS : owns
+  BRANDS ||--o{ CAR_MODELS : catalogs
+  MODELS ||--o{ CAR_MODELS : catalogs
+  CAR_MODELS ||--o{ PARTNER_CARS : has_inventory
+  CAR_MODELS ||--o{ CAR_MODEL_IMAGES : has
+  PARTNER_CARS ||--o{ PARTNER_CAR_IMAGES : has
+  CAR_MODELS ||--o{ CAR_FEATURES : tagged
+  FEATURES ||--o{ CAR_FEATURES : assigned
+  CAR_MODELS ||--o{ CAR_COMMENTS : model_reviews
+  PARTNER_CARS |o--o{ CAR_COMMENTS : car_reviews
+  FILE_OBJECTS ||--o{ PARTNER_CARS : ownership_file
+  IMAGE_OBJECTS ||--o{ CAR_MODEL_IMAGES : stores
+  IMAGE_OBJECTS ||--o{ PARTNER_CAR_IMAGES : stores
+```
 
 ## Стек
 - ASP.NET Core (`net10.0`)

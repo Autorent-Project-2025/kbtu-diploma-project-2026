@@ -6,6 +6,34 @@
 - локальный диск (`USE_WEB_STORAGE=false`);
 - Google Cloud Storage (`USE_WEB_STORAGE=true`).
 
+## Диаграмма хранения
+
+```mermaid
+erDiagram
+  IMAGE_OBJECTS {
+    string image_id PK
+    binary original_content
+    string output_format
+    string storage_backend
+    string public_url
+  }
+
+  LOCAL_PUBLIC_FILES {
+    string file_name PK
+    string path
+  }
+
+  GCS_OBJECTS {
+    string object_name PK
+    string bucket
+  }
+
+  IMAGE_OBJECTS |o--o| LOCAL_PUBLIC_FILES : local_mode
+  IMAGE_OBJECTS |o--o| GCS_OBJECTS : gcs_mode
+```
+
+Сервис не хранит реляционную мета-БД: диаграмма описывает логическую модель объекта изображения и два режима хранения.
+
 ## Стек
 - Node.js + TypeScript
 - Express

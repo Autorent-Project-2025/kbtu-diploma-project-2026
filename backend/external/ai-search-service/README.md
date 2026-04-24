@@ -63,47 +63,23 @@
 
 ### Общая схема обработки
 
-```
-prompt
-  │
-  ▼
-┌──────────────────────┐
-│ Redis cache lookup   │  — hit: мгновенный ответ
-└──────────────────────┘
-  │ miss
-  ▼
-┌──────────────────────┐
-│ Intent classifier    │  — greeting/gibberish: fast-path clarification
-└──────────────────────┘
-  │ search/ambiguous
-  ▼
-┌──────────────────────┐
-│ Parser + Embedding   │  — параллельно: LLM parser и вычисление embedding
-│ (parallel)           │
-└──────────────────────┘
-  │
-  ▼
-┌──────────────────────┐
-│ Hybrid search (RRF)  │  — BM25 + vector с весами 0.6/0.4
-└──────────────────────┘
-  │
-  ▼
-┌──────────────────────┐
-│ LLM rerank           │  — только если ≥4 кандидатов
-└──────────────────────┘
-  │
-  ▼
-┌──────────────────────┐
-│ Personalization      │  — user_embedding × doc_embedding boost
-└──────────────────────┘
-  │
-  ▼
-┌──────────────────────┐
-│ Answer composer      │  — LLM recommendation summary или template
-└──────────────────────┘
-  │
-  ▼
-Redis cache set + response
+```mermaid
+flowchart TD
+  Prompt["prompt"] --> Cache{"Redis cache lookup"}
+  Cache -->|hit| CachedResponse["мгновенный cached response"]
+  Cache -->|miss| Intent["Intent classifier"]
+  Intent -->|greeting / gibberish| Clarification["fast-path clarification"]
+  Intent -->|search / ambiguous| Parallel["Parser + embedding<br/>parallel execution"]
+  Parallel --> Hybrid["Hybrid search<br/>RRF: lexical 0.6 + vector 0.4"]
+  Hybrid --> Rerank{"кандидатов >= 4?"}
+  Rerank -->|yes| LlmRerank["LLM rerank"]
+  Rerank -->|no| DeterministicRank["deterministic rank"]
+  LlmRerank --> Personalization["Personalization<br/>user_embedding x doc_embedding"]
+  DeterministicRank --> Personalization
+  Personalization --> Answer["Answer composer<br/>LLM summary или template"]
+  Clarification --> Store["Redis cache set"]
+  Answer --> Store
+  Store --> Response["response"]
 ```
 
 ### 1. Входной payload
@@ -362,6 +338,72 @@ reviews: <top_5_comments>
 Вызывается через `POST /internal/reindex/partner-cars/:id` и через RabbitMQ.
 
 ## Схема БД
+
+```mermaid
+erDiagram
+  AI_CAR_DOCUMENTS {
+    int partner_car_id PK
+    int car_model_id
+    uuid partner_user_id
+    string carrier_name
+    string brand
+    string model
+    int year
+    string title
+    string description
+    string color
+    string transmission
+    string fuel_type
+    string engine
+    int seats
+    decimal price_hour
+    decimal price_day
+    decimal rating
+    int ratings_count
+    string image_url
+    string details_url
+    string booking_url
+    jsonb tags
+    string searchable_text
+    vector vector_embedding
+    tsvector lexical_document
+    timestamptz updated_at
+  }
+
+  AI_CHAT_HISTORIES {
+    string user_id PK
+    jsonb messages
+    timestamptz updated_at
+  }
+
+  BRAND_MODEL_ALIASES {
+    int id PK
+    string alias UK
+    string canonical_brand
+    string canonical_model
+  }
+
+  AI_RECOMMENDATION_CLICKS {
+    bigint id PK
+    uuid user_id
+    string session_id
+    string prompt
+    bigint partner_car_id
+    int position
+    timestamptz clicked_at
+  }
+
+  USER_EMBEDDINGS {
+    uuid user_id PK
+    vector vector_embedding
+    int sample_count
+    timestamptz refreshed_at
+  }
+
+  AI_CAR_DOCUMENTS ||--o{ AI_RECOMMENDATION_CLICKS : clicked_from
+  AI_CHAT_HISTORIES |o--o| USER_EMBEDDINGS : same_user
+  USER_EMBEDDINGS ||--o{ AI_RECOMMENDATION_CLICKS : trained_from
+```
 
 Миграции в `src/Migrations/`:
 

@@ -14,7 +14,26 @@
 Для локальной отладки можно переключить `USE_WEB_STORAGE=false`.
 
 ### ERM Диаграмма
-![ERM](./docs/images/erm.png)
+
+```mermaid
+erDiagram
+  STORED_FILES {
+    string file_name PK
+    binary content
+    string storage_backend
+    string original_extension
+  }
+
+  TEMPORARY_LINKS {
+    string file_name PK
+    string url
+    timestamptz expires_at_utc
+  }
+
+  STORED_FILES ||--o{ TEMPORARY_LINKS : issues
+```
+
+Диаграмма описывает логическую модель хранения. `file-service` не ведет реляционную мета-БД: файлы лежат в локальной директории `/app/uploads` или в Google Cloud Storage.
 
 ## Стек
 - Node.js + TypeScript
