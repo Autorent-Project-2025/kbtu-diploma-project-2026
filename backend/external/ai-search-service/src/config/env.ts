@@ -65,7 +65,7 @@ export const config = {
     process.env.AUTO_REFRESH_INTERVAL_SECONDS,
     900,
   ),
-  embeddingDimensions: 128,
+  embeddingDimensions: 1024,
   localLlmBaseUrl: process.env.LOCAL_LLM_BASE_URL?.trim() || null,
   localLlmChatModel: required("LOCAL_LLM_CHAT_MODEL", "qwen2.5:1.5b"),
   localLlmEmbeddingModel: required(
@@ -82,7 +82,7 @@ export const config = {
   ),
   llmRecommendationSummaryTimeoutMs: parsePositiveInteger(
     process.env.LLM_RECOMMENDATION_SUMMARY_TIMEOUT_MS,
-    8000,
+    5000,
   ),
   openAiApiKey: process.env.OPENAI_API_KEY?.trim() || null,
   openAiBaseUrl: required("OPENAI_BASE_URL", "https://api.openai.com/v1"),
@@ -90,5 +90,10 @@ export const config = {
   openAiEmbeddingModel: required(
     "OPENAI_EMBEDDING_MODEL",
     "text-embedding-3-small",
+  ),
+  redisUrl: process.env.REDIS_URL?.trim() || null,
+  redisCacheTtlSeconds: parsePositiveInteger(
+    process.env.REDIS_CACHE_TTL_SECONDS,
+    300,
   ),
 };

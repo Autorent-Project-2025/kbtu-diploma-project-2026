@@ -287,6 +287,8 @@ services:
       POSTGRES_DB: postgres_db
     expose:
       - "5432"
+    ports:
+      - "${AI_SEARCH_DB_PORT:-1836}:5432"
     volumes:
       - ai_search_pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -320,6 +322,10 @@ services:
     restart: unless-stopped
     environment:
       OLLAMA_KEEP_ALIVE: 30m
+    # GPU acceleration is opt-in via the override file docker-compose.gpu.yml:
+    #   docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d
+    # Requires nvidia-container-toolkit on the host (Linux) or Docker
+    # Desktop with WSL2 + NVIDIA driver (Windows). ~10x faster than CPU.
     expose:
       - "11434"
     volumes:
@@ -342,23 +348,51 @@ services:
     environment:
       OLLAMA_BASE_URL: http://ollama:11434
       OLLAMA_CHAT_MODEL: ${LOCAL_LLM_CHAT_MODEL:-qwen2.5:1.5b}
-      OLLAMA_EMBEDDING_MODEL: ${LOCAL_LLM_EMBEDDING_MODEL:-nomic-embed-text}
-    entrypoint:
-      - /bin/sh
-      - -ec
-    command: |
-      echo "Pulling Ollama model: $$OLLAMA_CHAT_MODEL"
-      curl -fsS "$$OLLAMA_BASE_URL/api/pull" \
-        -H "Content-Type: application/json" \
-        -d "{\"model\":\"$$OLLAMA_CHAT_MODEL\",\"stream\":false}"
-      echo
-      echo "Pulling Ollama model: $$OLLAMA_EMBEDDING_MODEL"
-      curl -fsS "$$OLLAMA_BASE_URL/api/pull" \
-        -H "Content-Type: application/json" \
-        -d "{\"model\":\"$$OLLAMA_EMBEDDING_MODEL\",\"stream\":false}"
-      echo
+      OLLAMA_EMBEDDING_MODEL: ${LOCAL_LLM_EMBEDDING_MODEL:-bge-m3}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -e
+        for MODEL in "$$OLLAMA_CHAT_MODEL" "$$OLLAMA_EMBEDDING_MODEL"; do
+          ATTEMPT=1
+          while [ "$$ATTEMPT" -le 3 ]; do
+            echo "Pulling $$MODEL (attempt $$ATTEMPT/3)..."
+            if curl -fsSL --connect-timeout 30 --max-time 300 "$$OLLAMA_BASE_URL/api/pull" -H "Content-Type: application/json" -d "{\"model\":\"$$MODEL\",\"stream\":false}"; then
+              echo "$$MODEL pulled OK"
+              break
+            fi
+            echo "Retry in 5s..."
+            sleep 5
+            ATTEMPT=$$((ATTEMPT + 1))
+          done
+          if [ "$$ATTEMPT" -gt 3 ]; then
+            echo "FATAL: failed to pull $$MODEL"
+            exit 1
+          fi
+        done
+        echo "Verifying..."
+        curl -fsS "$$OLLAMA_BASE_URL/api/tags" | grep -q "$$OLLAMA_CHAT_MODEL" || { echo "FATAL: $$OLLAMA_CHAT_MODEL missing"; exit 1; }
+        curl -fsS "$$OLLAMA_BASE_URL/api/tags" | grep -q "$$OLLAMA_EMBEDDING_MODEL" || { echo "FATAL: $$OLLAMA_EMBEDDING_MODEL missing"; exit 1; }
+        echo "All models ready."
     networks:
       - backend
+
+  ai-search-redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--maxmemory", "128mb", "--maxmemory-policy", "allkeys-lru", "--save", ""]
+    expose:
+      - "6379"
+    ports:
+      - "${AI_SEARCH_REDIS_PORT:-6380}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    networks:
+      - data
 
   ai-search-service:
     build:
@@ -384,10 +418,12 @@ services:
       AUTO_REFRESH_INTERVAL_SECONDS: 900
       LOCAL_LLM_BASE_URL: http://ollama:11434
       LOCAL_LLM_CHAT_MODEL: ${LOCAL_LLM_CHAT_MODEL:-qwen2.5:1.5b}
-      LOCAL_LLM_EMBEDDING_MODEL: ${LOCAL_LLM_EMBEDDING_MODEL:-nomic-embed-text}
+      LOCAL_LLM_EMBEDDING_MODEL: ${LOCAL_LLM_EMBEDDING_MODEL:-bge-m3}
       LOCAL_LLM_TIMEOUT_SECONDS: 90
       LLM_RECOMMENDATION_SUMMARY_ENABLED: "true"
-      LLM_RECOMMENDATION_SUMMARY_TIMEOUT_MS: 8000
+      LLM_RECOMMENDATION_SUMMARY_TIMEOUT_MS: 5000
+      REDIS_URL: redis://ai-search-redis:6379
+      REDIS_CACHE_TTL_SECONDS: 300
     expose:
       - "8080"
     depends_on:
@@ -397,6 +433,8 @@ services:
         condition: service_healthy
       ai-search-flyway:
         condition: service_completed_successfully
+      ai-search-redis:
+        condition: service_healthy
       ollama:
         condition: service_healthy
       ollama-pull:
@@ -975,8 +1013,8 @@ services:
       ALLOWED_ORIGINS: http://localhost:5173,http://localhost:5174,http://localhost:5175
       RATE_LIMIT_WINDOW_MS: 60000
       RATE_LIMIT_MAX_REQUESTS: 300
-      PROXY_TIMEOUT_MS: 30000
-      REQUEST_TIMEOUT_MS: 30000
+      PROXY_TIMEOUT_MS: 60000
+      REQUEST_TIMEOUT_MS: 60000
       PORT: 8080
       HTTPS_PORT: 8443
       TLS_ENABLED: "true"

@@ -20,6 +20,44 @@ function buildSearchableText(parts: Array<string | null | undefined>): string {
     .trim();
 }
 
+// Build a short natural-language sentence about how the car is positioned
+// (price tier + style). BM25 and embeddings both benefit from these
+// phrases more than a raw tag list — "budget city sedan" is a much
+// stronger signal for "дешёвая городская" than ["city", "sedan"] alone.
+function buildStyleNarrative(tags: string[], priceHour: number | null): string | null {
+  const tagSet = new Set(tags.map((t) => t.toLowerCase()));
+  const pieces: string[] = [];
+
+  if (priceHour != null) {
+    if (priceHour <= 600) pieces.push("budget affordable economy");
+    else if (priceHour <= 1500) pieces.push("mid-range");
+    else if (priceHour <= 3000) pieces.push("premium");
+    else pieces.push("luxury high-end");
+  }
+
+  if (tagSet.has("sport")) pieces.push("sport coupe fast driving");
+  if (tagSet.has("business")) pieces.push("business class comfortable professional");
+  if (tagSet.has("family")) pieces.push("family friendly spacious safe");
+  if (tagSet.has("city")) pieces.push("city urban daily commute");
+  if (tagSet.has("luxury")) pieces.push("luxurious premium high-end");
+  if (tagSet.has("sedan")) pieces.push("sedan four door");
+  if (tagSet.has("coupe")) pieces.push("coupe two door sporty");
+
+  return pieces.length > 0 ? `style: ${pieces.join(" ")}` : null;
+}
+
+function buildSpecsNarrative(modelDetails: {
+  engine?: string | null;
+  transmission?: string | null;
+  fuelType?: string | null;
+}): string {
+  const parts: string[] = [];
+  if (modelDetails.engine) parts.push(`engine ${modelDetails.engine}`);
+  if (modelDetails.transmission) parts.push(`transmission ${modelDetails.transmission}`);
+  if (modelDetails.fuelType) parts.push(`fuel ${modelDetails.fuelType}`);
+  return parts.length > 0 ? `specs: ${parts.join(" ")}` : "";
+}
+
 function toVectorLiteral(values: number[]): string {
   return `[${values.map((value) => Number(value).toFixed(6)).join(",")}]`;
 }
@@ -160,17 +198,28 @@ async function buildDocument(partnerCarId: number): Promise<SearchDocument | nul
     priceHour: partnerCar.priceHour ?? null,
   });
 
+  const featureNames = (modelDetails.features ?? [])
+    .map((f) => f?.name)
+    .filter((name): name is string => Boolean(name && name.trim()));
+
+  const styleNarrative = buildStyleNarrative(tags, partnerCar.priceHour ?? null);
+  const specsNarrative = buildSpecsNarrative(modelDetails);
+  const comments = (partnerCar.comments ?? []).map((c) => c.content);
+  const reviewNarrative = comments.length > 0
+    ? `reviews: ${comments.slice(0, 5).join(" | ")}`
+    : null;
+
   const searchableText = buildSearchableText([
     `${modelDetails.brand} ${modelDetails.model} ${modelDetails.year}`,
-    modelDetails.description,
-    partnerCar.color,
-    modelDetails.engine,
-    modelDetails.transmission,
-    modelDetails.fuelType,
+    specsNarrative,
+    styleNarrative,
+    modelDetails.description ? `description: ${modelDetails.description}` : null,
+    partnerCar.color ? `color ${partnerCar.color}` : null,
+    featureNames.length > 0 ? `features: ${featureNames.join(", ")}` : null,
     typeof modelDetails.seats === "number" ? `${modelDetails.seats} seats` : null,
-    partnerProfile?.carrierName ?? null,
+    partnerProfile?.carrierName ? `by ${partnerProfile.carrierName}` : null,
     tags.join(" "),
-    ...(partnerCar.comments ?? []).map((comment) => comment.content),
+    reviewNarrative,
   ]);
 
   const embedding = await createEmbedding(searchableText);

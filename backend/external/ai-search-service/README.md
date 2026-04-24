@@ -11,510 +11,541 @@
 
 ## Что делает сервис
 
-Сервис решает две отдельные задачи:
+Сервис решает четыре задачи:
 
-1. Online-поиск и подбор машин по free-text запросу пользователя.
-2. Offline/async индексация карточек машин в локальную поисковую таблицу PostgreSQL + pgvector.
+1. **Online-поиск** и подбор машин по free-text запросу пользователя.
+2. **Offline/async индексация** карточек машин в PostgreSQL + pgvector.
+3. **Feedback loop**: сбор кликов из AI-подборки для улучшения ранжирования.
+4. **Персонализация**: построение user-embeddings из истории взаимодействий и boost релевантных машин.
 
-Основная идея: не ходить в `car-service` с тяжёлыми текстовыми запросами каждый раз, а держать собственный поисковый индекс `ai_car_documents`, в котором уже собраны текст, теги и embedding для каждой доступной машины.
+Основная идея: не ходить в `car-service` с тяжёлыми текстовыми запросами каждый раз, а держать собственный поисковый индекс `ai_car_documents`, в котором уже собраны обогащённый текст, теги и embedding для каждой доступной машины.
 
 ## Основные части сервиса
 
-- `src/index.ts`
-  HTTP entrypoint, маршруты, health/metrics, периодический reindex, graceful shutdown.
-- `src/ai/queryParser.ts`
-  Главный оркестратор разбора пользовательского запроса.
-- `src/ai/heuristicQueryParser.ts`
-  Rule-based parser для бюджета, мест, коробки, рейтинга, года, бренда и стиля.
-- `src/ai/localLlmQueryParser.ts`
-  Извлечение structured filters через локальную LLM.
-- `src/ai/openAiQueryParser.ts`
-  Извлечение structured filters через OpenAI-compatible API.
-- `src/search/searchService.ts`
-  Hybrid retrieval, фильтрация, rerank и формирование причин рекомендации.
-- `src/indexing/searchIndexer.ts`
-  Полная и точечная переиндексация документов.
-- `src/messaging/indexingConsumer.ts`
-  RabbitMQ consumer для событий изменения машин.
-- `src/chat/chatHistoryRepository.ts`
-  Чтение и сохранение истории диалога.
-- `src/embeddings/*`
-  Провайдеры embedding: local deterministic, local LLM, OpenAI-compatible.
+- `src/index.ts` — HTTP entrypoint, маршруты, health/metrics, периодический reindex, graceful shutdown.
+- `src/ai/intentClassifier.ts` — fast-path классификатор intent (greeting / gibberish / search / ambiguous) до LLM.
+- `src/ai/queryParser.ts` — оркестратор разбора пользовательского запроса, объединяет heuristic и LLM.
+- `src/ai/heuristicQueryParser.ts` — rule-based parser для бюджета, мест, коробки, рейтинга, года, бренда и стиля.
+- `src/ai/localLlmQueryParser.ts` — извлечение structured filters через локальную LLM с RAG-контекстом.
+- `src/ai/openAiQueryParser.ts` — извлечение structured filters через OpenAI-compatible API.
+- `src/ai/answerComposer.ts` — формирование текста ответа (clarification + recommendation summary).
+- `src/search/searchService.ts` — hybrid retrieval (RRF), фильтрация, rerank, personalization boost.
+- `src/search/llmReranker.ts` — опциональный LLM rerank для top-k.
+- `src/indexing/searchIndexer.ts` — полная и точечная переиндексация документов.
+- `src/messaging/indexingConsumer.ts` — RabbitMQ consumer для событий изменения машин.
+- `src/chat/chatHistoryRepository.ts` — чтение и сохранение истории диалога.
+- `src/embeddings/*` — провайдеры embedding: local deterministic, local LLM (bge-m3), OpenAI-compatible.
+- `src/cache/recommendationCache.ts` — Redis-кэш с in-memory fallback.
+- `src/feedback/clickTracking.ts` — запись кликов пользователя из AI-подборки.
+- `src/personalization/userEmbeddings.ts` — nightly job для построения user-embeddings, cosine-boost при re-rank.
+- `src/queryTaxonomy.ts` — динамические словари брендов/моделей/алиасов из БД.
+- `src/tests/llmRecommendations.test.ts` — assertion-based smoke-тесты.
+- `src/tests/evalHarness.test.ts` — offline evaluation с метриками recall@k / precision@k / MRR.
 
 ## API
 
-- `GET /healthz`
-- `GET /metrics`
-- `POST /recommendations`
-- `GET /history`
-- `PUT /history`
-- `POST /internal/reindex`
-- `POST /internal/reindex/partner-cars/:partnerCarId`
+### Public
+
+- `POST /recommendations` — получить подборку машин
+- `POST /click` — трекинг клика по карточке из подборки
+- `GET /history` — история чата (JWT)
+- `PUT /history` — сохранение истории (JWT)
+- `GET /healthz` — health check
+- `GET /metrics` — Prometheus metrics
+
+### Internal
+
+- `POST /internal/reindex` — полный reindex
+- `POST /internal/reindex/partner-cars/:partnerCarId` — точечный reindex
+- `POST /internal/refresh-user-embeddings` — пересчёт user-embeddings из бронирований и кликов
 
 ## Как работает запрос `/recommendations`
+
+### Общая схема обработки
+
+```
+prompt
+  │
+  ▼
+┌──────────────────────┐
+│ Redis cache lookup   │  — hit: мгновенный ответ
+└──────────────────────┘
+  │ miss
+  ▼
+┌──────────────────────┐
+│ Intent classifier    │  — greeting/gibberish: fast-path clarification
+└──────────────────────┘
+  │ search/ambiguous
+  ▼
+┌──────────────────────┐
+│ Parser + Embedding   │  — параллельно: LLM parser и вычисление embedding
+│ (parallel)           │
+└──────────────────────┘
+  │
+  ▼
+┌──────────────────────┐
+│ Hybrid search (RRF)  │  — BM25 + vector с весами 0.6/0.4
+└──────────────────────┘
+  │
+  ▼
+┌──────────────────────┐
+│ LLM rerank           │  — только если ≥4 кандидатов
+└──────────────────────┘
+  │
+  ▼
+┌──────────────────────┐
+│ Personalization      │  — user_embedding × doc_embedding boost
+└──────────────────────┘
+  │
+  ▼
+┌──────────────────────┐
+│ Answer composer      │  — LLM recommendation summary или template
+└──────────────────────┘
+  │
+  ▼
+Redis cache set + response
+```
 
 ### 1. Входной payload
 
 Сервис ожидает:
 
-- `prompt: string`
-- `messages?: AiChatMessage[]`
+- `prompt: string` (обязателен)
+- `messages?: AiChatMessage[]` — история для follow-up запросов
+- `userId?: string` — опциональный UUID для персонализации
 
 `prompt` обязателен. Если его нет или он пустой, сервис вернёт `400`.
 
-`messages` не обязателен, но важен для follow-up запросов вроде:
+### 2. Redis cache
 
-- `подешевле`
-- `теперь автомат`
-- `не спорт`
-- `а можно с рейтингом выше`
+Перед любой обработкой сервис проверяет Redis-кэш по ключу `ai-search:recommendation:<normalized_prompt>|h=<history_size>`. При hit ответ возвращается за ~10ms.
 
-Перед использованием история нормализуется и чистится.
+Кэш:
+- TTL: 300 секунд (`REDIS_CACHE_TTL_SECONDS`)
+- LRU eviction на уровне Redis (128MB лимит)
+- Автоматический fallback на in-memory LRU если Redis недоступен
 
-### 2. Разбор запроса через `queryParser`
+### 3. Intent classifier
 
-Файл `src/ai/queryParser.ts` это центральный оркестратор разбора. Он не просто парсит текст, а собирает итоговый `ParsedRecommendationQuery`.
+Файл: `src/ai/intentClassifier.ts`
+
+Классификатор смотрит на промпт до вызова LLM и различает:
+
+- **greeting** — "привет", "hello", "здравствуйте" → fast-path: сразу clarification без LLM-парсера (экономия ~20 секунд на одном запросе).
+- **gibberish** — случайный набор символов → тоже clarification.
+- **search** — найден бренд/модель/стиль/бюджет/год/рейтинг → полный пайплайн.
+- **ambiguous** — есть слова, но сигналов нет → пайплайн с упором на clarification.
+
+Детекция основана на:
+- regex для greetings/smalltalk
+- проверке вхождения токенов против `getBrandDictionary`, `getModelToBrandDictionary`, `getAliasToCanonicalBrand`, `getAliasToCanonicalModel` (загружаются из БД)
+- regex-cues для бюджета, года, пассажиров, рейтинга
+
+### 4. Параллельное выполнение parser + embedding
+
+Чтобы не ждать LLM-парсер перед стартом поиска, сервис запускает одновременно:
+- `parseRecommendationQuery(prompt, history)` — LLM + heuristic
+- `createEmbedding(buildBaseRetrievalPrompt(prompt))` — на базовом промпте без LLM-фильтров
+
+Экономия: до 1-2 секунд на каждом запросе. Если embedding не удался, пайплайн продолжает без него.
+
+### 5. Разбор запроса через `queryParser`
+
+Файл: `src/ai/queryParser.ts` — центральный оркестратор.
 
 Структура `ParsedRecommendationQuery`:
 
-- `prompt`
-- `maxBudgetPerHour`
-- `passengers`
-- `transmission`
-- `minRating`
-- `preferredStyles`
-- `excludedStyles`
-- `preferredBrands`
-- `minYear`
-- `startTime`
-- `endTime`
-- `requiresAvailableOnDates`
+- `prompt`, `maxBudgetPerHour`, `passengers`, `transmission`, `minRating`
+- `preferredStyles`, `excludedStyles`, `preferredBrands`
+- `minYear`, `maxYear`
+- `startTime`, `endTime`, `requiresAvailableOnDates`
 
-### 3. Первый слой: heuristic parser
+#### Первый слой: heuristic parser
 
-Сначала всегда вызывается `parseQueryHeuristically(prompt)`.
+Извлекает:
+- бюджет в час: `до 10000`, `до 15 тыс`
+- количество мест, коробку, рейтинг
+- год: `от 2020`, `2021+`, `до 2015`, `между 2018 и 2022`
+- стили: `sport`, `business`, `family`, `city`, `luxury`
+- исключения: `не спорт`, `без luxury`, `кроме family`
+- бренды из динамического словаря `brand_model_aliases`
 
-Эвристический parser умеет извлекать:
+#### Второй слой: LLM parser с RAG-контекстом
 
-- бюджет в час:
-  - `до 10000`
-  - `до 15 тыс`
-- количество мест:
-  - `6 мест`
-  - `4 человека`
-- коробку:
-  - `автомат`
-  - `механика`
-- рейтинг:
-  - `рейтинг от 4.5`
-  - `rating 4+`
-- минимальный год:
-  - `от 2020`
-  - `2021+`
-- предпочтительные стили:
-  - `sport`
-  - `business`
-  - `family`
-  - `city`
-  - `luxury`
-- исключённые стили:
-  - `не спорт`
-  - `без luxury`
-  - `кроме family`
-- бренды из словаря:
-  - `toyota`, `bmw`, `audi` и т.д.
+Если задан `LOCAL_LLM_BASE_URL` — используется `localLlmQueryParser`.
 
-Это базовый слой надёжности. Даже если LLM недоступна, сервис всё равно умеет работать.
+Перед вызовом LLM сервис строит RAG-контекст: ищет в `brand_model_aliases` и `ai_car_documents` совпадения с токенами запроса и добавляет их в user message. Это помогает слабой локальной модели (qwen2.5:1.5b) правильно определять бренд для малоизвестных моделей.
 
-### 4. Второй слой: LLM parser
+System prompt содержит:
+- JSON-схему ответа;
+- допустимые лейблы стилей и коробок;
+- каталог доступных моделей;
+- **5 few-shot примеров** против галлюцинаций (для "cobalt", "камри", "привет", "спортивную", "camry автомат");
+- абсолютное правило: заполнять поле только если оно явно упомянуто пользователем.
 
-После эвристики сервис пытается улучшить разбор:
+#### reconcile: объединение heuristic + LLM с защитой от галлюцинаций
 
-- если задан `LOCAL_LLM_BASE_URL`, используется `localLlmQueryParser`;
-- иначе, если задан `OPENAI_API_KEY`, используется `openAiQueryParser`;
-- если оба варианта недоступны или LLM вызов упал, сервис остаётся на heuristic parser.
+`reconcileWithHeuristics(...)`:
+- LLM — основной источник для большинства полей
+- Heuristic имеет приоритет для дат (ISO regex надёжнее)
+- **Защитные гарды** отбрасывают LLM-значения, если промпт не содержит ключевых слов:
+  - `transmission` принимается только если в промпте есть `автомат`, `механика`, `акпп`, `automatic`, `manual`, `коробк`, `gearbox`
+  - `minRating` принимается только если в промпте есть `рейтинг`, `rating`, `звёзд`, `stars`, `оцен`
 
-LLM parser должен вернуть только JSON по фиксированной схеме.
+Эти гарды решают классический кейс: "нужна камри" — LLM галлюцинирует `transmission: manual`, но промпт не содержит transmission-ключевика → отбрасывается.
 
-Он особенно полезен для:
+#### Наследование контекста из истории
 
-- более свободных формулировок;
-- извлечения дат;
-- более мягкого понимания style/brand intent;
-- случаев, где rule-based parser ничего не нашёл.
+Для коротких/продолжающих запросов (`подешевле`, `теперь автомат`, `не спорт`) фильтры наследуются из предыдущего ассистент-сообщения с `appliedFilters`. Для reset-маркеров (`привет`, `новый запрос`) контекст обрывается.
 
-### 5. reconcile: как сервис объединяет heuristic и LLM
-
-Сервис не доверяет LLM безусловно.
-
-После ответа модели применяется `reconcileWithHeuristics(...)`, где:
-
-- бюджет берётся из heuristic parser, если он его нашёл;
-- пассажиры берутся из heuristic parser, если он их нашёл;
-- коробка берётся из heuristic parser;
-- рейтинг берётся из heuristic parser;
-- год учитывается только если в prompt есть явный year intent;
-- стили и бренды модель может расширить, но не в follow-up запросах, где это рискованно.
-
-Идея простая: rule-based логика отвечает за точные поля, а модель помогает там, где нужна семаника.
-
-### 6. Наследование контекста из истории
-
-Если текущий prompt короткий или похож на продолжение предыдущего запроса, `queryParser` может унаследовать прошлые фильтры из истории чата.
-
-Сервис ищет последнее сообщение ассистента, у которого есть `appliedFilters`, и использует его как предыдущий контекст.
-
-Это срабатывает для запросов вида:
-
-- `не спорт`
-- `подешевле`
-- `дороже`
-- `теперь автомат`
-- `от 2022`
-- `6 мест`
-
-Контекст не наследуется для явного reset/greeting, например:
-
-- `привет`
-- `сначала`
-- `новый запрос`
-- `reset`
-
-При merge:
-
-- отсутствующие поля берутся из прошлого запроса;
-- новые `excludedStyles` объединяются с предыдущими;
-- `preferredStyles` очищаются от того, что пользователь исключил;
-- даты и флаг availability тоже могут наследоваться.
-
-### 7. Clarification или полноценный поиск
-
-После парсинга сервис решает, достаточно ли критериев для реального поиска.
-
-Если filters почти пустые, а текст слишком общий, сервис не запускает поиск, а возвращает уточняющий ответ.
-
-Примеры запросов, где сервис может попросить уточнение:
-
-- `привет`
-- `что посоветуешь`
-- `машину`
-
-Если в запросе уже есть достаточные search signals, запускается поиск.
-
-## Как работает `searchCars`
+## Hybrid search с Reciprocal Rank Fusion
 
 Файл: `src/search/searchService.ts`
 
-### 1. Формирование retrieval prompt
+### 1. Query expansion перед retrieval
 
-Для retrieval сервис не ограничивается исходным `prompt`.
-Он строит расширенный `retrievalPrompt`, в который добавляет:
+Функция `computeQueryExpansions(prompt)` превращает запрос в расширенный поисковый prompt:
 
-- исходный текст;
-- preferred styles;
-- preferred brands;
-- transmission;
-- rating threshold;
-- seats;
-- budget;
-- excluded styles в виде `not ...`.
+- алиасы → канонические английские токены: "камри" → "toyota camry", "кобальт" → "chevrolet cobalt"
+- модели из каталога → с брендом: "cobalt" → "chevrolet cobalt"
 
-Это нужно, чтобы и lexical search, и embedding search лучше отражали извлечённые фильтры.
+Это закрывает разрыв между кириллическими запросами пользователей и латинскими документами в БД.
 
-### 2. Создание embedding
+### 2. Embedding через bge-m3
 
-Для `retrievalPrompt` считается embedding через `createEmbedding(...)`.
+`createEmbedding(...)` использует bge-m3 (мультиязычный SOTA, 1024 dim):
 
-Порядок провайдеров такой:
+1. Если есть `LOCAL_LLM_BASE_URL` — получаем embedding у Ollama;
+2. Если локальный embedding упал — deterministic local fallback;
+3. Если локальной модели нет, но есть `OPENAI_API_KEY` — OpenAI-compatible;
+4. Если всё упало — deterministic local.
 
-1. Если есть `LOCAL_LLM_BASE_URL`, сервис пытается получить embedding у локальной модели.
-2. Если локальный embedding не удался, используется deterministic local fallback.
-3. Если локальной модели нет, но есть `OPENAI_API_KEY`, можно использовать OpenAI-compatible embeddings.
-4. Если и это недоступно или упало, остаётся deterministic local embedding.
+**Размерность: 1024.** Исторически в схеме было 128 с обрезкой через `normalizeDimensions` — это уничтожало семантику. После миграции `V4__resize_vector_to_1024` размерность соответствует нативной для bge-m3.
 
-Все embeddings нормализуются к размерности `128`.
+### 3. Hybrid retrieval в PostgreSQL (RRF)
 
-### 3. Hybrid retrieval в PostgreSQL
+Поиск идёт по таблице `ai_car_documents` через **Reciprocal Rank Fusion**:
 
-Поиск идёт по таблице `ai_car_documents`.
+```sql
+with filtered as (
+  select * from ai_car_documents where <hard_filters>
+),
+vector_ranked as (
+  select partner_car_id, row_number() over (order by vector_embedding <=> $embedding) as vec_rank
+  from filtered
+  order by vector_embedding <=> $embedding
+  limit 60
+),
+lexical_ranked as (
+  select partner_car_id, row_number() over (order by ts_rank_cd(lexical_document, $tsquery) desc) as lex_rank
+  from filtered
+  where lexical_document @@ $tsquery
+  order by ts_rank_cd(lexical_document, $tsquery) desc
+  limit 60
+),
+fused as (
+  select partner_car_id, sum(score) as rrf_score
+  from (
+    select partner_car_id, 0.4 / (60 + vec_rank) as score from vector_ranked
+    union all
+    select partner_car_id, 0.6 / (60 + lex_rank) as score from lexical_ranked
+  )
+  group by partner_car_id
+)
+select * from filtered
+join fused using (partner_car_id)
+order by fused.rrf_score desc
+limit 24
+```
 
-В SQL одновременно считаются:
+Ключевые детали:
+- **Веса 0.6 lexical + 0.4 vector** — именованные сущности (модели/бренды) лучше различаются BM25, чем слабым локальным embedding'ом.
+- Для лексического канала собирается **отдельный набор токенов** через `buildLexicalQueryTokens(...)`: только brands/styles/transmission/expansions, без filler-слов ("нужна", "хочу" и т.п., которые убивают recall с AND-семантикой).
+- **OR-семантика** `to_tsquery('simple', 'toyota | camry | sedan')` — любой matching токен активирует канал.
+- Hard filters в SQL: бюджет × 1.25, seats ≥ passengers, year bounds, transmission, minRating, preferredBrands.
+- Кандидатный пул: 60, финальный лимит: 24.
 
-- `vectorDistance` через `pgvector`;
-- `lexicalScore` через `ts_rank_cd(...)` и `websearch_to_tsquery(...)`.
+### 4. Post-processing
 
-Одновременно в SQL применяются жёсткие фильтры:
+- availability filter через `booking-service`
+- preferred style filter (мягкий — откат к исходному набору если всё отфильтровалось)
+- excluded style filter
+- точный budget filter
 
-- `price_hour <= budget * 1.25`
-- `seats >= passengers`
-- `year >= minYear`
-- `transmission == requested transmission`
-- `rating >= minRating`
-- `brand IN preferredBrands`
+### 5. Business rerank + Personalization
 
-Лимит на этом этапе: `24` кандидата.
+Для каждого кандидата считаются `vectorScore`, `lexicalScore`, `businessScore`, `finalScore`:
 
-Важно: для бюджета в SQL есть мягкий коридор `125%`, чтобы не потерять близкие варианты, если точного совпадения нет.
+```
+finalScore = vectorScore * 0.5 + lexicalScore * 0.2 + businessScore * 0.3
+```
 
-### 4. Post-processing после SQL
+`businessScore` повышается за попадание в бюджет, число мест, коробку, рейтинг, стиль, год, высокий рейтинг.
 
-После получения кандидатов сервис применяет ещё несколько шагов в коде:
+### 6. LLM rerank
 
-- availability filter по датам через `booking-service`;
-- preferred style filter;
-- excluded style filter;
-- точный budget filter.
+`rerankCarsWithLlm` вызывается только при **≥4 кандидатах** (иначе нет смысла). LLM получает топ-10 и возвращает переупорядоченный список ID. Таймаут 5 секунд с fallback на детерминистическую сортировку.
 
-Логика для preferred styles мягкая:
+### 7. Personalization boost
 
-- если после style filter остались совпадения, остаются только они;
-- если style filter всё вырезал, сервис откатывается к исходному набору.
+Если запрос включает `userId` и в `user_embeddings` есть вектор пользователя:
 
-То есть стиль здесь не превращается в жёсткий стоп-фильтр, который случайно убьёт все результаты.
+```
+personalBoost = max(0, cosine(user_vec, doc_vec)) * 0.15
+finalScore += personalBoost
+```
 
-### 5. Business rerank
+Если cosine > 0.6 — добавляется reason "похоже на ваши прошлые выборы". Детали см. раздел "Персонализация".
 
-Для каждого кандидата вычисляются:
-
-- `vectorScore`
-- `lexicalScore`
-- `businessScore`
-- `finalScore`
-
-`businessScore` повышается за:
-
-- попадание в бюджет;
-- достаточное число мест;
-- нужную коробку;
-- достаточный рейтинг;
-- совпадение по стилю;
-- год не ниже запрошенного;
-- просто высокий рейтинг машины.
-
-Итоговая формула:
-
-- `finalScore = vectorScore * 0.5 + lexicalScore * 0.2 + businessScore * 0.3`
-
-После этого:
-
-- кандидаты сортируются по `finalScore`;
-- остаются top 6;
-- для каждой машины формируются краткие `reasons`.
-
-## Как формируется текст ответа
+## Формирование ответа
 
 Файл: `src/ai/answerComposer.ts`
 
-Сейчас основной recommendation text формируется детерминированно.
+### Recommendation summary
 
-То есть сервис:
+Если `LLM_RECOMMENDATION_SUMMARY_ENABLED=true`, сервис использует локальную LLM для создания summary на основе топ-6 машин. LLM получает краткую карточку каждой машины (brand, model, year, price, rating, tags) и пишет 1-2 предложения на русском.
 
-- не пишет итоговую рекомендацию через LLM;
-- не пересказывает результаты моделью;
-- не делает генеративный summary для обычного search response.
+Таймаут 5 секунд. При падении — fallback на шаблонный summary.
 
-Итоговый ответ собирается шаблонно на основе:
+### Clarification
 
-- количества найденных машин;
-- учтённого бюджета;
-- коробки;
-- рейтинга;
-- вместимости;
-- style preference.
-
-LLM сейчас используется только для короткого clarification reply, если сервису не хватает критериев для поиска.
-
-Если локальная LLM для clarification недоступна, используется жёстко заданный fallback text.
+Для пустых/неопределённых запросов сервис возвращает clarification. LLM генерирует живой ответ с приветствием и уточняющим вопросом. Fallback — детерминированный текст.
 
 ## Индексация
 
 Файл: `src/indexing/searchIndexer.ts`
 
-Индексация нужна, чтобы подготовить поисковые документы заранее.
-
 ### Полный reindex
 
 `reindexEverything()`:
+1. Запрашивает список доступных моделей из `car-service`
+2. Для каждой модели — partner cars
+3. Для каждой partner car — собирает документ, делает upsert
+4. Удаляет из индекса неактивные машины
+5. Перезагружает taxonomy из БД
 
-1. Запрашивает список доступных моделей из `car-service`.
-2. Для каждой модели запрашивает partner cars.
-3. Для каждой partner car строит документ.
-4. Upsert'ит документ в `ai_car_documents`.
-5. Удаляет из индекса те машины, которых больше нет среди активных.
+Запускается:
+- при старте, если `AUTO_INDEX_ON_STARTUP=true`
+- по таймеру `AUTO_REFRESH_INTERVAL_SECONDS`
+- через `POST /internal/reindex`
 
-Полный reindex вызывается:
+### Обогащённый `searchable_text`
 
-- на старте сервиса, если `AUTO_INDEX_ON_STARTUP=true`;
-- по cron-like таймеру через `AUTO_REFRESH_INTERVAL_SECONDS`;
-- через `POST /internal/reindex`.
+Для каждой машины собирается структурированный текст:
+
+```
+<brand> <model> <year>
+specs: engine <engine> transmission <trans> fuel <fuel>
+style: <price_tier_phrase> <style_phrases>
+description: <model_description>
+color <color>
+features: <feature1>, <feature2>
+<seats> seats
+by <partner_name>
+<tags>
+reviews: <top_5_comments>
+```
+
+Два helper'а добавляют семантические фразы для лучшего BM25 и embedding:
+
+- `buildStyleNarrative(tags, priceHour)` — "budget city daily commute", "luxury premium high-end"
+- `buildSpecsNarrative(modelDetails)` — "engine 2.5L transmission Automatic fuel Petrol"
+
+Эти natural-language фразы даёт более сильный сигнал чем plain список тегов.
 
 ### Точечный reindex
 
 `reindexPartnerCar(partnerCarId)`:
-
 - обновляет один документ;
-- если машина больше неактивна, удаляет её из индекса.
+- удаляет, если машина неактивна.
 
-Вызывается:
+Вызывается через `POST /internal/reindex/partner-cars/:id` и через RabbitMQ.
 
-- через `POST /internal/reindex/partner-cars/:partnerCarId`;
-- через RabbitMQ события.
+## Схема БД
 
-### Из каких сервисов тянутся данные
+Миграции в `src/Migrations/`:
 
-Через `catalogClient.ts` индексатор ходит в:
-
-- `car-service`
-  - список доступных моделей;
-  - детали модели;
-  - список partner cars;
-  - детали partner car;
-- `partner-service`
-  - публичный профиль партнёра;
-- `booking-service`
-  - проверка availability по датам.
-
-### Что попадает в поисковый документ
-
-Для каждой машины сервис собирает:
-
-- `brand`
-- `model`
-- `year`
-- `title`
-- `description`
-- `color`
-- `transmission`
-- `fuelType`
-- `engine`
-- `seats`
-- `priceHour`
-- `priceDay`
-- `rating`
-- `ratingsCount`
-- `imageUrl`
-- `carrierName`
-- `detailsUrl`
-- `bookingUrl`
-- `tags`
-- `searchableText`
-- `embedding`
-
-`searchableText` склеивается из:
-
-- названия модели;
-- описания;
-- цвета;
-- двигателя;
-- коробки;
-- топлива;
-- количества мест;
-- имени партнёра;
-- тегов;
-- комментариев к машине.
-
-### Теги
-
-`buildSearchTags(...)` добавляет в документ нормализованные теги на основе:
-
-- features;
-- engine;
-- transmission;
-- fuelType;
-- seats.
-
-Также делаются простые нормализации вроде:
-
-- transmission -> `automatic` / `manual`
-- fuelType -> `petrol`
-
-## Хранилище и схема БД
+- **V1** `init_ai_search` — таблица `ai_car_documents` + pgvector
+- **V2** `add_ai_chat_histories` — история чата
+- **V3** `add_brand_model_aliases` — алиасы брендов/моделей (cyrillic variants)
+- **V4** `resize_vector_to_1024` — переход с vector(128) на vector(1024) для bge-m3
+- **V5** `add_feedback_tables` — `ai_recommendation_clicks`, `user_embeddings`
 
 ### `ai_car_documents`
 
-Создаётся миграцией `V1__init_ai_search.sql`.
+- бизнес-данные по машине
+- JSON теги
+- `searchable_text`
+- `vector_embedding vector(1024)`
+- generated `lexical_document tsvector` (from title + searchable_text)
 
-Таблица хранит:
+Индексы: GIN по `lexical_document`, B-tree по `partner_user_id` и `price_hour`, IVFFLAT по `vector_embedding`.
 
-- бизнес-данные по машине;
-- JSON-теги;
-- `searchable_text`;
-- `vector_embedding vector(128)`;
-- generated `tsvector` поле `lexical_document`.
+### `brand_model_aliases`
 
-Индексы:
+Динамический словарь транслитерации и алиасов — без хардкода в коде.
 
-- GIN по `lexical_document`;
-- B-tree по `partner_user_id`;
-- B-tree по `price_hour`;
-- IVFFLAT по `vector_embedding`.
+- `alias TEXT` — "камри", "кобальт", "тойота"
+- `canonical_brand TEXT` — "toyota", "chevrolet"
+- `canonical_model TEXT NULL` — "camry", "cobalt" (null для brand-only алиасов)
 
-Это и есть основа hybrid retrieval.
+Используется для:
+- query expansion при retrieval
+- RAG-контекста при LLM parsing
+- intent classification
 
 ### `ai_chat_histories`
 
-Создаётся миграцией `V2__add_ai_chat_histories.sql`.
+История диалога пользователя: `user_id`, `messages jsonb`, `updated_at`.
 
-Хранит:
+### `ai_recommendation_clicks`
 
-- `user_id`
-- `messages jsonb`
-- `updated_at`
+Трекинг кликов из AI-подборки:
+- `user_id UUID NULL`, `session_id TEXT NULL`
+- `prompt TEXT` — оригинальный запрос
+- `partner_car_id BIGINT` — на какую машину кликнули
+- `position INT` — позиция в списке (0 = первая)
+- `clicked_at TIMESTAMPTZ`
 
-История используется для:
+### `user_embeddings`
 
-- показа прошлых сообщений пользователю;
-- наследования фильтров в follow-up запросах.
+Персональные preference-векторы:
+- `user_id UUID PRIMARY KEY`
+- `vector_embedding vector(1024)`
+- `sample_count INT` — сколько взаимодействий легло в вектор
+- `refreshed_at TIMESTAMPTZ`
 
-## История чата
+## Feedback loop
 
-Маршруты:
+### Click tracking
 
-- `GET /history`
-- `PUT /history`
+`POST /click`:
+```json
+{
+  "userId": "uuid | optional",
+  "sessionId": "string | optional",
+  "prompt": "original query",
+  "partnerCarId": 42,
+  "position": 2
+}
+```
 
-Они защищены JWT middleware.
+Возвращает `202 Accepted`. Запись идёт fire-and-forget.
 
-Сервис:
+### Использование сигналов
 
-- вручную валидирует Bearer token;
-- поддерживает только `RS256`;
-- проверяет signature;
-- проверяет `nbf`, `exp`;
-- опционально проверяет `iss` и `aud`;
-- использует `sub` как `userId`.
+Клики — это более сильный relevance-сигнал чем чистое "пользователь увидел". Они:
+1. Питают построение `user_embeddings` (персонализация)
+2. Могут быть использованы для re-ranking: популярные машины в AI-подборке получают boost
+3. Служат evaluation-сигналом: если recall@5 высокий, но click-through низкий — ранжирование слабое
 
-Перед сохранением история проходит нормализацию:
+## Персонализация
 
-- ограничение числа сообщений;
-- ограничение длины текста;
-- нормализация `appliedFilters`;
-- нормализация машин в сообщении;
-- отбрасывание мусорных/битых значений.
+Файл: `src/personalization/userEmbeddings.ts`
 
-## Метрики и observability
+### Как строится user-вектор
 
-Сервис ведёт:
+`refreshUserEmbeddings()`:
+1. Собирает все клики из `ai_recommendation_clicks` за последние 90 дней
+2. Взвешивает: клики × 1.0, бронирования × 2.0 (когда интеграция будет готова)
+3. Группирует по `user_id`
+4. Для каждого пользователя с ≥3 взаимодействий:
+   - берёт `vector_embedding` документов, с которыми он взаимодействовал
+   - считает взвешенный mean → preference vector
+5. Upsert в `user_embeddings`
 
-- `GET /healthz`
-- `GET /metrics`
-- structured logs через `observabilityLogger`
+Это content-based подход: пользователь, который кликает на спортивные купе, получит вектор в sport-coupe регионе embedding пространства.
 
-HTTP-метрики собираются в памяти процесса:
+### Re-rank через cosine boost
 
-- общее число запросов;
-- суммарная длительность по `method + route + status`.
+В `searchCars(...)` после базового ранжирования и LLM-rerank:
 
-Также логируются ключевые события:
+```typescript
+const similarity = cosineSimilarity(userVector, docVector);
+const personalBoost = Math.max(0, similarity) * 0.15;
+candidate.finalScore += personalBoost;
+```
 
-- старт сервиса;
-- ошибки startup;
-- успешный/проваленный parser fallback;
-- reindex completed;
-- reindex failure;
-- chat history load/save;
-- RabbitMQ indexing failures;
-- завершение HTTP request.
+Буст до 0.15 — умеренный, чтобы не перекрыть smart retrieval полностью.
+
+### Запуск refresh
+
+`POST /internal/refresh-user-embeddings` — можно повесить на cron (раз в день) или вызывать из внешнего scheduler.
+
+## Кэш (Redis)
+
+Файл: `src/cache/recommendationCache.ts`
+
+Каждый успешный ответ кэшируется в Redis по нормализованному ключу:
+
+```
+ai-search:recommendation:<lowercase_trimmed_prompt>|h=<history_count>
+```
+
+Параметры:
+- TTL: 300s (`REDIS_CACHE_TTL_SECONDS`)
+- Redis с `maxmemory 128mb` и `allkeys-lru` eviction
+- Connection через `ioredis` с `lazyConnect: false`
+- При падении Redis — silent fallback на in-memory LRU (200 записей, 5 мин TTL)
+
+Это критично: один cached запрос экономит ~22 секунды LLM-времени. На повторяющихся запросах ("cobalt", "семейная машина") hit-rate высокий.
+
+## Offline evaluation
+
+Файл: `src/tests/evalHarness.test.ts`
+
+Golden set из 30 запросов с разметкой "какие машины релевантны". Метрики:
+
+- **recall@k** — процент релевантных машин в топ-k
+- **precision@k** — доля релевантных среди топ-k
+- **MRR** — Mean Reciprocal Rank для запросов с `mustAppearFirst`
+- **avg/p95 latency**
+
+Запуск:
+```bash
+npm run eval
+```
+
+Baseline после всех улучшений (n=30):
+- recall@5 = **0.822**
+- precision@5 = **0.770**
+- MRR = **0.933**
+
+Используется для детекта регрессий при изменении retrieval, embedding, parser.
+
+## Fine-tuning локальной LLM
+
+Папка: `fine-tuning/`
+
+Для улучшения парсинга малая модель (qwen2.5:1.5b) дообучается через LoRA.
+
+### Датасет
+
+`generate_dataset.py` собирает примеры из 10 секций (~3173 примеров):
+
+- **transliteration** — "хачу кобальт" → `brand: chevrolet`
+- **catalog_direct** — прямые названия моделей из каталога
+- **year**, **budget**, **styles**, **other_filters** — одиночные фильтры
+- **combined** — multi-filter запросы
+- **negative** — greetings, gibberish, off-topic → пустые фильтры
+- **anti_hallucination** (×3 weight) — промпты с моделью/брендом без других сигналов → фильтры остаются null
+- **colloquial** — опечатки, сленг ("шеврик", "мэрс")
+- **conversational** — "подешевле", "на выходные" (не leakage в budget)
+- **mixed_language** — "нужна camry", "I need камри"
+- **negation** — "не хочу спорт", "кроме luxury"
+
+### Тренировка
+
+`train.py` — LoRA fine-tuning через unsloth, bf16, 3 epochs на RTX 3060.
+
+### Экспорт в Ollama
+
+`export_gguf.py` конвертирует в GGUF (Q4_K_M) и загружает в Ollama под именем `autorent-assistant`.
+
+После успешной тренировки меняется env-переменная:
+```yaml
+LOCAL_LLM_CHAT_MODEL: autorent-assistant
+```
 
 ## RabbitMQ
 
@@ -525,69 +556,108 @@ HTTP-метрики собираются в памяти процесса:
 - routing key delete: `car.search.partner-car-deleted`
 
 Поведение:
+- upsert → `reindexPartnerCar(...)`
+- delete → удаление документа
+- ошибка → `nack(requeue=false)`
 
-- при upsert event сервис делает `reindexPartnerCar(...)`;
-- при delete event удаляет документ из `ai_car_documents`;
-- при ошибке message уходит в `nack(..., requeue=false)`.
+## GPU для Ollama
 
-Если `RABBITMQ_URL` не задан, consumer просто не запускается.
+CPU inference с qwen2.5:1.5b выдаёт ~20 tok/s. LLM-вызовы занимают 15-25 секунд, часто таймаутятся.
+
+GPU (NVIDIA, CUDA) даёт ~200 tok/s — все LLM-шаги укладываются в 1-3 секунды.
+
+Опт-ин через отдельный compose override:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d
+```
+
+Требования:
+- Linux: `apt install nvidia-container-toolkit` + `systemctl restart docker`
+- Windows: Docker Desktop + WSL2 + up-to-date NVIDIA драйвер
+
+Проверка:
+```bash
+docker run --rm --gpus all nvidia/cuda:12.4.0-base-ubuntu22.04 nvidia-smi
+```
+
+## Метрики и observability
+
+- `GET /healthz`
+- `GET /metrics`
+- structured logs через `observabilityLogger`
+
+Ключевые события:
+- старт/shutdown сервиса
+- parser succeeded/failed (local LLM / OpenAI / heuristic)
+- embedding succeeded/failed
+- hybrid search failure
+- LLM rerank succeeded/failed_fallback
+- LLM summary succeeded/failed_fallback
+- recommendation_cache_hit / redis_connected / redis_error
+- recommendation_intent_fast_path
+- recommendation_click_recorded
+- user_embeddings_refresh_completed
+- reindex completed/failure
+- chat history load/save
+- RabbitMQ indexing failures
+- HTTP request completion с latency
 
 ## Fallback-стратегия
 
-Сервис спроектирован так, чтобы деградировать мягко, а не падать целиком.
+Сервис деградирует мягко, а не падает целиком.
 
 ### Query parsing
 
-- local LLM parser
-- OpenAI-compatible parser
-- heuristic parser
-
-Если модель недоступна, поиск всё равно работает.
+1. Local LLM parser с RAG-контекстом
+2. OpenAI-compatible parser
+3. Heuristic parser
 
 ### Embeddings
 
-- local LLM embeddings
-- OpenAI-compatible embeddings
-- deterministic local embeddings
-
-Если внешние embedding-провайдеры недоступны, сервис всё равно может искать по локальному вектору и lexical search.
+1. Local LLM (bge-m3) embeddings
+2. OpenAI-compatible embeddings
+3. Deterministic local embeddings
 
 ### Ответ ассистента
 
-- clarification может быть сгенерирован локальной LLM;
-- если это не удалось, есть deterministic fallback text;
-- recommendation summary сейчас детерминированный по умолчанию.
+1. LLM recommendation summary
+2. LLM clarification
+3. Deterministic template text
+
+### Кэш
+
+1. Redis
+2. In-memory LRU
 
 ## Ограничения текущей реализации
 
-- heuristic parser знает только ограниченный словарь стилей и брендов;
-- даты нормально извлекаются в основном через LLM parser;
-- recommendation text не генерируется моделью и не делает rich summary по карточкам;
-- style tagging пока довольно простой и зависит от исходных features/transmission/fuelType;
-- full reindex идёт последовательно и может быть дорогим на большом каталоге;
-- SQL retrieval сейчас берёт top 24 кандидата до post-filtering, это может ограничивать recall при очень большом каталоге.
+- heuristic parser знает только ограниченный словарь стилей
+- даты нормально извлекаются в основном через LLM parser
+- style tagging зависит от исходных features/transmission/fuelType
+- full reindex идёт последовательно и может быть дорогим на большом каталоге
+- user_embeddings сейчас только от кликов — бронирования пока не интегрированы
+- при каталоге <10 машин collaborative filtering невозможен (требует thousands+ interactions)
 
 ## Пример жизненного цикла запроса
 
-Запрос пользователя:
+Запрос: `Хочу не спорт, автомат, до 12000, рейтинг от 4.5`
 
-`Хочу не спорт, автомат, до 12000, рейтинг от 4.5`
-
-Сервис делает следующее:
-
-1. Эвристика извлекает:
-   - `excludedStyles = ["sport"]`
-   - `transmission = "automatic"`
-   - `maxBudgetPerHour = 12000`
-   - `minRating = 4.5`
-2. Если доступна LLM, она может дополнительно предложить style/brand/date intent.
-3. `queryParser` объединяет результат модели с эвристикой.
-4. Строится retrieval prompt с этими фильтрами.
-5. Считается embedding.
-6. SQL выбирает кандидатов из `ai_car_documents`.
-7. Сервис вырезает машины со style `sport`.
-8. Считает `businessScore` и `finalScore`.
-9. Возвращает top 6 машин и причины выбора.
+1. **Redis**: miss, идём дальше
+2. **Intent**: classifier видит `transmission`, `budget`, `rating` → `search`
+3. **Parallel**: LLM parser + embedding запускаются параллельно
+4. **Heuristic**: `excludedStyles=["sport"]`, `transmission="automatic"`, `maxBudgetPerHour=12000`, `minRating=4.5`
+5. **LLM**: подтверждает фильтры, может добавить brand intent
+6. **Reconcile**: anti-hallucination гард проверяет — все поля валидны
+7. **Query expansion**: если упоминалась модель, добавляется canonical токен
+8. **Embedding**: bge-m3 → 1024-dim вектор
+9. **SQL hybrid (RRF)**: 60 кандидатов vector + 60 lexical, fusion
+10. **Post-filters**: availability + excluded `sport` + exact budget
+11. **Business rerank**: finalScore
+12. **LLM rerank**: если ≥4 кандидатов
+13. **Personalization**: если есть userId — cosine boost
+14. **Answer**: LLM summary или template
+15. **Redis set**: TTL 300s, ответ
 
 ## Environment
 
@@ -595,19 +665,34 @@ HTTP-метрики собираются в памяти процесса:
 
 Ключевые переменные:
 
-- `DATABASE_URL`
-- `CAR_SERVICE_BASE_URL`
-- `PARTNER_SERVICE_BASE_URL`
-- `BOOKING_SERVICE_BASE_URL`
+**DB и шина**
+- `DATABASE_URL` — PostgreSQL с pgvector
+- `RABBITMQ_URL` — опционально
+- `REDIS_URL` — опционально (fallback на in-memory)
+- `REDIS_CACHE_TTL_SECONDS` — default 300
+
+**Внешние сервисы**
+- `CAR_SERVICE_BASE_URL`, `PARTNER_SERVICE_BASE_URL`, `BOOKING_SERVICE_BASE_URL`
 - `API_GATEWAY_PUBLIC_BASE_URL`
-- `RABBITMQ_URL`
-- `AUTO_INDEX_ON_STARTUP`
-- `AUTO_REFRESH_INTERVAL_SECONDS`
+
+**Индексация**
+- `AUTO_INDEX_ON_STARTUP`, `AUTO_REFRESH_INTERVAL_SECONDS`
+
+**LLM и embeddings**
 - `LOCAL_LLM_BASE_URL`
-- `LOCAL_LLM_CHAT_MODEL`
-- `LOCAL_LLM_EMBEDDING_MODEL`
+- `LOCAL_LLM_CHAT_MODEL` — qwen2.5:1.5b или autorent-assistant
+- `LOCAL_LLM_EMBEDDING_MODEL` — bge-m3
 - `LOCAL_LLM_TIMEOUT_SECONDS`
-- `OPENAI_API_KEY`
-- `OPENAI_BASE_URL`
-- `OPENAI_CHAT_MODEL`
-- `OPENAI_EMBEDDING_MODEL`
+- `LLM_RECOMMENDATION_SUMMARY_ENABLED`
+- `LLM_RECOMMENDATION_SUMMARY_TIMEOUT_MS`
+- `OPENAI_API_KEY`, `OPENAI_BASE_URL`, `OPENAI_CHAT_MODEL`, `OPENAI_EMBEDDING_MODEL`
+
+## Скрипты
+
+```bash
+npm run build         # tsc
+npm run start         # node dist/index.js
+npm run dev           # build + start
+npm run test:llm      # smoke тесты (12 assertion)
+npm run eval          # offline eval с метриками (30 queries)
+```

@@ -3,7 +3,7 @@ import { observabilityLogger } from "../observability/logger";
 import { ParsedRecommendationQuery, SearchCandidate } from "../types";
 
 const MAX_CANDIDATES_TO_RERANK = 10;
-const LLM_RERANK_TIMEOUT_MS = 8000;
+const LLM_RERANK_TIMEOUT_MS = 5000;
 
 type RerankResponse = {
   rankedPartnerCarIds?: number[];
@@ -103,11 +103,13 @@ function normalizeRankedIds(
   return orderedIds;
 }
 
+const MIN_CANDIDATES_FOR_RERANK = 4;
+
 export async function rerankCarsWithLlm(
   query: ParsedRecommendationQuery,
   candidates: SearchCandidate[],
 ): Promise<SearchCandidate[]> {
-  if (candidates.length <= 1) {
+  if (candidates.length < MIN_CANDIDATES_FOR_RERANK) {
     return candidates;
   }
 

@@ -183,48 +183,58 @@ function mergeWithConversationContext(
   };
 }
 
+// Defensive anti-hallucination guard. The small local LLM sometimes fills
+// in transmission/rating when the user never mentioned them (e.g. "нужна
+// камри" → transmission=manual). We only accept the LLM's value if the
+// raw prompt actually contains a related keyword.
+const TRANSMISSION_KEYWORDS = [
+  "автомат", "акпп", "автомате", "automatic", "auto",
+  "механик", "мкпп", "механике", "manual", "stick",
+  "коробк", "gearbox",
+];
+const RATING_KEYWORDS = [
+  "рейтинг", "ratings", "rating", "звёзд", "звезд", "stars", "оцен",
+];
+
+function promptMentionsAny(prompt: string, keywords: string[]): boolean {
+  const normalized = prompt.toLowerCase();
+  return keywords.some((kw) => normalized.includes(kw));
+}
+
 function reconcileWithHeuristics(
   modelQuery: ParsedRecommendationQuery,
   heuristicQuery: ParsedRecommendationQuery,
 ): ParsedRecommendationQuery {
-  const hasYearIntent = hasExplicitYearIntent(modelQuery.prompt);
-  // Trust LLM for styles/brands when heuristic found nothing — no prompt-length gate.
-  const modelPreferredStyles =
-    heuristicQuery.preferredStyles.length === 0 &&
-    heuristicQuery.excludedStyles.length === 0
-      ? modelQuery.preferredStyles
-      : [];
-  const modelExcludedStyles =
-    heuristicQuery.excludedStyles.length === 0
-      ? modelQuery.excludedStyles
-      : [];
-  const modelPreferredBrands =
-    heuristicQuery.preferredBrands.length === 0
-      ? modelQuery.preferredBrands
-      : [];
-  const excludedStyles = unique([
-    ...heuristicQuery.excludedStyles,
-    ...modelExcludedStyles,
-  ]);
-
+  // LLM is the primary source — it understands context (e.g. "2020" is a year, not a price).
+  // Heuristic only supplements for datetime parsing (ISO regex is more reliable than LLM).
+  const prompt = modelQuery.prompt;
+  const transmission =
+    heuristicQuery.transmission ??
+    (promptMentionsAny(prompt, TRANSMISSION_KEYWORDS) ? modelQuery.transmission : null);
+  const minRating =
+    promptMentionsAny(prompt, RATING_KEYWORDS) ? modelQuery.minRating : null;
   return {
     prompt: modelQuery.prompt,
-    maxBudgetPerHour:
-      heuristicQuery.maxBudgetPerHour ?? modelQuery.maxBudgetPerHour,
-    passengers: heuristicQuery.passengers ?? modelQuery.passengers,
-    transmission: heuristicQuery.transmission ?? modelQuery.transmission,
-    minRating: heuristicQuery.minRating ?? modelQuery.minRating,
+    maxBudgetPerHour: modelQuery.maxBudgetPerHour,
+    passengers: modelQuery.passengers,
+    transmission,
+    minRating,
     preferredStyles: unique([
-      ...heuristicQuery.preferredStyles,
-      ...modelPreferredStyles,
-    ]).filter((style) => !excludedStyles.includes(style)),
-    excludedStyles,
-    preferredBrands: unique([
-      ...heuristicQuery.preferredBrands,
-      ...modelPreferredBrands,
+      ...modelQuery.preferredStyles,
+    ]).filter((style) => !modelQuery.excludedStyles.includes(style)),
+    excludedStyles: unique([
+      ...modelQuery.excludedStyles,
     ]),
-    minYear: hasYearIntent ? heuristicQuery.minYear ?? modelQuery.minYear : null,
-    maxYear: hasYearIntent ? heuristicQuery.maxYear ?? modelQuery.maxYear : null,
+    preferredBrands: unique([
+      ...modelQuery.preferredBrands,
+      // Supplement with heuristic brand detection (model→brand dictionary)
+      ...heuristicQuery.preferredBrands.filter(
+        (brand) => !modelQuery.preferredBrands.includes(brand),
+      ),
+    ]),
+    minYear: modelQuery.minYear,
+    maxYear: modelQuery.maxYear,
+    // Dates: heuristic ISO parsing is more reliable than LLM
     startTime: heuristicQuery.startTime ?? modelQuery.startTime,
     endTime: heuristicQuery.endTime ?? modelQuery.endTime,
     requiresAvailableOnDates:

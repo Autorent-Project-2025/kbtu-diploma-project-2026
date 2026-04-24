@@ -19,9 +19,15 @@ export const TRANSMISSION_DICTIONARY: Array<{ label: string; variants: string[] 
   { label: "manual", variants: ["manual", "механик", "мкпп"] },
 ];
 
-// Dynamic dictionaries loaded from ai_car_documents at startup
+// Dynamic dictionaries — loaded from DB at startup, zero hardcoded brands/models
 let _brands: string[] = [];
 let _modelToBrand: Record<string, string> = {};
+// Maps cyrillic/variant aliases back to their canonical english model token.
+// E.g. "камри" → "camry", "кобальт" → "cobalt". Used for query expansion
+// so that retrieval vocabulary matches the indexed documents.
+let _aliasToCanonicalModel: Record<string, string> = {};
+// Maps aliases back to their canonical english brand token. E.g. "тойота" → "toyota".
+let _aliasToCanonicalBrand: Record<string, string> = {};
 
 export function getBrandDictionary(): string[] {
   return _brands;
@@ -31,25 +37,81 @@ export function getModelToBrandDictionary(): Record<string, string> {
   return _modelToBrand;
 }
 
+export function getAliasToCanonicalModel(): Record<string, string> {
+  return _aliasToCanonicalModel;
+}
+
+export function getAliasToCanonicalBrand(): Record<string, string> {
+  return _aliasToCanonicalBrand;
+}
+
+export function getCatalogSummary(): string {
+  if (_brands.length === 0) return "";
+  const seen = new Set<string>();
+  const entries: string[] = [];
+  for (const [model, brand] of Object.entries(_modelToBrand)) {
+    const key = `${brand} ${model}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      entries.push(key);
+    }
+  }
+  return entries.length > 0 ? `Available cars in catalog: ${entries.join(", ")}` : "";
+}
+
 export async function loadTaxonomyFromDatabase(): Promise<void> {
-  const rows = await sql<{ brand: string; model: string }[]>`
+  const brandSet = new Set<string>();
+  const modelMap: Record<string, string> = {};
+
+  // 1. Brands and models from indexed car documents
+  const carRows = await sql<{ brand: string; model: string }[]>`
     select distinct lower(brand) as brand, lower(model) as model
     from ai_car_documents
     where brand is not null and model is not null
   `;
 
-  const brandSet = new Set<string>();
-  const modelMap: Record<string, string> = {};
-
-  for (const row of rows) {
+  for (const row of carRows) {
     const brand = row.brand.trim();
     const model = row.model.trim();
     if (brand) brandSet.add(brand);
     if (model && brand) modelMap[model] = brand;
   }
 
+  // 2. Aliases from brand_model_aliases table (cyrillic, abbreviations, etc.)
+  //    Managed via SQL migration — no hardcoded aliases in code.
+  const aliasToModel: Record<string, string> = {};
+  const aliasToBrand: Record<string, string> = {};
+  try {
+    const aliasRows = await sql<{ alias: string; canonical_brand: string; canonical_model: string | null }[]>`
+      select lower(alias) as alias, lower(canonical_brand) as canonical_brand,
+             lower(coalesce(canonical_model, '')) as canonical_model
+      from brand_model_aliases
+    `;
+
+    for (const row of aliasRows) {
+      const alias = row.alias.trim();
+      const brand = row.canonical_brand.trim();
+      if (!alias || !brand) continue;
+
+      const canonicalModel = row.canonical_model?.trim();
+      if (canonicalModel) {
+        // Alias for a model (e.g. "камри" → toyota camry)
+        modelMap[alias] = brand;
+        aliasToModel[alias] = canonicalModel;
+      } else {
+        // Alias for a brand only (e.g. "тойота" → toyota)
+        brandSet.add(alias);
+        aliasToBrand[alias] = brand;
+      }
+    }
+  } catch {
+    // Table may not exist on first migration run
+  }
+
   _brands = [...brandSet];
   _modelToBrand = modelMap;
+  _aliasToCanonicalModel = aliasToModel;
+  _aliasToCanonicalBrand = aliasToBrand;
 }
 
 export const STYLE_LABELS_TEXT = STYLE_DICTIONARY.map((item) => item.label).join(", ");
