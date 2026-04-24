@@ -8,18 +8,21 @@
 - `partner rejected`;
 - `partner car approved`;
 - `partner car rejected`;
+- `chat new message`;
 - `custom`.
 
 ## Стек
 - Node.js
 - TypeScript (runtime: `node --experimental-strip-types`)
 - Nodemailer
+- RabbitMQ consumer
 
 ## API
 Base path: `/`.
 
 Маршруты:
 - `GET /health`
+- `GET /healthz`
 - `POST /emails/approved`
 - `POST /emails/rejected`
 - `POST /emails/partners/approved`
@@ -27,6 +30,20 @@ Base path: `/`.
 - `POST /emails/partners/cars/approved`
 - `POST /emails/partners/cars/rejected`
 - `POST /emails/custom`
+
+HTTP API оставлен для custom/internal сценариев. Основные ticket/chat уведомления в текущем compose приходят через RabbitMQ.
+
+## RabbitMQ
+Consumer слушает exchange `RABBITMQ_EXCHANGE` (`autorent.events` по умолчанию), queue `email-service.notifications`.
+
+Routing keys:
+- `ticket.email.client-approved`
+- `ticket.email.client-rejected`
+- `ticket.email.partner-approved`
+- `ticket.email.partner-rejected`
+- `ticket.email.partner-car-approved`
+- `ticket.email.partner-car-rejected`
+- `chat.email.new-message`
 
 Пример `POST /emails/approved`:
 
@@ -50,6 +67,9 @@ Base path: `/`.
 - `SMTP_USER`
 - `SMTP_PASS`
 - `SMTP_FROM`
+- `RABBITMQ_URL`
+- `RABBITMQ_EXCHANGE`
+- `EMAIL_EVENT_DEDUP_TTL_MS`
 
 ## Запуск
 ### Локально

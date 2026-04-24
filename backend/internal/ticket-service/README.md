@@ -1,17 +1,21 @@
 # Ticket Service
 
 ## Назначение
-Сервис тикетов регистрации/верификации и оркестрации одобрения. Поддерживает типы:
+Сервис тикетов регистрации/верификации, жалоб и менеджерских review-потоков. Поддерживает типы:
 - `Client` - регистрация клиента;
 - `Partner` - регистрация партнера;
-- `PartnerCar` - добавление машины партнером через согласование.
+- `PartnerCar` - добавление машины партнером через согласование;
+- booking completion review и partner cancellation review через ticket workflow;
+- complaints и booking access requests.
 
 Основные задачи:
 - создание тикета;
 - просмотр pending-очереди менеджером;
 - approve/reject с фиксированием причины/менеджера/времени;
 - интеграции с другими сервисами при approve/reject;
-- выдача временных ссылок на документы тикета.
+- выдача временных ссылок на документы тикета;
+- очередь жалоб, action logs, reopen requests и доступ к booking review;
+- создание/миграция chat conversations для complaint context.
 
 ### ERM Диаграмма
 ![ERM](./docs/images/erm.png)
@@ -22,6 +26,7 @@
 - PostgreSQL
 - Flyway (миграции через корневой `docker-compose.yml`)
 - JWT авторизация
+- RabbitMQ outbox для workflow events
 
 ## API
 Нативный base path сервиса: `/`.
@@ -29,14 +34,47 @@
 
 Маршруты:
 - `POST /` (`AllowAnonymous`) - создание тикета (`multipart/form-data`)
+- `GET /all` (policy `tickets:view-all`)
 - `GET /pending` (policy `tickets:view`)
 - `GET /{id:guid}` (policy `tickets:view`)
 - `GET /{id:guid}/documents/{documentType}/temporary-link` (policy `tickets:view`)
   - `documentType`: `identity` | `license` | `ownership`
 - `POST /{id:guid}/approve` (policy `tickets:approve`)
 - `POST /{id:guid}/reject` (policy `tickets:reject`)
+- `POST /{id:guid}/issue-fine` (booking completion fine workflow)
 - `GET /healthz`
 - `GET /metrics`
+
+### Complaints (`/complaints`)
+- `POST /complaints` - создать жалобу (`multipart/form-data`)
+- `GET /complaints/my`
+- `GET /complaints/my/{id:guid}`
+- `POST /complaints/my/{id:guid}/respond`
+- `GET /complaints/my/by-booking/{bookingId:int}`
+- `POST /complaints/my/{id:guid}/reopen-request`
+- `GET /complaints/my/{id:guid}/reopen-requests`
+- `GET /complaints/all` (manager queue)
+- `GET /complaints/all/{id:guid}`
+- `POST /complaints/all/{id:guid}/take`
+- `POST /complaints/all/{id:guid}/request-info`
+- `POST /complaints/all/{id:guid}/note`
+- `POST /complaints/all/{id:guid}/resolve`
+- `POST /complaints/all/{id:guid}/reject`
+- `POST /complaints/all/{id:guid}/actions/cancel-booking`
+- `POST /complaints/all/{id:guid}/actions/waive-charge`
+- `POST /complaints/all/{id:guid}/actions/escalate`
+- `POST /complaints/all/{id:guid}/actions/refund-charge`
+- `GET /complaints/all/{id:guid}/action-logs`
+
+### Booking access requests
+- `POST /complaints/{complaintId:guid}/booking-access-requests`
+- `GET /complaints/{complaintId:guid}/booking-access-requests/mine`
+- `GET /complaints/{complaintId:guid}/booking-review`
+- `GET /complaints/access-requests`
+- `GET /complaints/access-requests/{id:guid}`
+- `POST /complaints/access-requests/{id:guid}/approve`
+- `POST /complaints/access-requests/{id:guid}/reject`
+- `POST /complaints/access-requests/{id:guid}/revoke`
 
 ## Контракты
 ### Создание тикета (`POST /`)
@@ -121,14 +159,16 @@ Body необязателен.
 - `image-service`
   - `POST /api/images` (с `Authorization`) для загрузки фото `PartnerCar`
 - `car-service`
-  - `POST /internal/partner-cars/provision` (`X-Internal-Api-Key`) после approve `PartnerCar`
+  - provisioning `PartnerCar` выполняется через RabbitMQ-событие `ticket.partner-car-provision-requested`
+- `booking-service`
+  - booking completion review, partner cancellation review, cancel booking action
+- `payment-service`
+  - refund/waive/fine flows через booking/payment workflows
+- `chat-service`
+  - conversations для complaints и системные сообщения
 - `email-service`
-  - `POST /emails/approved`
-  - `POST /emails/rejected`
-  - `POST /emails/partners/approved`
-  - `POST /emails/partners/rejected`
-  - `POST /emails/partners/cars/approved`
-  - `POST /emails/partners/cars/rejected`
+  - стандартные ticket email-уведомления отправляются через RabbitMQ-события;
+  - часть custom booking/complaint уведомлений может отправляться прямым HTTP-клиентом.
 
 ## Переменные окружения
 См. `./.env.example`:
@@ -137,6 +177,10 @@ Body необязателен.
 - `IdentityService__BaseUrl`
 - `IdentityService__InternalApiKey`
 - `EmailService__BaseUrl`
+- `ChatService__BaseUrl`
+- `ChatService__InternalApiKey`
+- `BookingService__BaseUrl`
+- `BookingService__InternalApiKey`
 - `ClientService__BaseUrl`
 - `ClientService__InternalApiKey`
 - `PartnerService__BaseUrl`
@@ -146,6 +190,11 @@ Body необязателен.
 - `ImageService__BaseUrl`
 - `CarService__BaseUrl`
 - `CarService__InternalApiKey`
+- `RabbitMq__HostName`
+- `RabbitMq__Port`
+- `RabbitMq__UserName`
+- `RabbitMq__Password`
+- `RabbitMq__ExchangeName`
 - `Activation__SetPasswordBaseUrl`
 - `EXTERNAL_PORT`
 - `POSTGRES_USER`
@@ -173,8 +222,12 @@ docker compose up --build ticket-db ticket-flyway ticket-service
 Права проверяются по claim `permissions` в JWT.
 
 - `Ticket.View` - `GET /pending`, `GET /{id}`, `GET /{id}/documents/...`
+- `Ticket.ViewAll` - `GET /all`, super-manager views
 - `Ticket.Approve` - `POST /{id}/approve`
 - `Ticket.Reject` - `POST /{id}/reject`
+- `Complaint.View` - manager complaint queue
+- `Complaint.Review` - complaint actions and booking review
+- `AccessRequest.Review` - approve/reject/revoke booking access requests
 
 Публичный маршрут без JWT:
 - `POST /` (для `Client` и `Partner`)

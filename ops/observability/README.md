@@ -19,7 +19,7 @@
 | `prometheus/prometheus.yml` | scrape targets и правила опроса |
 | `loki/config.yml` | хранилище и API-конфиг Loki |
 | `tempo/tempo.yml` | конфиг Tempo |
-| `promtail/promtail.yml` | сбор логов из `gateway_logs`, `ticket_logs`, `identity_logs` |
+| `promtail/promtail.yml` | сбор JSON-логов из service volumes |
 | `otel-collector/config.yml` | pipeline для traces/metrics/logs |
 
 ## Как запускается
@@ -42,17 +42,30 @@ docker compose down -v --remove-orphans
 - Tempo: `3200`
 
 ## Что уже подключено
-В текущем compose observability заведен для:
+Метрики в текущем compose собираются Prometheus для:
 - `api-gateway`
 - `ticket-service`
 - `identity-service`
 
-Именно поэтому `promtail` читает тома:
+JSON-логи через Promtail собираются для:
+- `api-gateway`
+- `ticket-service`
+- `identity-service`
+- `car-service`
+- `booking-service`
+- `email-service`
+- `ai-search-service`
+
+Promtail читает соответствующие Docker volumes:
 - `gateway_logs`
 - `ticket_logs`
 - `identity_logs`
+- `car_logs`
+- `booking_logs`
+- `email_logs`
+- `ai_search_logs`
 
-А `Prometheus` и `Grafana` показывают метрики этих сервисов через смонтированные конфиги и preprovisioned dashboard.
+Grafana получает datasource provisioning для Prometheus, Loki и Tempo, а dashboard-ы лежат в `grafana/dashboards`.
 
 ## Практическое замечание
 Если UI недоступен после `docker compose up -d --build`, сначала проверь:

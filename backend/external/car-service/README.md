@@ -8,6 +8,8 @@
 - CRUD изображений моделей и партнерских машин через `image-service`;
 - партнерский кабинет `/my` (сводка, детали, отзывы, связанные бронирования);
 - автоподбор машины по модели и временному интервалу;
+- price estimate на основе `car-market-value-service`;
+- события для переиндексации `ai-search-service`;
 - внутренний provisioning партнерской машины (после approve `PartnerCar` тикета).
 
 ## Структура каталога
@@ -23,7 +25,8 @@
 - PostgreSQL
 - Flyway (SQL миграции)
 - JWT авторизация
-- HTTP-интеграции с `partner-service`, `booking-service`, `image-service`
+- HTTP-интеграции с `partner-service`, `booking-service`, `image-service`, `car-market-value-service`
+- RabbitMQ events для search index refresh
 
 ## API
 Нативный base path сервиса: `/`.
@@ -79,6 +82,10 @@
 - `GET /available-models` (`AllowAnonymous`)
   - список моделей, по которым есть машины в статусе `Available`
   - содержит `availableCarsCount`, ценовой диапазон и средний рейтинг
+- `GET /price-estimate` (`AllowAnonymous`)
+  - возвращает оценку стоимости для brand/model/year через `car-market-value-service`
+- `GET /recommendations` (`AllowAnonymous`)
+  - lightweight рекомендации из каталога без LLM-пайплайна
 - `POST /match` (`AllowAnonymous`)
   - подбирает лучшую машину партнера по `modelId + startTime + endTime`
   - сначала берутся кандидаты `status=Available`
@@ -99,6 +106,12 @@
   - если пары `brand+model` нет в каталоге:
     - автоматически создаются `brand`, `model` и новая запись в `car_models`
     - фото машины из тикета сохраняются как `car_model_images` для новой модели
+- `GET /internal/partner-cars/{partnerCarId:int}/snapshot`
+  - snapshot машины для `booking-service` и AI damage context
+- `GET /internal/partner-cars/{partnerCarId:int}/pricing-context`
+  - данные для price-preview и финансовых расчетов
+- `POST /internal/partner-cars/by-partner/{partnerUserId:guid}/set-active`
+  - массовое включение/выключение машин партнера
 
 ## Примеры payload
 ### Создание модели (`POST /models`)
@@ -198,6 +211,8 @@
   - связанных бронирований и агрегатов по машинам в `/my`;
   - проверки доступности кандидатов в `/match` (`/internal/bookings/check-availability`);
 - `image-service` для хранения бинарных изображений (upload/delete/update).
+- `car-market-value-service` для оценки рыночной стоимости.
+- `RabbitMQ` для публикации событий `car.search.partner-car-upserted` / `car.search.partner-car-deleted`, которые читает `ai-search-service`.
 
 ## Переменные окружения
 См. `./.env.example`:
@@ -207,6 +222,7 @@
 - `BookingService__BaseUrl`
 - `BookingService__InternalApiKey`
 - `ImageService__BaseUrl`
+- `CarMarketValueService__BaseUrl`
 - `InternalAuth__ApiKey`
 - `EXTERNAL_PORT`
 - `POSTGRES_USER`

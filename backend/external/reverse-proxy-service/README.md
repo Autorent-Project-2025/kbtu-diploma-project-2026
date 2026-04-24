@@ -26,11 +26,14 @@ Edge-сервис, который является единственной вн
 Входящие префиксы:
 - `/identity/*` -> `IDENTITY_SERVICE_URL`
 - `/cars/*` -> `CAR_SERVICE_URL`
+- `/ai/*` -> `AI_SEARCH_SERVICE_URL`
 - `/bookings/*` -> `BOOKING_SERVICE_URL`
 - `/clients/*` -> `CLIENT_SERVICE_URL`
 - `/partners/*` -> `PARTNER_SERVICE_URL`
 - `/tickets/*` -> `TICKET_SERVICE_URL`
 - `/files/*` -> `FILE_SERVICE_URL`
+- `/chat/*` -> `CHAT_SERVICE_URL`
+- `/payments/*` -> `PAYMENT_SERVICE_URL`
 - `/internal/*` -> `INTERNAL_SERVICE_URL`
 
 Gateway удаляет префикс перед проксированием.
@@ -40,11 +43,14 @@ Gateway удаляет префикс перед проксированием.
 См. `./.env.example` и `src/index.ts`:
 - `IDENTITY_SERVICE_URL`
 - `CAR_SERVICE_URL`
+- `AI_SEARCH_SERVICE_URL`
 - `BOOKING_SERVICE_URL`
 - `CLIENT_SERVICE_URL`
 - `PARTNER_SERVICE_URL`
 - `TICKET_SERVICE_URL`
 - `FILE_SERVICE_URL`
+- `CHAT_SERVICE_URL`
+- `PAYMENT_SERVICE_URL`
 - `INTERNAL_SERVICE_URL`
 - `ALLOWED_ORIGINS`
 - `RATE_LIMIT_WINDOW_MS`

@@ -5,9 +5,12 @@
 - просмотр машин;
 - витрина доступных моделей с карточками (изображение, детали, кнопки `Подробнее`/`Забронировать`);
 - автоподбор машины по модели и интервалу дат из модального окна бронирования;
+- AI-подбор по свободному тексту через `/ai`;
 - регистрация/активация;
 - авторизация;
-- создание и просмотр своих бронирований;
+- создание, оплата, просмотр и завершение своих бронирований;
+- completion review с загрузкой 5 фотографий после поездки;
+- жалобы и чат по контексту жалобы/бронирования;
 - создание тикета на регистрацию;
 - партнерский раздел с машинами и тикетом на добавление новой машины.
 
@@ -24,8 +27,15 @@
 - `/apply` (`/register` -> redirect)
 - `/activate`
 - `/cars`
+- `/ai` (`/car-recommendations` -> redirect)
 - `/cars/:id`
+- `/cars/partner-cars/:id`
 - `/bookings`
+- `/bookings/:id`
+- `/bookings/:id/payment`
+- `/bookings/:id/complete`
+- `/complaints`
+- `/complaints/:id`
 - `/profile`
 - `/profile/user`
 - `/profile/partner`
@@ -54,11 +64,26 @@
 - `GET /cars/partner-cars?carModelId=...`
 - `GET /cars/comments/partner-cars/{partnerCarId}`
 - `POST /cars/match`
+- `POST /ai/recommendations`
+- `GET /ai/history`
+- `PUT /ai/history`
 - `POST /bookings`
 - `GET /bookings/my`
+- `GET /bookings/{id}`
+- `POST /bookings/{id}/payment/start`
+- `GET /bookings/{id}/payment/status`
+- `POST /bookings/{id}/payment/submit`
+- `POST /bookings/{id}/complete-review`
 - `POST /bookings/{id}/cancel`
 - `GET /bookings/available`
+- `GET /bookings/price-preview`
 - `POST /tickets`
+- `GET /tickets/complaints/my`
+- `GET /tickets/complaints/my/{id}`
+- `POST /tickets/complaints`
+- `POST /tickets/complaints/my/{id}/respond`
+- `GET /chat/conversations/by-context/{contextType}/{contextId}`
+- `POST /chat/conversations/{conversationId}/messages`
 - `GET /cars/my`
 - `GET /cars/my/{id}`
 
@@ -106,7 +131,7 @@ UI не проверяет permissions явно для большинства с
 
 Фактические требования:
 - без прав: `/`, `/cars`, `/cars/:id`, `/apply`, `/activate`, создание тикета `POST /tickets`
-- валидный JWT: раздел `/bookings`, автоподбор/бронирование, партнерский кабинет (`/partner/*`)
+- валидный JWT: раздел `/bookings`, оплата, completion review, жалобы, чат, автоподбор/бронирование, партнерский кабинет (`/partner/*`)
 - валидный JWT + `actor_type=partner`: `/profile/partner`, `/partner/*`
 - `Booking.Create`: создание брони (`POST /bookings`)
 
