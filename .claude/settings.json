@@ -43,7 +43,10 @@
       "Bash(curl -s -X POST http://localhost:9186/ai/internal/reindex)",
       "Bash(node dist/tests/evalHarness.test.js)",
       "Bash(python -m pytest tests/test_api.py tests/test_verification.py -x -v)",
-      "Bash(python -c ' *)"
+      "Bash(python -c ' *)",
+      "Bash(grep -E \"\\\\.\\(cs\\)$\")",
+      "Bash(grep -nA 15 \"^  identity-service:\" \"c:/Users/Arlan/Desktop/Проекты/KBTU Diploma Project 2026/docker-compose.yml\")",
+      "Bash(dotnet --list-sdks)"
     ]
   }
 }

@@ -7,15 +7,18 @@ public sealed class AssignPermissionToRoleCommandHandler
 {
     private readonly IRoleRepository _roleRepository;
     private readonly IPermissionRepository _permissionRepository;
+    private readonly IRolePermissionGraphProvider _roleGraphProvider;
     private readonly IIdentityUnitOfWork _unitOfWork;
 
     public AssignPermissionToRoleCommandHandler(
         IRoleRepository roleRepository,
         IPermissionRepository permissionRepository,
+        IRolePermissionGraphProvider roleGraphProvider,
         IIdentityUnitOfWork unitOfWork)
     {
         _roleRepository = roleRepository;
         _permissionRepository = permissionRepository;
+        _roleGraphProvider = roleGraphProvider;
         _unitOfWork = unitOfWork;
     }
 
@@ -41,5 +44,6 @@ public sealed class AssignPermissionToRoleCommandHandler
 
         role.AddPermission(permission);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
+        _roleGraphProvider.Invalidate();
     }
 }

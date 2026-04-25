@@ -6,13 +6,16 @@ namespace IdentityService.Application.Commands.RemovePermissionFromRole;
 public sealed class RemovePermissionFromRoleCommandHandler
 {
     private readonly IRoleRepository _roleRepository;
+    private readonly IRolePermissionGraphProvider _roleGraphProvider;
     private readonly IIdentityUnitOfWork _unitOfWork;
 
     public RemovePermissionFromRoleCommandHandler(
         IRoleRepository roleRepository,
+        IRolePermissionGraphProvider roleGraphProvider,
         IIdentityUnitOfWork unitOfWork)
     {
         _roleRepository = roleRepository;
+        _roleGraphProvider = roleGraphProvider;
         _unitOfWork = unitOfWork;
     }
 
@@ -38,5 +41,6 @@ public sealed class RemovePermissionFromRoleCommandHandler
 
         role.RemovePermission(command.PermissionId);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
+        _roleGraphProvider.Invalidate();
     }
 }

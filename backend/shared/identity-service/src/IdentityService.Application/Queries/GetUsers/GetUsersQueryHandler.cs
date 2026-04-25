@@ -8,12 +8,14 @@ namespace IdentityService.Application.Queries.GetUsers;
 public sealed class GetUsersQueryHandler
 {
     private readonly IUserRepository _userRepository;
-    private readonly IRoleRepository _roleRepository;
+    private readonly IRolePermissionGraphProvider _roleGraphProvider;
 
-    public GetUsersQueryHandler(IUserRepository userRepository, IRoleRepository roleRepository)
+    public GetUsersQueryHandler(
+        IUserRepository userRepository,
+        IRolePermissionGraphProvider roleGraphProvider)
     {
         _userRepository = userRepository;
-        _roleRepository = roleRepository;
+        _roleGraphProvider = roleGraphProvider;
     }
 
     public async Task<GetUsersResult> Handle(
@@ -24,12 +26,7 @@ public sealed class GetUsersQueryHandler
             includeRolesAndPermissions: true,
             cancellationToken: cancellationToken);
 
-        var roles = await _roleRepository.ListAsync(
-            includePermissions: true,
-            includeParentRoles: true,
-            cancellationToken: cancellationToken);
-
-        var roleGraph = RolePermissionResolver.BuildGraph(roles);
+        var roleGraph = await _roleGraphProvider.GetGraphAsync(cancellationToken);
         var result = users.Select(user => MapUser(user, roleGraph)).ToArray();
         return new GetUsersResult(result);
     }

@@ -10,7 +10,7 @@ namespace IdentityService.Application.Commands.LoginUser;
 public sealed class LoginUserCommandHandler
 {
     private readonly IUserRepository _userRepository;
-    private readonly IRoleRepository _roleRepository;
+    private readonly IRolePermissionGraphProvider _roleGraphProvider;
     private readonly IRefreshTokenRepository _refreshTokenRepository;
     private readonly IPasswordHasher _passwordHasher;
     private readonly IJwtProvider _jwtProvider;
@@ -18,14 +18,14 @@ public sealed class LoginUserCommandHandler
 
     public LoginUserCommandHandler(
         IUserRepository userRepository,
-        IRoleRepository roleRepository,
+        IRolePermissionGraphProvider roleGraphProvider,
         IRefreshTokenRepository refreshTokenRepository,
         IPasswordHasher passwordHasher,
         IJwtProvider jwtProvider,
         IIdentityUnitOfWork unitOfWork)
     {
         _userRepository = userRepository;
-        _roleRepository = roleRepository;
+        _roleGraphProvider = roleGraphProvider;
         _refreshTokenRepository = refreshTokenRepository;
         _passwordHasher = passwordHasher;
         _jwtProvider = jwtProvider;
@@ -54,12 +54,7 @@ public sealed class LoginUserCommandHandler
             throw new UnauthorizedException("User account is deactivated.");
         }
 
-        var roles = await _roleRepository.ListAsync(
-            includePermissions: true,
-            includeParentRoles: true,
-            cancellationToken: cancellationToken);
-
-        var roleGraph = RolePermissionResolver.BuildGraph(roles);
+        var roleGraph = await _roleGraphProvider.GetGraphAsync(cancellationToken);
         var permissions = RolePermissionResolver.ResolveEffectivePermissions(
             user.Roles.Select(role => role.Id),
             roleGraph);

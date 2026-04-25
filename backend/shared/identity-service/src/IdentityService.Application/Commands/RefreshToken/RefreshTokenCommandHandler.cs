@@ -9,18 +9,18 @@ namespace IdentityService.Application.Commands.RefreshToken;
 
 public sealed class RefreshTokenCommandHandler
 {
-    private readonly IRoleRepository _roleRepository;
+    private readonly IRolePermissionGraphProvider _roleGraphProvider;
     private readonly IRefreshTokenRepository _refreshTokenRepository;
     private readonly IJwtProvider _jwtProvider;
     private readonly IIdentityUnitOfWork _unitOfWork;
 
     public RefreshTokenCommandHandler(
-        IRoleRepository roleRepository,
+        IRolePermissionGraphProvider roleGraphProvider,
         IRefreshTokenRepository refreshTokenRepository,
         IJwtProvider jwtProvider,
         IIdentityUnitOfWork unitOfWork)
     {
-        _roleRepository = roleRepository;
+        _roleGraphProvider = roleGraphProvider;
         _refreshTokenRepository = refreshTokenRepository;
         _jwtProvider = jwtProvider;
         _unitOfWork = unitOfWork;
@@ -60,12 +60,7 @@ public sealed class RefreshTokenCommandHandler
 
         storedRefreshToken.Revoke(nowUtc);
 
-        var roles = await _roleRepository.ListAsync(
-            includePermissions: true,
-            includeParentRoles: true,
-            cancellationToken: cancellationToken);
-
-        var roleGraph = RolePermissionResolver.BuildGraph(roles);
+        var roleGraph = await _roleGraphProvider.GetGraphAsync(cancellationToken);
         var permissions = RolePermissionResolver.ResolveEffectivePermissions(
             user.Roles.Select(role => role.Id),
             roleGraph);

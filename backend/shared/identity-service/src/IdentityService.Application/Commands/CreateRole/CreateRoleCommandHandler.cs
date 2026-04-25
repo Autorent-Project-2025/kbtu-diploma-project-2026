@@ -8,15 +8,18 @@ public sealed class CreateRoleCommandHandler
 {
     private readonly IRoleRepository _roleRepository;
     private readonly IPermissionRepository _permissionRepository;
+    private readonly IRolePermissionGraphProvider _roleGraphProvider;
     private readonly IIdentityUnitOfWork _unitOfWork;
 
     public CreateRoleCommandHandler(
         IRoleRepository roleRepository,
         IPermissionRepository permissionRepository,
+        IRolePermissionGraphProvider roleGraphProvider,
         IIdentityUnitOfWork unitOfWork)
     {
         _roleRepository = roleRepository;
         _permissionRepository = permissionRepository;
+        _roleGraphProvider = roleGraphProvider;
         _unitOfWork = unitOfWork;
     }
 
@@ -77,6 +80,7 @@ public sealed class CreateRoleCommandHandler
 
         await _roleRepository.AddAsync(role, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
+        _roleGraphProvider.Invalidate();
 
         return new CreateRoleResult(role.Id, role.Name);
     }
