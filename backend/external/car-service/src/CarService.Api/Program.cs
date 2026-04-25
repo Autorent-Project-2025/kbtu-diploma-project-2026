@@ -22,6 +22,25 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddHttpContextAccessor();
+
+// Output caching for the public partner-car read endpoints. These are
+// AllowAnonymous reads with no per-user data, so caching at the HTTP layer
+// is safe. Mutation endpoints evict by tag "partner-cars" so reads stay
+// consistent with writes within the same process.
+builder.Services.AddOutputCache(options =>
+{
+    options.AddPolicy("partner-cars-list", policy =>
+        policy
+            .Tag("partner-cars")
+            .SetVaryByQuery("page", "pageSize", "carModelId", "status", "partnerUserId", "search")
+            .Expire(TimeSpan.FromSeconds(30)));
+
+    options.AddPolicy("partner-cars-detail", policy =>
+        policy
+            .Tag("partner-cars")
+            .SetVaryByRouteValue("id")
+            .Expire(TimeSpan.FromSeconds(60)));
+});
 builder.Services.AddSingleton<ObservabilityLogWriter>();
 builder.Services.AddTransient<ObservabilityHttpClientHandler>();
 var httpClientResilienceOptions = builder.Configuration.GetHttpClientResilienceOptions();
@@ -250,6 +269,7 @@ app.UseHttpsRedirection();
 app.UseCors("app-cors");
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseOutputCache();
 app.MapControllers();
 app.MapGet("/healthz", () => Results.Ok(new { status = "ok" }));
 

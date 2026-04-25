@@ -29,6 +29,15 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: postgres_db
+    # Default Postgres ships with max_connections=100 — easy to saturate at
+    # 50 VU x N services. Bumping to 300 + warming the page cache with a
+    # bigger shared_buffers gives identity-service real headroom under load.
+    command:
+      - postgres
+      - -c
+      - max_connections=300
+      - -c
+      - shared_buffers=128MB
     expose:
       - "5432"
     volumes:
@@ -71,7 +80,7 @@ services:
         required: false
     environment:
       ASPNETCORE_ENVIRONMENT: Development
-      ConnectionStrings__DbConnection: Host=identity-db;Port=5432;Database=postgres_db;Username=postgres;Password=postgres
+      ConnectionStrings__DbConnection: Host=identity-db;Port=5432;Database=postgres_db;Username=postgres;Password=postgres;Maximum Pool Size=200;Minimum Pool Size=20;Connection Idle Lifetime=60
       InternalAuth__ApiKey: local-identity-service-key
       RabbitMq__HostName: rabbitmq
       RabbitMq__Port: 5672
@@ -470,6 +479,15 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: postgres_db
+    # Match identity-db tuning: default max_connections=100 saturates fast
+    # under booking creation load (Serializable transactions hold connections
+    # longer than typical reads).
+    command:
+      - postgres
+      - -c
+      - max_connections=300
+      - -c
+      - shared_buffers=128MB
     expose:
       - "5432"
     volumes:
@@ -539,7 +557,7 @@ services:
         required: false
     environment:
       ASPNETCORE_ENVIRONMENT: Development
-      ConnectionStrings__DbConnection: Host=booking-db;Port=5432;Database=postgres_db;Username=postgres;Password=postgres
+      ConnectionStrings__DbConnection: Host=booking-db;Port=5432;Database=postgres_db;Username=postgres;Password=postgres;Maximum Pool Size=200;Minimum Pool Size=20;Connection Idle Lifetime=60
       InternalAuth__ApiKey: local-booking-service-key
       Observability__LogPath: /tmp/autorent/booking-service/booking-service.jsonl
       CarService__BaseUrl: http://car-service:8080

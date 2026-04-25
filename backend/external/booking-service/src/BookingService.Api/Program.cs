@@ -5,6 +5,7 @@ using BookingService.Api.Options;
 using BookingService.Application.Constants;
 using BookingService.Application.Interfaces;
 using BookingService.Application.Interfaces.Integrations;
+using BookingService.Infrastructure.Caching;
 using BookingService.Infrastructure.Integrations;
 using BookingService.Infrastructure.Observability;
 using BookingService.Infrastructure.Options;
@@ -23,6 +24,11 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddSingleton<ObservabilityLogWriter>();
 builder.Services.AddTransient<ObservabilityHttpClientHandler>();
+
+// In-process cache used by the booking-service decorators below to keep the
+// hot read paths (pricing context, client booking access) off the network on
+// repeat calls within a short window.
+builder.Services.AddMemoryCache();
 var httpClientResilienceOptions = builder.Configuration.GetHttpClientResilienceOptions();
 builder.Services.Configure<InternalAuthOptions>(builder.Configuration.GetSection(InternalAuthOptions.SectionName));
 builder.Services.Configure<CarServiceOptions>(builder.Configuration.GetSection(CarServiceOptions.SectionName));
@@ -143,7 +149,9 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("bookings:delete", policy =>
         policy.RequireClaim("permissions", PermissionConstants.BookingDelete));
 });
-builder.Services.AddHttpClient<IPartnerCarReadClient, PartnerCarReadClient>((serviceProvider, client) =>
+// HttpClient registers the concrete client only — IPartnerCarReadClient is
+// then bound to CachedPartnerCarReadClient below so reads get cache.
+builder.Services.AddHttpClient<PartnerCarReadClient>((serviceProvider, client) =>
 {
     var options = serviceProvider
         .GetRequiredService<Microsoft.Extensions.Options.IOptions<CarServiceOptions>>()
@@ -159,6 +167,10 @@ builder.Services.AddHttpClient<IPartnerCarReadClient, PartnerCarReadClient>((ser
 })
 .AddHttpMessageHandler<ObservabilityHttpClientHandler>()
 .AddConfiguredResilience(httpClientResilienceOptions);
+builder.Services.AddScoped<IPartnerCarReadClient>(sp =>
+    new CachedPartnerCarReadClient(
+        sp.GetRequiredService<PartnerCarReadClient>(),
+        sp.GetRequiredService<Microsoft.Extensions.Caching.Memory.IMemoryCache>()));
 builder.Services.AddHttpClient<ICarCommentWriteClient, CarCommentWriteClient>((serviceProvider, client) =>
 {
     var options = serviceProvider
@@ -191,7 +203,9 @@ builder.Services.AddHttpClient<IPaymentSyncClient, PaymentSyncClient>((servicePr
 })
 .AddHttpMessageHandler<ObservabilityHttpClientHandler>()
 .AddConfiguredResilience(httpClientResilienceOptions);
-builder.Services.AddHttpClient<IClientBookingAccessClient, ClientBookingAccessClient>((serviceProvider, client) =>
+// HttpClient registers the concrete client only — IClientBookingAccessClient
+// is then bound to CachedClientBookingAccessClient below.
+builder.Services.AddHttpClient<ClientBookingAccessClient>((serviceProvider, client) =>
 {
     var options = serviceProvider
         .GetRequiredService<Microsoft.Extensions.Options.IOptions<ClientServiceOptions>>()
@@ -206,6 +220,10 @@ builder.Services.AddHttpClient<IClientBookingAccessClient, ClientBookingAccessCl
 })
 .AddHttpMessageHandler<ObservabilityHttpClientHandler>()
 .AddConfiguredResilience(httpClientResilienceOptions);
+builder.Services.AddScoped<IClientBookingAccessClient>(sp =>
+    new CachedClientBookingAccessClient(
+        sp.GetRequiredService<ClientBookingAccessClient>(),
+        sp.GetRequiredService<Microsoft.Extensions.Caching.Memory.IMemoryCache>()));
 builder.Services.AddHttpClient<IIdentityUserReadClient, IdentityUserReadClient>((serviceProvider, client) =>
 {
     var options = serviceProvider

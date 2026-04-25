@@ -6,13 +6,16 @@ namespace IdentityService.Application.Commands.RemoveParentRoleFromRole;
 public sealed class RemoveParentRoleFromRoleCommandHandler
 {
     private readonly IRoleRepository _roleRepository;
+    private readonly IRolePermissionGraphProvider _roleGraphProvider;
     private readonly IIdentityUnitOfWork _unitOfWork;
 
     public RemoveParentRoleFromRoleCommandHandler(
         IRoleRepository roleRepository,
+        IRolePermissionGraphProvider roleGraphProvider,
         IIdentityUnitOfWork unitOfWork)
     {
         _roleRepository = roleRepository;
+        _roleGraphProvider = roleGraphProvider;
         _unitOfWork = unitOfWork;
     }
 
@@ -38,5 +41,6 @@ public sealed class RemoveParentRoleFromRoleCommandHandler
 
         role.RemoveParentRole(command.ParentRoleId);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
+        _roleGraphProvider.Invalidate();
     }
 }

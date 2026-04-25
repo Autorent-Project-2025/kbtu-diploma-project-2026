@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 500" font-family="Arial, sans-serif" font-size="13">
+<rect width="900" height="500" fill="white"/>
+<rect x="362" y="15" width="14" height="14" fill="#d9534f"/>
+<text x="382" y="26">Baseline</text>
+<rect x="478" y="15" width="14" height="14" fill="#5cb85c"/>
+<text x="498" y="26">Final</text>
+<text x="20" y="225" text-anchor="middle" transform="rotate(-90 20 225)">P95 response time</text>
+<rect x="80" y="50" width="788" height="350" fill="none" stroke="#ccc"/>
+<line x1="80" y1="400" x2="868" y2="400" stroke="#eee"/>
+<text x="72" y="404" text-anchor="end" fill="#444">100ms</text>
+<line x1="80" y1="283.33333333333337" x2="868" y2="283.33333333333337" stroke="#eee"/>
+<text x="72" y="287.33333333333337" text-anchor="end" fill="#444">1.0s</text>
+<line x1="80" y1="166.66666666666669" x2="868" y2="166.66666666666669" stroke="#eee"/>
+<text x="72" y="170.66666666666669" text-anchor="end" fill="#444">10.0s</text>
+<line x1="80" y1="50" x2="868" y2="50" stroke="#eee"/>
+<text x="72" y="54" text-anchor="end" fill="#444">100.0s</text>
+<rect x="97.70000000000002" y="81.53792273278543" width="45.96666666666667" height="318.46207726721457" fill="#d9534f"/>
+<text x="120.68333333333335" y="77.53792273278543" text-anchor="middle" font-size="11" fill="#222">53.7s</text>
+<rect x="147.66666666666669" y="326.77947866032054" width="45.96666666666667" height="73.22052133967946" fill="#5cb85c"/>
+<text x="170.65000000000003" y="322.77947866032054" text-anchor="middle" font-size="11" fill="#222">424ms</text>
+<text x="145.66666666666669" y="424" text-anchor="end" transform="rotate(-30 145.66666666666669 424)">Login</text>
+<rect x="229.03333333333333" y="320.73341206191947" width="45.96666666666667" height="79.26658793808053" fill="#d9534f"/>
+<text x="252.01666666666665" y="316.73341206191947" text-anchor="middle" font-size="11" fill="#222">478ms</text>
+<rect x="279" y="326.56287229576577" width="45.96666666666667" height="73.43712770423423" fill="#5cb85c"/>
+<text x="301.98333333333335" y="322.56287229576577" text-anchor="middle" font-size="11" fill="#222">426ms</text>
+<text x="277" y="424" text-anchor="end" transform="rotate(-30 277 424)">Catalog</text>
+<rect x="360.3666666666667" y="99.91299674514308" width="45.96666666666667" height="300.08700325485694" fill="#d9534f"/>
+<text x="383.35" y="95.91299674514308" text-anchor="middle" font-size="11" fill="#222">37.3s</text>
+<rect x="410.33333333333337" y="358.1109454432703" width="45.96666666666667" height="41.88905455672972" fill="#5cb85c"/>
+<text x="433.3166666666667" y="354.1109454432703" text-anchor="middle" font-size="11" fill="#222">229ms</text>
+<text x="408.33333333333337" y="424" text-anchor="end" transform="rotate(-30 408.33333333333337 424)">Car details</text>
+<rect x="491.70000000000005" y="75.88319859043804" width="45.96666666666667" height="324.11680140956196" fill="#d9534f"/>
+<text x="514.6833333333334" y="71.88319859043804" text-anchor="middle" font-size="11" fill="#222">60.0s</text>
+<rect x="541.6666666666667" y="344.0998064678511" width="45.96666666666667" height="55.900193532148876" fill="#5cb85c"/>
+<text x="564.6500000000001" y="340.0998064678511" text-anchor="middle" font-size="11" fill="#222">301ms</text>
+<text x="539.6666666666667" y="424" text-anchor="end" transform="rotate(-30 539.6666666666667 424)">Price preview</text>
+<rect x="623.0333333333333" y="75.88235412190824" width="45.96666666666667" height="324.11764587809176" fill="#d9534f"/>
+<text x="646.0166666666667" y="71.88235412190824" text-anchor="middle" font-size="11" fill="#222">60.0s</text>
+<rect x="673" y="358.9130574214841" width="45.96666666666667" height="41.0869425785159" fill="#5cb85c"/>
+<text x="695.9833333333333" y="354.9130574214841" text-anchor="middle" font-size="11" fill="#222">225ms</text>
+<text x="671" y="424" text-anchor="end" transform="rotate(-30 671 424)">Booking creation</text>
+<rect x="754.3666666666667" y="354.5972901574712" width="45.96666666666667" height="45.40270984252879" fill="#d9534f"/>
+<text x="777.35" y="350.5972901574712" text-anchor="middle" font-size="11" fill="#222">245ms</text>
+<rect x="804.3333333333334" y="352.89761142633995" width="45.96666666666667" height="47.10238857366005" fill="#5cb85c"/>
+<text x="827.3166666666667" y="348.89761142633995" text-anchor="middle" font-size="11" fill="#222">253ms</text>
+<text x="802.3333333333334" y="424" text-anchor="end" transform="rotate(-30 802.3333333333334 424)">Ticket queue</text>
+</svg>

@@ -4,6 +4,7 @@ using CarService.Application.Interfaces;
 using CarService.Application.Interfaces.Integrations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.OutputCaching;
 
 namespace CarService.Api.Controllers
 {
@@ -11,19 +12,25 @@ namespace CarService.Api.Controllers
     [Route("partner-cars")]
     public sealed class PartnerCarsController : ControllerBase
     {
+        private const string PartnerCarsCacheTag = "partner-cars";
+
         private readonly IPartnerCarService _partnerCarService;
         private readonly IPartnerContextClient _partnerContextClient;
+        private readonly IOutputCacheStore _outputCacheStore;
 
         public PartnerCarsController(
             IPartnerCarService partnerCarService,
-            IPartnerContextClient partnerContextClient)
+            IPartnerContextClient partnerContextClient,
+            IOutputCacheStore outputCacheStore)
         {
             _partnerCarService = partnerCarService;
             _partnerContextClient = partnerContextClient;
+            _outputCacheStore = outputCacheStore;
         }
 
         [HttpGet]
         [AllowAnonymous]
+        [OutputCache(PolicyName = "partner-cars-list")]
         public async Task<IActionResult> GetAll([FromQuery] PartnerCarQueryParams queryParams, CancellationToken cancellationToken)
         {
             var payload = await _partnerCarService.GetAllAsync(queryParams, cancellationToken);
@@ -32,6 +39,7 @@ namespace CarService.Api.Controllers
 
         [HttpGet("{id:int}")]
         [AllowAnonymous]
+        [OutputCache(PolicyName = "partner-cars-detail")]
         public async Task<IActionResult> GetById(int id, CancellationToken cancellationToken)
         {
             var payload = await _partnerCarService.GetByIdAsync(id, cancellationToken);
@@ -54,6 +62,7 @@ namespace CarService.Api.Controllers
             }
 
             var created = await _partnerCarService.CreateAsync(currentUserId, dto, cancellationToken);
+            await _outputCacheStore.EvictByTagAsync(PartnerCarsCacheTag, cancellationToken);
             return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
         }
 
@@ -72,6 +81,7 @@ namespace CarService.Api.Controllers
                 return NotFound(new { error = "Partner car not found" });
             }
 
+            await _outputCacheStore.EvictByTagAsync(PartnerCarsCacheTag, cancellationToken);
             return Ok(updated);
         }
 
@@ -90,6 +100,7 @@ namespace CarService.Api.Controllers
                 return NotFound(new { error = "Partner car not found" });
             }
 
+            await _outputCacheStore.EvictByTagAsync(PartnerCarsCacheTag, cancellationToken);
             return NoContent();
         }
 

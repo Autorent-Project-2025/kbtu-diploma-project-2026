@@ -41,7 +41,8 @@ public sealed class BookingPaymentConsumer : BackgroundService
                     RabbitMqTopology.BookingPaymentsQueue,
                     RabbitMqTopology.RoutingKeys.BookingPaymentConfirmed,
                     RabbitMqTopology.RoutingKeys.BookingPaymentCanceled,
-                    RabbitMqTopology.RoutingKeys.BookingPaymentCompleted);
+                    RabbitMqTopology.RoutingKeys.BookingPaymentCompleted,
+                    RabbitMqTopology.RoutingKeys.BookingPaymentSessionRequested);
 
                 channel.BasicQos(0, 1, false);
 
@@ -86,6 +87,7 @@ public sealed class BookingPaymentConsumer : BackgroundService
         {
             using var scope = _scopeFactory.CreateScope();
             var paymentLedgerService = scope.ServiceProvider.GetRequiredService<IPaymentLedgerService>();
+            var mockPaymentService = scope.ServiceProvider.GetRequiredService<IMockPaymentService>();
 
             switch (args.RoutingKey)
             {
@@ -130,6 +132,24 @@ public sealed class BookingPaymentConsumer : BackgroundService
                         message.Payload.BookingId,
                         message.EventId,
                         message.RoutingKey,
+                        cancellationToken);
+                    break;
+                }
+
+                case RabbitMqTopology.RoutingKeys.BookingPaymentSessionRequested:
+                {
+                    // Async handler for the session-provisioning step that used
+                    // to be a synchronous HTTP call from booking-service. Idempotent
+                    // by booking id at the IMockPaymentService.StartAsync layer.
+                    var message = RabbitMqJson.Deserialize<BookingPaymentSessionRequested>(args.Body)
+                        ?? throw new InvalidOperationException("Booking payment session requested message is invalid.");
+
+                    await mockPaymentService.StartAsync(
+                        new StartMockPaymentCommand(
+                            message.Payload.BookingId,
+                            message.Payload.UserId,
+                            message.Payload.TotalPrice,
+                            message.Payload.Currency),
                         cancellationToken);
                     break;
                 }

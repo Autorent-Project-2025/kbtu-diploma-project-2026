@@ -1,0 +1,19 @@
+# Compose override applied ONLY during performance testing.
+#
+# The default api-gateway is configured with RATE_LIMIT_MAX_REQUESTS=300 per
+# 60s window — a sane production value, but it caps any load test long before
+# we reach a meaningful concurrency level. This override bumps the limit and
+# the proxy/request timeouts so k6 measures backend behavior, not the
+# gateway's throttling.
+#
+# Apply with:
+#   docker compose -f docker-compose.yml -f tests/performance/docker-compose.perf.yml up -d api-gateway
+# Revert by re-running `docker compose up -d api-gateway` without this file.
+
+services:
+  api-gateway:
+    environment:
+      RATE_LIMIT_WINDOW_MS: 60000
+      RATE_LIMIT_MAX_REQUESTS: 1000000
+      PROXY_TIMEOUT_MS: 120000
+      REQUEST_TIMEOUT_MS: 120000

@@ -187,6 +187,23 @@ namespace BookingService.Infrastructure.Integrations
                         cancellationToken);
                     return;
 
+                case PaymentSyncOutboxEventTypes.BookingPaymentSessionRequested:
+                    if (payload.UserId is null || payload.TotalPrice is null || string.IsNullOrWhiteSpace(payload.Currency))
+                    {
+                        throw new InvalidOperationException("Booking payment session requested outbox payload is incomplete.");
+                    }
+
+                    await rabbitMqPublisher.PublishAsync(
+                        eventId,
+                        RabbitMqTopology.RoutingKeys.BookingPaymentSessionRequested,
+                        new BookingPaymentSessionRequested(
+                            payload.BookingId,
+                            payload.UserId.Value,
+                            payload.TotalPrice.Value,
+                            payload.Currency!),
+                        cancellationToken);
+                    return;
+
                 default:
                     throw new InvalidOperationException($"Unsupported payment outbox event type '{eventType}'.");
             }

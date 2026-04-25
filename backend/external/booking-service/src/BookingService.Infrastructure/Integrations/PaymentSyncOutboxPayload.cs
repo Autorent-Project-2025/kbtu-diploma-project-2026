@@ -8,5 +8,6 @@ namespace BookingService.Infrastructure.Integrations
         public int? PartnerCarId { get; init; }
         public decimal? PriceHour { get; init; }
         public decimal? TotalPrice { get; init; }
+        public string? Currency { get; init; }
     }
 }

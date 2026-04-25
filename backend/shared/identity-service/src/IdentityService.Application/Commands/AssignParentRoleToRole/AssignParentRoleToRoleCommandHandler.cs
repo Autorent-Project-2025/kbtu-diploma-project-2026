@@ -7,13 +7,16 @@ namespace IdentityService.Application.Commands.AssignParentRoleToRole;
 public sealed class AssignParentRoleToRoleCommandHandler
 {
     private readonly IRoleRepository _roleRepository;
+    private readonly IRolePermissionGraphProvider _roleGraphProvider;
     private readonly IIdentityUnitOfWork _unitOfWork;
 
     public AssignParentRoleToRoleCommandHandler(
         IRoleRepository roleRepository,
+        IRolePermissionGraphProvider roleGraphProvider,
         IIdentityUnitOfWork unitOfWork)
     {
         _roleRepository = roleRepository;
+        _roleGraphProvider = roleGraphProvider;
         _unitOfWork = unitOfWork;
     }
 
@@ -50,11 +53,7 @@ public sealed class AssignParentRoleToRoleCommandHandler
             return;
         }
 
-        var allRoles = await _roleRepository.ListAsync(
-            includeParentRoles: true,
-            cancellationToken: cancellationToken);
-
-        var roleGraph = RolePermissionResolver.BuildGraph(allRoles);
+        var roleGraph = await _roleGraphProvider.GetGraphAsync(cancellationToken);
         var parentAncestors = RolePermissionResolver.ResolveAncestorRoleIds(parentRole.Id, roleGraph);
         if (parentAncestors.Contains(role.Id))
         {
@@ -63,5 +62,6 @@ public sealed class AssignParentRoleToRoleCommandHandler
 
         role.AddParentRole(parentRole);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
+        _roleGraphProvider.Invalidate();
     }
 }

@@ -23,6 +23,7 @@ public static class RabbitMqTopology
         public const string BookingPaymentConfirmed = "booking.payment.confirmed";
         public const string BookingPaymentCanceled = "booking.payment.canceled";
         public const string BookingPaymentCompleted = "booking.payment.completed";
+        public const string BookingPaymentSessionRequested = "booking.payment.session-requested";
         public const string CarSearchPartnerCarUpsertRequested = "car.search.partner-car-upserted";
         public const string CarSearchPartnerCarDeleted = "car.search.partner-car-deleted";
         public const string UserDeleted = "user.deleted";
