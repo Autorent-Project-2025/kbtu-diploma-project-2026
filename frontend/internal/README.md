@@ -1,15 +1,21 @@
 # AutoRent Internal Frontend
 
-Внутренний интерфейс менеджера для обработки регистрационных заявок в AutoRent. Приложение покрывает вход в кабинет, очередь заявок и карточку проверки с документами и действиями по approve/reject.
+Внутренний интерфейс менеджера для операционной работы AutoRent. Приложение покрывает вход в кабинет, очередь заявок, справочники клиентов/партнеров/машин, бронирования, жалобы, финансы, чаты и карточки проверки с действиями по approve/reject.
 
 ## Что есть в интерфейсе
 
 - экран входа в кабинет;
 - рабочая очередь с быстрым обзором по типам заявок;
-- карточка заявки с данными пользователя;
+- карточка заявки с данными пользователя, документами и фотографиями;
 - просмотр документов и фотографий автомобиля;
 - одобрение и отклонение заявки с причиной отказа;
 - редактирование данных автомобиля для заявок типа `PartnerCar`.
+- таблицы клиентов, партнеров, машин и бронирований;
+- очередь жалоб, access requests и booking review;
+- advisory-блок AI-оценки повреждений для completion review;
+- чат по контексту жалобы/бронирования с вложениями;
+- финансовый экран и просмотр charges по бронированию;
+- административная панель пользователей/ролей внутри internal UI.
 
 ## Скриншоты
 
@@ -37,12 +43,38 @@
 
 - `/login`
 - `/tickets`
+- `/clients`
+- `/clients/:id`
+- `/partners`
+- `/partners/:id`
+- `/cars`
+- `/cars/:id`
+- `/bookings`
+- `/bookings/:id`
+- `/complaints`
+- `/complaints/access-requests`
+- `/complaints/:id`
+- `/complaints/:complaintId/booking-review`
+- `/finance`
+- `/super`
+- `/super/managers/:id`
+- `/admin`
 
-Маршрут `/tickets` открывается только для авторизованного пользователя. Для корректной работы раздела нужны права:
+Маршруты открываются только для авторизованного пользователя и дополнительно проверяют permissions:
 
 - `Ticket.View`
 - `Ticket.Approve`
 - `Ticket.Reject`
+- `Ticket.ViewAll`
+- `Client.View`
+- `Partner.View`
+- `PartnerCar.View`
+- `Booking.View`
+- `Complaint.View`
+- `Complaint.Review`
+- `AccessRequest.Review`
+- `Payment.View`
+- `User.View`
 
 ## Интеграция с API Gateway
 
@@ -56,6 +88,22 @@
 - `GET /tickets/{id}/documents/{identity|license|ownership}/temporary-link`
 - `POST /tickets/{id}/approve`
 - `POST /tickets/{id}/reject`
+- `GET /clients`
+- `GET /partners`
+- `GET /cars/partner-cars`
+- `GET /bookings/all`
+- `GET /bookings/all/{id}`
+- `GET /payments/view/bookings/{bookingId}/charges`
+- `GET /tickets/complaints/all`
+- `GET /tickets/complaints/all/{id}`
+- `POST /tickets/complaints/all/{id}/resolve`
+- `POST /tickets/complaints/all/{id}/reject`
+- `GET /tickets/complaints/{complaintId}/booking-review`
+- `GET /tickets/complaints/access-requests`
+- `GET /chat/conversations/by-context/{contextType}/{contextId}`
+- `POST /chat/conversations/{conversationId}/messages`
+- `GET /identity/users`
+- `GET /identity/roles`
 
 ## Переменные окружения
 

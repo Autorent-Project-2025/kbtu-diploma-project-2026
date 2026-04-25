@@ -41,7 +41,9 @@
       "Bash(curl -s http://localhost:9186/ai/recommendations -H \"Content-Type: application/json\" -d '{\"prompt\": \"нужна камри\"}')",
       "Bash(python generate_dataset.py --output dataset.jsonl)",
       "Bash(curl -s -X POST http://localhost:9186/ai/internal/reindex)",
-      "Bash(node dist/tests/evalHarness.test.js)"
+      "Bash(node dist/tests/evalHarness.test.js)",
+      "Bash(python -m pytest tests/test_api.py tests/test_verification.py -x -v)",
+      "Bash(python -c ' *)"
     ]
   }
 }

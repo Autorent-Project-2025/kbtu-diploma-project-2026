@@ -106,7 +106,8 @@ public sealed class TicketsController : ControllerBase
                 await MapToOptionalFilePayloadAsync(request.CompletionBackPhotoFile, cancellationToken),
                 await MapToOptionalFilePayloadAsync(request.CompletionSideLeftPhotoFile, cancellationToken),
                 await MapToOptionalFilePayloadAsync(request.CompletionSideRightPhotoFile, cancellationToken),
-                await MapToOptionalFilePayloadAsync(request.CompletionInteriorPhotoFile, cancellationToken)),
+                await MapToOptionalFilePayloadAsync(request.CompletionInteriorPhotoFile, cancellationToken),
+                request.DamageAssessment),
             cancellationToken);
 
         return Created($"/{result.Ticket.Id}", result.Ticket);

@@ -5,6 +5,9 @@
 - создание брони по `partnerCarId`;
 - получение бронирований текущего пользователя;
 - смену статуса (confirm, complete, cancel);
+- mock payment flow и price preview;
+- completion review с загрузкой 5 фото и advisory-проверкой через `ai-damage-eval-service`;
+- создание review/complaint тикетов через `ticket-service`;
 - проверку доступности машины по временному интервалу;
 - внутренние read-эндпоинты для `car-service`;
 - массовую проверку доступности по списку машин (`check-availability`).
@@ -14,6 +17,7 @@
 - PostgreSQL
 - Flyway (SQL миграции)
 - JWT авторизация
+- RabbitMQ outbox для платежной синхронизации
 
 ## Важные изменения схемы
 Актуальная схема бронирований внедрена в миграции `V3__refactor_bookings_for_car_sharing.sql`:
@@ -26,7 +30,98 @@
   - статусы блокировки: `pending`, `confirmed`, `active`.
 
 ### ERM Диаграмма
-![ERM](./docs/images/erm.png) 
+
+```mermaid
+erDiagram
+  BOOKINGS {
+    int id PK
+    uuid user_id
+    int partner_car_id
+    uuid partner_user_id
+    timestamptz start_time
+    timestamptz end_time
+    tstzrange booking_range
+    decimal price_hour
+    decimal total_price
+    string status
+    timestamptz created_at
+    timestamptz trip_started_at
+    timestamptz trip_completed_at
+    uuid completion_review_ticket_id
+    uuid partner_cancellation_ticket_id
+    timestamptz partner_cancellation_requested_at
+    string cancellation_actor
+    string cancellation_reason
+    int car_comment_id
+    timestamptz car_comment_submitted_at
+    jsonb pricing_breakdown
+    string car_brand
+    string car_model
+    string partner_name
+    string cover_image_url
+    jsonb image_urls
+    int subscription_id FK
+    boolean used_subscription
+  }
+
+  SUBSCRIPTION_PLANS {
+    int id PK
+    string name
+    string plan_type
+    decimal price
+    int included_bookings
+    boolean is_active
+    timestamptz created_at
+  }
+
+  SUBSCRIPTIONS {
+    int id PK
+    uuid user_id
+    int subscription_plan_id FK
+    string status
+    timestamptz start_date
+    timestamptz end_date
+    boolean auto_renew
+    int included_bookings
+    int used_bookings
+    timestamptz created_at
+  }
+
+  PAYMENT_SYNC_OUTBOX_MESSAGES {
+    bigint id PK
+    int booking_id
+    string event_key UK
+    string event_type
+    jsonb payload
+    int attempt_count
+    string last_error
+    timestamptz created_at
+    timestamptz next_attempt_at
+    timestamptz processed_at
+    timestamptz locked_until
+  }
+
+  IDENTITY_USERS {
+    uuid id PK
+  }
+
+  PARTNER_CARS {
+    int id PK
+  }
+
+  TICKETS {
+    uuid id PK
+  }
+
+  SUBSCRIPTION_PLANS ||--o{ SUBSCRIPTIONS : offers
+  SUBSCRIPTIONS ||--o{ BOOKINGS : applied_to
+  BOOKINGS ||--o{ PAYMENT_SYNC_OUTBOX_MESSAGES : emits
+  IDENTITY_USERS ||--o{ BOOKINGS : customer
+  IDENTITY_USERS ||--o{ BOOKINGS : partner
+  PARTNER_CARS ||--o{ BOOKINGS : reserved
+  TICKETS |o--o{ BOOKINGS : completion_review
+  TICKETS |o--o{ BOOKINGS : partner_cancellation
+```
 
 ## API
 Нативный base path сервиса: `/`.
@@ -35,10 +130,22 @@
 ### Основные маршруты
 - `POST /` (policy `bookings:create`)
 - `GET /my`
+- `GET /my/stats`
+- `GET /all`
 - `GET /{id:int}`
+- `GET /all/{id:int}`
 - `POST /{id:int}/cancel`
+- `POST /all/{id:int}/cancel`
 - `POST /{id:int}/confirm`
 - `POST /{id:int}/complete`
+- `POST /{id:int}/complete-review`
+- `POST /{id:int}/partner-cancel`
+- `POST /{id:int}/payment/start`
+- `GET /{id:int}/payment/status`
+- `POST /{id:int}/payment/submit`
+- `GET /{id:int}/charges`
+- `POST /{id:int}/charges/{chargeId:long}/pay`
+- `GET /price-preview`
 - `GET /available?partnerCarId={id}&startTime={iso}&endTime={iso}` (`AllowAnonymous`)
 
 ### Internal API (для межсервисного доступа)
@@ -49,6 +156,21 @@
 - `GET /internal/bookings/counts?partnerCarIds=1,2,3`
 - `GET /internal/bookings/counts?carIds=1,2,3` (alias для обратной совместимости)
 - `POST /internal/bookings/check-availability`
+- `POST /internal/bookings/{id:int}/cancel`
+- `POST /internal/bookings/{id:int}/completion-review/approve`
+- `POST /internal/bookings/{id:int}/completion-review/fine-issued`
+- `POST /internal/bookings/{id:int}/partner-cancellation/approve`
+- `POST /internal/bookings/{id:int}/partner-cancellation/reject`
+
+## Интеграции
+- `car-service` - snapshot машины, pricing context и проверки доступности.
+- `client-service` / `partner-service` - профильный контекст для booking flows.
+- `identity-service` - внутренние lookup/provisioning данные.
+- `payment-service` - mock payment attempts, charges, ledger, fines и payouts.
+- `ticket-service` - review tickets, complaint flows и manager decisions.
+- `email-service` - отдельные email-уведомления для booking flows.
+- `ai-damage-eval-service` - advisory проверка пяти completion-фото. Интеграция fail-open: при timeout/5xx ticket создается для ручной проверки.
+- `RabbitMQ` - async payment sync по статусам бронирования.
 
 ## Контракты
 ### Создание брони (`POST /`)
@@ -69,6 +191,21 @@
 - `Active`
 - `Completed`
 - `Canceled`
+
+### Completion review (`POST /{id:int}/complete-review`)
+Запрос multipart содержит 5 обязательных slot-labelled файлов:
+- `completionFrontPhotoFile`
+- `completionBackPhotoFile`
+- `completionSideLeftPhotoFile`
+- `completionSideRightPhotoFile`
+- `completionInteriorPhotoFile`
+
+`booking-service` передает фото и snapshot машины в `ai-damage-eval-service /inspect-session`.
+
+Результат:
+- `OK` / `DAMAGES_FOUND` - создается review ticket для менеджера;
+- `INVALID_SESSION` - клиент получает `400` с rejected photo details;
+- AI timeout/unavailable - ticket создается без AI verdict, менеджер проверяет вручную.
 
 ### Массовая проверка доступности (`POST /internal/bookings/check-availability`)
 
@@ -105,6 +242,20 @@
 - `Cors__AllowedOrigins__0`
 - `InternalAuth__ApiKey`
 - `CarService__BaseUrl`
+- `CarService__InternalApiKey`
+- `PartnerService__BaseUrl`
+- `PartnerService__InternalApiKey`
+- `ClientService__BaseUrl`
+- `ClientService__InternalApiKey`
+- `IdentityService__BaseUrl`
+- `IdentityService__InternalApiKey`
+- `PaymentService__BaseUrl`
+- `PaymentService__InternalApiKey`
+- `TicketService__BaseUrl`
+- `EmailService__BaseUrl`
+- `DamageEvalService__BaseUrl`
+- `DamageEvalService__InternalApiKey`
+- `DamageEvalService__TimeoutSeconds`
 - `EXTERNAL_PORT`
 - `POSTGRES_USER`
 - `POSTGRES_PASSWORD`

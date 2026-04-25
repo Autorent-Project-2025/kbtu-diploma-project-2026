@@ -26,25 +26,54 @@ Edge-сервис, который является единственной вн
 Входящие префиксы:
 - `/identity/*` -> `IDENTITY_SERVICE_URL`
 - `/cars/*` -> `CAR_SERVICE_URL`
+- `/ai/*` -> `AI_SEARCH_SERVICE_URL`
 - `/bookings/*` -> `BOOKING_SERVICE_URL`
 - `/clients/*` -> `CLIENT_SERVICE_URL`
 - `/partners/*` -> `PARTNER_SERVICE_URL`
 - `/tickets/*` -> `TICKET_SERVICE_URL`
 - `/files/*` -> `FILE_SERVICE_URL`
+- `/chat/*` -> `CHAT_SERVICE_URL`
+- `/payments/*` -> `PAYMENT_SERVICE_URL`
 - `/internal/*` -> `INTERNAL_SERVICE_URL`
 
 Gateway удаляет префикс перед проксированием.
 Пример: `/identity/auth/login` -> `{IDENTITY_SERVICE_URL}/auth/login`.
 
+### Диаграмма маршрутизации
+
+```mermaid
+flowchart LR
+  FE["Frontend apps"] --> GW["api-gateway<br/>HTTP :9186 / HTTPS :9443"]
+
+  GW -->|/identity/*| ID["identity-service"]
+  GW -->|/cars/*| CAR["car-service"]
+  GW -->|/ai/*| AI["ai-search-service"]
+  GW -->|/bookings/*| BOOKING["booking-service"]
+  GW -->|/clients/*| CLIENT["client-service"]
+  GW -->|/partners/*| PARTNER["partner-service"]
+  GW -->|/tickets/*| TICKET["ticket-service"]
+  GW -->|/files/*| FILE["file-service"]
+  GW -->|/chat/* + ws| CHAT["chat-service"]
+  GW -->|/payments/*| PAYMENT["payment-service"]
+  GW -->|/internal/*| IMAGE["image-service"]
+
+  GW -. metrics .-> PROM["Prometheus"]
+  GW -. traces .-> OTEL["OpenTelemetry Collector"]
+  GW -. json logs .-> LOKI["Loki via Promtail"]
+```
+
 ## Переменные окружения
 См. `./.env.example` и `src/index.ts`:
 - `IDENTITY_SERVICE_URL`
 - `CAR_SERVICE_URL`
+- `AI_SEARCH_SERVICE_URL`
 - `BOOKING_SERVICE_URL`
 - `CLIENT_SERVICE_URL`
 - `PARTNER_SERVICE_URL`
 - `TICKET_SERVICE_URL`
 - `FILE_SERVICE_URL`
+- `CHAT_SERVICE_URL`
+- `PAYMENT_SERVICE_URL`
 - `INTERNAL_SERVICE_URL`
 - `ALLOWED_ORIGINS`
 - `RATE_LIMIT_WINDOW_MS`

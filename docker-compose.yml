@@ -500,6 +500,33 @@ services:
     networks:
       - data
 
+  ai-damage-eval-service:
+    build:
+      context: ./backend/internal/ai-car-damage-eval-service/car-detection-service
+      dockerfile: ./Dockerfile
+    restart: unless-stopped
+    environment:
+      INTERNAL_API_KEY: local-ai-damage-eval-service-key
+      ENVIRONMENT: production
+      ALLOW_UNAUTHENTICATED_INTERNAL_DEV: "false"
+      USE_REGISTRY_VALIDATION: "false"
+      MIN_PHOTOS: 4
+      MAX_PHOTOS: 5
+    expose:
+      - "8000"
+    # /ready is backed by a warmup latch: only succeeds after YOLO weights
+    # are in memory. This prevents booking-service from seeing the AI as
+    # "up" while it's actually still loading ~450MB of model weights.
+    # Generous start_period covers cold model load on CPU.
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/ready"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 120s
+    networks:
+      - backend
+
   booking-service:
     build:
       context: ./backend
@@ -527,6 +554,11 @@ services:
       PaymentService__InternalApiKey: local-payment-service-key
       TicketService__BaseUrl: http://ticket-service:8080
       EmailService__BaseUrl: http://email-service:8080
+      DamageEvalService__BaseUrl: http://ai-damage-eval-service:8000
+      DamageEvalService__InternalApiKey: local-ai-damage-eval-service-key
+      # Must stay materially below PROXY_TIMEOUT_MS (60000) so the AI
+      # call fails open before the gateway returns 504 to the client.
+      DamageEvalService__TimeoutSeconds: 15
       RabbitMq__HostName: rabbitmq
       RabbitMq__Port: 5672
       RabbitMq__UserName: ${RABBITMQ_DEFAULT_USER:-autorent}

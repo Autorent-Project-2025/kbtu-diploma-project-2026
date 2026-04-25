@@ -114,11 +114,13 @@
               :key="field.key"
               class="rounded-3xl border-2 p-4 sm:p-5 transition-colors"
               :class="
-                activeDropzoneKey === field.key
-                  ? 'border-primary-500 bg-primary-50 dark:border-primary-500 dark:bg-primary-500/10'
-                  : selectedFiles[field.key]
-                    ? 'border-emerald-300 bg-emerald-50 dark:border-emerald-500/40 dark:bg-emerald-500/10'
-                    : 'border-dashed border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50'
+                aiPhotoErrors[field.slot]
+                  ? 'border-red-400 bg-red-50 dark:border-red-500/60 dark:bg-red-500/10'
+                  : activeDropzoneKey === field.key
+                    ? 'border-primary-500 bg-primary-50 dark:border-primary-500 dark:bg-primary-500/10'
+                    : selectedFiles[field.key]
+                      ? 'border-emerald-300 bg-emerald-50 dark:border-emerald-500/40 dark:bg-emerald-500/10'
+                      : 'border-dashed border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50'
               "
               @dragover.prevent="activeDropzoneKey = field.key"
               @dragleave.prevent="activeDropzoneKey = null"
@@ -142,6 +144,14 @@
                   {{ selectedFiles[field.key] ? "Готово" : "Нужно" }}
                 </span>
               </div>
+
+              <p
+                v-if="aiPhotoErrors[field.slot]"
+                class="mt-2 flex items-start gap-2 rounded-2xl bg-red-100 px-3 py-2 text-xs font-medium text-red-700 dark:bg-red-500/20 dark:text-red-200"
+              >
+                <span aria-hidden="true">⚠</span>
+                <span>{{ aiPhotoErrors[field.slot] }}</span>
+              </p>
 
               <div
                 class="overflow-hidden rounded-2xl border border-gray-200/80 dark:border-gray-700/80 bg-white/80 dark:bg-gray-900/60"
@@ -395,13 +405,18 @@ const showReviewModal = ref(false);
 const reviewSubmitting = ref(false);
 const now = ref(Date.now());
 
-const completionPhotoFields: Array<{ key: CompletionPhotoKey; label: string }> = [
-  { key: "completionFrontPhotoFile", label: "Фото спереди" },
-  { key: "completionBackPhotoFile", label: "Фото сзади" },
-  { key: "completionSideLeftPhotoFile", label: "Левый бок" },
-  { key: "completionSideRightPhotoFile", label: "Правый бок" },
-  { key: "completionInteriorPhotoFile", label: "Салон" },
+const completionPhotoFields: Array<{ key: CompletionPhotoKey; label: string; slot: string }> = [
+  { key: "completionFrontPhotoFile", label: "Фото спереди", slot: "front" },
+  { key: "completionBackPhotoFile", label: "Фото сзади", slot: "back" },
+  { key: "completionSideLeftPhotoFile", label: "Левый бок", slot: "side_left" },
+  { key: "completionSideRightPhotoFile", label: "Правый бок", slot: "side_right" },
+  { key: "completionInteriorPhotoFile", label: "Салон", slot: "interior" },
 ];
+
+// Rejection reasons returned by the AI inspection service, keyed by slot
+// (same values the server sends in rejectedPhotos[].slot). Populated
+// after a 400 response; cleared when the user edits any photo.
+const aiPhotoErrors = ref<Record<string, string>>({});
 
 function createEmptySelectedFiles(): Record<CompletionPhotoKey, File | null> {
   return {
@@ -557,6 +572,14 @@ function setSelectedFile(key: CompletionPhotoKey, file: File | null) {
   revokePreviewUrl(key);
   selectedFiles.value[key] = null;
 
+  // Clear any AI rejection marker on this slot — the user replaced the
+  // photo, they deserve a fresh chance.
+  const slot = completionPhotoFields.find((field) => field.key === key)?.slot;
+  if (slot && aiPhotoErrors.value[slot]) {
+    const { [slot]: _removed, ...rest } = aiPhotoErrors.value;
+    aiPhotoErrors.value = rest;
+  }
+
   if (!file) {
     return;
   }
@@ -637,11 +660,31 @@ async function submitCompletion() {
     );
   } catch (e: any) {
     console.error("Failed to submit booking completion review", e);
-    error(
-      e?.response?.data?.detail ||
-        e?.response?.data?.error ||
-        "Не удалось отправить завершение поездки."
-    );
+
+    // Structured 400 from the AI inspection path — booking stays Active,
+    // the client must re-upload rejected photos. We decorate the photo
+    // cards with the AI reason so the user knows which slot to fix.
+    const rejected: Array<{ slot?: string | null; reason?: string }> =
+      e?.response?.data?.rejectedPhotos ?? [];
+    if (e?.response?.status === 400 && Array.isArray(rejected) && rejected.length > 0) {
+      aiPhotoErrors.value = {};
+      for (const item of rejected) {
+        if (item?.slot) {
+          aiPhotoErrors.value[item.slot] = item.reason ?? "Фото отклонено автоматическим анализом.";
+        }
+      }
+      error(
+        `Автоматический анализ отклонил ${rejected.length} из 5 фото. ` +
+          "Исправьте отмеченные снимки и попробуйте снова."
+      );
+    } else {
+      aiPhotoErrors.value = {};
+      error(
+        e?.response?.data?.detail ||
+          e?.response?.data?.error ||
+          "Не удалось отправить завершение поездки."
+      );
+    }
   } finally {
     submitting.value = false;
   }

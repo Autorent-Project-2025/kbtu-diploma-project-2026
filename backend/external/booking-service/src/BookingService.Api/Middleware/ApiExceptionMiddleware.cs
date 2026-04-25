@@ -1,3 +1,4 @@
+using BookingService.Application.Exceptions;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Security;
@@ -46,6 +47,35 @@ namespace BookingService.Api.Middleware
                 context.Response.StatusCode = statusCode;
                 context.Response.ContentType = "application/problem+json";
 
+                if (ex is BookingCompletionAiRejectedException aiRejected)
+                {
+                    // Enriched problem payload so the client UI can mark
+                    // the exact photo slots that failed and display AI
+                    // rejection reasons. Keep filenames and technical
+                    // step numbers out of the user-facing fields where
+                    // possible — UI may still render them for debugging.
+                    var aiProblem = new AiRejectedProblemDetails
+                    {
+                        Status = statusCode,
+                        Title = title,
+                        Detail = ex.Message,
+                        Instance = context.Request.Path,
+                        ValidPhotosCount = aiRejected.ValidPhotosCount,
+                        RejectedPhotos = aiRejected.RejectedPhotos
+                            .Select(photo => new AiRejectedPhotoItem
+                            {
+                                Slot = photo.Slot,
+                                FileName = photo.FileName,
+                                Reason = photo.Reason,
+                                Details = photo.Details,
+                            })
+                            .ToList(),
+                    };
+
+                    await JsonSerializer.SerializeAsync(context.Response.Body, aiProblem, JsonOptions);
+                    return;
+                }
+
                 var problem = new ProblemDetails
                 {
                     Status = statusCode,
@@ -64,6 +94,7 @@ namespace BookingService.Api.Middleware
         {
             return ex switch
             {
+                BookingCompletionAiRejectedException => (StatusCodes.Status400BadRequest, "Completion Photos Rejected"),
                 UnauthorizedAccessException => (StatusCodes.Status401Unauthorized, "Unauthorized"),
                 SecurityException => (StatusCodes.Status403Forbidden, "Forbidden"),
                 KeyNotFoundException => (StatusCodes.Status404NotFound, "Not Found"),
@@ -72,6 +103,20 @@ namespace BookingService.Api.Middleware
                 ArgumentException => (StatusCodes.Status400BadRequest, "Bad Request"),
                 _ => (StatusCodes.Status500InternalServerError, "Internal Server Error")
             };
+        }
+
+        private sealed class AiRejectedProblemDetails : ProblemDetails
+        {
+            public int ValidPhotosCount { get; set; }
+            public IList<AiRejectedPhotoItem> RejectedPhotos { get; set; } = new List<AiRejectedPhotoItem>();
+        }
+
+        private sealed class AiRejectedPhotoItem
+        {
+            public string? Slot { get; set; }
+            public string FileName { get; set; } = string.Empty;
+            public string Reason { get; set; } = string.Empty;
+            public IReadOnlyList<string> Details { get; set; } = Array.Empty<string>();
         }
     }
 }

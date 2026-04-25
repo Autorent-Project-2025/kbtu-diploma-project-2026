@@ -50,4 +50,5 @@ public sealed record CreateTicketCommand(
     TicketDocumentFilePayload? CompletionBackPhotoFile,
     TicketDocumentFilePayload? CompletionSideLeftPhotoFile,
     TicketDocumentFilePayload? CompletionSideRightPhotoFile,
-    TicketDocumentFilePayload? CompletionInteriorPhotoFile);
+    TicketDocumentFilePayload? CompletionInteriorPhotoFile,
+    string? DamageAssessmentJson);

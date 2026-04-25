@@ -189,6 +189,7 @@ public sealed class Ticket
         DateTimeOffset tripCompletedAt,
         decimal? latePenaltyAmount,
         IReadOnlyCollection<BookingCompletionTicketPhotoData> completionPhotos,
+        BookingCompletionAiAssessmentData? aiAssessment,
         DateTime createdAt)
     {
         var ticket = new Ticket
@@ -214,6 +215,7 @@ public sealed class Ticket
             LatePenaltyAmount = NormalizeOptionalFineAmount(latePenaltyAmount, nameof(latePenaltyAmount)),
             DamageFineAmount = null,
             CompletionPhotos = NormalizeCompletionPhotos(completionPhotos),
+            AiAssessment = aiAssessment,
             DecisionReason = null,
             ReviewedByManagerId = null,
             ReviewedAt = null

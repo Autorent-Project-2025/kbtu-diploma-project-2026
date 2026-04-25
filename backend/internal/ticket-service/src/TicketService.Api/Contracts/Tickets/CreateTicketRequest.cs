@@ -50,4 +50,9 @@ public sealed class CreateTicketRequest
     public IFormFile? CompletionSideLeftPhotoFile { get; init; }
     public IFormFile? CompletionSideRightPhotoFile { get; init; }
     public IFormFile? CompletionInteriorPhotoFile { get; init; }
+
+    // JSON-serialised BookingCompletionAiAssessmentData produced by
+    // booking-service. Transported as a single form field to keep the
+    // public contract stable across AI schema changes.
+    public string? DamageAssessment { get; init; }
 }

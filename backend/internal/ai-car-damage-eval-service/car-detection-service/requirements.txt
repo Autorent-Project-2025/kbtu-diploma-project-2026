@@ -1,0 +1,20 @@
+# Веб-фреймворк и сервер
+fastapi==0.110.0
+uvicorn[standard]==0.27.1
+python-multipart==0.0.9
+pydantic-settings==2.2.1
+
+# Работа с изображениями и ИИ
+opencv-python-headless==4.9.0.80
+numpy==1.26.4
+ultralytics>=8.3.0
+
+# Для запросов к сторонним API (Vision, PlateRecognizer)
+# httpx рекомендуется вместо requests для асинхронной работы в FastAPI
+httpx==0.27.0
+python-dotenv==1.0.1
+
+# Продакшен и логирование
+gunicorn==21.2.0
+loguru==0.7.2
+pytest==8.3.5

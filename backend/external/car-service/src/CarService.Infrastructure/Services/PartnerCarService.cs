@@ -207,6 +207,7 @@ namespace CarService.Infrastructure.Services
                 CarModel = entity.CarModel.ModelLookup.Name,
                 ModelYear = entity.CarModel.Year,
                 LicensePlate = entity.LicensePlate,
+                Color = entity.Color,
                 PriceHour = entity.PriceHour,
                 Rating = entity.Rating,
                 CoverImageUrl = orderedImages.FirstOrDefault(),

@@ -1,5 +1,7 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text;
+using System.Text.Json;
 using BookingService.Application.Interfaces.Integrations;
 
 namespace BookingService.Infrastructure.Integrations;
@@ -44,6 +46,18 @@ public sealed class BookingCompletionTicketClient : IBookingCompletionTicketClie
         AddFileContent(content, payload.CompletionSideLeftPhotoFile, "completionSideLeftPhotoFile");
         AddFileContent(content, payload.CompletionSideRightPhotoFile, "completionSideRightPhotoFile");
         AddFileContent(content, payload.CompletionInteriorPhotoFile, "completionInteriorPhotoFile");
+
+        if (payload.DamageAssessment is not null)
+        {
+            // ticket-service deserialises this form field as a JSON blob
+            // and writes it into the polymorphic Data column. Sending as
+            // a string avoids multi-field explosion on the multipart
+            // request and keeps the ticket API contract versioned.
+            var assessmentJson = JsonSerializer.Serialize(
+                payload.DamageAssessment,
+                new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            content.Add(new StringContent(assessmentJson, Encoding.UTF8, "application/json"), "damageAssessment");
+        }
 
         using var response = await _httpClient.PostAsync("/", content, cancellationToken);
         if (!response.IsSuccessStatusCode)

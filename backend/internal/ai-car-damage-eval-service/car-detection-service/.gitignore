@@ -1,0 +1,9 @@
+runs/
+damage_model_research/
+__pycache__/
+*.jpg
+*.png
+venv/
+.env
+*.pyc
+.DS_Store

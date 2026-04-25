@@ -1,6 +1,7 @@
 using BookingService.Application.DTOs.Booking;
 using BookingService.Application.DTOs;
 using BookingService.Application.DTOs.Common;
+using BookingService.Application.Exceptions;
 using BookingService.Application.Interfaces;
 using BookingService.Application.Interfaces.Integrations;
 using BookingService.Application.Mappers;
@@ -38,6 +39,7 @@ namespace BookingService.Infrastructure.Services
         private readonly IBookingCompletionTicketClient _bookingCompletionTicketClient;
         private readonly IPartnerBookingCancellationTicketClient _partnerBookingCancellationTicketClient;
         private readonly IBookingEmailClient _bookingEmailClient;
+        private readonly IDamageEvaluationClient _damageEvaluationClient;
         private readonly PaymentServiceOptions _paymentServiceOptions;
         private readonly PendingBookingExpirationOptions _pendingBookingExpirationOptions;
         private readonly ILogger<BookingService> _logger;
@@ -54,6 +56,7 @@ namespace BookingService.Infrastructure.Services
             IBookingCompletionTicketClient bookingCompletionTicketClient,
             IPartnerBookingCancellationTicketClient partnerBookingCancellationTicketClient,
             IBookingEmailClient bookingEmailClient,
+            IDamageEvaluationClient damageEvaluationClient,
             IOptions<PaymentServiceOptions> paymentServiceOptions,
             IOptions<PendingBookingExpirationOptions> pendingBookingExpirationOptions,
             ILogger<BookingService> logger)
@@ -69,6 +72,7 @@ namespace BookingService.Infrastructure.Services
             _bookingCompletionTicketClient = bookingCompletionTicketClient;
             _partnerBookingCancellationTicketClient = partnerBookingCancellationTicketClient;
             _bookingEmailClient = bookingEmailClient;
+            _damageEvaluationClient = damageEvaluationClient;
             _paymentServiceOptions = paymentServiceOptions.Value;
             _pendingBookingExpirationOptions = pendingBookingExpirationOptions.Value;
             _logger = logger;
@@ -673,6 +677,28 @@ namespace BookingService.Infrastructure.Services
             booking.TripCompletedAt = tripCompletedAt;
 
             var latePenaltyAmount = CalculateLatePenaltyAmount(booking, tripCompletedAt);
+
+            // ── AI damage assessment ────────────────────────────────────
+            // Pulls authoritative car details (brand/model/color) from
+            // car-service so the AI validates photos against what is
+            // actually registered for this partner car. We run this
+            // synchronously before the ticket is created because (a) an
+            // INVALID_SESSION must short-circuit ticket creation and
+            // (b) the assessment is embedded in the ticket payload.
+            var carSnapshot = await _partnerCarReadClient.GetSnapshotAsync(booking.PartnerCarId);
+            var aiAssessment = await RunDamageAssessmentAsync(booking, carSnapshot, dto);
+
+            if (aiAssessment.Status == DamageEvaluationStatus.InvalidSession)
+            {
+                _logger.LogInformation(
+                    "AI rejected completion photos for booking {BookingId}: {ValidCount}/5 photos accepted.",
+                    booking.Id,
+                    aiAssessment.ValidPhotosCount);
+                throw new BookingCompletionAiRejectedException(
+                    aiAssessment.ValidPhotosCount,
+                    aiAssessment.RejectedPhotos);
+            }
+
             var reviewTicket = await _bookingCompletionTicketClient.CreateBookingCompletionTicketAsync(
                 new BookingCompletionTicketCreatePayload
                 {
@@ -690,7 +716,8 @@ namespace BookingService.Infrastructure.Services
                     CompletionBackPhotoFile = dto.CompletionBackPhotoFile,
                     CompletionSideLeftPhotoFile = dto.CompletionSideLeftPhotoFile,
                     CompletionSideRightPhotoFile = dto.CompletionSideRightPhotoFile,
-                    CompletionInteriorPhotoFile = dto.CompletionInteriorPhotoFile
+                    CompletionInteriorPhotoFile = dto.CompletionInteriorPhotoFile,
+                    DamageAssessment = BuildDamageAssessmentPayload(aiAssessment),
                 });
 
             booking.CompletionReviewTicketId = reviewTicket.Id;
@@ -2182,6 +2209,93 @@ namespace BookingService.Infrastructure.Services
         {
             return ex.SqlState == PostgresErrorCodes.ExclusionViolation &&
                    string.Equals(ex.ConstraintName, "prevent_overlapping_bookings", StringComparison.Ordinal);
+        }
+
+        private async Task<DamageEvaluationAssessment> RunDamageAssessmentAsync(
+            Booking booking,
+            PartnerCarSnapshotPayload? carSnapshot,
+            BookingCompletionSubmissionDto dto)
+        {
+            // If car-service doesn't know this partner car, we can't
+            // send meaningful metadata to the AI. Fail open — the
+            // manager will still see the ticket.
+            if (carSnapshot is null)
+            {
+                _logger.LogWarning(
+                    "Partner car {PartnerCarId} snapshot unavailable for completion review {BookingId}; skipping AI assessment.",
+                    booking.PartnerCarId, booking.Id);
+                return new DamageEvaluationAssessment(
+                    DamageEvaluationStatus.Unavailable,
+                    Verdict: null,
+                    ValidPhotosCount: 0,
+                    Damages: Array.Empty<DamageEvaluationDamage>(),
+                    RejectedPhotos: Array.Empty<DamageEvaluationRejectedPhoto>(),
+                    ProcessedAtUtc: DateTimeOffset.UtcNow,
+                    ErrorMessage: "Car snapshot unavailable; AI assessment skipped.");
+            }
+
+            try
+            {
+                return await _damageEvaluationClient.InspectSessionAsync(new DamageEvaluationRequest(
+                    PartnerCarId: booking.PartnerCarId,
+                    LicensePlate: carSnapshot.LicensePlate,
+                    CarBrand: carSnapshot.CarBrand,
+                    CarModel: carSnapshot.CarModel,
+                    CarColor: carSnapshot.Color ?? string.Empty,
+                    FrontPhoto: dto.CompletionFrontPhotoFile,
+                    BackPhoto: dto.CompletionBackPhotoFile,
+                    SideLeftPhoto: dto.CompletionSideLeftPhotoFile,
+                    SideRightPhoto: dto.CompletionSideRightPhotoFile,
+                    InteriorPhoto: dto.CompletionInteriorPhotoFile));
+            }
+            catch (Exception ex)
+            {
+                // The client is designed to never throw on infrastructure
+                // errors — but defensively convert any unexpected throw
+                // into a fail-open path so the booking flow never breaks
+                // because of the AI service.
+                _logger.LogError(ex, "Damage evaluation client threw unexpectedly for booking {BookingId}.", booking.Id);
+                return new DamageEvaluationAssessment(
+                    DamageEvaluationStatus.Unavailable,
+                    Verdict: null,
+                    ValidPhotosCount: 0,
+                    Damages: Array.Empty<DamageEvaluationDamage>(),
+                    RejectedPhotos: Array.Empty<DamageEvaluationRejectedPhoto>(),
+                    ProcessedAtUtc: DateTimeOffset.UtcNow,
+                    ErrorMessage: ex.Message);
+            }
+        }
+
+        private static DamageAssessmentPayload BuildDamageAssessmentPayload(DamageEvaluationAssessment assessment)
+        {
+            return new DamageAssessmentPayload
+            {
+                Status = assessment.Status.ToString().ToLowerInvariant(),
+                Verdict = assessment.Verdict?.ToString().ToLowerInvariant(),
+                ValidPhotosCount = assessment.ValidPhotosCount,
+                ProcessedAtUtc = assessment.ProcessedAtUtc,
+                ErrorMessage = assessment.ErrorMessage,
+                Damages = assessment.Damages
+                    .Select(damage => new DamageAssessmentDamagePayload
+                    {
+                        Type = damage.Type,
+                        Confidence = damage.Confidence,
+                        BoundingBox = damage.BoundingBox,
+                        Slot = damage.Slot,
+                        SourceFile = damage.SourceFile,
+                    })
+                    .ToList(),
+                RejectedPhotos = assessment.RejectedPhotos
+                    .Select(photo => new DamageAssessmentRejectedPhotoPayload
+                    {
+                        Slot = photo.Slot,
+                        FileName = photo.FileName,
+                        Step = photo.Step,
+                        Reason = photo.Reason,
+                        Details = photo.Details,
+                    })
+                    .ToList(),
+            };
         }
 
         private sealed record BookingDisplaySnapshot(

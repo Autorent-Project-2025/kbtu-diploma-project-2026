@@ -75,6 +75,48 @@ public sealed record BookingCompletionTicketData : TicketData
     public decimal? LatePenaltyAmount { get; init; }
     public decimal? DamageFineAmount { get; init; }
     public IReadOnlyCollection<BookingCompletionTicketPhotoData> CompletionPhotos { get; init; } = [];
+
+    // Advisory-only AI output. Never feeds DamageFineAmount automatically
+    // — the manager still decides fines by hand. Null means the ticket
+    // was created before AI integration or AI was technically unavailable
+    // and we fell open without recording anything.
+    public BookingCompletionAiAssessmentData? AiAssessment { get; init; }
+}
+
+public sealed record BookingCompletionAiAssessmentData
+{
+    /// <summary>"ok" | "invalid_session" | "error" | "unavailable"</summary>
+    public string Status { get; init; } = string.Empty;
+
+    /// <summary>"ok" | "damages_found" | "invalid_session" | null</summary>
+    public string? Verdict { get; init; }
+
+    public int ValidPhotosCount { get; init; }
+    public DateTimeOffset ProcessedAtUtc { get; init; }
+
+    /// <summary>Populated when Status is "error" or "unavailable".</summary>
+    public string? ErrorMessage { get; init; }
+
+    public IReadOnlyCollection<BookingCompletionAiDamageData> Damages { get; init; } = [];
+    public IReadOnlyCollection<BookingCompletionAiRejectedPhotoData> RejectedPhotos { get; init; } = [];
+}
+
+public sealed record BookingCompletionAiDamageData
+{
+    public string Type { get; init; } = string.Empty;
+    public double Confidence { get; init; }
+    public IReadOnlyList<int> BoundingBox { get; init; } = [];
+    public string? Slot { get; init; }
+    public string? SourceFile { get; init; }
+}
+
+public sealed record BookingCompletionAiRejectedPhotoData
+{
+    public string? Slot { get; init; }
+    public string FileName { get; init; } = string.Empty;
+    public int Step { get; init; }
+    public string Reason { get; init; } = string.Empty;
+    public IReadOnlyList<string> Details { get; init; } = [];
 }
 
 public sealed record PartnerBookingCancellationTicketData : TicketData

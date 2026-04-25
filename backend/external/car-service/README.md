@@ -8,6 +8,8 @@
 - CRUD изображений моделей и партнерских машин через `image-service`;
 - партнерский кабинет `/my` (сводка, детали, отзывы, связанные бронирования);
 - автоподбор машины по модели и временному интервалу;
+- price estimate на основе `car-market-value-service`;
+- события для переиндексации `ai-search-service`;
 - внутренний provisioning партнерской машины (после approve `PartnerCar` тикета).
 
 ## Структура каталога
@@ -16,14 +18,121 @@
 - `car_models` - основная сущность каталога, содержит тех. характеристики/год и ссылки на `brands` + `models`.
 
 ### ERM Диаграмма
-![ERM](./docs/images/erm.png)
+
+```mermaid
+erDiagram
+  BRANDS {
+    int id PK
+    string name UK
+  }
+
+  MODELS {
+    int id PK
+    int brand_id FK
+    string name
+  }
+
+  CAR_MODELS {
+    int id PK
+    int brand_id FK
+    int model_id FK
+    int year
+    string engine
+    string transmission
+    int seats
+    string fuel_type
+    int doors
+    string description
+    decimal rating
+    int ratings_count
+  }
+
+  PARTNER_CARS {
+    int id PK
+    uuid partner_user_id
+    int car_model_id FK
+    string license_plate UK
+    string ownership_file_name
+    string color
+    decimal price_hour
+    decimal price_day
+    int status
+    timestamptz created_at
+    decimal rating
+    int ratings_count
+  }
+
+  CAR_MODEL_IMAGES {
+    int id PK
+    int model_id FK
+    string image_url
+    string image_id
+    int image_type
+    int display_order
+  }
+
+  PARTNER_CAR_IMAGES {
+    int id PK
+    int car_id FK
+    string image_url
+    string image_id
+    int image_type
+    int display_order
+  }
+
+  FEATURES {
+    int id PK
+    string name UK
+    timestamp created_on
+  }
+
+  CAR_FEATURES {
+    int id PK
+    int car_id FK
+    int feature_id FK
+  }
+
+  CAR_COMMENTS {
+    int id PK
+    string user_id
+    string user_name
+    int car_id FK
+    int partner_car_id FK
+    string content
+    int rating
+    timestamp created_on
+  }
+
+  FILE_OBJECTS {
+    string file_name PK
+  }
+
+  IMAGE_OBJECTS {
+    string image_id PK
+  }
+
+  BRANDS ||--o{ MODELS : owns
+  BRANDS ||--o{ CAR_MODELS : catalogs
+  MODELS ||--o{ CAR_MODELS : catalogs
+  CAR_MODELS ||--o{ PARTNER_CARS : has_inventory
+  CAR_MODELS ||--o{ CAR_MODEL_IMAGES : has
+  PARTNER_CARS ||--o{ PARTNER_CAR_IMAGES : has
+  CAR_MODELS ||--o{ CAR_FEATURES : tagged
+  FEATURES ||--o{ CAR_FEATURES : assigned
+  CAR_MODELS ||--o{ CAR_COMMENTS : model_reviews
+  PARTNER_CARS |o--o{ CAR_COMMENTS : car_reviews
+  FILE_OBJECTS ||--o{ PARTNER_CARS : ownership_file
+  IMAGE_OBJECTS ||--o{ CAR_MODEL_IMAGES : stores
+  IMAGE_OBJECTS ||--o{ PARTNER_CAR_IMAGES : stores
+```
 
 ## Стек
 - ASP.NET Core (`net10.0`)
 - PostgreSQL
 - Flyway (SQL миграции)
 - JWT авторизация
-- HTTP-интеграции с `partner-service`, `booking-service`, `image-service`
+- HTTP-интеграции с `partner-service`, `booking-service`, `image-service`, `car-market-value-service`
+- RabbitMQ events для search index refresh
 
 ## API
 Нативный base path сервиса: `/`.
@@ -79,6 +188,10 @@
 - `GET /available-models` (`AllowAnonymous`)
   - список моделей, по которым есть машины в статусе `Available`
   - содержит `availableCarsCount`, ценовой диапазон и средний рейтинг
+- `GET /price-estimate` (`AllowAnonymous`)
+  - возвращает оценку стоимости для brand/model/year через `car-market-value-service`
+- `GET /recommendations` (`AllowAnonymous`)
+  - lightweight рекомендации из каталога без LLM-пайплайна
 - `POST /match` (`AllowAnonymous`)
   - подбирает лучшую машину партнера по `modelId + startTime + endTime`
   - сначала берутся кандидаты `status=Available`
@@ -99,6 +212,12 @@
   - если пары `brand+model` нет в каталоге:
     - автоматически создаются `brand`, `model` и новая запись в `car_models`
     - фото машины из тикета сохраняются как `car_model_images` для новой модели
+- `GET /internal/partner-cars/{partnerCarId:int}/snapshot`
+  - snapshot машины для `booking-service` и AI damage context
+- `GET /internal/partner-cars/{partnerCarId:int}/pricing-context`
+  - данные для price-preview и финансовых расчетов
+- `POST /internal/partner-cars/by-partner/{partnerUserId:guid}/set-active`
+  - массовое включение/выключение машин партнера
 
 ## Примеры payload
 ### Создание модели (`POST /models`)
@@ -198,6 +317,8 @@
   - связанных бронирований и агрегатов по машинам в `/my`;
   - проверки доступности кандидатов в `/match` (`/internal/bookings/check-availability`);
 - `image-service` для хранения бинарных изображений (upload/delete/update).
+- `car-market-value-service` для оценки рыночной стоимости.
+- `RabbitMQ` для публикации событий `car.search.partner-car-upserted` / `car.search.partner-car-deleted`, которые читает `ai-search-service`.
 
 ## Переменные окружения
 См. `./.env.example`:
@@ -207,6 +328,7 @@
 - `BookingService__BaseUrl`
 - `BookingService__InternalApiKey`
 - `ImageService__BaseUrl`
+- `CarMarketValueService__BaseUrl`
 - `InternalAuth__ApiKey`
 - `EXTERNAL_PORT`
 - `POSTGRES_USER`

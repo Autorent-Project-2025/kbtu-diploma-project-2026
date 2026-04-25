@@ -12,7 +12,39 @@
 - ссылка на аватар (из image-service).
 
 ### ERM Диаграмма
-![ERM](./docs/images/erm.png)
+
+```mermaid
+erDiagram
+  CLIENTS {
+    int id PK
+    string first_name
+    string last_name
+    timestamptz created_on
+    date birth_date
+    string identity_document_file_name
+    string driver_license_file_name
+    string related_user_id UK
+    string phone_number
+    string avatar_url
+  }
+
+  IDENTITY_USERS {
+    string id PK
+  }
+
+  FILE_OBJECTS {
+    string file_name PK
+  }
+
+  IMAGE_OBJECTS {
+    string image_url PK
+  }
+
+  IDENTITY_USERS ||--o| CLIENTS : related_user_id
+  FILE_OBJECTS ||--o{ CLIENTS : identity_document
+  FILE_OBJECTS ||--o{ CLIENTS : driver_license
+  IMAGE_OBJECTS ||--o{ CLIENTS : avatar
+```
 
 
 ## Стек
@@ -90,4 +122,3 @@ docker compose -f docker-compose.yaml up --build
 Маршрут `GET /me` требует только валидный JWT и возвращает детали пользователя из токена.
 
 Внутренний маршрут `POST /internal/clients/provision` не требует JWT, но требует валидный `X-Internal-Api-Key`.
-
