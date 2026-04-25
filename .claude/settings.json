@@ -46,7 +46,9 @@
       "Bash(python -c ' *)",
       "Bash(grep -E \"\\\\.\\(cs\\)$\")",
       "Bash(grep -nA 15 \"^  identity-service:\" \"c:/Users/Arlan/Desktop/Проекты/KBTU Diploma Project 2026/docker-compose.yml\")",
-      "Bash(dotnet --list-sdks)"
+      "Bash(dotnet --list-sdks)",
+      "Bash(node k6/parse-results.mjs)",
+      "Bash(grep -nB1 -A 25 \"^  identity-db:\" \"c:/Users/Arlan/Desktop/Проекты/KBTU Diploma Project 2026/docker-compose.yml\")"
     ]
   }
 }

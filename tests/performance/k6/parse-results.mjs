@@ -13,12 +13,12 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const resultsDir = path.resolve(__dirname, '..', 'results');
 
 const SCENARIOS = [
-  { file: '01-login.json',            label: 'Login',             users: 50, p95Budget: 800,  errorBudget: 0.01 },
-  { file: '02-catalog.json',          label: 'Catalog loading',   users: 50, p95Budget: 600,  errorBudget: 0.01 },
-  { file: '03-car-details.json',      label: 'Car details',       users: 50, p95Budget: 400,  errorBudget: 0.01 },
-  { file: '04-price-preview.json',    label: 'Price preview',     users: 50, p95Budget: 700,  errorBudget: 0.01 },
-  { file: '05-booking-creation.json', label: 'Booking creation',  users: 20, p95Budget: 1500, errorBudget: 0.02 },
-  { file: '06-ticket-queue.json',     label: 'Ticket queue',      users: 20, p95Budget: 800,  errorBudget: 0.01 },
+  { file: '01-login.json',            label: 'Login',             p95Budget: 800,  errorBudget: 0.01 },
+  { file: '02-catalog.json',          label: 'Catalog loading',   p95Budget: 600,  errorBudget: 0.01 },
+  { file: '03-car-details.json',      label: 'Car details',       p95Budget: 400,  errorBudget: 0.01 },
+  { file: '04-price-preview.json',    label: 'Price preview',     p95Budget: 700,  errorBudget: 0.01 },
+  { file: '05-booking-creation.json', label: 'Booking creation',  p95Budget: 1500, errorBudget: 0.02 },
+  { file: '06-ticket-queue.json',     label: 'Ticket queue',      p95Budget: 800,  errorBudget: 0.01 },
 ];
 
 const fmtMs = (ms) => `${ms.toFixed(1)} ms`;
@@ -41,6 +41,7 @@ function extract(summary) {
   const dur = summary?.metrics?.http_req_duration || {};
   const failed = summary?.metrics?.http_req_failed || {};
   const reqs = summary?.metrics?.http_reqs || {};
+  const vusMax = summary?.metrics?.vus_max || {};
 
   return {
     avg: dur.avg ?? 0,
@@ -48,6 +49,7 @@ function extract(summary) {
     errorRate: failed.value ?? failed.rate ?? 0,
     rps: reqs.rate ?? 0,
     count: reqs.count ?? 0,
+    users: vusMax.value ?? vusMax.max ?? 0,
   };
 }
 
@@ -57,8 +59,8 @@ const json = [];
 for (const sc of SCENARIOS) {
   const summary = readSummary(sc.file);
   if (!summary) {
-    rows.push(`| ${sc.label} | ${sc.users} | n/a | n/a | n/a | Not run |`);
-    json.push({ scenario: sc.label, users: sc.users, status: 'Not run' });
+    rows.push(`| ${sc.label} | n/a | n/a | n/a | n/a | Not run |`);
+    json.push({ scenario: sc.label, status: 'Not run' });
     continue;
   }
 
@@ -66,12 +68,12 @@ for (const sc of SCENARIOS) {
   const passed = m.p95 <= sc.p95Budget && m.errorRate <= sc.errorBudget;
 
   rows.push(
-    `| ${sc.label} | ${sc.users} | ${fmtMs(m.avg)} | ${fmtMs(m.p95)} | ${fmtPct(m.errorRate)} | ${passed ? 'Passed' : 'Failed'} |`,
+    `| ${sc.label} | ${m.users} | ${fmtMs(m.avg)} | ${fmtMs(m.p95)} | ${fmtPct(m.errorRate)} | ${passed ? 'Passed' : 'Failed'} |`,
   );
 
   json.push({
     scenario: sc.label,
-    users: sc.users,
+    users: m.users,
     avgMs: +m.avg.toFixed(1),
     p95Ms: +m.p95.toFixed(1),
     errorRate: +m.errorRate.toFixed(4),

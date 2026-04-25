@@ -41,6 +41,18 @@ public sealed class UserRepository : IUserRepository
             cancellationToken);
     }
 
+    public Task<User?> GetForLoginAsync(
+        string email,
+        CancellationToken cancellationToken = default)
+    {
+        var normalizedEmail = email.Trim().ToLowerInvariant();
+
+        return _dbContext.Users
+            .AsNoTracking()
+            .Include(user => user.Roles)
+            .FirstOrDefaultAsync(user => user.Email == normalizedEmail, cancellationToken);
+    }
+
     public Task<User?> GetByUsernameAsync(
         string username,
         bool includeRolesAndPermissions = false,

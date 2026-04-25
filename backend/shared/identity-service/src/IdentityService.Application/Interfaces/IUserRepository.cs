@@ -14,6 +14,16 @@ public interface IUserRepository
         bool includeRolesAndPermissions = false,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Tight, login-path-only user load: pulls just User + Roles (without
+    /// permissions) and skips EF change tracking. The role-permission graph
+    /// is supplied by IRolePermissionGraphProvider, so we don't need to drag
+    /// permission rows over the wire on every authentication.
+    /// </summary>
+    Task<User?> GetForLoginAsync(
+        string email,
+        CancellationToken cancellationToken = default);
+
     Task<User?> GetByUsernameAsync(
         string username,
         bool includeRolesAndPermissions = false,

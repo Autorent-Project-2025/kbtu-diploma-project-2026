@@ -39,10 +39,7 @@ public sealed class LoginUserCommandHandler
         Validate(command);
 
         var normalizedEmail = command.Email.Trim().ToLowerInvariant();
-        var user = await _userRepository.GetByEmailAsync(
-            normalizedEmail,
-            includeRolesAndPermissions: true,
-            cancellationToken: cancellationToken);
+        var user = await _userRepository.GetForLoginAsync(normalizedEmail, cancellationToken);
 
         if (user is null || !_passwordHasher.Verify(command.Password, user.PasswordHash))
         {
