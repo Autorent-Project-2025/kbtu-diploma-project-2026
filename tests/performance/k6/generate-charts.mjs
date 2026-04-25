@@ -50,8 +50,8 @@ function readFinal() {
 
 // SVG layout constants — all coordinates in pixels.
 const W = 900;
-const H = 540;
-const MARGIN = { top: 64, right: 32, bottom: 132, left: 80 };
+const H = 500;
+const MARGIN = { top: 50, right: 32, bottom: 100, left: 80 };
 const PLOT_W = W - MARGIN.left - MARGIN.right;
 const PLOT_H = H - MARGIN.top - MARGIN.bottom;
 
@@ -82,17 +82,36 @@ function makeLinearY(min, max) {
   };
 }
 
-function buildChart({ title, yLabel, scenarios, series, yMap, yTicks, valueFormat }) {
+function buildChart({ yLabel, scenarios, series, yMap, yTicks, valueFormat }) {
   const groupWidth = PLOT_W / scenarios.length;
   const barWidth = Math.min(groupWidth * 0.35, 60);
   const barGap = 4;
+  const yBase = yMap(yTicks[0]);
 
   const parts = [];
   parts.push(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" font-family="Arial, sans-serif" font-size="13">`);
   parts.push(`<rect width="${W}" height="${H}" fill="white"/>`);
 
-  // Title
-  parts.push(`<text x="${W / 2}" y="28" text-anchor="middle" font-size="16" font-weight="bold">${escapeXml(title)}</text>`);
+  // Legend at the top, horizontal, centered. Short labels ("Baseline" /
+  // "Final") so the two text blocks never run into each other; figure
+  // caption in the thesis spells out what each one means.
+  const legendY = 26;
+  const swatchW = 14;
+  const labelGap = 6;
+  const interGap = 32;
+  const charPx = 8;
+  const text1Width = series[0].name.length * charPx;
+  const text2Width = series[1].name.length * charPx;
+  const totalLegendWidth = swatchW + labelGap + text1Width + interGap + swatchW + labelGap + text2Width;
+  let lx = (W - totalLegendWidth) / 2;
+
+  parts.push(`<rect x="${lx}" y="${legendY - 11}" width="${swatchW}" height="14" fill="${series[0].color}"/>`);
+  lx += swatchW + labelGap;
+  parts.push(`<text x="${lx}" y="${legendY}">${escapeXml(series[0].name)}</text>`);
+  lx += text1Width + interGap;
+  parts.push(`<rect x="${lx}" y="${legendY - 11}" width="${swatchW}" height="14" fill="${series[1].color}"/>`);
+  lx += swatchW + labelGap;
+  parts.push(`<text x="${lx}" y="${legendY}">${escapeXml(series[1].name)}</text>`);
 
   // Y-axis label (rotated)
   parts.push(`<text x="20" y="${MARGIN.top + PLOT_H / 2}" text-anchor="middle" transform="rotate(-90 20 ${MARGIN.top + PLOT_H / 2})">${escapeXml(yLabel)}</text>`);
@@ -113,53 +132,35 @@ function buildChart({ title, yLabel, scenarios, series, yMap, yTicks, valueForma
     const x1 = groupCenter - barWidth - barGap / 2;
     const x2 = groupCenter + barGap / 2;
 
-    const v1 = series[0].values[i];
-    const v2 = series[1].values[i];
-    const y1 = yMap(v1);
-    const y2 = yMap(v2);
-    const yBase = yMap(yTicks[0]);
-
-    // Baseline bar
-    if (v1 > 0) {
-      parts.push(`<rect x="${x1}" y="${y1}" width="${barWidth}" height="${yBase - y1}" fill="${series[0].color}"/>`);
-      parts.push(`<text x="${x1 + barWidth / 2}" y="${y1 - 4}" text-anchor="middle" font-size="11" fill="#222">${escapeXml(valueFormat(v1))}</text>`);
-    }
-    // Final bar
-    if (v2 > 0) {
-      parts.push(`<rect x="${x2}" y="${y2}" width="${barWidth}" height="${yBase - y2}" fill="${series[1].color}"/>`);
-      parts.push(`<text x="${x2 + barWidth / 2}" y="${y2 - 4}" text-anchor="middle" font-size="11" fill="#222">${escapeXml(valueFormat(v2))}</text>`);
-    } else {
-      // Mark zero values explicitly so they don't disappear visually.
-      parts.push(`<text x="${x2 + barWidth / 2}" y="${yBase - 4}" text-anchor="middle" font-size="11" fill="#777">${escapeXml(valueFormat(0))}</text>`);
-    }
+    drawBar(parts, x1, series[0].values[i], series[0].color, barWidth, yMap, yBase, valueFormat);
+    drawBar(parts, x2, series[1].values[i], series[1].color, barWidth, yMap, yBase, valueFormat);
 
     // X-axis label, rotated for readability
     const labelY = MARGIN.top + PLOT_H + 24;
     parts.push(`<text x="${groupCenter}" y="${labelY}" text-anchor="end" transform="rotate(-30 ${groupCenter} ${labelY})">${escapeXml(label)}</text>`);
   });
 
-  // Legend — horizontal, centered below the rotated x-axis labels so it
-  // never collides with bars regardless of their heights.
-  const legendY = MARGIN.top + PLOT_H + 70;
-  const swatch1Width = 14;
-  const swatch2Width = 14;
-  const text1Width = series[0].name.length * 7;
-  const text2Width = series[1].name.length * 7;
-  const gap = 24;
-  const totalWidth = swatch1Width + 6 + text1Width + gap + swatch2Width + 6 + text2Width;
-  const legendStartX = (W - totalWidth) / 2;
-
-  let cursor = legendStartX;
-  parts.push(`<rect x="${cursor}" y="${legendY - 11}" width="${swatch1Width}" height="14" fill="${series[0].color}"/>`);
-  cursor += swatch1Width + 6;
-  parts.push(`<text x="${cursor}" y="${legendY}">${escapeXml(series[0].name)}</text>`);
-  cursor += text1Width + gap;
-  parts.push(`<rect x="${cursor}" y="${legendY - 11}" width="${swatch2Width}" height="14" fill="${series[1].color}"/>`);
-  cursor += swatch2Width + 6;
-  parts.push(`<text x="${cursor}" y="${legendY}">${escapeXml(series[1].name)}</text>`);
-
   parts.push('</svg>');
   return parts.join('\n');
+}
+
+// Draws a single bar at x with the given value. For non-zero values: the
+// usual filled rect with a value label on top. For exact zero values: a
+// small visible stub at the baseline plus a bold colour-matched "0.0%"
+// label so the reader can tell at a glance that the bar IS there and IS
+// zero (as opposed to missing data). Critical for the error-rate chart
+// where the headline finding is "all error rates dropped to zero".
+function drawBar(parts, x, value, color, barWidth, yMap, yBase, valueFormat) {
+  if (value > 0) {
+    const y = yMap(value);
+    parts.push(`<rect x="${x}" y="${y}" width="${barWidth}" height="${yBase - y}" fill="${color}"/>`);
+    parts.push(`<text x="${x + barWidth / 2}" y="${y - 4}" text-anchor="middle" font-size="11" fill="#222">${escapeXml(valueFormat(value))}</text>`);
+  } else {
+    // Stub: 4-px tall colored bar sitting on the x-axis so the eye picks
+    // it up. Bold colored label sits just above the stub.
+    parts.push(`<rect x="${x}" y="${yBase - 4}" width="${barWidth}" height="4" fill="${color}"/>`);
+    parts.push(`<text x="${x + barWidth / 2}" y="${yBase - 8}" text-anchor="middle" font-size="11" font-weight="bold" fill="${color}">${escapeXml(valueFormat(0))}</text>`);
+  }
 }
 
 function formatMs(v) {
@@ -183,12 +184,11 @@ function main() {
 
   // Figure 4.1 — P95 log scale
   const p95Svg = buildChart({
-    title: 'Figure 4.1 — P95 response time: baseline vs final (log scale)',
     yLabel: 'P95 response time',
     scenarios,
     series: [
-      { name: 'Baseline (no optimization)', color: COLOR_BASELINE, values: baselineP95 },
-      { name: 'Final (after optimization)', color: COLOR_FINAL,    values: finalP95 },
+      { name: 'Baseline', color: COLOR_BASELINE, values: baselineP95 },
+      { name: 'Final',    color: COLOR_FINAL,    values: finalP95 },
     ],
     yMap: makeLogY(100, 100000),
     yTicks: [100, 1000, 10000, 100000],
@@ -198,12 +198,11 @@ function main() {
 
   // Figure 4.2 — Error rate linear scale
   const errSvg = buildChart({
-    title: 'Figure 4.2 — Error rate: baseline vs final',
     yLabel: 'Error rate',
     scenarios,
     series: [
-      { name: 'Baseline (no optimization)', color: COLOR_BASELINE, values: baselineErr },
-      { name: 'Final (after optimization)', color: COLOR_FINAL,    values: finalErr },
+      { name: 'Baseline', color: COLOR_BASELINE, values: baselineErr },
+      { name: 'Final',    color: COLOR_FINAL,    values: finalErr },
     ],
     yMap: makeLinearY(0, 1),
     yTicks: [0, 0.25, 0.5, 0.75, 1],

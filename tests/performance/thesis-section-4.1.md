@@ -12,12 +12,12 @@ prose.
 
 | Item | Value |
 |---|---|
-| CPU | **<fill in>** (`wmic cpu get name` on Windows) |
-| RAM | **<fill in>** (`wmic memorychip get capacity`) |
-| OS | Windows 11 Home, build 26200 (already known) |
-| Docker version | **<fill in>** (`docker --version`) |
-| Docker Compose version | **<fill in>** (`docker compose version`) |
-| k6 version | **<fill in>** (`k6 version`) |
+| CPU | AMD Ryzen 7 4800H with Radeon Graphics — 8 physical cores, 16 logical threads, base clock 2.9 GHz |
+| RAM | 32 GB |
+| OS | Windows 11 Home, build 26200 |
+| Docker version | 29.4.0 (build 9d7ad9f) |
+| Docker Compose version | v5.1.1 |
+| k6 version | v1.7.1 (Go 1.26.1, windows/amd64) |
 
 **Where the tests ran**:
 
