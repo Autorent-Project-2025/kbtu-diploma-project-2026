@@ -11,23 +11,30 @@ export const options = {
 
 export function setup() {
   const token = login(DEMO_USERS.user.email, DEMO_USERS.user.password);
-  return { token, carIds: fetchCarIds(50) };
+
+  // Each run picks a random offset from a 50-year window. Combined with the
+  // tight per-iteration footprint below, this makes cross-run collisions on
+  // the EXCLUDE constraint statistically negligible (a single test run
+  // occupies <1 day of slot space; salt range is ~18 250 days).
+  const baseSaltMs = Math.floor(Math.random() * 50 * 365 * 24 * 60 * 60 * 1000);
+
+  return { token, carIds: fetchCarIds(50), baseSaltMs };
 }
 
-// Booking availability is enforced by the service, so each VU/iteration
-// must request a non-overlapping time window. We pick a far-future date
-// and offset hours by VU * iter to keep slots disjoint.
-function buildWindow() {
-  const baseFuture = Date.now() + 30 * 24 * 60 * 60 * 1000; // 30 days ahead
-  const offsetMs = (__VU * 1000 + __ITER) * 2 * 60 * 60 * 1000; // 2h per slot
+// Per-iteration slot is 1 minute spacing × 30 seconds duration. Within a run
+// (~10k iterations), the test occupies ~7 days of future time — small enough
+// that even ten residual runs in DB barely raise collision probability.
+function buildWindow(baseSaltMs) {
+  const baseFuture = Date.now() + 30 * 24 * 60 * 60 * 1000 + baseSaltMs;
+  const offsetMs = (__VU * 1000 + __ITER) * 60 * 1000; // 1 min between slot starts
   const start = new Date(baseFuture + offsetMs);
-  const end = new Date(start.getTime() + 60 * 60 * 1000); // 1 hour
+  const end = new Date(start.getTime() + 30 * 1000); // 30 seconds long
   return { start: start.toISOString(), end: end.toISOString() };
 }
 
 export default function (data) {
   const id = data.carIds[(__VU + __ITER) % data.carIds.length];
-  const { start, end } = buildWindow();
+  const { start, end } = buildWindow(data.baseSaltMs);
 
   const body = JSON.stringify({
     partnerCarId: id,
