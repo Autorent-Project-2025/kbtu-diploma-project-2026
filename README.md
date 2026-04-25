@@ -19,6 +19,7 @@
 - [Обзор](#overview)
 - [Ключевые сценарии](#scenarios)
 - [Архитектура](#architecture)
+- [Layered backend service structure](#backend-service-layers)
 - [Быстрый старт](#quick-start)
 - [Публичные точки входа](#entry-points)
 - [Карта репозитория](#repo-map)
@@ -71,6 +72,60 @@ AutoRent объединяет внешний клиентский контур, 
 - `ai-search-service` держит собственный pgvector-индекс и обновляется через reindex API, периодический refresh и события `RabbitMQ`.
 - `ai-damage-eval-service` работает как advisory-only сервис: при недоступности AI booking flow деградирует в ручную проверку менеджером.
 - JWT и JWKS централизованы в `identity-service`.
+
+<a id="backend-service-layers"></a>
+## Layered backend service structure
+
+Most .NET backend services follow the same layered project shape: `Api`, `Application`, `Domain` and `Infrastructure`. The exact files differ by service, but the responsibility split is consistent across the main .NET services.
+
+```text
+backend/
+└── <area>/
+    └── <service-name>/
+        └── src/
+            ├── <ServiceName>.Api/
+            │   ├── Controllers/
+            │   ├── Contracts/
+            │   ├── Middleware/
+            │   ├── Options/
+            │   └── Program.cs
+            ├── <ServiceName>.Application/
+            │   ├── Commands/
+            │   ├── Queries/
+            │   ├── DTOs/
+            │   ├── Interfaces/
+            │   └── Models/
+            ├── <ServiceName>.Domain/
+            │   ├── Entities/
+            │   ├── Enums/
+            │   └── ValueObjects/
+            ├── <ServiceName>.Infrastructure/
+            │   ├── Persistence/
+            │   ├── Integrations/
+            │   ├── Services/
+            │   ├── Options/
+            │   └── Observability/
+            └── Migrations/
+                └── V*_*.sql
+```
+
+| Layer | Responsibility |
+|---|---|
+| `Api` | Exposes HTTP endpoints, configures ASP.NET Core, authentication, authorization policies, middleware, dependency injection and request/response contracts. |
+| `Application` | Contains use-case logic boundaries: commands, queries, handlers, DTOs, service interfaces and integration abstractions used by the API layer. |
+| `Domain` | Contains core business entities, enums and domain rules that should not depend on infrastructure, databases or HTTP frameworks. |
+| `Infrastructure` | Implements persistence, EF Core DbContext, repositories where used, service implementations, typed HttpClient integrations, RabbitMQ publishers/consumers, background workers and observability helpers. |
+| `Migrations` | Contains Flyway SQL migrations that create and evolve the service-owned PostgreSQL schema. |
+
+Example services with this structure:
+
+- `backend/shared/identity-service/src`
+- `backend/external/car-service/src`
+- `backend/external/booking-service/src`
+- `backend/internal/ticket-service/src`
+- `backend/internal/payment-service/src`
+
+Non-.NET services use a lighter structure, but keep the same boundary idea: HTTP API entrypoint, domain/service logic, infrastructure clients and configuration.
 
 <a id="quick-start"></a>
 ## Быстрый старт
