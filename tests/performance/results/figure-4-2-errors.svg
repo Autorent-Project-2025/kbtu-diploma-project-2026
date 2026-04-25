@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 540" font-family="Arial, sans-serif" font-size="13">
+<rect width="900" height="540" fill="white"/>
+<text x="450" y="28" text-anchor="middle" font-size="16" font-weight="bold">Figure 4.2 — Error rate: baseline vs final</text>
+<text x="20" y="236" text-anchor="middle" transform="rotate(-90 20 236)">Error rate</text>
+<rect x="80" y="64" width="788" height="344" fill="none" stroke="#ccc"/>
+<line x1="80" y1="408" x2="868" y2="408" stroke="#eee"/>
+<text x="72" y="412" text-anchor="end" fill="#444">0.0%</text>
+<line x1="80" y1="322" x2="868" y2="322" stroke="#eee"/>
+<text x="72" y="326" text-anchor="end" fill="#444">25.0%</text>
+<line x1="80" y1="236" x2="868" y2="236" stroke="#eee"/>
+<text x="72" y="240" text-anchor="end" fill="#444">50.0%</text>
+<line x1="80" y1="150" x2="868" y2="150" stroke="#eee"/>
+<text x="72" y="154" text-anchor="end" fill="#444">75.0%</text>
+<line x1="80" y1="64" x2="868" y2="64" stroke="#eee"/>
+<text x="72" y="68" text-anchor="end" fill="#444">100.0%</text>
+<rect x="97.70000000000002" y="400.87919999999997" width="45.96666666666667" height="7.120800000000031" fill="#d9534f"/>
+<text x="120.68333333333335" y="396.87919999999997" text-anchor="middle" font-size="11" fill="#222">2.1%</text>
+<text x="170.65000000000003" y="404" text-anchor="middle" font-size="11" fill="#777">0.0%</text>
+<text x="145.66666666666669" y="432" text-anchor="end" transform="rotate(-30 145.66666666666669 432)">Login</text>
+<text x="301.98333333333335" y="404" text-anchor="middle" font-size="11" fill="#777">0.0%</text>
+<text x="277" y="432" text-anchor="end" transform="rotate(-30 277 432)">Catalog</text>
+<text x="433.3166666666667" y="404" text-anchor="middle" font-size="11" fill="#777">0.0%</text>
+<text x="408.33333333333337" y="432" text-anchor="end" transform="rotate(-30 408.33333333333337 432)">Car details</text>
+<rect x="491.70000000000005" y="142.776" width="45.96666666666667" height="265.224" fill="#d9534f"/>
+<text x="514.6833333333334" y="138.776" text-anchor="middle" font-size="11" fill="#222">77.1%</text>
+<text x="564.6500000000001" y="404" text-anchor="middle" font-size="11" fill="#777">0.0%</text>
+<text x="539.6666666666667" y="432" text-anchor="end" transform="rotate(-30 539.6666666666667 432)">Price preview</text>
+<rect x="623.0333333333333" y="95.2696" width="45.96666666666667" height="312.73040000000003" fill="#d9534f"/>
+<text x="646.0166666666667" y="91.2696" text-anchor="middle" font-size="11" fill="#222">90.9%</text>
+<text x="695.9833333333333" y="404" text-anchor="middle" font-size="11" fill="#777">0.0%</text>
+<text x="671" y="432" text-anchor="end" transform="rotate(-30 671 432)">Booking creation</text>
+<text x="827.3166666666667" y="404" text-anchor="middle" font-size="11" fill="#777">0.0%</text>
+<text x="802.3333333333334" y="432" text-anchor="end" transform="rotate(-30 802.3333333333334 432)">Ticket queue</text>
+<rect x="236" y="467" width="14" height="14" fill="#d9534f"/>
+<text x="256" y="478">Baseline (no optimization)</text>
+<rect x="462" y="467" width="14" height="14" fill="#5cb85c"/>
+<text x="482" y="478">Final (after optimization)</text>
+</svg>

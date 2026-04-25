@@ -22,7 +22,6 @@ namespace BookingService.Infrastructure.Services
 {
     public class BookingService : IBookingService
     {
-        private const int MaxSerializableRetries = 3;
         private const string CancellationActorClient = "client";
         private const string CancellationActorPartner = "partner";
         private const string CancellationActorManager = "manager";
@@ -114,57 +113,61 @@ namespace BookingService.Infrastructure.Services
                     endTime);
             }
 
-            for (var attempt = 1; attempt <= MaxSerializableRetries; attempt++)
+            // Booking creation runs under ReadCommitted: the two EXCLUDE
+            // constraints on the bookings table — prevent_overlapping_bookings
+            // (per partner_car_id, V3) and prevent_overlapping_user_bookings
+            // (per user_id, V20) — are the source of truth for overlap
+            // correctness. ReadCommitted gives full concurrency between
+            // non-conflicting transactions; only genuinely overlapping
+            // INSERTs raise 23P01 exclusion_violation, which we surface as
+            // a user-facing error without retrying (a retry would just hit
+            // the same conflict).
+            await using var transaction = await _db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted);
+            try
             {
-                await using var transaction = await _db.Database.BeginTransactionAsync(IsolationLevel.Serializable);
-                try
-                {
-                    var booking = await CreateBookingWithOverlapCheck(
-                        userId,
-                        partnerCarId,
-                        priceQuote,
-                        startTime,
-                        endTime);
+                var booking = await CreateBookingWithOverlapCheck(
+                    userId,
+                    partnerCarId,
+                    priceQuote,
+                    startTime,
+                    endTime);
 
-                    await transaction.CommitAsync();
-                    await EnsureMockPaymentSessionStartedAsync(booking);
-                    return booking.ToBookingResponseDto();
-                }
-                catch (PostgresException ex) when (IsSerializationFailure(ex))
-                {
-                    await transaction.RollbackAsync();
-                    _db.ChangeTracker.Clear();
+                // Enqueue the payment-session-requested outbox row in the SAME
+                // transaction as the booking insert. Atomicity guarantees that
+                // every committed booking has exactly one matching outbox row;
+                // PaymentSyncOutboxDispatcher then publishes it to RabbitMQ
+                // (at-least-once) and payment-service provisions the session
+                // off the booking-creation hot path.
+                EnqueuePaymentSessionRequestedOutbox(booking);
+                await _db.SaveChangesAsync();
 
-                    if (attempt == MaxSerializableRetries)
-                    {
-                        throw new InvalidOperationException("Car is already booked for this time.");
-                    }
-                }
-                catch (DbUpdateException ex) when (IsSerializationFailure(ex))
-                {
-                    await transaction.RollbackAsync();
-                    _db.ChangeTracker.Clear();
-
-                    if (attempt == MaxSerializableRetries)
-                    {
-                        throw new InvalidOperationException("Car is already booked for this time.");
-                    }
-                }
-                catch (PostgresException ex) when (IsOverlappingConstraintViolation(ex))
-                {
-                    await transaction.RollbackAsync();
-                    _db.ChangeTracker.Clear();
-                    throw new InvalidOperationException("Car is already booked for this time.");
-                }
-                catch (DbUpdateException ex) when (IsOverlappingConstraintViolation(ex))
-                {
-                    await transaction.RollbackAsync();
-                    _db.ChangeTracker.Clear();
-                    throw new InvalidOperationException("Car is already booked for this time.");
-                }
+                await transaction.CommitAsync();
+                return booking.ToBookingResponseDto();
             }
-
-            throw new InvalidOperationException("Car is already booked for this time.");
+            catch (PostgresException ex) when (IsCarOverlapViolation(ex))
+            {
+                await transaction.RollbackAsync();
+                _db.ChangeTracker.Clear();
+                throw new InvalidOperationException("Car is already booked for this time.");
+            }
+            catch (DbUpdateException ex) when (IsCarOverlapViolation(ex))
+            {
+                await transaction.RollbackAsync();
+                _db.ChangeTracker.Clear();
+                throw new InvalidOperationException("Car is already booked for this time.");
+            }
+            catch (PostgresException ex) when (IsUserOverlapViolation(ex))
+            {
+                await transaction.RollbackAsync();
+                _db.ChangeTracker.Clear();
+                throw new InvalidOperationException("You already have a booking for this time period.");
+            }
+            catch (DbUpdateException ex) when (IsUserOverlapViolation(ex))
+            {
+                await transaction.RollbackAsync();
+                _db.ChangeTracker.Clear();
+                throw new InvalidOperationException("You already have a booking for this time period.");
+            }
         }
 
         public async Task<IEnumerable<BookingResponseDto>> GetUserBookings(Guid userId)
@@ -2146,6 +2149,37 @@ namespace BookingService.Infrastructure.Services
             return booking.CreatedAt.AddMinutes(_pendingBookingExpirationOptions.TtlMinutes) <= DateTimeOffset.UtcNow;
         }
 
+        private void EnqueuePaymentSessionRequestedOutbox(Booking booking)
+        {
+            if (booking.UserId == Guid.Empty || booking.TotalPrice is null || booking.TotalPrice.Value <= 0)
+            {
+                throw new InvalidOperationException(
+                    "Booking must have a valid user id and non-zero total price before requesting a payment session.");
+            }
+
+            var now = DateTimeOffset.UtcNow;
+            var payload = new PaymentSyncOutboxPayload
+            {
+                BookingId = booking.Id,
+                UserId = booking.UserId,
+                PartnerUserId = booking.PartnerUserId,
+                PartnerCarId = booking.PartnerCarId,
+                PriceHour = booking.PriceHour,
+                TotalPrice = booking.TotalPrice,
+                Currency = ResolvePaymentCurrency(),
+            };
+
+            _db.PaymentSyncOutboxMessages.Add(new PaymentSyncOutboxMessage
+            {
+                BookingId = booking.Id,
+                EventKey = $"booking:{booking.Id}:payment-session-requested",
+                EventType = PaymentSyncOutboxEventTypes.BookingPaymentSessionRequested,
+                Payload = JsonSerializer.Serialize(payload),
+                CreatedAt = now,
+                NextAttemptAt = now,
+            });
+        }
+
         private static PaymentSyncOutboxMessage? CreatePaymentSyncOutboxMessage(Booking booking, BookingStatus targetStatus)
         {
             var now = DateTimeOffset.UtcNow;
@@ -2190,25 +2224,26 @@ namespace BookingService.Infrastructure.Services
             };
         }
 
-        private static bool IsSerializationFailure(DbUpdateException ex)
+        private static bool IsCarOverlapViolation(DbUpdateException ex)
         {
-            return ex.InnerException is PostgresException postgresException && IsSerializationFailure(postgresException);
+            return ex.InnerException is PostgresException postgresException && IsCarOverlapViolation(postgresException);
         }
 
-        private static bool IsSerializationFailure(PostgresException ex)
-        {
-            return ex.SqlState == PostgresErrorCodes.SerializationFailure;
-        }
-
-        private static bool IsOverlappingConstraintViolation(DbUpdateException ex)
-        {
-            return ex.InnerException is PostgresException postgresException && IsOverlappingConstraintViolation(postgresException);
-        }
-
-        private static bool IsOverlappingConstraintViolation(PostgresException ex)
+        private static bool IsCarOverlapViolation(PostgresException ex)
         {
             return ex.SqlState == PostgresErrorCodes.ExclusionViolation &&
                    string.Equals(ex.ConstraintName, "prevent_overlapping_bookings", StringComparison.Ordinal);
+        }
+
+        private static bool IsUserOverlapViolation(DbUpdateException ex)
+        {
+            return ex.InnerException is PostgresException postgresException && IsUserOverlapViolation(postgresException);
+        }
+
+        private static bool IsUserOverlapViolation(PostgresException ex)
+        {
+            return ex.SqlState == PostgresErrorCodes.ExclusionViolation &&
+                   string.Equals(ex.ConstraintName, "prevent_overlapping_user_bookings", StringComparison.Ordinal);
         }
 
         private async Task<DamageEvaluationAssessment> RunDamageAssessmentAsync(
