@@ -28,6 +28,11 @@ public sealed class FileStorageClient : IFileStorageClient
         TicketDocumentFilePayload payload,
         CancellationToken cancellationToken = default)
     {
+        if (payload is null || payload.Content.Length == 0)
+        {
+            throw new ValidationException("File payload is required.");
+        }
+
         using var content = new ByteArrayContent(payload.Content);
         content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(payload.ContentType);
 

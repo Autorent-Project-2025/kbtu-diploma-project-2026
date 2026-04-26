@@ -45,6 +45,7 @@ public sealed class CreateTicketCommandHandler
         Guid? relatedPartnerUserId = null;
         IReadOnlyCollection<PartnerCarTicketImageData>? carImages = null;
         IReadOnlyCollection<BookingCompletionTicketPhotoData>? completionPhotos = null;
+        BookingCompletionAiAssessmentData? aiAssessment = null;
         var partnerCarRequestKind = ResolvePartnerCarRequestKind(command.PartnerCarRequestKind);
 
         if (command.TicketType == TicketType.PartnerCar)
@@ -76,10 +77,6 @@ public sealed class CreateTicketCommandHandler
         else if (command.TicketType == TicketType.BookingCompletion)
         {
             completionPhotos = await UploadBookingCompletionPhotosAsync(command, cancellationToken);
-        }
-        BookingCompletionAiAssessmentData? aiAssessment = null;
-        if (command.TicketType == TicketType.BookingCompletion)
-        {
             aiAssessment = ParseAiAssessment(command.DamageAssessmentJson);
         }
         else if (command.TicketType == TicketType.PartnerBookingCancellation)
