@@ -673,7 +673,7 @@ function userInitials(username: string): string {
 }
 
 function permissionColor(name: string): string {
-  const prefix = name.split(".")[0].toLowerCase();
+  const prefix = name.split(".")[0]?.toLowerCase() ?? "";
   const colors: Record<string, string> = {
     user: "bg-violet-100 dark:bg-violet-500/15 text-violet-700 dark:text-violet-300",
     role: "bg-purple-100 dark:bg-purple-500/15 text-purple-700 dark:text-purple-300",

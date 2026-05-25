@@ -455,6 +455,7 @@ function shouldShowDateSeparator(idx: number): boolean {
   if (idx === 0) return true;
   const prev = messages.value[idx - 1];
   const curr = messages.value[idx];
+  if (!prev || !curr) return false;
   const prevDate = new Date(prev.createdAt).toDateString();
   const currDate = new Date(curr.createdAt).toDateString();
   return prevDate !== currDate;
@@ -464,6 +465,7 @@ function isSameSenderAsPrevious(idx: number): boolean {
   if (idx === 0) return false;
   const prev = messages.value[idx - 1];
   const curr = messages.value[idx];
+  if (!prev || !curr) return false;
   if (prev.messageType === "System" || curr.messageType === "System") return false;
   if (prev.senderUserId !== curr.senderUserId) return false;
   // Also break grouping if date separator is shown

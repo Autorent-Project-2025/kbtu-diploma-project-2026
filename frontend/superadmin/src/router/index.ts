@@ -1,7 +1,8 @@
 import { createRouter, createWebHistory } from "vue-router";
-import LoginView from "../views/LoginView.vue";
-import SuperadminUsersView from "../views/SuperadminUsersView.vue";
 import { auth } from "../store/auth";
+
+const LoginView = () => import("../views/LoginView.vue");
+const SuperadminUsersView = () => import("../views/SuperadminUsersView.vue");
 
 const router = createRouter({
   history: createWebHistory(),

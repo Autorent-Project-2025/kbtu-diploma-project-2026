@@ -31,7 +31,7 @@
     <div class="flex gap-1 rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-1.5 w-fit shadow">
       <button
         v-for="f in filters"
-        :key="f.value"
+        :key="f.value ?? 'all'"
         @click="activeFilter = f.value"
         :class="[
           'px-5 py-2 rounded-xl text-sm font-semibold transition-colors',

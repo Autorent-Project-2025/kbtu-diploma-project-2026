@@ -1,23 +1,24 @@
 import { createRouter, createWebHistory } from "vue-router";
-import LoginView from "../views/LoginView.vue";
-import ManagerDetailView from "../views/ManagerDetailView.vue";
-import ManagerTicketsView from "../views/ManagerTicketsView.vue";
-import SuperManagerView from "../views/SuperManagerView.vue";
-import AdminControlView from "../views/AdminControlView.vue";
-import ClientsTableView from "../views/ClientsTableView.vue";
-import ClientDetailView from "../views/ClientDetailView.vue";
-import PartnersTableView from "../views/PartnersTableView.vue";
-import PartnerDetailView from "../views/PartnerDetailView.vue";
-import CarsTableView from "../views/CarsTableView.vue";
-import CarDetailView from "../views/CarDetailView.vue";
-import BookingsTableView from "../views/BookingsTableView.vue";
-import BookingDetailView from "../views/BookingDetailView.vue";
-import ComplaintsQueueView from "../views/ComplaintsQueueView.vue";
-import ComplaintDetailView from "../views/ComplaintDetailView.vue";
-import BookingReviewView from "../views/BookingReviewView.vue";
-import AccessRequestsView from "../views/AccessRequestsView.vue";
-import FinanceView from "../views/FinanceView.vue";
 import { auth } from "../store/auth";
+
+const LoginView = () => import("../views/LoginView.vue");
+const ManagerDetailView = () => import("../views/ManagerDetailView.vue");
+const ManagerTicketsView = () => import("../views/ManagerTicketsView.vue");
+const SuperManagerView = () => import("../views/SuperManagerView.vue");
+const AdminControlView = () => import("../views/AdminControlView.vue");
+const ClientsTableView = () => import("../views/ClientsTableView.vue");
+const ClientDetailView = () => import("../views/ClientDetailView.vue");
+const PartnersTableView = () => import("../views/PartnersTableView.vue");
+const PartnerDetailView = () => import("../views/PartnerDetailView.vue");
+const CarsTableView = () => import("../views/CarsTableView.vue");
+const CarDetailView = () => import("../views/CarDetailView.vue");
+const BookingsTableView = () => import("../views/BookingsTableView.vue");
+const BookingDetailView = () => import("../views/BookingDetailView.vue");
+const ComplaintsQueueView = () => import("../views/ComplaintsQueueView.vue");
+const ComplaintDetailView = () => import("../views/ComplaintDetailView.vue");
+const BookingReviewView = () => import("../views/BookingReviewView.vue");
+const AccessRequestsView = () => import("../views/AccessRequestsView.vue");
+const FinanceView = () => import("../views/FinanceView.vue");
 
 const defaultRoutes: { path: string; permission: string }[] = [
   { path: "/tickets", permission: "Ticket.View" },

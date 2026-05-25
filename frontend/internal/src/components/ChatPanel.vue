@@ -634,8 +634,11 @@ function formatDateSeparator(iso: string): string {
 
 function shouldShowDateSeparator(idx: number): boolean {
   if (idx === 0) return true;
-  const prev = new Date(messages.value[idx - 1].createdAt).toDateString();
-  const curr = new Date(messages.value[idx].createdAt).toDateString();
+  const prevMessage = messages.value[idx - 1];
+  const currMessage = messages.value[idx];
+  if (!prevMessage || !currMessage) return false;
+  const prev = new Date(prevMessage.createdAt).toDateString();
+  const curr = new Date(currMessage.createdAt).toDateString();
   return prev !== curr;
 }
 

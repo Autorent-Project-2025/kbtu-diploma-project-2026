@@ -157,24 +157,20 @@ async function search(q: string) {
   const found: SearchResult[] = [];
 
   try {
-    const promises: Promise<unknown>[] = [
-      getClients(q),
-      getPartners(q),
-      getPartnerCars({ page: 1, pageSize: 5, search: q }),
-      getAllBookings({ page: 1, pageSize: 5, search: q }),
-    ];
-
-    if (auth.hasPermission("Ticket.ViewAll")) {
-      promises.push(getAllTickets(q));
-    }
-
-    const settled = await Promise.allSettled(promises);
+    const includeTickets = auth.hasPermission("Ticket.ViewAll");
+    const [clients, partners, carsResult, bookingsResult, ticketsResult] =
+      await Promise.allSettled([
+        getClients(q),
+        getPartners(q),
+        getPartnerCars({ page: 1, pageSize: 5, search: q }),
+        getAllBookings({ page: 1, pageSize: 5, search: q }),
+        includeTickets ? getAllTickets(q) : Promise.resolve(null),
+      ] as const);
     if (thisSearch !== searchCounter) return;
 
     // Clients
-    const clients = settled[0];
     if (clients.status === "fulfilled") {
-      for (const c of (clients.value as ReturnType<typeof getClients> extends Promise<infer R> ? R : never).slice(0, 5)) {
+      for (const c of clients.value.slice(0, 5)) {
         found.push({
           type: "client",
           id: c.id,
@@ -189,9 +185,8 @@ async function search(q: string) {
     }
 
     // Partners
-    const partners = settled[1];
     if (partners.status === "fulfilled") {
-      for (const p of (partners.value as ReturnType<typeof getPartners> extends Promise<infer R> ? R : never).slice(0, 5)) {
+      for (const p of partners.value.slice(0, 5)) {
         found.push({
           type: "partner",
           id: p.id,
@@ -206,10 +201,8 @@ async function search(q: string) {
     }
 
     // Cars
-    const carsResult = settled[2];
     if (carsResult.status === "fulfilled") {
-      const carsData = carsResult.value as { items: Array<{ id: number; modelBrand: string; modelName: string; modelYear: number; licensePlate: string }> };
-      for (const car of carsData.items) {
+      for (const car of carsResult.value.items) {
         found.push({
           type: "car",
           id: car.id,
@@ -224,10 +217,8 @@ async function search(q: string) {
     }
 
     // Bookings
-    const bookingsResult = settled[3];
     if (bookingsResult.status === "fulfilled") {
-      const bookingsData = bookingsResult.value as { items: Array<{ id: number; carBrand: string; carModel: string }> };
-      for (const b of bookingsData.items) {
+      for (const b of bookingsResult.value.items) {
         found.push({
           type: "booking",
           id: b.id,
@@ -242,22 +233,18 @@ async function search(q: string) {
     }
 
     // Tickets
-    if (settled.length > 4) {
-      const ticketsResult = settled[4];
-      if (ticketsResult.status === "fulfilled") {
-        const tickets = ticketsResult.value as Array<{ id: string; fullName?: string; email?: string; phoneNumber?: string; ticketType?: string; status?: string }>;
-        for (const t of tickets.slice(0, 5)) {
-          found.push({
-            type: "ticket",
-            id: t.id,
-            title: t.fullName || `Заявка ${t.id.slice(0, 8)}...`,
-            subtitle: t.email || t.phoneNumber || t.ticketType || "",
-            badge: "T",
-            badgeCss: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
-            typeLabel: "Заявка",
-            route: `/tickets`,
-          });
-        }
+    if (ticketsResult.status === "fulfilled" && ticketsResult.value) {
+      for (const t of ticketsResult.value.slice(0, 5)) {
+        found.push({
+          type: "ticket",
+          id: t.id,
+          title: t.fullName || `Заявка ${t.id.slice(0, 8)}...`,
+          subtitle: t.email || t.phoneNumber || String(t.ticketType ?? ""),
+          badge: "T",
+          badgeCss: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
+          typeLabel: "Заявка",
+          route: `/tickets`,
+        });
       }
     }
   } catch {
@@ -277,7 +264,8 @@ function navigateTo(r: SearchResult) {
 
 function navigateToFirst() {
   if (results.value.length > 0) {
-    navigateTo(results.value[0]);
+    const firstResult = results.value[0];
+    if (firstResult) navigateTo(firstResult);
   }
 }
 
