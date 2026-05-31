@@ -32,10 +32,18 @@ function processQueue(error: unknown, token: string | null = null) {
   failedQueue = [];
 }
 
+function isLoginRequest(url?: string): boolean {
+  return !!url && url.includes("/identity/auth/login");
+}
+
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
+
+    if (error.response?.status === 401 && isLoginRequest(originalRequest?.url)) {
+      return Promise.reject(error);
+    }
 
     if (error.response?.status === 401 && !originalRequest._retry) {
       if (isRefreshing) {

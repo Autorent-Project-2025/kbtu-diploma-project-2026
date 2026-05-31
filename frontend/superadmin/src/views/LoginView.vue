@@ -77,12 +77,23 @@
 import { ref } from "vue";
 import { useRouter } from "vue-router";
 import { auth } from "../store/auth";
+import { useToast } from "../composables/useToast";
 
 const router = useRouter();
 const email = ref("");
 const password = ref("");
 const loading = ref(false);
 const errorMessage = ref("");
+const toast = useToast();
+
+function getLoginErrorMessage(err: unknown): string {
+  const status = (err as { response?: { status?: number } })?.response?.status;
+  if (status === 400 || status === 401) {
+    return "Неверный email или пароль.";
+  }
+
+  return "Не удалось войти. Попробуйте позже.";
+}
 
 async function onSubmit() {
   if (loading.value) return;
@@ -93,11 +104,13 @@ async function onSubmit() {
     if (!auth.hasPermission("User.View")) {
       auth.logout();
       errorMessage.value = "Недостаточно прав для superadmin panel.";
+      toast.error(errorMessage.value);
       return;
     }
     router.push("/users");
-  } catch {
-    errorMessage.value = "Ошибка входа. Проверьте email и пароль.";
+  } catch (err) {
+    errorMessage.value = getLoginErrorMessage(err);
+    toast.error(errorMessage.value);
   } finally {
     loading.value = false;
   }

@@ -33,6 +33,7 @@
     </header>
 
     <router-view />
+    <ToastContainer />
   </div>
 </template>
 
@@ -40,6 +41,7 @@
 import { computed } from "vue";
 import { useRouter } from "vue-router";
 import { auth } from "./store/auth";
+import ToastContainer from "./components/ToastContainer.vue";
 
 const router = useRouter();
 const isAuthenticated = computed(() => Boolean(auth.token));
