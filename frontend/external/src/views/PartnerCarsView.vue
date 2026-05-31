@@ -346,54 +346,12 @@
             </p>
           </div>
 
-          <div class="space-y-3 md:col-span-2">
-            <label
-              class="block text-sm font-semibold text-gray-700 dark:text-gray-300"
-              >Примерная стоимость аренды</label
-            >
-            <div class="flex items-center gap-3 flex-wrap">
-              <button
-                type="button"
-                :disabled="!canEstimatePrice || estimating"
-                class="inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
-                @click="runPriceEstimate"
-              >
-                <svg
-                  class="h-4 w-4"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 11h.01M12 11h.01M15 11h.01M4 19h16a2 2 0 002-2V7a2 2 0 00-2-2H4a2 2 0 00-2 2v10a2 2 0 002 2z"
-                  />
-                </svg>
-                {{ estimating ? "Запрос..." : "Рассчитать" }}
-              </button>
-              <p
-                v-if="!canEstimatePrice"
-                class="text-xs text-gray-400 dark:text-gray-500"
-              >
-                Заполните марку, модель и год
-              </p>
-              <div
-                v-if="priceEstimate"
-                class="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 dark:border-emerald-500/30 dark:bg-emerald-500/10"
-              >
-                <span
-                  class="text-sm font-semibold text-emerald-800 dark:text-emerald-300"
-                >
-                  {{ priceEstimate.priceHour.toLocaleString("ru-RU") }} ₸/час
-                </span>
-                <span class="text-xs text-emerald-600 dark:text-emerald-400">
-                  · {{ priceEstimate.priceDay.toLocaleString("ru-RU") }} ₸/сут
-                </span>
-              </div>
-            </div>
-          </div>
+          <PartnerCarPriceEstimate
+            :can-estimate-price="canEstimatePrice"
+            :estimating="estimating"
+            :price-estimate="priceEstimate"
+            @estimate="runPriceEstimate"
+          />
 
           <div class="space-y-3 md:col-span-2">
             <label
@@ -610,64 +568,11 @@
         </form>
       </section>
 
-      <section
-        class="glass p-8 rounded-3xl border border-gray-200 dark:border-gray-800 shadow-xl space-y-4"
-      >
-        <div class="flex items-center justify-between">
-          <h2 class="text-2xl font-bold text-gray-900 dark:text-white">
-            Мои активные машины
-          </h2>
-          <button
-            class="btn-premium px-4 py-2 rounded-xl"
-            @click="loadCars"
-            :disabled="loadingCars"
-          >
-            {{ loadingCars ? "Обновление..." : "Обновить" }}
-          </button>
-        </div>
-
-        <div v-if="loadingCars" class="text-gray-600 dark:text-gray-400">
-          Загрузка...
-        </div>
-        <div
-          v-else-if="cars.length === 0"
-          class="text-gray-600 dark:text-gray-400"
-        >
-          Пока нет машин. Создайте заявку выше.
-        </div>
-
-        <div v-else class="grid md:grid-cols-2 gap-4">
-          <article
-            v-for="car in cars"
-            :key="car.id"
-            class="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-5 space-y-3"
-          >
-            <div class="flex items-center justify-between gap-3">
-              <h3 class="font-bold text-gray-900 dark:text-white">
-                {{ car.modelDisplayName }}
-              </h3>
-              <span
-                class="text-xs rounded-full bg-gray-100 dark:bg-gray-800 px-3 py-1 text-gray-600 dark:text-gray-300"
-              >
-                #{{ car.id }}
-              </span>
-            </div>
-            <p class="text-sm text-gray-600 dark:text-gray-400">
-              Гос номер: {{ car.licensePlate }}
-            </p>
-            <p class="text-sm text-gray-600 dark:text-gray-400">
-              Рейтинг: {{ car.rating ?? "нет" }} · Бронирований:
-              {{ car.bookingCount }}
-            </p>
-            <router-link
-              :to="`/partner/cars/${car.id}`"
-              class="inline-flex items-center gap-2 text-primary-600 dark:text-primary-400 font-semibold"
-            >
-              Детали машины
-            </router-link>
-          </article>
-        </div>
-      </section>
+      <PartnerCarsList
+        :cars="cars"
+        :loading="loadingCars"
+        @refresh="loadCars"
+      />
     </div>
   </div>
 </template>
@@ -685,6 +590,8 @@ import {
   getMyPartnerCars,
   type PartnerCarSummary,
 } from "../api/partnerCars";
+import PartnerCarPriceEstimate from "../components/partner/PartnerCarPriceEstimate.vue";
+import PartnerCarsList from "../components/partner/PartnerCarsList.vue";
 import { useToast } from "../composables/useToast";
 import {
   bodyTypeOptions,
