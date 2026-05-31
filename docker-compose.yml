@@ -1,3 +1,24 @@
+x-dotnet-watch-env: &dotnet-watch-env
+  DOTNET_USE_POLLING_FILE_WATCHER: "1"
+  DOTNET_WATCH_RESTART_ON_RUDE_EDIT: "1"
+
+x-node-ts-watch-env: &node-ts-watch-env
+  TSC_WATCHFILE: PriorityPollingInterval
+  TSC_WATCHDIRECTORY: RecursiveDirectoryUsingDynamicPriorityPolling
+
+x-vite-watch-env: &vite-watch-env
+  CHOKIDAR_USEPOLLING: "true"
+  WATCHPACK_POLLING: "true"
+
+x-node-ts-dev-command: &node-ts-dev-command
+  - /bin/sh
+  - -c
+  - |
+    rm -rf dist/*
+    npm run build -- --watch --preserveWatchOutput &
+    while [ ! -f dist/index.js ]; do sleep 1; done
+    node --watch dist/index.js
+
 services:
   rabbitmq:
     image: rabbitmq:3.13-management
@@ -72,6 +93,7 @@ services:
     build:
       context: ./backend
       dockerfile: ./shared/identity-service/src/IdentityService.Api/Dockerfile
+      target: build
     restart: unless-stopped
     env_file:
       - path: ./backend/shared/identity-service/.env.example
@@ -79,6 +101,7 @@ services:
       - path: ./backend/shared/identity-service/.env
         required: false
     environment:
+      <<: *dotnet-watch-env
       ASPNETCORE_ENVIRONMENT: Development
       ConnectionStrings__DbConnection: Host=identity-db;Port=5432;Database=postgres_db;Username=postgres;Password=postgres;Maximum Pool Size=200;Minimum Pool Size=20;Connection Idle Lifetime=60
       InternalAuth__ApiKey: local-identity-service-key
@@ -89,6 +112,16 @@ services:
       RabbitMq__ExchangeName: ${RABBITMQ_EXCHANGE_NAME:-autorent.events}
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
       Observability__LogPath: /tmp/autorent/identity-service/identity-service.jsonl
+    command:
+      - dotnet
+      - watch
+      - --artifacts-path
+      - /tmp/dotnet-artifacts/identity-service
+      - --project
+      - /src/shared/identity-service/src/IdentityService.Api/IdentityService.Api.csproj
+      - run
+      - --urls
+      - http://0.0.0.0:8080
     expose:
       - "8080"
     depends_on:
@@ -108,6 +141,7 @@ services:
       - backend
       - data
     volumes:
+      - ./backend:/src
       - identity_logs:/tmp/autorent/identity-service
 
   chat-db:
@@ -132,6 +166,7 @@ services:
     build:
       context: ./backend
       dockerfile: ./shared/chat-service/src/ChatService.Api/Dockerfile
+      target: build
     restart: unless-stopped
     env_file:
       - path: ./backend/shared/chat-service/.env.example
@@ -139,6 +174,7 @@ services:
       - path: ./backend/shared/chat-service/.env
         required: false
     environment:
+      <<: *dotnet-watch-env
       ASPNETCORE_ENVIRONMENT: Development
       MongoDB__ConnectionString: mongodb://chat-db:27017
       MongoDB__DatabaseName: chat_db
@@ -152,6 +188,16 @@ services:
       Cors__AllowedOrigins__0: http://localhost:5173
       Cors__AllowedOrigins__1: http://localhost:5174
       Cors__AllowedOrigins__2: http://localhost:5175
+    command:
+      - dotnet
+      - watch
+      - --artifacts-path
+      - /tmp/dotnet-artifacts/chat-service
+      - --project
+      - /src/shared/chat-service/src/ChatService.Api/ChatService.Api.csproj
+      - run
+      - --urls
+      - http://0.0.0.0:8080
     expose:
       - "8080"
     depends_on:
@@ -170,6 +216,8 @@ services:
     networks:
       - backend
       - data
+    volumes:
+      - ./backend:/src
 
   car-db:
     image: postgres:16
@@ -220,6 +268,8 @@ services:
         required: false
     environment:
       PORT: 8080
+      WATCHFILES_FORCE_POLLING: "true"
+    command: uvicorn main:app --host 0.0.0.0 --port 8080 --reload
     expose:
       - "8080"
     healthcheck:
@@ -236,11 +286,14 @@ services:
       start_period: 15s
     networks:
       - backend
+    volumes:
+      - ./backend/internal/car-market-value-service/src:/app
 
   car-service:
     build:
       context: ./backend
       dockerfile: ./external/car-service/src/CarService.Api/Dockerfile
+      target: build
     restart: unless-stopped
     env_file:
       - path: ./backend/external/car-service/.env.example
@@ -248,6 +301,7 @@ services:
       - path: ./backend/external/car-service/.env
         required: false
     environment:
+      <<: *dotnet-watch-env
       ASPNETCORE_ENVIRONMENT: Development
       ConnectionStrings__DbConnection: Host=car-db;Port=5432;Database=postgres_db;Username=postgres;Password=postgres
       PartnerService__BaseUrl: http://partner-service:8080
@@ -264,6 +318,16 @@ services:
       RabbitMq__UserName: ${RABBITMQ_DEFAULT_USER:-autorent}
       RabbitMq__Password: ${RABBITMQ_DEFAULT_PASS:-autorent}
       RabbitMq__ExchangeName: ${RABBITMQ_EXCHANGE_NAME:-autorent.events}
+    command:
+      - dotnet
+      - watch
+      - --artifacts-path
+      - /tmp/dotnet-artifacts/car-service
+      - --project
+      - /src/external/car-service/src/CarService.Api/CarService.Api.csproj
+      - run
+      - --urls
+      - http://0.0.0.0:8080
     expose:
       - "8080"
     depends_on:
@@ -285,6 +349,7 @@ services:
       - backend
       - data
     volumes:
+      - ./backend:/src
       - car_logs:/tmp/autorent/car-service
 
   ai-search-db:
@@ -407,6 +472,7 @@ services:
     build:
       context: ./backend/external/ai-search-service/src
       dockerfile: ./Dockerfile
+      target: build
     restart: unless-stopped
     env_file:
       - path: ./backend/external/ai-search-service/.env.example
@@ -414,6 +480,7 @@ services:
       - path: ./backend/external/ai-search-service/.env
         required: false
     environment:
+      <<: *node-ts-watch-env
       PORT: 8080
       DATABASE_URL: postgres://postgres:postgres@ai-search-db:5432/postgres_db
       CAR_SERVICE_BASE_URL: http://car-service:8080
@@ -433,6 +500,7 @@ services:
       LLM_RECOMMENDATION_SUMMARY_TIMEOUT_MS: 5000
       REDIS_URL: redis://ai-search-redis:6379
       REDIS_CACHE_TTL_SECONDS: 300
+    command: *node-ts-dev-command
     expose:
       - "8080"
     depends_on:
@@ -470,6 +538,9 @@ services:
       - backend
       - data
     volumes:
+      - ./backend/external/ai-search-service/src:/app
+      - /app/node_modules
+      - /app/dist
       - ai_search_logs:/tmp/autorent/ai-search-service
 
   booking-db:
@@ -530,6 +601,8 @@ services:
       USE_REGISTRY_VALIDATION: "false"
       MIN_PHOTOS: 4
       MAX_PHOTOS: 5
+      WATCHFILES_FORCE_POLLING: "true"
+    command: uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload
     expose:
       - "8000"
     # /ready is backed by a warmup latch: only succeeds after YOLO weights
@@ -544,11 +617,14 @@ services:
       start_period: 120s
     networks:
       - backend
+    volumes:
+      - ./backend/internal/ai-car-damage-eval-service/car-detection-service:/app
 
   booking-service:
     build:
       context: ./backend
       dockerfile: ./external/booking-service/src/BookingService.Api/Dockerfile
+      target: build
     restart: unless-stopped
     env_file:
       - path: ./backend/external/booking-service/.env.example
@@ -556,6 +632,7 @@ services:
       - path: ./backend/external/booking-service/.env
         required: false
     environment:
+      <<: *dotnet-watch-env
       ASPNETCORE_ENVIRONMENT: Development
       ConnectionStrings__DbConnection: Host=booking-db;Port=5432;Database=postgres_db;Username=postgres;Password=postgres;Maximum Pool Size=200;Minimum Pool Size=20;Connection Idle Lifetime=60
       InternalAuth__ApiKey: local-booking-service-key
@@ -582,6 +659,16 @@ services:
       RabbitMq__UserName: ${RABBITMQ_DEFAULT_USER:-autorent}
       RabbitMq__Password: ${RABBITMQ_DEFAULT_PASS:-autorent}
       RabbitMq__ExchangeName: ${RABBITMQ_EXCHANGE_NAME:-autorent.events}
+    command:
+      - dotnet
+      - watch
+      - --artifacts-path
+      - /tmp/dotnet-artifacts/booking-service
+      - --project
+      - /src/external/booking-service/src/BookingService.Api/BookingService.Api.csproj
+      - run
+      - --urls
+      - http://0.0.0.0:8080
     expose:
       - "8080"
     depends_on:
@@ -603,6 +690,7 @@ services:
       - backend
       - data
     volumes:
+      - ./backend:/src
       - booking_logs:/tmp/autorent/booking-service
 
   client-db:
@@ -646,6 +734,7 @@ services:
     build:
       context: ./backend/external/client-service/src
       dockerfile: ./ClientService.Api/Dockerfile
+      target: build
     restart: unless-stopped
     env_file:
       - path: ./backend/external/client-service/.env.example
@@ -653,10 +742,21 @@ services:
       - path: ./backend/external/client-service/.env
         required: false
     environment:
+      <<: *dotnet-watch-env
       ASPNETCORE_ENVIRONMENT: Development
       ConnectionStrings__DbConnection: Host=client-db;Port=5432;Database=postgres_db;Username=postgres;Password=postgres
       InternalAuth__ApiKey: local-client-service-key
       ImageService__BaseUrl: http://image-service:8080
+    command:
+      - dotnet
+      - watch
+      - --artifacts-path
+      - /tmp/dotnet-artifacts/client-service
+      - --project
+      - /src/ClientService.Api/ClientService.Api.csproj
+      - run
+      - --urls
+      - http://0.0.0.0:8080
     expose:
       - "8080"
     depends_on:
@@ -673,6 +773,8 @@ services:
     networks:
       - backend
       - data
+    volumes:
+      - ./backend/external/client-service/src:/src
 
   partner-db:
     image: postgres:16
@@ -715,6 +817,7 @@ services:
     build:
       context: ./backend/internal/partner-service/src
       dockerfile: ./PartnerService.Api/Dockerfile
+      target: build
     restart: unless-stopped
     env_file:
       - path: ./backend/internal/partner-service/.env.example
@@ -722,6 +825,7 @@ services:
       - path: ./backend/internal/partner-service/.env
         required: false
     environment:
+      <<: *dotnet-watch-env
       ASPNETCORE_ENVIRONMENT: Development
       ConnectionStrings__DbConnection: Host=partner-db;Port=5432;Database=postgres_db;Username=postgres;Password=postgres
       InternalAuth__ApiKey: local-partner-service-key
@@ -731,6 +835,16 @@ services:
       PaymentService__InternalApiKey: local-payment-service-key
       BookingService__BaseUrl: http://booking-service:8080
       BookingService__InternalApiKey: local-booking-service-key
+    command:
+      - dotnet
+      - watch
+      - --artifacts-path
+      - /tmp/dotnet-artifacts/partner-service
+      - --project
+      - /src/PartnerService.Api/PartnerService.Api.csproj
+      - run
+      - --urls
+      - http://0.0.0.0:8080
     expose:
       - "8080"
     depends_on:
@@ -751,6 +865,8 @@ services:
     networks:
       - backend
       - data
+    volumes:
+      - ./backend/internal/partner-service/src:/src
 
   payment-db:
     image: postgres:16
@@ -793,6 +909,7 @@ services:
     build:
       context: ./backend
       dockerfile: ./internal/payment-service/src/PaymentService.Api/Dockerfile
+      target: build
     restart: unless-stopped
     env_file:
       - path: ./backend/internal/payment-service/.env.example
@@ -800,6 +917,7 @@ services:
       - path: ./backend/internal/payment-service/.env
         required: false
     environment:
+      <<: *dotnet-watch-env
       ASPNETCORE_ENVIRONMENT: Development
       ConnectionStrings__DbConnection: Host=payment-db;Port=5432;Database=postgres_db;Username=postgres;Password=postgres
       InternalAuth__ApiKey: local-payment-service-key
@@ -810,6 +928,16 @@ services:
       RabbitMq__UserName: ${RABBITMQ_DEFAULT_USER:-autorent}
       RabbitMq__Password: ${RABBITMQ_DEFAULT_PASS:-autorent}
       RabbitMq__ExchangeName: ${RABBITMQ_EXCHANGE_NAME:-autorent.events}
+    command:
+      - dotnet
+      - watch
+      - --artifacts-path
+      - /tmp/dotnet-artifacts/payment-service
+      - --project
+      - /src/internal/payment-service/src/PaymentService.Api/PaymentService.Api.csproj
+      - run
+      - --urls
+      - http://0.0.0.0:8080
     expose:
       - "8080"
     depends_on:
@@ -828,6 +956,8 @@ services:
     networks:
       - backend
       - data
+    volumes:
+      - ./backend:/src
 
   ticket-db:
     image: postgres:16
@@ -881,6 +1011,7 @@ services:
       RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER:-autorent}:${RABBITMQ_DEFAULT_PASS:-autorent}@rabbitmq:5672
       RABBITMQ_EXCHANGE: ${RABBITMQ_EXCHANGE_NAME:-autorent.events}
       OBSERVABILITY_LOG_PATH: /tmp/autorent/email-service/email-service.jsonl
+    command: node --watch --experimental-strip-types index.ts
     expose:
       - "8080"
     depends_on:
@@ -901,12 +1032,15 @@ services:
     networks:
       - backend
     volumes:
+      - ./backend/shared/email-service/src:/app
+      - /app/node_modules
       - email_logs:/tmp/autorent/email-service
 
   ticket-service:
     build:
       context: ./backend
       dockerfile: ./internal/ticket-service/src/TicketService.Api/Dockerfile
+      target: build
     restart: unless-stopped
     env_file:
       - path: ./backend/internal/ticket-service/.env.example
@@ -914,6 +1048,7 @@ services:
       - path: ./backend/internal/ticket-service/.env
         required: false
     environment:
+      <<: *dotnet-watch-env
       ASPNETCORE_ENVIRONMENT: Development
       ConnectionStrings__DbConnection: Host=ticket-db;Port=5432;Database=postgres_db;Username=postgres;Password=postgres
       BookingService__BaseUrl: http://booking-service:8080
@@ -941,6 +1076,16 @@ services:
       RabbitMq__ExchangeName: ${RABBITMQ_EXCHANGE_NAME:-autorent.events}
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
       Observability__LogPath: /tmp/autorent/ticket-service/ticket-service.jsonl
+    command:
+      - dotnet
+      - watch
+      - --artifacts-path
+      - /tmp/dotnet-artifacts/ticket-service
+      - --project
+      - /src/internal/ticket-service/src/TicketService.Api/TicketService.Api.csproj
+      - run
+      - --urls
+      - http://0.0.0.0:8080
     expose:
       - "8080"
     depends_on:
@@ -976,12 +1121,14 @@ services:
       - backend
       - data
     volumes:
+      - ./backend:/src
       - ticket_logs:/tmp/autorent/ticket-service
 
   image-service:
     build:
       context: ./backend/shared/image-service/src
       dockerfile: ./Dockerfile
+      target: build
     restart: unless-stopped
     env_file:
       - path: ./backend/shared/image-service/.env.example
@@ -989,11 +1136,16 @@ services:
       - path: ./backend/shared/image-service/.env
         required: false
     environment:
+      <<: *node-ts-watch-env
       PORT: 8080
       PUBLIC_BASE_URL: ${IMAGE_SERVICE_PUBLIC_BASE_URL:-http://localhost:9186/internal}
+    command: *node-ts-dev-command
     expose:
       - "8080"
     volumes:
+      - ./backend/shared/image-service/src:/app
+      - /app/node_modules
+      - /app/dist
       - image_uploads:/app/uploads
     healthcheck:
       test:
@@ -1014,6 +1166,7 @@ services:
     build:
       context: ./backend/internal/file-service/src
       dockerfile: ./Dockerfile
+      target: build
     restart: unless-stopped
     env_file:
       - path: ./backend/internal/file-service/.env.example
@@ -1021,12 +1174,17 @@ services:
       - path: ./backend/internal/file-service/.env
         required: false
     environment:
+      <<: *node-ts-watch-env
       PORT: 8080
       INTERNAL_API_KEY: local-file-service-key
       PUBLIC_BASE_URL: ${FILE_SERVICE_PUBLIC_BASE_URL:-http://localhost:9186/files}
+    command: *node-ts-dev-command
     expose:
       - "8080"
     volumes:
+      - ./backend/internal/file-service/src:/app
+      - /app/node_modules
+      - /app/dist
       - file_uploads:/app/uploads
     healthcheck:
       test:
@@ -1047,8 +1205,10 @@ services:
     build:
       context: ./backend/external/reverse-proxy-service/src
       dockerfile: ./Dockerfile
+      target: build
     restart: unless-stopped
     environment:
+      <<: *node-ts-watch-env
       IDENTITY_SERVICE_URL: http://identity-service:8080
       CAR_SERVICE_URL: http://car-service:8080
       AI_SEARCH_SERVICE_URL: http://ai-search-service:8080
@@ -1077,6 +1237,24 @@ services:
       OTEL_SERVICE_NAME: api-gateway
       OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: http://otel-collector:4318/v1/traces
       OBSERVABILITY_LOG_PATH: /tmp/autorent/api-gateway/api-gateway.jsonl
+    command:
+      - /bin/sh
+      - -c
+      - |
+        if [ "$${TLS_ENABLED:-true}" = "true" ]; then
+          cert_path="$${TLS_CERT_PATH:-/tmp/autorent-edge.crt}"
+          key_path="$${TLS_KEY_PATH:-/tmp/autorent-edge.key}"
+          cert_cn="$${TLS_CERT_CN:-localhost}"
+          cert_days="$${TLS_CERT_DAYS:-30}"
+          if [ ! -f "$$cert_path" ] || [ ! -f "$$key_path" ]; then
+            mkdir -p "$$(dirname "$$cert_path")" "$$(dirname "$$key_path")"
+            openssl req -x509 -newkey rsa:2048 -nodes -keyout "$$key_path" -out "$$cert_path" -days "$$cert_days" -subj "/CN=$$cert_cn" >/dev/null 2>&1
+          fi
+        fi
+        rm -rf dist/*
+        npm run build -- --watch --preserveWatchOutput &
+        while [ ! -f dist/index.js ] || [ ! -f dist/instrumentation.js ]; do sleep 1; done
+        node --watch -r ./dist/instrumentation.js dist/index.js
     ports:
       - "${API_GATEWAY_PORT:-9186}:8080"
       - "${API_GATEWAY_TLS_PORT:-9443}:8443"
@@ -1117,6 +1295,9 @@ services:
       - frontend
       - backend
     volumes:
+      - ./backend/external/reverse-proxy-service/src:/app
+      - /app/node_modules
+      - /app/dist
       - gateway_logs:/tmp/autorent/api-gateway
 
   frontend:
@@ -1129,6 +1310,8 @@ services:
         required: true
       - path: ./frontend/external/.env
         required: false
+    environment:
+      <<: *vite-watch-env
     command: npm run dev -- --host
     ports:
       - "${FRONTEND_PORT:-5173}:5173"
@@ -1149,6 +1332,9 @@ services:
       start_period: 20s
     networks:
       - frontend
+    volumes:
+      - ./frontend/external:/app
+      - /app/node_modules
 
   internal-frontend:
     build:
@@ -1160,6 +1346,8 @@ services:
         required: true
       - path: ./frontend/internal/.env
         required: false
+    environment:
+      <<: *vite-watch-env
     command: npm run dev -- --host
     ports:
       - "${INTERNAL_FRONTEND_PORT:-5174}:5173"
@@ -1180,6 +1368,9 @@ services:
       start_period: 20s
     networks:
       - frontend
+    volumes:
+      - ./frontend/internal:/app
+      - /app/node_modules
 
   superadmin-frontend:
     build:
@@ -1191,6 +1382,8 @@ services:
         required: true
       - path: ./frontend/superadmin/.env
         required: false
+    environment:
+      <<: *vite-watch-env
     command: npm run dev -- --host
     ports:
       - "${SUPERADMIN_FRONTEND_PORT:-5175}:5173"
@@ -1211,6 +1404,9 @@ services:
       start_period: 20s
     networks:
       - frontend
+    volumes:
+      - ./frontend/superadmin:/app
+      - /app/node_modules
 
   prometheus:
     image: prom/prometheus:latest
