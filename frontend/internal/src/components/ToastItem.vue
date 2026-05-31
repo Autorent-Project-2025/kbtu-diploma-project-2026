@@ -42,35 +42,55 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, h } from "vue";
+import { ref, computed, onMounted, onUnmounted, h } from "vue";
 import type { ToastType } from "../types/Toast";
 
 interface Props {
   id: string;
   message: string;
   type: ToastType;
+  duration?: number;
 }
 
-const props = defineProps<Props>();
+const props = withDefaults(defineProps<Props>(), {
+  duration: 3000,
+});
 const emit = defineEmits<{
   close: [id: string];
 }>();
 
 const visible = ref(false);
+let closeTimer: ReturnType<typeof setTimeout> | null = null;
+let removeTimer: ReturnType<typeof setTimeout> | null = null;
 
 onMounted(() => {
   // Небольшая задержка для анимации появления
   setTimeout(() => {
     visible.value = true;
   }, 10);
+
+  if (props.duration > 0) {
+    closeTimer = setTimeout(close, props.duration);
+  }
 });
 
 const close = () => {
+  if (!visible.value) return;
+  if (closeTimer) {
+    clearTimeout(closeTimer);
+    closeTimer = null;
+  }
+
   visible.value = false;
-  setTimeout(() => {
+  removeTimer = setTimeout(() => {
     emit("close", props.id);
   }, 200);
 };
+
+onUnmounted(() => {
+  if (closeTimer) clearTimeout(closeTimer);
+  if (removeTimer) clearTimeout(removeTimer);
+});
 
 // Классы в зависимости от типа
 const toastClasses = computed(() => {

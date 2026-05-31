@@ -39,33 +39,53 @@
 </template>
 
 <script setup lang="ts">
-import { computed, h, onMounted, ref } from "vue";
+import { computed, h, onMounted, onUnmounted, ref } from "vue";
 import type { ToastType } from "../types/Toast";
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   id: string;
   message: string;
   type: ToastType;
-}>();
+  duration?: number;
+}>(), {
+  duration: 3000,
+});
 
 const emit = defineEmits<{
   close: [id: string];
 }>();
 
 const visible = ref(false);
+let closeTimer: ReturnType<typeof setTimeout> | null = null;
+let removeTimer: ReturnType<typeof setTimeout> | null = null;
 
 onMounted(() => {
   setTimeout(() => {
     visible.value = true;
   }, 10);
+
+  if (props.duration > 0) {
+    closeTimer = setTimeout(close, props.duration);
+  }
 });
 
 function close() {
+  if (!visible.value) return;
+  if (closeTimer) {
+    clearTimeout(closeTimer);
+    closeTimer = null;
+  }
+
   visible.value = false;
-  setTimeout(() => {
+  removeTimer = setTimeout(() => {
     emit("close", props.id);
   }, 200);
 }
+
+onUnmounted(() => {
+  if (closeTimer) clearTimeout(closeTimer);
+  if (removeTimer) clearTimeout(removeTimer);
+});
 
 const toastClasses = computed(() => {
   const baseClasses = "border-l-4";

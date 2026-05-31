@@ -27,12 +27,6 @@ export function useToast() {
 
     state.toasts.push(toast);
 
-    if (duration > 0) {
-      setTimeout(() => {
-        removeToast(id);
-      }, duration);
-    }
-
     return id;
   };
 

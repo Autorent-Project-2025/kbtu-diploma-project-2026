@@ -10,6 +10,7 @@
           :id="toast.id"
           :message="toast.message"
           :type="toast.type"
+          :duration="toast.duration"
           @close="removeToast"
         />
       </div>

@@ -27,13 +27,6 @@ export function useToast() {
 
     state.toasts.push(toast);
 
-    // Автоматически удаляем через duration
-    if (duration > 0) {
-      setTimeout(() => {
-        removeToast(id);
-      }, duration);
-    }
-
     return id;
   };
 
