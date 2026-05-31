@@ -1,0 +1,61 @@
+import { reactive } from "vue";
+import type { Toast, ToastType } from "./types";
+
+interface ToastState {
+  toasts: Toast[];
+}
+
+const state = reactive<ToastState>({
+  toasts: [],
+});
+
+let toastId = 0;
+
+export function useToast() {
+  const addToast = (
+    message: string,
+    type: ToastType = "info",
+    duration = 3000,
+  ) => {
+    const id = `toast-${toastId++}`;
+    const toast: Toast = {
+      id,
+      message,
+      type,
+      duration,
+    };
+
+    state.toasts.push(toast);
+
+    return id;
+  };
+
+  const removeToast = (id: string) => {
+    const index = state.toasts.findIndex((toast: Toast) => toast.id === id);
+    if (index > -1) {
+      state.toasts.splice(index, 1);
+    }
+  };
+
+  const success = (message: string, duration = 3000) =>
+    addToast(message, "success", duration);
+
+  const error = (message: string, duration = 4000) =>
+    addToast(message, "error", duration);
+
+  const warning = (message: string, duration = 3500) =>
+    addToast(message, "warning", duration);
+
+  const info = (message: string, duration = 3000) =>
+    addToast(message, "info", duration);
+
+  return {
+    toasts: state.toasts,
+    addToast,
+    removeToast,
+    success,
+    error,
+    warning,
+    info,
+  };
+}

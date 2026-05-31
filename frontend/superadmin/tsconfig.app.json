@@ -5,7 +5,10 @@
   "compilerOptions": {
     "tsBuildInfoFile": "./tsconfig.app.tsbuildinfo",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@shared/*": ["../shared/src/*"],
+      "axios": ["./node_modules/axios"],
+      "vue": ["./node_modules/vue"]
     }
   }
 }

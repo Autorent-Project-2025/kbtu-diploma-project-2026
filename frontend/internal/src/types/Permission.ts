@@ -1,5 +1,1 @@
-export interface Permission {
-  id: string;
-  name: string;
-  description: string;
-}
+export type { Permission } from "@shared/types/permission";

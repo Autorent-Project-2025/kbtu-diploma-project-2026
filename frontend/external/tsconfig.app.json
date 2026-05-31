@@ -6,7 +6,11 @@
     "tsBuildInfoFile": "./tsconfig.app.tsbuildinfo",
 
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@shared/*": ["../shared/src/*"],
+      "@microsoft/signalr": ["./node_modules/@microsoft/signalr"],
+      "axios": ["./node_modules/axios"],
+      "vue": ["./node_modules/vue"]
     }
   }
 }

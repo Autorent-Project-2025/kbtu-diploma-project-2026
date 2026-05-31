@@ -836,9 +836,10 @@ async function send() {
 async function connectSignalR() {
   if (!conversation.value) return;
   try {
-    connection = createChatConnection();
+    const chatConnection = createChatConnection();
+    connection = chatConnection;
 
-    connection.on("NewMessage", (msg: ChatMessage) => {
+    chatConnection.on("NewMessage", (msg: ChatMessage) => {
       if (
         msg.conversationId === conversation.value?.id &&
         !messages.value.find((m) => m.id === msg.id)
@@ -849,20 +850,20 @@ async function connectSignalR() {
       }
     });
 
-    connection.on("ConversationClosed", () => {
+    chatConnection.on("ConversationClosed", () => {
       if (conversation.value) {
         conversation.value = { ...conversation.value, status: "Closed" };
       }
     });
 
-    connection.on("ConversationReopened", () => {
+    chatConnection.on("ConversationReopened", () => {
       if (conversation.value) {
         conversation.value = { ...conversation.value, status: "Open" };
         loadConversation();
       }
     });
 
-    connection.on("UserTyping", (data: { userId: string; actorType?: string; isTyping: boolean }) => {
+    chatConnection.on("UserTyping", (data: { userId: string; actorType?: string; isTyping: boolean }) => {
       if (data.userId === currentUserId.value) return;
       const existing = typingTimers.get(data.userId);
       if (existing) clearTimeout(existing);
@@ -884,8 +885,8 @@ async function connectSignalR() {
       }
     });
 
-    await connection.start();
-    await connection.invoke("JoinConversation", conversation.value.id);
+    await chatConnection.start();
+    await chatConnection.invoke("JoinConversation", conversation.value.id);
   } catch {
     startPolling();
   }

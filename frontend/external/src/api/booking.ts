@@ -416,7 +416,9 @@ export async function getBookingCharges(
 ): Promise<BookingCharge[]> {
   const response = await api.get(`/bookings/${bookingId}/charges`);
   const payload = Array.isArray(response.data) ? response.data : [];
-  return payload.map((item) => mapBookingCharge(item as BookingChargeApiDto));
+  return payload.map((item: unknown) =>
+    mapBookingCharge(item as BookingChargeApiDto),
+  );
 }
 
 export async function payBookingCharge(
