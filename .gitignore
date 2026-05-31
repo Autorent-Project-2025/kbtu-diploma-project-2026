@@ -10,3 +10,9 @@ bin/
 .vs
 .dotnet-cli
 .codex-dotnet
+.claude/settings.json
+.claude/agents/
+.claude/rules/
+.claude/settings.local.json
+.claude/.cache/
+.claude/logs/

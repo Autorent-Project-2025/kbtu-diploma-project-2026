@@ -54,7 +54,9 @@
       "Bash(docker --version)",
       "Bash(k6 version *)",
       "PowerShell($cpu = Get-CimInstance Win32_Processor | Select-Object -First 1; \"CPU: $\\($cpu.Name\\) \\($\\($cpu.NumberOfCores\\) cores, $\\($cpu.NumberOfLogicalProcessors\\) threads\\)\"; $totalRamBytes = \\(Get-CimInstance Win32_PhysicalMemory | Measure-Object -Property Capacity -Sum\\).Sum; \"RAM: $\\([math]::Round\\($totalRamBytes/1GB, 0\\)\\) GB\"; \"k6: \" + \\(k6 version 2>&1 | Select-Object -First 1\\))",
-      "PowerShell($paths = @\\(\"C:\\\\Program Files\\\\k6\\\\k6.exe\", \"C:\\\\ProgramData\\\\chocolatey\\\\bin\\\\k6.exe\", \"$env:LOCALAPPDATA\\\\Microsoft\\\\WinGet\\\\Packages\\\\k6.k6_Microsoft.Winget.Source_8wekyb3d8bbwe\\\\k6.exe\", \"$env:USERPROFILE\\\\scoop\\\\apps\\\\k6\\\\current\\\\k6.exe\"\\); foreach \\($p in $paths\\) { if \\(Test-Path $p\\) { \"Found: $p\"; & $p version | Select-Object -First 1; break } }; if \\(-not $?\\) { Write-Host \"k6 not found in common locations; please run 'k6 version' in your shell\" })"
+      "PowerShell($paths = @\\(\"C:\\\\Program Files\\\\k6\\\\k6.exe\", \"C:\\\\ProgramData\\\\chocolatey\\\\bin\\\\k6.exe\", \"$env:LOCALAPPDATA\\\\Microsoft\\\\WinGet\\\\Packages\\\\k6.k6_Microsoft.Winget.Source_8wekyb3d8bbwe\\\\k6.exe\", \"$env:USERPROFILE\\\\scoop\\\\apps\\\\k6\\\\current\\\\k6.exe\"\\); foreach \\($p in $paths\\) { if \\(Test-Path $p\\) { \"Found: $p\"; & $p version | Select-Object -First 1; break } }; if \\(-not $?\\) { Write-Host \"k6 not found in common locations; please run 'k6 version' in your shell\" })",
+      "Bash(ls frontend/internal/node_modules)",
+      "Bash(ls frontend/superadmin/node_modules)"
     ]
   }
 }
