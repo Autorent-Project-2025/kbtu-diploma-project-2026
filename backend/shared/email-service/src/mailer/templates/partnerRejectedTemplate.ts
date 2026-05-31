@@ -1,4 +1,9 @@
 import { escapeHtml } from "./escapeHtml.ts";
+import {
+  renderCallout,
+  renderEmailLayout,
+  renderParagraph,
+} from "./layout.ts";
 import type { MailTemplate } from "./types.ts";
 
 type PartnerRejectedTemplateParams = {
@@ -14,15 +19,17 @@ export function partnerRejectedTemplate(params: PartnerRejectedTemplateParams): 
     (params.reason ? `\nПричина: ${params.reason}\n` : "\n") +
     `\nВы можете подать заявку повторно.`;
 
-  const html = `
-    <div style="font-family: Arial, sans-serif; line-height: 1.5">
-      <h2>Партнерская заявка отклонена</h2>
-      <p>Здравствуйте, <b>${escapeHtml(params.fullName)}</b>!</p>
-      <p>К сожалению, заявка на партнерство отклонена.</p>
-      ${params.reason ? `<p><b>Причина:</b> ${escapeHtml(params.reason)}</p>` : ""}
-      <p>Вы можете подать заявку повторно.</p>
-    </div>
-  `;
+  const html = renderEmailLayout({
+    title: "Партнерская заявка отклонена",
+    preheader: "К сожалению, заявка на партнерство отклонена. Вы можете подать заявку повторно.",
+    eyebrow: "Статус заявки",
+    tone: "danger",
+    bodyHtml:
+      renderParagraph(`Здравствуйте, <strong>${escapeHtml(params.fullName)}</strong>!`) +
+      renderParagraph("К сожалению, заявка на партнерство отклонена.") +
+      (params.reason ? renderCallout("Причина", params.reason, "danger") : "") +
+      renderParagraph("Вы можете исправить данные и подать заявку повторно."),
+  });
 
   return { subject, text, html };
 }
