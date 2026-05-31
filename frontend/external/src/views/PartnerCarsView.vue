@@ -353,208 +353,19 @@
             @estimate="runPriceEstimate"
           />
 
-          <div class="space-y-3 md:col-span-2">
-            <label
-              class="block text-sm font-semibold text-gray-700 dark:text-gray-300"
-              >Подтверждение собственности</label
-            >
-            <div
-              class="relative flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-6 py-6 transition-colors cursor-pointer"
-              :class="
-                pdfDragging
-                  ? 'border-primary-400 bg-primary-50 dark:border-primary-500 dark:bg-primary-500/10'
-                  : form.ownershipDocumentFile
-                    ? 'border-emerald-300 bg-emerald-50 dark:border-emerald-500/40 dark:bg-emerald-500/10'
-                    : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-gray-300 dark:hover:border-gray-600'
-              "
-              @dragover.prevent="pdfDragging = true"
-              @dragleave.prevent="pdfDragging = false"
-              @drop.prevent="onPdfDrop"
-              @click="pdfInputRef?.click()"
-            >
-              <template v-if="form.ownershipDocumentFile">
-                <svg
-                  class="h-7 w-7 text-emerald-500 dark:text-emerald-400 shrink-0"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="1.5"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"
-                  />
-                </svg>
-                <p
-                  class="text-sm font-medium text-emerald-700 dark:text-emerald-300 text-center break-all"
-                >
-                  {{ form.ownershipDocumentFile.name }}
-                </p>
-                <button
-                  type="button"
-                  class="text-xs text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-colors"
-                  @click.stop="form.ownershipDocumentFile = null"
-                >
-                  Удалить
-                </button>
-              </template>
-              <template v-else>
-                <svg
-                  class="h-7 w-7 text-gray-400 dark:text-gray-500"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="1.5"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"
-                  />
-                </svg>
-                <p class="text-sm text-gray-500 dark:text-gray-400">
-                  <span
-                    class="font-semibold text-primary-600 dark:text-primary-400"
-                    >Нажмите</span
-                  >
-                  или перетащите PDF сюда
-                </p>
-              </template>
-              <input
-                ref="pdfInputRef"
-                type="file"
-                accept="application/pdf,.pdf"
-                class="hidden"
-                @change="onOwnershipFileChange"
-              />
-            </div>
-          </div>
+          <PartnerCarOwnershipDocumentUpload
+            :file="form.ownershipDocumentFile"
+            @file-selected="applyPdfFile"
+            @remove="form.ownershipDocumentFile = null"
+          />
 
-          <div class="space-y-4 md:col-span-2">
-            <label
-              class="block text-sm font-semibold text-gray-700 dark:text-gray-300"
-              >Фото машины</label
-            >
-            <div
-              class="relative flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-6 py-8 transition-colors cursor-pointer"
-              :class="
-                imageDragging
-                  ? 'border-primary-400 bg-primary-50 dark:border-primary-500 dark:bg-primary-500/10'
-                  : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-gray-300 dark:hover:border-gray-600'
-              "
-              @dragover.prevent="imageDragging = true"
-              @dragleave.prevent="imageDragging = false"
-              @drop.prevent="onImageDrop"
-              @click="imageInputRef?.click()"
-            >
-              <svg
-                class="h-8 w-8 text-gray-400 dark:text-gray-500"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="1.5"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3 10.5a7.5 7.5 0 1115 0 7.5 7.5 0 01-15 0z"
-                />
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  d="M12 16.5v-9m-4.5 4.5h9"
-                />
-              </svg>
-              <p class="text-sm text-gray-500 dark:text-gray-400">
-                <span
-                  class="font-semibold text-primary-600 dark:text-primary-400"
-                  >Нажмите</span
-                >
-                или перетащите фото сюда
-              </p>
-              <p class="text-xs text-gray-400 dark:text-gray-500">
-                До 12 изображений. Для каждого фото выберите тип, чтобы менеджеру было проще проверить заявку.
-              </p>
-              <input
-                ref="imageInputRef"
-                type="file"
-                accept="image/*"
-                multiple
-                class="hidden"
-                @change="onCarImagesChange"
-              />
-            </div>
-            <div
-              v-if="form.carImages.length > 0"
-              class="grid gap-3 md:grid-cols-2 xl:grid-cols-3"
-            >
-              <div
-                v-for="(image, index) in form.carImages"
-                :key="index"
-                class="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-hidden shadow-sm"
-              >
-                <img
-                  :src="image.previewUrl"
-                  :alt="`Фото ${index + 1}`"
-                  class="h-44 w-full object-cover"
-                />
-                <div class="p-4 space-y-3">
-                  <div class="flex items-start justify-between gap-3">
-                    <div class="min-w-0">
-                      <p class="text-sm font-semibold text-gray-900 dark:text-white">
-                        Фото {{ index + 1 }}
-                      </p>
-                      <p class="text-xs text-gray-500 dark:text-gray-400 truncate">
-                        {{ image.file.name }}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      class="shrink-0 rounded-full p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
-                      @click.stop="removeImage(index)"
-                    >
-                      <svg
-                        class="h-4 w-4"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="2.5"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          stroke-linecap="round"
-                          stroke-linejoin="round"
-                          d="M6 18L18 6M6 6l12 12"
-                        />
-                      </svg>
-                    </button>
-                  </div>
-
-                  <div class="space-y-1.5">
-                    <label
-                      :for="`partner-car-image-type-${index}`"
-                      class="block text-xs font-bold uppercase tracking-[0.12em] text-gray-500 dark:text-gray-400"
-                    >
-                      Тип фото
-                    </label>
-                    <select
-                      :id="`partner-car-image-type-${index}`"
-                      v-model="image.imageType"
-                      class="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-3 py-2.5 text-sm text-gray-900 dark:text-white focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 transition-colors"
-                    >
-                      <option
-                        v-for="option in partnerCarImageTypeOptions"
-                        :key="option.value"
-                        :value="option.value"
-                      >
-                        {{ option.label }}
-                      </option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+          <PartnerCarImagesUpload
+            :images="form.carImages"
+            :image-type-options="partnerCarImageTypeOptions"
+            @add-files="applyImageFiles"
+            @remove-image="removeImage"
+            @update-image-type="updateCarImageType"
+          />
 
           <div class="md:col-span-2">
             <button
@@ -590,6 +401,8 @@ import {
   getMyPartnerCars,
   type PartnerCarSummary,
 } from "../api/partnerCars";
+import PartnerCarImagesUpload from "../components/partner/PartnerCarImagesUpload.vue";
+import PartnerCarOwnershipDocumentUpload from "../components/partner/PartnerCarOwnershipDocumentUpload.vue";
 import PartnerCarPriceEstimate from "../components/partner/PartnerCarPriceEstimate.vue";
 import PartnerCarsList from "../components/partner/PartnerCarsList.vue";
 import { useToast } from "../composables/useToast";
@@ -614,10 +427,6 @@ const submitting = ref(false);
 const submitted = ref(false);
 const tagDropdownOpen = ref(false);
 const tagDropdownRef = ref<HTMLElement | null>(null);
-const imageInputRef = ref<HTMLInputElement | null>(null);
-const pdfInputRef = ref<HTMLInputElement | null>(null);
-const imageDragging = ref(false);
-const pdfDragging = ref(false);
 const customOptionValue = "__custom__";
 const maxAllowedCarYear = new Date().getUTCFullYear() + 1;
 
@@ -823,19 +632,6 @@ function applyPdfFile(file: File | null) {
   form.ownershipDocumentFile = file;
 }
 
-function onOwnershipFileChange(event: Event) {
-  const input = event.target as HTMLInputElement;
-  const file = input.files?.[0] ?? null;
-  input.value = "";
-  applyPdfFile(file);
-}
-
-function onPdfDrop(event: DragEvent) {
-  pdfDragging.value = false;
-  const file = event.dataTransfer?.files?.[0] ?? null;
-  applyPdfFile(file);
-}
-
 function getDefaultPartnerCarImageType(index: number): PartnerCarImageType {
   if (index === 0) return "front";
   if (index === 1) return "back";
@@ -878,22 +674,19 @@ function applyImageFiles(files: File[]) {
   form.carImages.push(...nextImages);
 }
 
-function onCarImagesChange(event: Event) {
-  const input = event.target as HTMLInputElement;
-  const files = Array.from(input.files ?? []);
-  input.value = "";
-  applyImageFiles(files);
-}
-
-function onImageDrop(event: DragEvent) {
-  imageDragging.value = false;
-  const files = Array.from(event.dataTransfer?.files ?? []);
-  applyImageFiles(files);
-}
-
 function removeImage(index: number) {
   const [removedImage] = form.carImages.splice(index, 1);
   revokeCarImagePreview(removedImage);
+}
+
+function updateCarImageType(payload: {
+  index: number;
+  imageType: PartnerCarImageType;
+}) {
+  const image = form.carImages[payload.index];
+  if (image) {
+    image.imageType = payload.imageType;
+  }
 }
 
 async function loadCars() {
