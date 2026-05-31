@@ -15,6 +15,7 @@ COPY ["shared/identity-service/src/IdentityService.Application/IdentityService.A
 COPY ["shared/identity-service/src/IdentityService.Domain/IdentityService.Domain.csproj", "shared/identity-service/src/IdentityService.Domain/"]
 COPY ["shared/identity-service/src/IdentityService.Infrastructure/IdentityService.Infrastructure.csproj", "shared/identity-service/src/IdentityService.Infrastructure/"]
 COPY ["libraries/messaging-dotnet/src/AutoRent.Messaging/AutoRent.Messaging.csproj", "libraries/messaging-dotnet/src/AutoRent.Messaging/"]
+COPY ["libraries/backend-shared-dotnet/src/AutoRent.Backend.Shared/AutoRent.Backend.Shared.csproj", "libraries/backend-shared-dotnet/src/AutoRent.Backend.Shared/"]
 RUN dotnet restore "shared/identity-service/src/IdentityService.Api/IdentityService.Api.csproj"
 COPY . .
 WORKDIR "/src/shared/identity-service/src/IdentityService.Api"

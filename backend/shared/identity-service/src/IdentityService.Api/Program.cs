@@ -1,3 +1,5 @@
+using AutoRent.Backend.Shared.ProblemDetails;
+using AutoRent.Backend.Shared.ServiceDefaults;
 using IdentityService.Api.Middleware;
 using IdentityService.Api.Observability;
 using IdentityService.Application.Constants;
@@ -27,42 +29,10 @@ using IdentityService.Infrastructure;
 using IdentityService.Infrastructure.Security;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
-using OpenTelemetry.Exporter;
-using OpenTelemetry.Resources;
-using OpenTelemetry.Trace;
 
 var builder = WebApplication.CreateBuilder(args);
 
-static Uri BuildOtlpTracesEndpoint(string endpoint)
-{
-    var uri = new Uri(endpoint, UriKind.Absolute);
-    if (uri.AbsolutePath.EndsWith("/v1/traces", StringComparison.OrdinalIgnoreCase))
-    {
-        return uri;
-    }
-
-    var builder = new UriBuilder(uri);
-    var normalizedPath = builder.Path.TrimEnd('/');
-    builder.Path = string.IsNullOrEmpty(normalizedPath)
-        ? "/v1/traces"
-        : $"{normalizedPath}/v1/traces";
-
-    return builder.Uri;
-}
-
-builder.Logging.Configure(options =>
-{
-    options.ActivityTrackingOptions =
-        ActivityTrackingOptions.SpanId |
-        ActivityTrackingOptions.TraceId |
-        ActivityTrackingOptions.ParentId;
-});
-builder.Logging.ClearProviders();
-builder.Logging.AddJsonConsole(options =>
-{
-    options.IncludeScopes = true;
-    options.TimestampFormat = "yyyy-MM-ddTHH:mm:ss.fffZ ";
-});
+builder.AddAutoRentServiceDefaults("identity-service", "AutoRent.IdentityService");
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
@@ -70,28 +40,6 @@ builder.Services.AddSingleton<ObservabilityMetrics>();
 builder.Services.AddSingleton<ObservabilityLogWriter>();
 
 builder.Services.AddInfrastructure(builder.Configuration);
-
-var otlpEndpoint = builder.Configuration["OpenTelemetry:Endpoint"]
-    ?? Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT");
-if (!string.IsNullOrWhiteSpace(otlpEndpoint))
-{
-    builder.Services
-        .AddOpenTelemetry()
-        .ConfigureResource(resource => resource
-            .AddService("identity-service")
-            .AddAttributes(new Dictionary<string, object>
-            {
-                ["deployment.environment"] = builder.Environment.EnvironmentName
-            }))
-        .WithTracing(tracing => tracing
-            .AddAspNetCoreInstrumentation(options => options.RecordException = true)
-            .AddSource("AutoRent.IdentityService")
-            .AddOtlpExporter(options =>
-            {
-                options.Endpoint = BuildOtlpTracesEndpoint(otlpEndpoint);
-                options.Protocol = OtlpExportProtocol.HttpProtobuf;
-            }));
-}
 
 builder.Services.AddScoped<ActivateUserCommandHandler>();
 builder.Services.AddScoped<ActivateUserByAdminCommandHandler>();
@@ -116,20 +64,7 @@ builder.Services.AddScoped<GetRolesQueryHandler>();
 builder.Services.AddScoped<GetPermissionsQueryHandler>();
 builder.Services.AddScoped<GetActivationTokenStatusQueryHandler>();
 
-var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy("app-cors", policy =>
-    {
-        if (allowedOrigins.Length == 0)
-        {
-            policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod();
-            return;
-        }
-
-        policy.WithOrigins(allowedOrigins).AllowAnyHeader().AllowAnyMethod();
-    });
-});
+builder.Services.AddAutoRentCors(builder.Configuration);
 
 var jwtPrivateKey = builder.Configuration["Jwt:PrivateKey"];
 var jwtPublicKey = builder.Configuration["Jwt:PublicKey"];
@@ -205,13 +140,13 @@ builder.Services.AddAuthorization(options =>
 var app = builder.Build();
 
 app.UseMiddleware<RequestObservabilityMiddleware>();
-app.UseMiddleware<ApiExceptionMiddleware>();
+app.UseAutoRentProblemDetails();
 app.UseHttpsRedirection();
-app.UseCors("app-cors");
+app.UseCors(AutoRentDefaults.CorsPolicyName);
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
-app.MapGet("/healthz", () => Results.Ok(new { status = "ok" }));
+app.MapAutoRentHealthChecks();
 app.MapGet(
     "/metrics",
     (ObservabilityMetrics metrics) => Results.Text(metrics.RenderPrometheus(), "text/plain; version=0.0.4; charset=utf-8"));

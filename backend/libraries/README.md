@@ -11,6 +11,7 @@
 ## Что сейчас лежит в каталоге
 | Каталог | Назначение |
 |---|---|
+| `backend-shared-dotnet` | Общая .NET-библиотека для auth claims, ProblemDetails middleware, pagination, Result mapping, validation helpers и service defaults |
 | `messaging-dotnet` | Общая .NET-библиотека для RabbitMQ topology, envelope, publisher и контрактов интеграционных событий |
 
 ## Когда добавлять код в `libraries`

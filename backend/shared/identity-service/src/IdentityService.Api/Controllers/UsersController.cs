@@ -1,3 +1,4 @@
+using AutoRent.Backend.Shared.Auth;
 using IdentityService.Api.Contracts.Users;
 using IdentityService.Application.Commands.ActivateUserByAdmin;
 using IdentityService.Application.Commands.AssignRoleToUser;
@@ -11,7 +12,6 @@ using IdentityService.Application.Queries.GetUserById;
 using IdentityService.Application.Queries.GetUsers;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System.Security.Claims;
 
 namespace IdentityService.Api.Controllers;
 
@@ -178,15 +178,13 @@ public sealed class UsersController : ControllerBase
 
     private void EnsureNotCurrentUser(Guid userId)
     {
-        var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier)
-            ?? User.FindFirstValue("sub");
-
-        if (!Guid.TryParse(currentUserId, out var actorId))
+        var actorId = User.GetUserGuid();
+        if (actorId is null)
         {
             return;
         }
 
-        if (actorId == userId)
+        if (actorId.Value == userId)
         {
             throw new ValidationException("You cannot perform this operation on your own account.");
         }
