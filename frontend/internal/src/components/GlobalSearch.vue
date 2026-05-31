@@ -108,7 +108,7 @@ import { getPartners } from "../api/partners";
 import { getPartnerCars } from "../api/cars";
 import { getAllBookings } from "../api/bookings";
 import { getAllTickets } from "../api/tickets";
-import { auth } from "../store/auth";
+import { can } from "../accessControl";
 
 interface SearchResult {
   type: string;
@@ -157,7 +157,7 @@ async function search(q: string) {
   const found: SearchResult[] = [];
 
   try {
-    const includeTickets = auth.hasPermission("Ticket.ViewAll");
+    const includeTickets = can("Ticket.ViewAll");
     const [clients, partners, carsResult, bookingsResult, ticketsResult] =
       await Promise.allSettled([
         getClients(q),

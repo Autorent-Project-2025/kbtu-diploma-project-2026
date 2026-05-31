@@ -24,8 +24,13 @@ export interface JwtPayload {
   unique_name?: string;
   upn?: string;
   permissions?: string[] | string;
+  role?: string[] | string;
+  roles?: string[] | string;
   actor_type?: string;
   subject_type?: string;
+  "http://schemas.microsoft.com/ws/2008/06/identity/claims/role"?:
+    | string[]
+    | string;
   [key: string]: unknown;
 }
 
@@ -34,6 +39,15 @@ export function readStringClaim(value: unknown): string | null {
 
   const normalized = value.trim().toLowerCase();
   return normalized || null;
+}
+
+export function readStringClaims(value: unknown): string[] {
+  const values = Array.isArray(value) ? value : [value];
+
+  return values
+    .filter((claim): claim is string => typeof claim === "string")
+    .map((claim) => claim.trim())
+    .filter((claim) => claim.length > 0);
 }
 
 export function decodeJwtPayload(token: string): JwtPayload | null {
@@ -149,11 +163,7 @@ export function createAuthStore(options: CreateAuthStoreOptions) {
     getPermissions(): string[] {
       const token = state.token || getStoredToken();
       const payload = decodeJwtPayload(token);
-      const claim = payload?.permissions;
-
-      if (!claim) return [];
-      if (Array.isArray(claim)) return claim;
-      return [claim];
+      return readStringClaims(payload?.permissions);
     },
 
     hasPermission(permission: string): boolean {
@@ -162,6 +172,35 @@ export function createAuthStore(options: CreateAuthStoreOptions) {
       const expected = permission.toLowerCase();
       return state.getPermissions().some((claimPermission: string) => {
         const normalized = claimPermission.toLowerCase();
+        return (
+          normalized === expected ||
+          (options.wildcardPermissions === true && normalized === "*")
+        );
+      });
+    },
+
+    getRoles(): string[] {
+      const token = state.token || getStoredToken();
+      const payload = decodeJwtPayload(token);
+      const roleClaims = [
+        ...readStringClaims(payload?.roles),
+        ...readStringClaims(payload?.role),
+        ...readStringClaims(
+          payload?.[
+            "http://schemas.microsoft.com/ws/2008/06/identity/claims/role"
+          ],
+        ),
+      ];
+
+      return [...new Set(roleClaims)];
+    },
+
+    hasRole(role: string): boolean {
+      const expected = readStringClaim(role);
+      if (!expected) return false;
+
+      return state.getRoles().some((claimRole: string) => {
+        const normalized = readStringClaim(claimRole);
         return (
           normalized === expected ||
           (options.wildcardPermissions === true && normalized === "*")

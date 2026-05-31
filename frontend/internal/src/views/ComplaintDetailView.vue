@@ -911,6 +911,7 @@ import { createAccessRequest, getMyAccessRequest } from "../api/accessRequests";
 import { getBookingCharges, type BookingCharge } from "../api/payments";
 import { formatDateTime, formatPrice } from "../utils/formatters";
 import { useToast } from "../composables/useToast";
+import { can } from "../accessControl";
 import { auth } from "../store/auth";
 import EntityLink from "../components/EntityLink.vue";
 import ChatPanel from "../components/ChatPanel.vue";
@@ -986,8 +987,8 @@ const showAccessRequestModal = ref(false);
 const accessRequestReason = ref("");
 const accessRequest = ref<AccessRequest | null>(null);
 const complaintAttachmentPreviewUrls = ref<Record<string, string>>({});
-const hasBookingView = computed(() => auth.hasPermission("Booking.View"));
-const hasPaymentView = computed(() => auth.hasPermission("Payment.View"));
+const hasBookingView = computed(() => can("Booking.View"));
+const hasPaymentView = computed(() => can("Payment.View"));
 const bookingCharges = ref<BookingCharge[]>([]);
 
 const chargeTypeLabels: Record<string, string> = {

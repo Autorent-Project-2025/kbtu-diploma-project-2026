@@ -1,4 +1,6 @@
 import { createRouter, createWebHistory } from "vue-router";
+import { createRouteAccessGuard } from "@shared/routeGuard";
+import { access, can } from "../accessControl";
 import { auth } from "../store/auth";
 
 const LoginView = () => import("../views/LoginView.vue");
@@ -34,7 +36,7 @@ const defaultRoutes: { path: string; permission: string }[] = [
 
 function resolveHome(): string {
   for (const r of defaultRoutes) {
-    if (auth.hasPermission(r.permission)) return r.path;
+    if (can(r.permission)) return r.path;
   }
   return "/login";
 }
@@ -145,29 +147,15 @@ const router = createRouter({
   ],
 });
 
-router.beforeEach((to, from, next) => {
-  const token = localStorage.getItem("token");
-  const requiredPermission = to.meta.requiredPermission as string | undefined;
-
-  if (token) {
-    const isValid = auth.checkTokenValidity();
-    if (!isValid && to.meta.requiresAuth) {
-      next("/login");
-      return;
-    }
-  }
-
-  if (to.meta.requiresAuth && !token) {
-    next("/login");
-    return;
-  }
-
-  if (requiredPermission && !auth.hasPermission(requiredPermission)) {
-    next(token ? resolveHome() : "/login");
-    return;
-  }
-
-  next();
-});
+router.beforeEach(
+  createRouteAccessGuard({
+    access,
+    auth,
+    loginPath: "/login",
+    getForbiddenRedirect({ isAuthenticated }) {
+      return isAuthenticated ? resolveHome() : "/login";
+    },
+  }),
+);
 
 export { router };

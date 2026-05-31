@@ -116,6 +116,7 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import { useRouter } from "vue-router";
+import { canAny } from "../accessControl";
 import { auth } from "../store/auth";
 import { useToast } from "../composables/useToast";
 
@@ -165,7 +166,7 @@ async function onSubmit() {
       "PartnerCar.View",
       "Booking.View",
     ];
-    if (!internalPermissions.some((p) => auth.hasPermission(p))) {
+    if (!canAny(internalPermissions)) {
       auth.logout();
       errorMessage.value = "Недостаточно прав для внутренней панели.";
       toast.error(errorMessage.value);

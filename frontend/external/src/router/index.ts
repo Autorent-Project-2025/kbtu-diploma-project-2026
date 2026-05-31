@@ -1,4 +1,6 @@
 import { createRouter, createWebHistory } from "vue-router";
+import { createRouteAccessGuard } from "@shared/routeGuard";
+import { access, requireActorType } from "../accessControl";
 import { auth } from "../store/auth";
 
 const HomeView = () => import("../views/HomeView.vue");
@@ -174,27 +176,20 @@ export const router = createRouter({
   },
 });
 
-router.beforeEach((to, from, next) => {
-  const token = auth.token || localStorage.getItem("token");
-  const isAuthenticated = token ? auth.checkTokenValidity() : false;
+router.beforeEach(
+  createRouteAccessGuard({
+    access,
+    auth,
+    loginPath: "/login",
+    getForbiddenRedirect({ to }) {
+      return typeof to.meta.actorType === "string" ? "/profile/user" : "/403";
+    },
+    getAllowedRedirect({ to }) {
+      if (to.path === "/profile/user" && requireActorType("partner")) {
+        return "/profile/partner";
+      }
 
-  if (to.meta.requiresAuth && !isAuthenticated) {
-    next("/login");
-    return;
-  }
-
-  const requiredActorType =
-    typeof to.meta.actorType === "string" ? to.meta.actorType : null;
-
-  if (requiredActorType && !auth.isActorType(requiredActorType)) {
-    next("/profile/user");
-    return;
-  }
-
-  if (to.path === "/profile/user" && auth.isActorType("partner")) {
-    next("/profile/partner");
-    return;
-  }
-
-  next();
-});
+      return null;
+    },
+  }),
+);

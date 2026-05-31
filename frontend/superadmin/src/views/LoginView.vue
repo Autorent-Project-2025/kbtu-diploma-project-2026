@@ -76,6 +76,7 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import { useRouter } from "vue-router";
+import { can } from "../accessControl";
 import { auth } from "../store/auth";
 import { useToast } from "../composables/useToast";
 
@@ -101,7 +102,7 @@ async function onSubmit() {
   errorMessage.value = "";
   try {
     await auth.login(email.value, password.value);
-    if (!auth.hasPermission("User.View")) {
+    if (!can("User.View")) {
       auth.logout();
       errorMessage.value = "Недостаточно прав для superadmin panel.";
       toast.error(errorMessage.value);

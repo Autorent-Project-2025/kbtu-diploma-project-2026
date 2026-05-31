@@ -67,6 +67,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import { can } from "./accessControl";
 import { auth } from "./store/auth";
 import ToastContainer from "./components/ToastContainer.vue";
 import GlobalSearch from "./components/GlobalSearch.vue";
@@ -149,7 +150,7 @@ const showWorkspace = computed(
   () => isAuthenticated.value && route.path !== "/login",
 );
 const visibleNav = computed(() =>
-  navLinks.filter((link) => auth.hasPermission(link.permission)),
+  navLinks.filter((link) => can(link.permission)),
 );
 
 function isActive(to: string): boolean {

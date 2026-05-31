@@ -756,7 +756,7 @@ import {
   type LedgerEntryDto,
   type PayoutDto,
 } from "../api/partners";
-import { auth } from "../store/auth";
+import { can } from "../accessControl";
 import { getPartnerCars, type PartnerCarDto } from "../api/cars";
 import { getAllComplaints } from "../api/complaints";
 import type { Complaint } from "../types/Complaint";
@@ -798,7 +798,7 @@ const activeTab = ref<"overview" | "cars" | "bookings" | "finance" | "documents"
 const statusLoading = ref(false);
 const showDeactivateModal = ref(false);
 const deactivateReason = ref("");
-const hasDeactivatePermission = computed(() => auth.hasPermission("Partner.Deactivate"));
+const hasDeactivatePermission = computed(() => can("Partner.Deactivate"));
 
 const financeLoaded = ref(false);
 const complaintsLoading = ref(false);

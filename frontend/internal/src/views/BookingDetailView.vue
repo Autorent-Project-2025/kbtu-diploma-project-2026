@@ -406,7 +406,7 @@ import {
 import { formatDate, formatDateTime, formatPrice, relativeTime } from "../utils/formatters";
 import { bookingStatusLabel, bookingStatusBadge, chargeStatusMap } from "../utils/statusMaps";
 import { useToast } from "../composables/useToast";
-import { auth } from "../store/auth";
+import { can } from "../accessControl";
 import EntityLink from "../components/EntityLink.vue";
 import ConfirmModal from "../components/ConfirmModal.vue";
 
@@ -432,7 +432,7 @@ const canCancel = computed(
   () =>
     !!booking.value?.status &&
     cancellableStatuses.has(booking.value.status) &&
-    auth.hasPermission("Booking.Update"),
+    can("Booking.Update"),
 );
 
 /** Human-readable duration: "3 ч 30 мин" */
