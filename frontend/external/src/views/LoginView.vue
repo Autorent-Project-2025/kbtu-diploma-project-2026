@@ -191,6 +191,15 @@ const password = ref("");
 const loading = ref(false);
 const { success, error } = useToast();
 
+function getLoginErrorMessage(err: unknown): string {
+  const status = (err as { response?: { status?: number } })?.response?.status;
+  if (status === 400 || status === 401) {
+    return "Неверный email или пароль.";
+  }
+
+  return "Не удалось войти. Попробуйте позже.";
+}
+
 async function onLogin() {
   if (loading.value) return;
 
@@ -200,7 +209,7 @@ async function onLogin() {
     success("Добро пожаловать!");
     await router.push(auth.isActorType("partner") ? "/profile/partner" : "/cars");
   } catch (err) {
-    error("Ошибка входа! Проверьте email и пароль.");
+    error(getLoginErrorMessage(err));
   } finally {
     loading.value = false;
   }

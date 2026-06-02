@@ -1,5 +1,7 @@
+import { normalizeApiBaseUrl } from "@shared/apiClient";
+
 const rawApiUrl = import.meta.env.VITE_API_URL || "http://localhost:9186";
-const normalizedApiUrl = rawApiUrl.replace(/\/+$/, "").replace(/\/api$/i, "");
+const normalizedApiUrl = normalizeApiBaseUrl(rawApiUrl);
 
 export const config = {
   api: {

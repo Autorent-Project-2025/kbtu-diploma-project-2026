@@ -1,28 +1,32 @@
 import { createRouter, createWebHistory } from "vue-router";
-import HomeView from "../views/HomeView.vue";
-import LoginView from "../views/LoginView.vue";
-import RegisterView from "../views/RegisterView.vue";
-import PartnerApplyView from "../views/PartnerApplyView.vue";
-import ActivateAccountView from "../views/ActivateAccountView.vue";
-import CarsView from "../views/CarsView.vue";
-import MyBookingsView from "../views/MyBookingsView.vue";
-import BookingDetailView from "../views/BookingDetailView.vue";
-import BookingPaymentView from "../views/BookingPaymentView.vue";
-import BookingCompletionView from "../views/BookingCompletionView.vue";
-import NotFoundView from "../views/NotFoundView.vue";
-import CarDetailView from "@/views/CarDetailView.vue";
-import PublicPartnerCarDetailView from "../views/PublicPartnerCarDetailView.vue";
-import PartnerProfileView from "../views/PartnerProfileView.vue";
-import PartnerCarsView from "../views/PartnerCarsView.vue";
-import PartnerCarDetailView from "../views/PartnerCarDetailView.vue";
-import PartnerBookingsView from "../views/PartnerBookingsView.vue";
-import ProfileView from "../views/ProfileView.vue";
-import ProfileRouterView from "../views/ProfileRouterView.vue";
-import ForbiddenView from "../views/ForbiddenView.vue";
+import { createRouteAccessGuard } from "@shared/routeGuard";
+import { access, requireActorType } from "../accessControl";
 import { auth } from "../store/auth";
-import AiView from "../views/AiView.vue";
-import MyComplaintsView from "../views/MyComplaintsView.vue";
-import ComplaintDetailView from "../views/ComplaintDetailView.vue";
+
+const HomeView = () => import("../views/HomeView.vue");
+const LoginView = () => import("../views/LoginView.vue");
+const RegisterView = () => import("../views/RegisterView.vue");
+const PartnerApplyView = () => import("../views/PartnerApplyView.vue");
+const ActivateAccountView = () => import("../views/ActivateAccountView.vue");
+const CarsView = () => import("../views/CarsView.vue");
+const MyBookingsView = () => import("../views/MyBookingsView.vue");
+const BookingDetailView = () => import("../views/BookingDetailView.vue");
+const BookingPaymentView = () => import("../views/BookingPaymentView.vue");
+const BookingCompletionView = () => import("../views/BookingCompletionView.vue");
+const NotFoundView = () => import("../views/NotFoundView.vue");
+const CarDetailView = () => import("@/views/CarDetailView.vue");
+const PublicPartnerCarDetailView = () =>
+  import("../views/PublicPartnerCarDetailView.vue");
+const PartnerProfileView = () => import("../views/PartnerProfileView.vue");
+const PartnerCarsView = () => import("../views/PartnerCarsView.vue");
+const PartnerCarDetailView = () => import("../views/PartnerCarDetailView.vue");
+const PartnerBookingsView = () => import("../views/PartnerBookingsView.vue");
+const ProfileView = () => import("../views/ProfileView.vue");
+const ProfileRouterView = () => import("../views/ProfileRouterView.vue");
+const ForbiddenView = () => import("../views/ForbiddenView.vue");
+const AiView = () => import("../views/AiView.vue");
+const MyComplaintsView = () => import("../views/MyComplaintsView.vue");
+const ComplaintDetailView = () => import("../views/ComplaintDetailView.vue");
 
 const routes = [
   {
@@ -172,27 +176,20 @@ export const router = createRouter({
   },
 });
 
-router.beforeEach((to, from, next) => {
-  const token = auth.token || localStorage.getItem("token");
-  const isAuthenticated = token ? auth.checkTokenValidity() : false;
+router.beforeEach(
+  createRouteAccessGuard({
+    access,
+    auth,
+    loginPath: "/login",
+    getForbiddenRedirect({ to }) {
+      return typeof to.meta.actorType === "string" ? "/profile/user" : "/403";
+    },
+    getAllowedRedirect({ to }) {
+      if (to.path === "/profile/user" && requireActorType("partner")) {
+        return "/profile/partner";
+      }
 
-  if (to.meta.requiresAuth && !isAuthenticated) {
-    next("/login");
-    return;
-  }
-
-  const requiredActorType =
-    typeof to.meta.actorType === "string" ? to.meta.actorType : null;
-
-  if (requiredActorType && !auth.isActorType(requiredActorType)) {
-    next("/profile/user");
-    return;
-  }
-
-  if (to.path === "/profile/user" && auth.isActorType("partner")) {
-    next("/profile/partner");
-    return;
-  }
-
-  next();
-});
+      return null;
+    },
+  }),
+);

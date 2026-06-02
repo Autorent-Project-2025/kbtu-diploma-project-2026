@@ -469,7 +469,7 @@ import {
   ticketStatusBadge,
 } from "../utils/statusMaps";
 import { useToast } from "../composables/useToast";
-import { auth } from "../store/auth";
+import { can } from "../accessControl";
 import EntityLink from "../components/EntityLink.vue";
 import ConfirmModal from "../components/ConfirmModal.vue";
 
@@ -498,8 +498,8 @@ const blockReason = ref("");
 
 // ── Permissions ─────────────────────────────────────────────────────────────
 
-const canUpdate = computed(() => auth.hasPermission("Client.Update"));
-const canBlock = computed(() => auth.hasPermission("Client.Block"));
+const canUpdate = computed(() => can("Client.Update"));
+const canBlock = computed(() => can("Client.Block"));
 
 // ── Edit form ───────────────────────────────────────────────────────────────
 

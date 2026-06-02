@@ -455,6 +455,7 @@ function shouldShowDateSeparator(idx: number): boolean {
   if (idx === 0) return true;
   const prev = messages.value[idx - 1];
   const curr = messages.value[idx];
+  if (!prev || !curr) return false;
   const prevDate = new Date(prev.createdAt).toDateString();
   const currDate = new Date(curr.createdAt).toDateString();
   return prevDate !== currDate;
@@ -464,6 +465,7 @@ function isSameSenderAsPrevious(idx: number): boolean {
   if (idx === 0) return false;
   const prev = messages.value[idx - 1];
   const curr = messages.value[idx];
+  if (!prev || !curr) return false;
   if (prev.messageType === "System" || curr.messageType === "System") return false;
   if (prev.senderUserId !== curr.senderUserId) return false;
   // Also break grouping if date separator is shown
@@ -660,9 +662,10 @@ async function send() {
 async function connectSignalR() {
   if (!conversation.value) return;
   try {
-    connection = createChatConnection();
+    const chatConnection = createChatConnection();
+    connection = chatConnection;
 
-    connection.on("NewMessage", (msg: ChatMessage) => {
+    chatConnection.on("NewMessage", (msg: ChatMessage) => {
       if (
         msg.conversationId === conversation.value?.id &&
         !messages.value.find((m) => m.id === msg.id)
@@ -673,20 +676,20 @@ async function connectSignalR() {
       }
     });
 
-    connection.on("ConversationClosed", () => {
+    chatConnection.on("ConversationClosed", () => {
       if (conversation.value) {
         conversation.value = { ...conversation.value, status: "Closed" };
       }
     });
 
-    connection.on("ConversationReopened", () => {
+    chatConnection.on("ConversationReopened", () => {
       if (conversation.value) {
         conversation.value = { ...conversation.value, status: "Open" };
         loadConversation();
       }
     });
 
-    connection.on("UserTyping", (data: { userId: string; isTyping: boolean }) => {
+    chatConnection.on("UserTyping", (data: { userId: string; isTyping: boolean }) => {
       if (data.userId === currentUserId.value) return;
       const existing = typingTimers.get(data.userId);
       if (existing) clearTimeout(existing);
@@ -705,8 +708,8 @@ async function connectSignalR() {
       }
     });
 
-    await connection.start();
-    await connection.invoke("JoinConversation", conversation.value.id);
+    await chatConnection.start();
+    await chatConnection.invoke("JoinConversation", conversation.value.id);
   } catch {
     startPolling();
   }

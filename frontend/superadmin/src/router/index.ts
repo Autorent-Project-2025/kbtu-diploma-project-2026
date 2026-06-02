@@ -1,7 +1,10 @@
 import { createRouter, createWebHistory } from "vue-router";
-import LoginView from "../views/LoginView.vue";
-import SuperadminUsersView from "../views/SuperadminUsersView.vue";
+import { createRouteAccessGuard } from "@shared/routeGuard";
+import { access } from "../accessControl";
 import { auth } from "../store/auth";
+
+const LoginView = () => import("../views/LoginView.vue");
+const SuperadminUsersView = () => import("../views/SuperadminUsersView.vue");
 
 const router = createRouter({
   history: createWebHistory(),
@@ -26,29 +29,15 @@ const router = createRouter({
   ],
 });
 
-router.beforeEach((to, from, next) => {
-  const token = localStorage.getItem("token");
-  const requiredPermission = to.meta.requiredPermission as string | undefined;
-
-  if (token) {
-    const isValid = auth.checkTokenValidity();
-    if (!isValid && to.meta.requiresAuth) {
-      next("/login");
-      return;
-    }
-  }
-
-  if (to.meta.requiresAuth && !token) {
-    next("/login");
-    return;
-  }
-
-  if (requiredPermission && !auth.hasPermission(requiredPermission)) {
-    next("/login");
-    return;
-  }
-
-  next();
-});
+router.beforeEach(
+  createRouteAccessGuard({
+    access,
+    auth,
+    loginPath: "/login",
+    getForbiddenRedirect() {
+      return "/login";
+    },
+  }),
+);
 
 export { router };

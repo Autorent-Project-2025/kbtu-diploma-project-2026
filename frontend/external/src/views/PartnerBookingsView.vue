@@ -96,36 +96,10 @@
       </div>
 
       <template v-else>
-        <section
-          class="rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-xl px-6 py-4"
-        >
-          <div class="flex items-center justify-between gap-4">
-            <div class="flex items-center gap-3">
-              <p class="text-sm font-semibold text-gray-500 dark:text-gray-400">
-                Период аналитики:
-              </p>
-              <span class="text-sm font-bold text-gray-900 dark:text-white"
-                >последние {{ selectedPeriod }} дней</span
-              >
-            </div>
-            <div class="flex gap-1.5">
-              <button
-                v-for="period in periodOptions"
-                :key="period"
-                type="button"
-                @click="selectedPeriod = period"
-                :class="[
-                  'px-3.5 py-1.5 rounded-xl text-sm font-bold transition-colors',
-                  selectedPeriod === period
-                    ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
-                    : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700',
-                ]"
-              >
-                {{ period }}д
-              </button>
-            </div>
-          </div>
-        </section>
+        <PartnerBookingsPeriodSelector
+          v-model:selected-period="selectedPeriod"
+          :period-options="periodOptions"
+        />
 
         <section class="grid sm:grid-cols-2 xl:grid-cols-4 gap-4">
           <article
@@ -378,350 +352,34 @@
           </article>
         </section>
 
-        <section
-          class="rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-xl p-6 space-y-6"
-        >
-          <div
-            class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4"
-          >
-            <div>
-              <p
-                class="text-sm uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400 font-bold"
-              >
-                Клиентские бронирования
-              </p>
-              <h2 class="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
-                Все брони по вашим машинам
-              </h2>
-              <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                Показаны бронирования, созданные за последние
-                {{ selectedPeriod }} дней.
-              </p>
-            </div>
-
-            <div class="flex flex-col sm:flex-row sm:items-center gap-3">
-              <button
-                type="button"
-                @click="exportFilteredBookingsCsv"
-                :disabled="filteredBookings.length === 0"
-                class="inline-flex items-center justify-center px-5 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed text-white font-semibold shadow-lg shadow-emerald-500/20"
-              >
-                Экспорт CSV
-              </button>
-
-              <div class="relative">
-                <button
-                  type="button"
-                  @click="statusDropdownOpen = !statusDropdownOpen"
-                  class="inline-flex items-center gap-3 px-5 py-3 rounded-2xl bg-gray-900 dark:bg-white text-white dark:text-gray-900 font-bold text-sm shadow-lg transition-colors min-w-[180px] justify-between"
-                >
-                  <span>
-                    {{
-                      statusFilters.find((f) => f.value === statusFilter)?.label
-                    }}
-                    <span class="ml-1 opacity-60">{{
-                      statusFilters.find((f) => f.value === statusFilter)?.count
-                    }}</span>
-                  </span>
-                  <svg
-                    class="w-4 h-4 transition-transform"
-                    :class="statusDropdownOpen ? 'rotate-180' : ''"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M19 9l-7 7-7-7"
-                    />
-                  </svg>
-                </button>
-
-                <Transition
-                  enter-active-class="transition ease-out duration-150"
-                  enter-from-class="opacity-0 translate-y-1 scale-95"
-                  enter-to-class="opacity-100 translate-y-0 scale-100"
-                  leave-active-class="transition ease-in duration-100"
-                  leave-from-class="opacity-100 translate-y-0 scale-100"
-                  leave-to-class="opacity-0 translate-y-1 scale-95"
-                >
-                  <div
-                    v-if="statusDropdownOpen"
-                    class="absolute right-0 mt-2 w-52 z-30 rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-2xl overflow-hidden"
-                  >
-                    <button
-                      v-for="filter in statusFilters"
-                      :key="filter.value"
-                      type="button"
-                      @click="
-                        statusFilter = filter.value;
-                        statusDropdownOpen = false;
-                      "
-                      :class="[
-                        'w-full flex items-center justify-between px-4 py-2.5 text-sm font-semibold transition-colors',
-                        statusFilter === filter.value
-                          ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
-                          : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800/60',
-                      ]"
-                    >
-                      <span>{{ filter.label }}</span>
-                      <span
-                        class="text-xs font-bold px-2 py-0.5 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300"
-                      >
-                        {{ filter.count }}
-                      </span>
-                    </button>
-                  </div>
-                </Transition>
-              </div>
-            </div>
-          </div>
-
-          <div
-            v-if="filteredBookings.length === 0"
-            class="rounded-2xl border border-dashed border-gray-300 dark:border-gray-700 p-10 text-center"
-          >
-            <div
-              class="w-12 h-12 rounded-2xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center mx-auto mb-3"
-            >
-              <svg
-                class="w-6 h-6 text-gray-400"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="1.5"
-                  d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-                />
-              </svg>
-            </div>
-            <p class="text-sm font-semibold text-gray-500 dark:text-gray-400">
-              Нет бронирований
-            </p>
-            <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">
-              Попробуйте изменить фильтр или период
-            </p>
-          </div>
-
-          <div v-else class="overflow-x-auto">
-            <table class="min-w-full text-sm">
-              <thead>
-                <tr
-                  class="text-left border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50"
-                >
-                  <th
-                    class="px-4 py-3 text-xs font-bold uppercase tracking-[0.12em] text-gray-500 dark:text-gray-400"
-                  >
-                    Бронь
-                  </th>
-                  <th
-                    class="px-4 py-3 text-xs font-bold uppercase tracking-[0.12em] text-gray-500 dark:text-gray-400"
-                  >
-                    Машина
-                  </th>
-                  <th
-                    class="px-4 py-3 text-xs font-bold uppercase tracking-[0.12em] text-gray-500 dark:text-gray-400"
-                  >
-                    Период
-                  </th>
-                  <th
-                    class="px-4 py-3 text-xs font-bold uppercase tracking-[0.12em] text-gray-500 dark:text-gray-400"
-                  >
-                    Сумма
-                  </th>
-                  <th
-                    class="px-4 py-3 text-xs font-bold uppercase tracking-[0.12em] text-gray-500 dark:text-gray-400"
-                  >
-                    Статус
-                  </th>
-                  <th
-                    class="px-4 py-3 text-xs font-bold uppercase tracking-[0.12em] text-gray-500 dark:text-gray-400 hidden lg:table-cell"
-                  >
-                    Создано
-                  </th>
-                  <th class="px-4 py-3"></th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr
-                  v-for="booking in filteredBookings"
-                  :key="booking.id"
-                  class="border-b border-gray-100 dark:border-gray-800/80"
-                >
-                  <td class="px-4 py-4 align-top">
-                    <p class="font-bold text-gray-900 dark:text-white">
-                      #{{ booking.id }}
-                    </p>
-                    <p class="text-xs text-gray-500 dark:text-gray-400">
-                      carId: {{ booking.partnerCarId }}
-                    </p>
-                  </td>
-                  <td class="px-4 py-4 align-top">
-                    <p class="font-semibold text-gray-900 dark:text-white">
-                      {{ resolveCarName(booking) }}
-                    </p>
-                    <p class="text-xs text-gray-500 dark:text-gray-400">
-                      {{ resolveLicensePlate(booking) }}
-                    </p>
-                  </td>
-                  <td class="px-4 py-4 align-top">
-                    <p class="font-medium text-gray-900 dark:text-white">
-                      {{ formatDateTime(booking.startTime) }}
-                    </p>
-                    <p class="text-xs text-gray-500 dark:text-gray-400">
-                      до {{ formatDateTime(booking.endTime) }}
-                    </p>
-                  </td>
-                  <td class="px-4 py-4 align-top">
-                    <p class="font-bold text-gray-900 dark:text-white">
-                      {{ formatMoney(booking.totalPrice ?? 0) }}
-                    </p>
-                    <p class="text-xs text-gray-500 dark:text-gray-400">
-                      {{
-                        booking.priceHour != null
-                          ? `${formatMoney(booking.priceHour)}/час`
-                          : "Ставка не указана"
-                      }}
-                    </p>
-                  </td>
-                  <td class="px-4 py-4 align-top">
-                    <div class="flex flex-col items-start gap-2">
-                      <span
-                        :class="getBookingStatusClass(booking.status)"
-                        class="inline-flex px-3 py-1 rounded-full text-xs font-bold uppercase tracking-[0.12em]"
-                      >
-                        {{ getBookingStatusLabel(booking.status) }}
-                      </span>
-                      <span
-                        v-if="hasPendingPartnerCancellation(booking)"
-                        class="inline-flex px-3 py-1 rounded-full text-[11px] font-bold tracking-[0.08em] bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300"
-                      >
-                        Запрос на отмену отправлен
-                      </span>
-                    </div>
-                  </td>
-                  <td class="px-4 py-4 align-top hidden lg:table-cell">
-                    <p class="font-medium text-gray-900 dark:text-white">
-                      {{ formatDateTime(booking.createdAt) }}
-                    </p>
-                  </td>
-                  <td class="px-4 py-4 align-top">
-                    <button
-                      v-if="
-                        (booking.status === 'pending' ||
-                          booking.status === 'confirmed') &&
-                        !hasPendingPartnerCancellation(booking)
-                      "
-                      @click="openPartnerCancelModal(booking)"
-                      :disabled="cancelingId === booking.id"
-                      class="px-3 py-1.5 rounded-xl border border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 text-xs font-bold hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50 transition-colors"
-                    >
-                      {{
-                        cancelingId === booking.id
-                          ? "Отправка..."
-                          : "Запросить отмену"
-                      }}
-                    </button>
-                    <p
-                      v-else-if="hasPendingPartnerCancellation(booking)"
-                      class="text-xs text-amber-700 dark:text-amber-300 leading-5 max-w-[180px]"
-                    >
-                      На рассмотрении менеджера
-                      <span v-if="booking.partnerCancellationRequestedAt">
-                        с {{ formatDateTime(booking.partnerCancellationRequestedAt) }}
-                      </span>
-                    </p>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </section>
+        <PartnerBookingsTable
+          :bookings="filteredBookings"
+          :selected-period="selectedPeriod"
+          v-model:status-filter="statusFilter"
+          :status-filters="statusFilters"
+          :canceling-id="cancelingId"
+          :format-money="formatMoney"
+          :format-date-time="formatDateTime"
+          :get-booking-status-label="getBookingStatusLabel"
+          :get-booking-status-class="getBookingStatusClass"
+          :has-pending-partner-cancellation="hasPendingPartnerCancellation"
+          :resolve-car-name="resolveCarName"
+          :resolve-license-plate="resolveLicensePlate"
+          @export-csv="exportFilteredBookingsCsv"
+          @request-cancel="openPartnerCancelModal"
+        />
       </template>
 
-      <Teleport to="body">
-        <Transition
-          enter-active-class="transition duration-200"
-          enter-from-class="opacity-0"
-          enter-to-class="opacity-100"
-          leave-active-class="transition duration-150"
-          leave-from-class="opacity-100"
-          leave-to-class="opacity-0"
-        >
-          <div
-            v-if="showCancelModal"
-            class="fixed inset-0 z-50 flex items-center justify-center bg-black/45 backdrop-blur-sm px-4"
-            @click.self="closePartnerCancelModal()"
-          >
-            <div class="w-full max-w-lg rounded-3xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-2xl p-6 space-y-5">
-              <div>
-                <p class="text-xs font-bold uppercase tracking-[0.22em] text-red-600 dark:text-red-400">
-                  Partner Cancellation Review
-                </p>
-                <h3 class="mt-2 text-2xl font-extrabold text-gray-900 dark:text-white">
-                  Запрос на отмену бронирования
-                </h3>
-                <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                  Заявка уйдет менеджеру на проверку. Бронирование не отменится мгновенно.
-                </p>
-              </div>
-
-              <div
-                v-if="cancelBookingDraft"
-                class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-950 p-4"
-              >
-                <p class="text-sm font-bold text-gray-900 dark:text-white">
-                  {{ resolveCarName(cancelBookingDraft) }}
-                </p>
-                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  Бронь #{{ cancelBookingDraft.id }} ·
-                  {{ formatDateTime(cancelBookingDraft.startTime) }} -
-                  {{ formatDateTime(cancelBookingDraft.endTime) }}
-                </p>
-              </div>
-
-              <div class="space-y-2">
-                <label
-                  for="partnerCancelReason"
-                  class="block text-xs font-bold uppercase tracking-[0.14em] text-gray-500 dark:text-gray-400"
-                >
-                  Причина отмены
-                </label>
-                <textarea
-                  id="partnerCancelReason"
-                  v-model="cancelReason"
-                  placeholder="Опишите, почему это бронирование нужно отменить"
-                  class="w-full min-h-[140px] rounded-2xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-3 text-sm text-gray-900 dark:text-white resize-y focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-colors placeholder-gray-400"
-                />
-              </div>
-
-              <div class="flex flex-col sm:flex-row gap-3 sm:justify-end">
-                <button
-                  type="button"
-                  @click="closePartnerCancelModal()"
-                  :disabled="cancelingId !== null"
-                  class="px-4 py-2.5 rounded-2xl border border-gray-300 dark:border-gray-700 text-sm font-semibold text-gray-700 dark:text-gray-300 hover:border-gray-400 transition-colors disabled:opacity-60"
-                >
-                  Закрыть
-                </button>
-                <button
-                  type="button"
-                  @click="submitPartnerCancelRequest"
-                  :disabled="cancelingId !== null"
-                  class="px-4 py-2.5 rounded-2xl bg-red-600 hover:bg-red-700 text-sm font-bold text-white transition-colors disabled:opacity-60"
-                >
-                  {{ cancelingId !== null ? "Отправка..." : "Отправить на проверку" }}
-                </button>
-              </div>
-            </div>
-          </div>
-        </Transition>
-      </Teleport>
+      <PartnerCancelBookingModal
+        :open="showCancelModal"
+        :booking="cancelBookingDraft"
+        v-model:reason="cancelReason"
+        :submitting="cancelingId !== null"
+        :resolve-car-name="resolveCarName"
+        :format-date-time="formatDateTime"
+        @close="closePartnerCancelModal"
+        @submit="submitPartnerCancelRequest"
+      />
     </div>
   </div>
 </template>
@@ -744,6 +402,9 @@ import type {
   PartnerLedgerEntry,
   PartnerWallet,
 } from "../types/Partner";
+import PartnerBookingsPeriodSelector from "../components/partner/PartnerBookingsPeriodSelector.vue";
+import PartnerBookingsTable from "../components/partner/PartnerBookingsTable.vue";
+import PartnerCancelBookingModal from "../components/partner/PartnerCancelBookingModal.vue";
 
 type BookingFilter = "all" | BookingStatus;
 type AnalyticsPeriod = 7 | 14 | 30;
@@ -772,7 +433,6 @@ const bookings = ref<PartnerBooking[]>([]);
 const cars = ref<PartnerCarSummary[]>([]);
 const selectedPeriod = ref<AnalyticsPeriod>(14);
 const statusFilter = ref<BookingFilter>("all");
-const statusDropdownOpen = ref(false);
 
 const bookingsInSelectedPeriod = computed(() => {
   const periodStart = buildPeriodStartDate(selectedPeriod.value);

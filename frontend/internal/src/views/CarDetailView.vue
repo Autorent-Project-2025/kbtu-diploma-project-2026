@@ -502,7 +502,7 @@ import {
 } from "../utils/statusMaps";
 import { getSemanticTagLabel } from "../utils/partnerCarSemanticTags";
 import { useToast } from "../composables/useToast";
-import { auth } from "../store/auth";
+import { can } from "../accessControl";
 import EntityLink from "../components/EntityLink.vue";
 import ConfirmModal from "../components/ConfirmModal.vue";
 
@@ -532,8 +532,8 @@ const deleting = ref(false);
 const showDeleteModal = ref(false);
 
 // ── Permissions ────────────────────────────────────────────────────────
-const canUpdate = computed(() => auth.hasPermission("PartnerCar.Update"));
-const canDelete = computed(() => auth.hasPermission("PartnerCar.Delete"));
+const canUpdate = computed(() => can("PartnerCar.Update"));
+const canDelete = computed(() => can("PartnerCar.Delete"));
 
 // ── Edit form ──────────────────────────────────────────────────────────
 const statusOptions = [
