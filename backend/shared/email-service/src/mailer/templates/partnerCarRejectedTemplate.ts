@@ -1,4 +1,10 @@
 import { escapeHtml } from "./escapeHtml.ts";
+import {
+  renderCallout,
+  renderDetailTable,
+  renderEmailLayout,
+  renderParagraph,
+} from "./layout.ts";
 import type { MailTemplate } from "./types.ts";
 
 type PartnerCarRejectedTemplateParams = {
@@ -19,17 +25,21 @@ export function partnerCarRejectedTemplate(params: PartnerCarRejectedTemplatePar
     (params.reason ? `Причина: ${params.reason}\n` : "") +
     `\nВы можете отправить заявку повторно.`;
 
-  const html = `
-    <div style="font-family: Arial, sans-serif; line-height: 1.5">
-      <h2>Заявка на машину отклонена</h2>
-      <p>Здравствуйте, <b>${escapeHtml(params.fullName)}</b>!</p>
-      <p>К сожалению, заявка на добавление машины отклонена.</p>
-      <p><b>Машина:</b> ${escapeHtml(params.carBrand)} ${escapeHtml(params.carModel)}</p>
-      <p><b>Гос номер:</b> ${escapeHtml(params.licensePlate)}</p>
-      ${params.reason ? `<p><b>Причина:</b> ${escapeHtml(params.reason)}</p>` : ""}
-      <p>Вы можете отправить заявку повторно.</p>
-    </div>
-  `;
+  const html = renderEmailLayout({
+    title: "Заявка на машину отклонена",
+    preheader: "К сожалению, заявка на добавление машины отклонена.",
+    eyebrow: "Статус автомобиля",
+    tone: "danger",
+    bodyHtml:
+      renderParagraph(`Здравствуйте, <strong>${escapeHtml(params.fullName)}</strong>!`) +
+      renderParagraph("К сожалению, заявка на добавление машины отклонена.") +
+      renderDetailTable([
+        { label: "Машина", value: `${params.carBrand} ${params.carModel}` },
+        { label: "Гос номер", value: params.licensePlate },
+      ]) +
+      (params.reason ? renderCallout("Причина", params.reason, "danger") : "") +
+      renderParagraph("Вы можете исправить данные и отправить заявку повторно."),
+  });
 
   return { subject, text, html };
 }

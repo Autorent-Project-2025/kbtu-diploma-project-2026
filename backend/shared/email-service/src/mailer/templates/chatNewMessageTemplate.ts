@@ -1,4 +1,10 @@
 import { escapeHtml } from "./escapeHtml.ts";
+import {
+  renderCallout,
+  renderEmailLayout,
+  renderParagraph,
+  renderQuote,
+} from "./layout.ts";
 import type { MailTemplate } from "./types.ts";
 
 type ChatNewMessageTemplateParams = {
@@ -21,18 +27,17 @@ export function chatNewMessageTemplate(params: ChatNewMessageTemplateParams): Ma
     `"${messagePreview}"\n\n` +
     `Откройте платформу для просмотра и ответа.`;
 
-  const html = `
-    <div style="font-family: Arial, sans-serif; line-height: 1.5">
-      <h2>Новое сообщение</h2>
-      <p>Здравствуйте, <b>${escapeHtml(recipientName)}</b>!</p>
-      <p>У вас новое сообщение от <b>${escapeHtml(senderName)}</b>:</p>
-      <blockquote style="border-left:3px solid #ddd;padding-left:12px;color:#555;margin:12px 0;">
-        ${escapeHtml(messagePreview)}
-      </blockquote>
-      <p>Откройте платформу для просмотра и ответа.</p>
-      <p style="color:#666;font-size:12px">Если это письмо пришло по ошибке — проигнорируйте его.</p>
-    </div>
-  `;
+  const html = renderEmailLayout({
+    title: "Новое сообщение",
+    preheader: `Новое сообщение от ${senderName} по ${contextLabel} #${contextId.slice(0, 8)}.`,
+    eyebrow: "Сообщение в чате",
+    tone: "info",
+    bodyHtml:
+      renderParagraph(`Здравствуйте, <strong>${escapeHtml(recipientName)}</strong>!`) +
+      renderParagraph(`У вас новое сообщение от <strong>${escapeHtml(senderName)}</strong>:`) +
+      renderQuote(messagePreview) +
+      renderCallout("Действие", "Откройте платформу для просмотра и ответа.", "info"),
+  });
 
   return { subject, text, html };
 }

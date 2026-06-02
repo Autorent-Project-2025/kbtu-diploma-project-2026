@@ -1,4 +1,10 @@
 import { escapeHtml } from "./escapeHtml.ts";
+import {
+  renderCallout,
+  renderDetailTable,
+  renderEmailLayout,
+  renderParagraph,
+} from "./layout.ts";
 import type { MailTemplate } from "./types.ts";
 
 type PartnerCarApprovedTemplateParams = {
@@ -17,16 +23,20 @@ export function partnerCarApprovedTemplate(params: PartnerCarApprovedTemplatePar
     `Гос номер: ${params.licensePlate}\n\n` +
     `Автомобиль уже добавлен в ваш партнерский кабинет.`;
 
-  const html = `
-    <div style="font-family: Arial, sans-serif; line-height: 1.5">
-      <h2>Заявка на машину одобрена</h2>
-      <p>Здравствуйте, <b>${escapeHtml(params.fullName)}</b>!</p>
-      <p>Ваша заявка на добавление машины одобрена.</p>
-      <p><b>Машина:</b> ${escapeHtml(params.carBrand)} ${escapeHtml(params.carModel)}</p>
-      <p><b>Гос номер:</b> ${escapeHtml(params.licensePlate)}</p>
-      <p>Автомобиль уже добавлен в ваш партнерский кабинет.</p>
-    </div>
-  `;
+  const html = renderEmailLayout({
+    title: "Заявка на машину одобрена",
+    preheader: "Автомобиль добавлен в ваш партнерский кабинет.",
+    eyebrow: "Автомобиль одобрен",
+    tone: "success",
+    bodyHtml:
+      renderParagraph(`Здравствуйте, <strong>${escapeHtml(params.fullName)}</strong>!`) +
+      renderParagraph("Ваша заявка на добавление машины одобрена.") +
+      renderDetailTable([
+        { label: "Машина", value: `${params.carBrand} ${params.carModel}` },
+        { label: "Гос номер", value: params.licensePlate },
+      ]) +
+      renderCallout("Готово", "Автомобиль уже добавлен в ваш партнерский кабинет.", "success"),
+  });
 
   return { subject, text, html };
 }
