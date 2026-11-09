@@ -1,0 +1,100 @@
+# Production override for a single VM (e.g. Oracle Cloud Always Free ARM).
+#
+# Usage (normally via deploy/deploy.sh):
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# What it changes compared to the dev compose:
+#   - Caddy terminates HTTPS (Let's Encrypt) on 80/443 and proxies to api-gateway.
+#   - No other ports are published on the host (DBs, RabbitMQ UI, gateway, Redis).
+#   - Frontends are not run here: they are deployed to Vercel.
+#   - Observability stack is disabled to save RAM/disk.
+#   - CORS / public URLs point to the real Vercel and API domains from .env.
+
+x-cors: &cors
+  Cors__AllowedOrigins__0: ${EXTERNAL_FRONTEND_URL:?set EXTERNAL_FRONTEND_URL in .env}
+  Cors__AllowedOrigins__1: ${INTERNAL_FRONTEND_URL:?set INTERNAL_FRONTEND_URL in .env}
+  Cors__AllowedOrigins__2: ${SUPERADMIN_FRONTEND_URL:?set SUPERADMIN_FRONTEND_URL in .env}
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      API_DOMAIN: ${API_DOMAIN:?set API_DOMAIN in .env}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+    networks:
+      - frontend
+
+  api-gateway:
+    ports: !reset []
+    environment:
+      ALLOWED_ORIGINS: ${EXTERNAL_FRONTEND_URL},${INTERNAL_FRONTEND_URL},${SUPERADMIN_FRONTEND_URL}
+      TLS_ENABLED: "false"
+      HTTP_TO_HTTPS_REDIRECT: "false"
+
+  identity-service:
+    environment: *cors
+  chat-service:
+    environment: *cors
+  car-service:
+    environment: *cors
+  booking-service:
+    environment: *cors
+  client-service:
+    environment: *cors
+  partner-service:
+    environment: *cors
+  payment-service:
+    environment: *cors
+  ticket-service:
+    environment:
+      <<: *cors
+      Activation__SetPasswordBaseUrl: ${EXTERNAL_FRONTEND_URL}/activate
+
+  ai-search-service:
+    environment:
+      API_GATEWAY_PUBLIC_BASE_URL: https://${API_DOMAIN}
+
+  # Do not expose internal infrastructure on the host.
+  rabbitmq:
+    ports: !reset []
+  ai-search-db:
+    ports: !reset []
+  ai-search-redis:
+    ports: !reset []
+
+  # Frontends live on Vercel.
+  frontend:
+    profiles: ["disabled"]
+  internal-frontend:
+    profiles: ["disabled"]
+  superadmin-frontend:
+    profiles: ["disabled"]
+
+  # Observability is optional; enable with: --profile observability
+  prometheus:
+    profiles: ["observability"]
+  otel-collector:
+    profiles: ["observability"]
+  tempo:
+    profiles: ["observability"]
+  loki:
+    profiles: ["observability"]
+  promtail:
+    profiles: ["observability"]
+  grafana:
+    profiles: ["observability"]
+
+volumes:
+  caddy_data:
+  caddy_config:
