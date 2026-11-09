@@ -1,0 +1,7 @@
+{$API_DOMAIN} {
+	encode zstd gzip
+
+	reverse_proxy api-gateway:8080 {
+		header_up X-Forwarded-Proto {scheme}
+	}
+}
